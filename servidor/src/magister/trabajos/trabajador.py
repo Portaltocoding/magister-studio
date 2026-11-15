@@ -46,10 +46,18 @@ async def ejecutar_uno(quien: str) -> bool:
 
     latidos = asyncio.create_task(latir())
     try:
-        if t.tipo != "material":
+        from magister.cerebro.modelo import traza_actual
+
+        traza_actual.set(t.traza_id or f"trabajo-{t.id}")
+        if t.tipo == "juez_online":
+            from magister.observar.juez_online import juzgar
+
+            await juzgar(t.parametros)
+        elif t.tipo == "material":
+            await ejecutar(t.id, t.plan_id, t.leccion_clave, t.parametros.get("tipos", ["apuntes"]))
+        else:
             await cola.terminar(t.id, "fallido", f"tipo de trabajo desconocido: {t.tipo}")
             return True
-        await ejecutar(t.id, t.plan_id, t.leccion_clave, t.parametros.get("tipos", ["apuntes"]))
         if not await cola.cancelado(t.id):
             await cola.terminar(t.id, "hecho")
     except Cancelado:

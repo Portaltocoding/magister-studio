@@ -58,6 +58,16 @@ class Ajustes(BaseSettings):
     trabajos_intentos: int = 5
     duracion_guion_min: int = 8
 
+    # Producción (Parte VI)
+    plazo_primer_token_s: int = 60  # sin primer trozo en este plazo, se corta (y se reintenta si toca)
+    canario: str = ""  # cadena secreta que nunca debe salir en una respuesta; se genera al instalar
+    juez_muestra: float = 0.5  # fracción de explicaciones que pasa el juez online
+    entorno: str = "produccion"  # produccion, desarrollo o evals
+    permitir_atacante_local: bool = False  # solo para la suite de ataques
+    buscador: str = "hibrido"  # hibrido o falso (mesa de ataque)
+    dir_secretos: str = "/run/secrets"
+    servir_web: bool = True  # la API sirve web/dist si existe: http://localhost:8000
+
     # Aprender (Parte V)
     programador: str = "fsrs"  # leitner, fsrs o modelo (ADR-0013)
     retencion: float = 0.9
@@ -74,3 +84,17 @@ class Ajustes(BaseSettings):
 
 
 ajustes = Ajustes()
+
+
+def leer_secretos(a: Ajustes) -> None:
+    """En Docker, los secretos llegan como ficheros en MAGISTER_DIR_SECRETOS (/run/secrets)."""
+    carpeta = Path(a.dir_secretos)
+    if not carpeta.is_dir():
+        return
+    for nombre, campo in (("canario", "canario"), ("magister_token", "token")):
+        f = carpeta / nombre
+        if f.is_file() and not getattr(a, campo):
+            setattr(a, campo, f.read_text(encoding="utf-8").strip())
+
+
+leer_secretos(ajustes)

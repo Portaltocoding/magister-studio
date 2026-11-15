@@ -14,6 +14,7 @@ export type IdModo =
   | 'progreso'
   | 'construccion'
   | 'etiquetar'
+  | 'triaje'
   | 'hablar'
 
 export interface Modo {
@@ -34,6 +35,7 @@ export const MODOS: Modo[] = [
   { id: 'repaso', nombre: 'Repaso', encendido: true },
   { id: 'progreso', nombre: 'Progreso', encendido: true },
   { id: 'etiquetar', nombre: 'Etiquetar tono', encendido: true },
+  { id: 'triaje', nombre: 'Triaje del banco', encendido: true },
   { id: 'construccion', nombre: 'Construcción', encendido: false },
   { id: 'hablar', nombre: 'Hablar', encendido: false },
 ]

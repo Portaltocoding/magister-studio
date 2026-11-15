@@ -33,7 +33,7 @@ async def _juzgar(texto: str, concepto: dict) -> dict:
                                                   apuntes=texto)
     async with semaforo:
         try:
-            j = await estructurar(sistema, "Devuelve el juicio.", JuicioCompletitud, reintentos=1)
+            j = await estructurar(sistema, "Devuelve el juicio.", JuicioCompletitud, reintentos=1, cachear=True)
         except ErrorEstructura as e:
             return {"explicado": None, "cita_valida": False, "fallo_juez": str(e)}
     if _plano(j.cita) not in _plano(texto):

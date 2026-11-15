@@ -14,6 +14,7 @@ from magister.api.rutas_fuentes import rutas as rutas_fuentes
 from magister.api.rutas_material import rutas as rutas_material
 from magister.api.rutas_practica import rutas as rutas_practica
 from magister.api.rutas_tutor import rutas as rutas_tutor
+from magister.api.rutas_produccion import rutas as rutas_produccion
 from magister.api.rutas_research import rutas as rutas_research
 from magister.api.rutas_plan import rutas as rutas_plan
 from magister.api.seguridad import Proteccion
@@ -23,7 +24,7 @@ from magister.datos import sesion
 from magister.datos.sesion import sesion_por_peticion
 from magister.flujo.grafo import iniciar as iniciar_grafo
 
-VERSION_CONTRATO = "0.5"
+VERSION_CONTRATO = "1.0"
 
 registro = logging.getLogger("uvicorn.error")
 
@@ -47,6 +48,14 @@ async def ciclo_de_vida(_: FastAPI):
     async def al_quedar_listas(ids: list[int]) -> None:
         await recalcular_apoyo_por_versiones(buscador, ids)
 
+    from magister.cerebro.enrutador import comprobar_al_arrancar
+    from magister.observar import alertas, registro as observar
+    from magister.api.instalacion import preparar_instalacion
+
+    comprobar_al_arrancar()
+    observar.instalar()
+    await preparar_instalacion()
+    vigia = asyncio.create_task(alertas.bucle())
     fondo = asyncio.create_task(bucle_de_fondo(al_quedar_listas)) if ajustes.procesar_fondo else None
     from magister.trabajos.trabajador import bucle as bucle_trabajos
 
@@ -55,7 +64,7 @@ async def ciclo_de_vida(_: FastAPI):
     async with AsyncSqliteSaver.from_conn_string(ajustes.checkpoints) as saver:
         iniciar_grafo(saver, buscador)
         yield
-    for tarea in (fondo, trabajador):
+    for tarea in (fondo, trabajador, vigia):
         if tarea is not None:
             tarea.cancel()
     iniciar_grafo(None)
@@ -72,7 +81,13 @@ app.add_middleware(Proteccion)
 @app.middleware("http")
 async def poner_sobre(request: Request, call_next):
     id_peticion = request.headers.get("X-Request-Id") or uuid.uuid4().hex
+    from magister.cerebro.modelo import traza_actual
+
+    traza_actual.set(id_peticion)
     respuesta = await call_next(request)
+    respuesta.headers["Content-Security-Policy"] = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+                                                     "frame-ancestors 'none'")
+    respuesta.headers["X-Content-Type-Options"] = "nosniff"
     respuesta.headers["X-Magister-Version"] = VERSION_CONTRATO
     respuesta.headers["X-Request-Id"] = id_peticion
     return respuesta
@@ -105,3 +120,11 @@ app.include_router(rutas_research)
 app.include_router(rutas_material)
 app.include_router(rutas_practica)
 app.include_router(rutas_tutor)
+app.include_router(rutas_produccion)
+
+# La API sirve también la página (web/dist) si está construida: un solo puerto, http://localhost:8000.
+_dist = __import__("pathlib").Path(__file__).resolve().parents[4] / "web" / "dist"
+if ajustes.servir_web and _dist.exists():
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/", StaticFiles(directory=_dist, html=True), name="web")

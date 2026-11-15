@@ -84,9 +84,14 @@ def hacer_recuperar(buscador: Buscador):
 
 
 def _bloque(recuperados: list[dict]) -> str:
-    return "\n\n".join(
-        f'<fragmento id="{x["id"]}" fuente="{x["titulo"]} ({x["tipo"]})">\n{x["texto"]}\n</fragmento>' for x in recuperados
-    )
+    from magister.seguridad.entrada import AVISO, marcar_externo
+
+    partes = []
+    for x in recuperados:
+        texto = marcar_externo(x["texto"], x["id"], "web") if x["tipo"] == "web" else x["texto"]
+        partes.append(f'<fragmento id="{x["id"]}" fuente="{x["titulo"]} ({x["tipo"]})">\n{texto}\n</fragmento>')
+    aviso = AVISO + "\n\n" if any(x["tipo"] == "web" for x in recuperados) else ""
+    return aviso + "\n\n".join(partes)
 
 
 async def responder(estado: Estado) -> dict:

@@ -46,3 +46,13 @@ Este repo es la herramienta construida siguiendo el libro de punta a punta, para
 | V | Experimento de programadores | Columna `brazo` creada y respetada al programar, pero sin asignación automática ni sondas | El ADR del experimento lo escribes tú antes de lanzarlo |
 | V | Modo Tutor | Tarjeta «Hoy» y sesión idea a idea con comprobación por bloque, saltar y marcar, y cierre | Está en `docs/tutor.md` y en el plan maestro, aún no como práctica del libro |
 | V | Reajuste | La carga de repasos se reserva como media por día de la semana | `calendarizar` trabaja con disponibilidad semanal |
+| VI | Langfuse | Opcional; todo se guarda en `llamadas` y `puntuaciones` (ADR-0014) | Sin tres servicios más para una persona |
+| VI | Enrutador | `config/modelos.yaml`: Haiku para extraer, reescribir y los jueces; `MAGISTER_MODELO` para lo demás | Ahorra cuota donde la calidad no se resiente |
+| VI | Ollama y Gemini | No se montan los motores (el enrutador y la guarda de datos personales sí) | Ni Ollama instalado ni clave de Gemini; `afinar/ollama.py` deja listos los experimentos |
+| VI | Juez online | Solo tono (fidelidad pendiente) sobre el 50 % de las explicaciones | La fidelidad necesita los fragmentos de cada traza guardados aparte |
+| VI | Inicio de sesión | No se monta (argon2 y cookie) | Instalación de una persona en 127.0.0.1 |
+| VI | La API sirve la web | `web/dist` en `http://localhost:8000` | Un solo proceso para el uso diario |
+| VI | PDF en Docker | Pendiente: el motor lanza el Chrome de Windows | ADR-0016 |
+| VI | Garak, Playwright y el incidente provocado | Pendientes | Herramientas externas; el libro las deja como ampliación o práctica tuya |
+| VI | Design doc | Borrador en `docs/design-doc.md` | El libro pide que lo escribas tú |
+| VI | Pares de preferencia para afinar | Pendientes | El generador solo guarda la versión aceptada de cada bloque |

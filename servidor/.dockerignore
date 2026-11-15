@@ -1,0 +1,12 @@
+.env
+.env.compose
+secretos/
+.venv
+node_modules
+copias/
+crudo/
+salidas/
+checkpoints.sqlite*
+evals/resultados/
+evals/olvido/
+__pycache__

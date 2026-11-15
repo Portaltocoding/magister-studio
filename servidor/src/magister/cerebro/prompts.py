@@ -42,9 +42,26 @@ class Plantilla:
 
 
 @cache
-def cargar(nombre: str) -> Plantilla:
+def _del_fichero(nombre: str) -> Plantilla:
     if not re.fullmatch(r"[a-z_]+", nombre):
         raise ErrorPlantilla(f"nombre de plantilla no válido: {nombre}")
     ruta = CARPETA / f"{nombre}.md"
     crudo = ruta.read_bytes()
     return Plantilla(nombre, hashlib.sha256(crudo).hexdigest()[:12], crudo.decode("utf-8").strip())
+
+
+# Versiones activas (Parte VI, «Vuelta atrás de un prompt»): `sincronizar()` las carga de la
+# base al arrancar la API. Sin ellas, manda el fichero.
+ACTIVAS: dict[str, Plantilla] = {}
+
+
+def cargar(nombre: str) -> Plantilla:
+    from magister.cerebro.modelo import prompt_actual
+
+    p = ACTIVAS.get(nombre) or _del_fichero(nombre)
+    prompt_actual.set((p.nombre, p.version))
+    return p
+
+
+def ficheros() -> list[Plantilla]:
+    return [_del_fichero(f.stem) for f in sorted(CARPETA.glob("*.md"))]

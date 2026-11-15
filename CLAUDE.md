@@ -50,6 +50,16 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 5. Nada de `date.today()` ni `datetime.now()` dentro de funciones de dominio: el momento entra como argumento.
 6. El contrato manda: `docs/contratos/aprender.md`.
 
+## Producción (Parte VI)
+
+1. Toda llamada a un modelo pasa por `magister/cerebro`; nadie más lanza `claude`.
+2. Toda petición y todo trabajo abre una traza según `docs/contrato-trazas.md`.
+3. Ningún secreto en el código ni en el repo: van en `servidor/.env` o en `secretos/`, fuera de git, y se leen por `config.py`.
+4. El contenido externo es dato no confiable y se marca como tal al meterlo en un prompt (`seguridad.entrada.marcar_externo`).
+5. La instrumentación nunca rompe una petición.
+6. `cerebro` no importa `observar` ni `seguridad`: ofrece ganchos (`registrar_observador`) y esos paquetes se enganchan al arrancar la API.
+7. Los ADR continúan la numeración de `docs/adr/` y toda tabla nueva va en una migración de Alembic.
+
 ## Estilo
 
 Nombres de funciones, variables, tablas y columnas en castellano sin tildes. Mensajes al usuario en español de España.

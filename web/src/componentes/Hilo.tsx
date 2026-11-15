@@ -3,6 +3,7 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { CitaInfo } from '../api.ts'
 import { conMarcas, PanelCita } from '../Cita.tsx'
+import Valorar from './Valorar.tsx'
 
 export interface Burbuja {
   clave: string
@@ -11,6 +12,7 @@ export interface Burbuja {
   estado: 'completo' | 'interrumpido' | 'error' | 'llegando'
   tiempos?: { primero: number | null; total: number }
   citas?: CitaInfo[]
+  traza?: string
 }
 
 interface Props {
@@ -66,7 +68,7 @@ export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeho
                 components={{
                   a: ({ href, children }) => {
                     const m = href?.match(/^#cita-(\d+)$/)
-                    if (!m) return <a href={href} target="_blank" rel="noreferrer">{children}</a>
+                    if (!m) return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
                     const id = Number(m[1])
                     const info = b.citas?.find((c) => c.fragmento_id === id)
                     return (
@@ -94,6 +96,7 @@ export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeho
                 primer trozo {b.tiempos.primero ?? '·'} ms · total {b.tiempos.total} ms
               </small>
             )}
+            {b.rol === 'tutor' && b.traza && b.estado === 'completo' && <Valorar traza={b.traza} />}
           </div>
         ))}
         <div ref={final} />

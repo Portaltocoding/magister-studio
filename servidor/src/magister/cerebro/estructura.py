@@ -15,7 +15,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from magister.cerebro.modelo import ErrorModelo, _lineas_claude
+from magister.cerebro.modelo import ErrorModelo, Llamada, _lineas_claude, llenar_desde_resultado, notificar, prompt_actual, traza_actual
+from magister.cerebro import cache
 from magister.config import RAIZ_SERVIDOR, ajustes
 
 T = TypeVar("T", bound=BaseModel)
@@ -72,9 +73,9 @@ def _limpiar(e: ValidationError) -> list[str]:
     return [f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}" for err in e.errors(include_url=False)]
 
 
-async def _llamar_cli(sistema: str, entrada: str, esquema: dict) -> tuple[dict | None, dict]:
+async def _llamar_cli(sistema: str, entrada: str, esquema: dict, modelo: str | None = None) -> tuple[dict | None, dict]:
     resultado: dict = {}
-    async for evento in _lineas_claude(sistema, entrada, esquema):
+    async for evento in _lineas_claude(sistema, entrada, esquema, modelo):
         if evento.get("type") == "result":
             resultado = evento
     return resultado.get("structured_output"), resultado
@@ -87,11 +88,24 @@ async def estructurar(
     reglas: Callable[[T], list[str]] | None = None,
     reintentos: int | None = None,
     intentos: list[Intento] | None = None,
+    tarea: str | None = None,
+    cachear: bool = False,
 ) -> T:
     """`intentos`, si se pasa, recibe los intentos fallidos (para contar y registrar)."""
     maximo = (ajustes.reintentos if reintentos is None else reintentos) + 1
     intentos = [] if intentos is None else intentos
     esquema = Modelo.model_json_schema()
+    from magister.cerebro.enrutador import ruta
+
+    p = prompt_actual.get()
+    motor, modelo = ruta(tarea, p[0] if p else None)
+    if cachear and motor != "eco":
+        guardada = await cache.leer(sistema, entrada, modelo, p)
+        if guardada is not None:
+            try:
+                return Modelo.model_validate(guardada)
+            except ValidationError:
+                pass
     for n in range(1, maximo + 1):
         t0 = time.perf_counter()
         texto = entrada
@@ -110,11 +124,20 @@ async def estructurar(
                 intentos.append(Intento([f"el motor eco no tiene fijo para {Modelo.__name__}"]))
                 continue
         else:
+            llamada = Llamada(funcion=tarea or (p[0] if p else Modelo.__name__), motor=motor, modelo_pedido=modelo,
+                              sistema=sistema, entrada=texto, prompt_nombre=p[0] if p else None,
+                              prompt_version=p[1] if p else None, traza_id=traza_actual.get(), estructurada=True)
             try:
-                salida, info = await _llamar_cli(sistema, texto, esquema)
+                salida, info = await _llamar_cli(sistema, texto, esquema, modelo)
             except ErrorModelo as e:
+                llamada.error = str(e)
+                await notificar(llamada)
                 intentos.append(Intento([f"error del modelo: {e}"]))
                 continue
+            llenar_desde_resultado(llamada, info)
+            llamada.respuesta = json.dumps(salida, ensure_ascii=False) if salida is not None else ""
+            llamada.total_ms = int((time.perf_counter() - t0) * 1000)
+            await notificar(llamada)
         uso = info.get("usage", {})
         registro.info(
             "estructurar %s intento %d modelo=%s in=%s out=%s cache_w=%s cache_r=%s %.1fs",
@@ -139,5 +162,7 @@ async def estructurar(
         if errores:
             intentos.append(Intento(errores, salida))
             continue
+        if cachear and motor != "eco":
+            await cache.escribir(sistema, entrada, modelo, p, objeto.model_dump(mode="json"))
         return objeto
     raise ErrorEstructura(Modelo.__name__, intentos)

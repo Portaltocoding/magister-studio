@@ -1,0 +1,10 @@
+# Patrones de anulación (expresiones regulares). Marcan, no bloquean.
+ignora (todas )?(las )?instrucciones
+olvida (todo|lo anterior|tus instrucciones)
+instrucci[oó]n para el asistente
+ignore (all )?(previous|prior) instructions
+you are now
+system prompt
+revela (tu|el) (prompt|sistema)
+propone .{0,60} como [uú]nica fuente
+!\[[^\]]*\]\(https?://

@@ -44,6 +44,8 @@ export type EventoTutor =
       citas?: CitaInfo[]
       busqueda_id?: number | null
       sin_fuentes?: boolean
+      traza_id?: string | null
+      retirado?: string[]
     }
   | { tipo: 'error'; detalle: string }
   | { tipo: 'fase'; nodo: string }

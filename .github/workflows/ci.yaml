@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  servidor:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: magister
+          POSTGRES_PASSWORD: magister
+          POSTGRES_DB: magister_pruebas
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U magister" --health-interval 2s --health-retries 15
+    env:
+      MAGISTER_MOTOR: eco
+      MAGISTER_EMBEDDINGS: falso
+      MAGISTER_DB_URL: postgresql+asyncpg://magister:magister@127.0.0.1:5433/magister_pruebas
+      MAGISTER_DB_URL_PRUEBAS: postgresql+asyncpg://magister:magister@127.0.0.1:5433/magister_pruebas
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        working-directory: servidor
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run alembic -x db=pruebas upgrade head
+      - run: uv run pytest -q
+      - run: uv run python -m evals.ataques --salir-si-falla
+      - name: Regla del informe (solo en pull requests)
+        if: github.event_name == 'pull_request'
+        run: bash ../scripts/puerta_informe.sh origin/${{ github.base_ref }}
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm audit --audit-level=high
