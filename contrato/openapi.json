@@ -87,10 +87,331 @@
           }
         }
       }
+    },
+    "/api/temas": {
+      "get": {
+        "summary": "Listar Temas",
+        "operationId": "listar_temas_api_temas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TemaSalida"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Temas Api Temas Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear Tema",
+        "operationId": "crear_tema_api_temas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemaEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemaSalida"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversaciones": {
+      "get": {
+        "summary": "Listar Conversaciones",
+        "operationId": "listar_conversaciones_api_conversaciones_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConversacionSalida"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Conversaciones Api Conversaciones Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear Conversacion",
+        "operationId": "crear_conversacion_api_conversaciones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversacionEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversacionSalida"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversaciones/{cid}": {
+      "delete": {
+        "summary": "Borrar Conversacion",
+        "operationId": "borrar_conversacion_api_conversaciones__cid__delete",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversaciones/{cid}/mensajes": {
+      "get": {
+        "summary": "Listar Mensajes",
+        "operationId": "listar_mensajes_api_conversaciones__cid__mensajes_get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MensajeSalida"
+                  },
+                  "title": "Response Listar Mensajes Api Conversaciones  Cid  Mensajes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Enviar Mensaje",
+        "operationId": "enviar_mensaje_api_conversaciones__cid__mensajes_post",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MensajeEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ConversacionEntrada": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "tema_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tema Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo"
+        ],
+        "title": "ConversacionEntrada"
+      },
+      "ConversacionSalida": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "tema_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tema Id"
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          },
+          "actualizada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo",
+          "tema_id",
+          "creada_en",
+          "actualizada_en"
+        ],
+        "title": "ConversacionSalida"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -103,6 +424,69 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "MensajeEntrada": {
+        "properties": {
+          "contenido": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Contenido"
+          },
+          "cuenta": {
+            "type": "boolean",
+            "title": "Cuenta",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "contenido"
+        ],
+        "title": "MensajeEntrada"
+      },
+      "MensajeSalida": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "usuario",
+              "tutor"
+            ],
+            "title": "Rol"
+          },
+          "contenido": {
+            "type": "string",
+            "title": "Contenido"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "completo",
+              "interrumpido",
+              "error"
+            ],
+            "title": "Estado"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rol",
+          "contenido",
+          "estado",
+          "creado_en"
+        ],
+        "title": "MensajeSalida"
       },
       "Salud": {
         "properties": {
@@ -126,6 +510,39 @@
           "modelo"
         ],
         "title": "Salud"
+      },
+      "TemaEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre"
+        ],
+        "title": "TemaEntrada"
+      },
+      "TemaSalida": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "TemaSalida"
       },
       "ValidationError": {
         "properties": {

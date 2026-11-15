@@ -4,12 +4,17 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from magister.api.rutas_conversaciones import rutas as rutas_conversaciones
 from magister.api.seguridad import Proteccion
 from magister.config import ajustes
+from magister.datos import conversaciones as dc
+from magister.datos import sesion
+from magister.datos.sesion import sesion_por_peticion
 
 VERSION_CONTRATO = "0.1"
 
@@ -21,6 +26,7 @@ async def ciclo_de_vida(_: FastAPI):
     if not ajustes.token:
         registro.warning("MAGISTER_TOKEN está vacío: la API no exige token. Ponlo en servidor/.env.")
     yield
+    await sesion.cerrar()
 
 
 app = FastAPI(title="Magister", version=VERSION_CONTRATO, lifespan=ciclo_de_vida)
@@ -46,7 +52,8 @@ class Salud(BaseModel):
 
 
 @app.get("/api/salud")
-async def salud() -> Salud:
+async def salud(s: AsyncSession = Depends(sesion_por_peticion)) -> Salud:
+    await dc.comprobar(s)
     return Salud(ok=True, motor=ajustes.motor, modelo=ajustes.modelo)
 
 
@@ -56,3 +63,6 @@ async def pulso(n: int = 5, juntos: int = 0) -> AsyncIterator[ServerSentEvent]:
         if not juntos and i > 0:
             await asyncio.sleep(0.5)
         yield ServerSentEvent(data={"i": i}, event="pulso")
+
+
+app.include_router(rutas_conversaciones)
