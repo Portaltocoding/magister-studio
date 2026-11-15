@@ -129,3 +129,47 @@ h2 {
   color: var(--suave);
 }
 .vacio { color: var(--suave); }
+
+/* v0.1: hilo de conversación */
+.boton, .boton-mini {
+  font: inherit;
+  padding: 8px 14px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: var(--fondo);
+  color: var(--texto);
+  cursor: pointer;
+}
+.boton:disabled { opacity: 0.5; cursor: default; }
+.boton-principal { background: var(--texto); color: var(--fondo); border-color: var(--texto); }
+.boton-mini { padding: 2px 8px; font-size: 0.8rem; }
+.cabecera-seccion { display: flex; justify-content: space-between; align-items: center; padding: 0 8px; }
+.conversaciones { overflow-y: auto; min-height: 0; flex: 1; }
+.fila-conversacion { display: flex; align-items: center; }
+.fila-conversacion .modo { flex: 1; min-width: 0; }
+.recorte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.borrar { border: 0; background: transparent; color: var(--suave); cursor: pointer; font-size: 1rem; visibility: hidden; }
+.fila-conversacion:hover .borrar, .borrar:focus { visibility: visible; }
+.lateral { max-height: 100vh; position: sticky; top: 0; }
+
+.vista-hilo { max-width: 760px; margin: 0 auto; height: calc(100vh - 120px); display: flex; flex-direction: column; }
+.hilo { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+.libre .hilo { flex: none; }
+.mensajes { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
+.burbuja { max-width: 85%; padding: 10px 14px; border-radius: 12px; line-height: 1.55; text-align: left; }
+.burbuja p { margin: 0.4em 0; }
+.burbuja-usuario { align-self: flex-end; background: var(--activo); }
+.burbuja-tutor { align-self: flex-start; background: var(--panel); border: 1px solid var(--borde); }
+.burbuja-error { border-color: #b4544a; color: #b4544a; }
+.burbuja pre { overflow-x: auto; background: var(--fondo); padding: 8px; border-radius: 6px; }
+.burbuja table { border-collapse: collapse; }
+.burbuja td, .burbuja th { border: 1px solid var(--borde); padding: 4px 8px; }
+.propio { white-space: pre-wrap; }
+.nota { display: block; color: var(--suave); font-size: 0.75rem; margin-top: 4px; }
+.puntos { letter-spacing: 2px; animation: latido 1.2s infinite; }
+@keyframes latido { 50% { opacity: 0.3; } }
+.entrada-hilo textarea {
+  flex: 1; font: inherit; padding: 8px 10px; border: 1px solid var(--borde);
+  border-radius: 6px; background: var(--fondo); color: var(--texto); resize: vertical;
+}
+.interruptor { font-size: 0.8rem; color: var(--suave); display: flex; gap: 6px; align-items: center; }

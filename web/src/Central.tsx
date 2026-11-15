@@ -1,11 +1,25 @@
-import Mascota from './Mascota.tsx'
+import EstudioLibre from './EstudioLibre.tsx'
 import type { IdModo } from './modos.ts'
 
+interface Props {
+  modo: IdModo
+  conversacionId: number | null
+  alCrearConversacion: (id: number) => void
+  alCambiarConversaciones: () => void
+  irA: (modo: IdModo) => void
+}
+
 // Recibe el modo como dato; no sabe nada de la barra lateral.
-export default function Central({ modo }: { modo: IdModo }) {
+export default function Central({ modo, conversacionId, alCrearConversacion, alCambiarConversaciones }: Props) {
   switch (modo) {
     case 'libre':
-      return <EstudioLibre />
+      return (
+        <EstudioLibre
+          conversacionId={conversacionId}
+          alCrear={alCrearConversacion}
+          alCambiar={alCambiarConversaciones}
+        />
+      )
     case 'tutor':
       return <Pendiente texto="El tutor prepara la sesión desde tus fuentes y te lleva." />
     case 'roadmap':
@@ -29,21 +43,6 @@ export default function Central({ modo }: { modo: IdModo }) {
     case 'hablar':
       return <Pendiente texto="Entrada por voz con la frase central." />
   }
-}
-
-function EstudioLibre() {
-  return (
-    <div className="libre">
-      <Mascota />
-      <h1>¿Qué tema tratamos hoy?</h1>
-      <form className="entrada" onSubmit={(e) => e.preventDefault()}>
-        <input type="text" placeholder="Escribe un tema o una pregunta" aria-label="Tu mensaje" />
-        <button type="button" className="micro" disabled title="Micrófono sin conectar">
-          Micrófono · sin conectar
-        </button>
-      </form>
-    </div>
-  )
 }
 
 function Pendiente({ texto }: { texto: string }) {

@@ -1,0 +1,22 @@
+# Postgres 16 con pgvector para Magister Studio.
+# Puerto 5433 y nombres propios para no chocar con el Postgres del repo magister.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: magister-studio-db
+    environment:
+      POSTGRES_USER: magister
+      POSTGRES_PASSWORD: magister
+      POSTGRES_DB: magister
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - magister-studio-datos:/var/lib/postgresql/data
+      - ./servidor/scripts/crear_bases.sql:/docker-entrypoint-initdb.d/10-crear_bases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U magister -d magister"]
+      interval: 2s
+      retries: 15
+
+volumes:
+  magister-studio-datos:

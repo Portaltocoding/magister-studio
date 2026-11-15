@@ -1,6 +1,6 @@
 # Qué es
 
-Magister personal. La v0.1 es una conversación con streaming guardada en Postgres.
+Magister Studio: el tutor personal construido siguiendo el libro de `magister` (Partes I a VI), para usarlo mientras se lee. Las decisiones tomadas están en `docs/decisiones.md`.
 
 ## Stack
 

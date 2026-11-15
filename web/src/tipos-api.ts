@@ -38,14 +38,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/temas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Temas */
+        get: operations["listar_temas_api_temas_get"];
+        put?: never;
+        /** Crear Tema */
+        post: operations["crear_tema_api_temas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Conversaciones */
+        get: operations["listar_conversaciones_api_conversaciones_get"];
+        put?: never;
+        /** Crear Conversacion */
+        post: operations["crear_conversacion_api_conversaciones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversaciones/{cid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Borrar Conversacion */
+        delete: operations["borrar_conversacion_api_conversaciones__cid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversaciones/{cid}/mensajes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Mensajes */
+        get: operations["listar_mensajes_api_conversaciones__cid__mensajes_get"];
+        put?: never;
+        /** Enviar Mensaje */
+        post: operations["enviar_mensaje_api_conversaciones__cid__mensajes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ConversacionEntrada */
+        ConversacionEntrada: {
+            /** Titulo */
+            titulo: string;
+            /** Tema Id */
+            tema_id?: number | null;
+        };
+        /** ConversacionSalida */
+        ConversacionSalida: {
+            /** Id */
+            id: number;
+            /** Titulo */
+            titulo: string;
+            /** Tema Id */
+            tema_id: number | null;
+            /**
+             * Creada En
+             * Format: date-time
+             */
+            creada_en: string;
+            /**
+             * Actualizada En
+             * Format: date-time
+             */
+            actualizada_en: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** MensajeEntrada */
+        MensajeEntrada: {
+            /** Contenido */
+            contenido: string;
+            /**
+             * Cuenta
+             * @default true
+             */
+            cuenta: boolean;
+        };
+        /** MensajeSalida */
+        MensajeSalida: {
+            /** Id */
+            id: number;
+            /**
+             * Rol
+             * @enum {string}
+             */
+            rol: "usuario" | "tutor";
+            /** Contenido */
+            contenido: string;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "completo" | "interrumpido" | "error";
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
         };
         /** Salud */
         Salud: {
@@ -55,6 +184,18 @@ export interface components {
             motor: string;
             /** Modelo */
             modelo: string;
+        };
+        /** TemaEntrada */
+        TemaEntrada: {
+            /** Nombre */
+            nombre: string;
+        };
+        /** TemaSalida */
+        TemaSalida: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -109,6 +250,207 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_temas_api_temas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemaSalida"][];
+                };
+            };
+        };
+    };
+    crear_tema_api_temas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemaEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemaSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_conversaciones_api_conversaciones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversacionSalida"][];
+                };
+            };
+        };
+    };
+    crear_conversacion_api_conversaciones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversacionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversacionSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_conversacion_api_conversaciones__cid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_mensajes_api_conversaciones__cid__mensajes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MensajeSalida"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enviar_mensaje_api_conversaciones__cid__mensajes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MensajeEntrada"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

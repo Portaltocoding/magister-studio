@@ -7,9 +7,9 @@ from magister.api.app import app
 from magister.config import ajustes
 
 
-@pytest.fixture
-def anyio_backend() -> str:
-    return "asyncio"
+@pytest.fixture(autouse=True)
+async def _base(base):
+    yield
 
 
 def cliente() -> httpx.AsyncClient:

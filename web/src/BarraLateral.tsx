@@ -1,22 +1,26 @@
+import { borrarConversacion, type Conversacion } from './api.ts'
 import { MODOS, type IdModo } from './modos.ts'
 
 interface Props {
   modoActivo: IdModo
   alElegir: (modo: IdModo) => void
+  conversaciones: Conversacion[]
+  activa: number | null
+  alElegirConversacion: (id: number | null) => void
+  alCambiar: () => void
 }
 
-export default function BarraLateral({ modoActivo, alElegir }: Props) {
+export default function BarraLateral({
+  modoActivo,
+  alElegir,
+  conversaciones,
+  activa,
+  alElegirConversacion,
+  alCambiar,
+}: Props) {
   return (
     <aside className="lateral">
       <div className="marca">Magister</div>
-
-      <input
-        className="buscar"
-        type="search"
-        placeholder="Buscar · próximamente"
-        aria-label="Buscar (próximamente)"
-        disabled
-      />
 
       <nav aria-label="Modos">
         <ul className="modos">
@@ -38,9 +42,45 @@ export default function BarraLateral({ modoActivo, alElegir }: Props) {
         </ul>
       </nav>
 
-      <section className="temas">
-        <h2>Tus temas</h2>
-        <p className="vacio">Aún no tienes temas.</p>
+      <section className="conversaciones">
+        <div className="cabecera-seccion">
+          <h2>Conversaciones</h2>
+          <button type="button" className="boton-mini" onClick={() => alElegirConversacion(null)}>
+            Nueva
+          </button>
+        </div>
+        {conversaciones.length === 0 ? (
+          <p className="vacio">Aún no tienes conversaciones.</p>
+        ) : (
+          <ul className="modos">
+            {conversaciones.map((c) => (
+              <li key={c.id} className="fila-conversacion">
+                <button
+                  type="button"
+                  className="modo"
+                  aria-current={c.id === activa && modoActivo === 'libre' ? 'page' : undefined}
+                  onClick={() => alElegirConversacion(c.id)}
+                  title={c.titulo}
+                >
+                  <span className="recorte">{c.titulo}</span>
+                </button>
+                <button
+                  type="button"
+                  className="borrar"
+                  aria-label={`Borrar ${c.titulo}`}
+                  onClick={async () => {
+                    if (!confirm(`¿Borrar «${c.titulo}»?`)) return
+                    await borrarConversacion(c.id)
+                    if (c.id === activa) alElegirConversacion(null)
+                    alCambiar()
+                  }}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </aside>
   )
