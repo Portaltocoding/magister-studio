@@ -57,6 +57,11 @@ async def ciclo_de_vida(_: FastAPI):
     observar.instalar()
     await preparar_instalacion()
     vigia = asyncio.create_task(alertas.bucle())
+    if ajustes.embeddings == "local":
+        from magister.fuentes.embeber import embeber
+
+        # Cargar e5 lleva unos 20 s: se hace ya, en un hilo, y no en la primera pregunta.
+        asyncio.create_task(asyncio.to_thread(embeber, ["calentar"], "consulta"))
     fondo = asyncio.create_task(bucle_de_fondo(al_quedar_listas)) if ajustes.procesar_fondo else None
     from magister.trabajos.trabajador import bucle as bucle_trabajos
 

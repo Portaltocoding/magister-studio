@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { crearConversacion, decidir, enviar, listarMensajes, propuestaPendiente, type Propuesta } from './api.ts'
 import Hilo from './componentes/Hilo.tsx'
 import { aBurbuja, usarConversacion } from './componentes/usarConversacion.ts'
@@ -30,6 +30,8 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     setPropuesta,
   )
   const [pendiente, setPendiente] = useState<string | null>(null)
+  // La que acabamos de crear aquí: no se recarga desde la API, o borraría la respuesta que está llegando.
+  const recienCreada = useRef<number | null>(null)
 
   useEffect(() => {
     let vigente = true
@@ -39,6 +41,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
       setBurbujas([])
       return
     }
+    if (recienCreada.current === conversacionId) return
     listarMensajes(conversacionId)
       .then((ms) => vigente && setBurbujas(ms.map(aBurbuja)))
       .catch((e) => vigente && setError(String(e.message ?? e)))
@@ -65,6 +68,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
       try {
         const titulo = tipo === 'plan' ? `Plan: ${texto.slice(0, 50)}` : texto.slice(0, 60)
         const c = await crearConversacion(titulo, null, tipo)
+        recienCreada.current = c.id
         setPendiente(texto)
         alCrear(c.id)
       } catch (e) {
