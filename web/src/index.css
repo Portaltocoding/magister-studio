@@ -1,0 +1,131 @@
+:root {
+  --fondo: #fafaf9;
+  --panel: #f2f1ef;
+  --borde: #dddbd7;
+  --texto: #2b2a28;
+  --suave: #75726c;
+  --activo: #e4e2de;
+  --ok: #5f8a63;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--texto);
+  background: var(--fondo);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #1d1c1b;
+    --panel: #252422;
+    --borde: #3a3835;
+    --texto: #e6e4e0;
+    --suave: #9a968f;
+    --activo: #34322f;
+    --ok: #86ad89;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); }
+h1 { font-size: 1.5rem; font-weight: 500; }
+h2 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--suave);
+}
+
+.marco {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "lateral sesion"
+    "lateral central";
+  min-height: 100vh;
+}
+
+.lateral {
+  grid-area: lateral;
+  background: var(--panel);
+  border-right: 1px solid var(--borde);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.marca { font-weight: 600; padding: 0 8px; }
+
+.buscar,
+.entrada input {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+.modos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.modo {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font: inherit;
+  text-align: left;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--texto);
+  cursor: pointer;
+}
+.modo[aria-current="page"] { background: var(--activo); font-weight: 500; }
+.modo:disabled { color: var(--suave); cursor: default; }
+.pronto { font-size: 0.75rem; }
+.temas { padding: 0 8px; }
+
+.sesion {
+  grid-area: sesion;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--borde);
+  font-size: 0.875rem;
+}
+.estado::before { content: "●"; margin-right: 6px; }
+.estado-si::before { color: var(--ok); }
+.estado-no::before { color: var(--suave); }
+
+.central { grid-area: central; padding: 40px; }
+.libre { max-width: 640px; margin: 8vh auto 0; text-align: center; }
+.libre .entrada { text-align: left; }
+
+.mascota { display: block; width: 120px; height: 120px; margin: 0 auto 8px; }
+.mascota-cuerpo { fill: #111; }
+.mascota-ojos { transition: transform 120ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .mascota-ojos { transition: none; }
+}
+@media (prefers-color-scheme: dark) {
+  /* Sobre fondo oscuro, un borde suave para que la bola no se pierda. */
+  .mascota-cuerpo { stroke: var(--borde); stroke-width: 2; }
+}
+.entrada { display: flex; gap: 8px; }
+.entrada input { flex: 1; }
+.micro {
+  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--suave);
+}
+.vacio { color: var(--suave); }

@@ -1,0 +1,21 @@
+# Python environments
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+
+# Node.js dependencies
+node_modules/
+dist/
+
+
+# Ajustes locales y secretos
+.env
+.env.local
+
+
+# Checkpoints de LangGraph y datos locales
+servidor/checkpoints.sqlite*
+servidor/datos_locales/
+*.log
