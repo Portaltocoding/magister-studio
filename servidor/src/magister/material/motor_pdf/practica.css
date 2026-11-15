@@ -1,0 +1,240 @@
+/* Estilo «ficha práctica» (como la E12 de evals) para el libro del deep tutor.
+   Convenciones en GUIA-PRACTICA.md. Se activa con FICHA_CSS=practica.css en build_win.py. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap");
+:root { --tinta:#161616; --gris:#6b6b6b; --linea:#d8d3c8; --amarillo:#f2c200; --amarillo-claro:#fff2b3; --negro:#141414; --crema:#f8f5ee; }
+@page { size: A4; margin: 15mm 17mm 16mm 17mm; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: Inter, "Segoe UI", Arial, sans-serif; font-size: 9.7pt; line-height: 1.5; color: var(--tinta); background: #fff; }
+p { margin: 0 0 2.6mm; orphans: 3; widows: 3; }
+b, strong { font-weight: 700; color: var(--tinta); }
+a { color: inherit; }
+code { font-family: "JetBrains Mono", Consolas, monospace; font-size: 8.2pt; background: var(--amarillo-claro); padding: 0 3px; border-radius: 2px; overflow-wrap: anywhere; }
+pre { font-family: "JetBrains Mono", Consolas, monospace; font-size: 8pt; line-height: 1.38; background: #f3f1ec; border: 0.6px solid var(--linea); padding: 3mm 3.5mm; white-space: pre-wrap; margin: 2mm 0 3.5mm; break-inside: avoid; border-radius: 2px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+ul, ol { margin: 1mm 0 3mm; padding-left: 5.5mm; }
+li { margin: 0 0 1.6mm; break-inside: avoid; }
+
+/* Capítulo: página de apertura negra. Uso: ::: capitulo  # 3. Título  párrafo  [3]{.num}  ::: */
+.capitulo { break-before: page; break-inside: avoid; background: var(--negro); color: #e9e9e9; padding: 16mm 12mm 14mm; min-height: 262mm; position: relative; border-radius: 2px; }
+.capitulo h1 { color: #fff; font-size: 27pt; line-height: 1.12; font-weight: 800; letter-spacing: -0.4px; margin: 14mm 0 7mm; border: 0; break-before: auto; max-width: 150mm; }
+.capitulo p { font-size: 10.5pt; line-height: 1.6; color: #d9d9d9; max-width: 150mm; }
+.capitulo strong { color: #fff; }
+.capitulo code { background: #333; color: var(--amarillo); }
+.capitulo .num { position: absolute; left: 12mm; bottom: 12mm; font-size: 96pt; font-weight: 800; color: var(--amarillo); line-height: 0.9; }
+.capitulo .salir { display: block; border-left: 3px solid var(--amarillo); background: #1f1f1f; padding: 3.5mm 4.5mm; margin-top: 8mm; max-width: 150mm; font-size: 9.4pt; color: #e6e6e6; }
+
+/* Títulos */
+h1 { font-size: 24pt; font-weight: 800; line-height: 1.15; letter-spacing: -0.3px; margin: 0 0 6mm; break-before: page; break-after: avoid; }
+h1.nb, h2.nb { break-before: auto; }
+h2 { font-size: 18pt; font-weight: 800; line-height: 1.18; letter-spacing: -0.3px; margin: 0 0 5mm; max-width: 160mm; break-before: page; break-after: avoid; }
+h2[data-etq]::before { content: attr(data-etq); display: block; font-size: 8.5pt; font-weight: 700; letter-spacing: 0; margin-bottom: 3.5mm; }
+h2.nb { margin-top: 8mm; }
+h3 { font-size: 10.3pt; font-weight: 700; margin: 5mm 0 2mm; break-after: avoid; }
+h4 { font-size: 9.7pt; font-weight: 700; margin: 4mm 0 1.5mm; break-after: avoid; }
+h3 + *, h4 + * { break-before: avoid; }
+
+/* Tablas finas */
+table { border-collapse: collapse; width: 100%; margin: 2mm 0 4mm; font-size: 8.5pt; line-height: 1.38; break-inside: avoid; }
+th { text-align: left; font-weight: 700; padding: 1.7mm 2mm; border-bottom: 1.2px solid var(--tinta); vertical-align: bottom; }
+td { padding: 1.7mm 2mm; border-bottom: 0.6px solid var(--linea); vertical-align: top; }
+tr { break-inside: avoid; }
+
+/* Cajas negras numeradas. Uso: ::: cajas  (dentro, varios ::: caja con **Título** y texto)  ::: */
+.cajas { display: grid; grid-template-columns: repeat(auto-fit, minmax(30mm, 1fr)); gap: 2.5mm; margin: 2mm 0 5mm; counter-reset: caja; break-inside: avoid; }
+.caja { background: var(--negro); color: #e6e6e6; padding: 3mm; border-radius: 2px; font-size: 8pt; line-height: 1.38; counter-increment: caja; }
+.caja::before { content: counter(caja); display: block; color: var(--amarillo); font-weight: 800; font-size: 15pt; line-height: 1; margin-bottom: 1.6mm; }
+.caja p { margin: 0 0 1mm; }
+.caja strong { color: #fff; display: block; margin-bottom: 0.8mm; font-size: 8.6pt; }
+.caja code { background: #333; color: var(--amarillo); }
+
+/* Cajas con borde, en rejilla. Uso: ::: rejilla  (dentro, varios ::: marco con **Título** y texto)  ::: */
+.rejilla { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3mm; margin: 2mm 0 5mm; break-inside: avoid; }
+.marco { border: 1.2px solid var(--tinta); padding: 3.5mm; font-size: 8.7pt; }
+.marco p { margin: 0 0 1mm; }
+.marco strong:first-child { display: block; margin-bottom: 1.2mm; font-size: 9pt; }
+
+/* Avisos y frases */
+.aviso, .box, .ok, .debo, .esqueleto, .s60, .resp, .keep, .frase, .decide, .pide, figure { break-inside: avoid; }
+.aviso { background: var(--amarillo-claro); border-left: 3px solid var(--amarillo); padding: 3mm 4mm; margin: 4mm 0; font-size: 9pt; }
+.aviso > p:first-child > strong:first-child { display: block; margin-bottom: 1mm; }
+.frase { border: 1.4px solid var(--tinta); padding: 3.2mm 4mm; font-weight: 600; font-size: 9.2pt; margin: 6mm 0 3mm; }
+.frase p { margin: 0; }
+/* «Decide tú» y «Pídele a Claude»: las dos cajas propias del libro */
+.decide { border-left: 3px solid var(--negro); background: #f3f1ec; padding: 3mm 4mm; margin: 4mm 0; }
+.decide::before { content: "Decide tú"; display: block; font-weight: 800; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1.5mm; }
+.pide { border: 1px dashed var(--tinta); padding: 3mm 4mm; margin: 4mm 0; }
+.pide::before { content: "Pídele a Claude"; display: block; font-weight: 800; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1.5mm; }
+.box { border: 1.2px solid var(--tinta); padding: 3mm 4mm; margin: 4mm 0; }
+.ok { border-left: 3px solid #2d6a3e; background: #f0f6f1; padding: 3mm 4mm; margin: 4mm 0; }
+.debo { background: var(--negro); color: #eee; padding: 4mm 5mm; margin: 4mm 0 6mm; font-size: 10pt; border-left: 3px solid var(--amarillo); }
+.debo strong { color: var(--amarillo); }
+.esqueleto { border: 1.4px solid var(--tinta); padding: 3mm 4.5mm; margin: 4mm 0; }
+.s60 { border: 1.2px dashed var(--tinta); background: #f8f6f1; padding: 3mm 4.5mm; margin: 4mm 0; }
+.resp { border-left: 3px solid var(--linea); padding: 1mm 4mm; margin: 2mm 0 4mm; }
+.aviso > :last-child, .box > :last-child, .ok > :last-child, .debo > :last-child, .esqueleto > :last-child, .s60 > :last-child, .resp > :last-child, .decide > :last-child, .pide > :last-child { margin-bottom: 0; }
+
+.ess, .sec2 { display: inline-block; font-size: 7.2pt; font-weight: 700; padding: 0 5px; margin-right: 4px; letter-spacing: .03em; vertical-align: 1px; }
+.ess { background: var(--negro); color: var(--amarillo); }
+.sec2 { border: 1px solid var(--gris); color: var(--gris); }
+.cita { color: var(--gris); font-size: 8.2pt; }
+.etq { display: block; font-size: 8.5pt; font-weight: 700; margin-bottom: 2mm; }
+
+/* Casillas, líneas y respuesta fantasma */
+.chk { display: inline-block; width: 10px; height: 10px; border: 1.3px solid #333; margin-right: 6px; vertical-align: -1px; }
+ul.task-list { list-style: none; padding-left: 2px; }
+.lines { margin: 2px 0 8px; break-inside: avoid; }
+.ln { border-bottom: 1px solid #c9c4b8; height: 24px; }
+.fantasma { color: #aaa497; font-size: 9.2pt; line-height: 8mm; margin: 0 0 4mm; padding-bottom: 8mm; break-inside: avoid;
+  background-image: linear-gradient(to bottom, transparent calc(8mm - 0.3mm), #d6d1c5 calc(8mm - 0.3mm)); background-size: 100% 8mm; }
+.fantasma p { margin: 0; line-height: 8mm; }
+.fantasma b, .fantasma strong, .fantasma code { color: inherit; background: none; }
+.fantasma .katex, .fantasma .katex * { color: #aaa497 !important; }
+
+/* Índice */
+.idx { list-style: none; padding: 0; margin: 2mm 0 6mm; font-size: 9pt; columns: 2; column-gap: 9mm; }
+.idx li { display: flex; gap: 6px; margin: 0 0 1.2mm; break-inside: avoid; }
+.idx li .t { flex: 1; }
+.idx li.l1 { font-weight: 700; margin-top: 2.5mm; }
+.idx li.l2 { padding-left: 4mm; font-size: 8.6pt; color: #333; }
+.katex { font-size: 1.04em; }
+.katex-display { margin: 2mm 0; }
+
+/* Páginas de teoría (densidad de ficha general). Uso: ::: teoria  ## Título {etq="Teoría · RAG"}  … ::: */
+.teoria { border-left: 3px solid var(--amarillo); padding-left: 5mm; margin-left: -1mm; }
+.teoria h2[data-etq]::before { color: #8a6d00; text-transform: uppercase; letter-spacing: 0.5px; font-size: 8pt; }
+.teoria h3 { margin-top: 4.5mm; }
+.teoria p { text-align: left; }
+
+/* ---- Tres tipos de página, cada uno con su color (también en el índice) ---- */
+:root { --c-plant: #3b6db3; --c-teo: #d4a900; --c-prac: #2d8a4e; }
+.planteamiento { border-left: 3px solid var(--c-plant); padding-left: 5mm; margin-left: -1mm; }
+.teoria { border-left-color: var(--c-teo); }
+.practica { border-left: 3px solid var(--c-prac); padding-left: 5mm; margin-left: -1mm; }
+.planteamiento h2[data-etq]::before, .teoria h2[data-etq]::before, .practica h2[data-etq]::before { text-transform: uppercase; letter-spacing: 0.5px; font-size: 8pt; }
+.planteamiento h2[data-etq]::before { color: var(--c-plant); }
+.teoria h2[data-etq]::before { color: #8a6d00; }
+.practica h2[data-etq]::before { color: var(--c-prac); }
+
+/* Índice por colores */
+.leyenda { font-size: 8.4pt; margin: 0 0 3mm; }
+.leyenda span { display: inline-block; margin-right: 6mm; }
+.leyenda span::before, .idx li.l2::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: 0; background: #bbb; }
+.leyenda .planteamiento::before, .idx li.planteamiento::before { background: var(--c-plant); }
+.leyenda .teoria::before, .idx li.teoria::before { background: var(--c-teo); }
+.leyenda .practica::before, .idx li.practica::before { background: var(--c-prac); }
+.leyenda span { border: 0; padding: 0; margin-left: 0; }
+.idx li.l2 { align-items: baseline; }
+.idx li.l2::before { flex: none; margin-top: 2px; }
+
+/* Cajas de la práctica: qué construyes, cómo lo pruebas y qué me cuentas */
+.construye, .prueba, .dime { break-inside: avoid; padding: 3mm 4mm; margin: 4mm 0; }
+.construye { border-left: 3px solid var(--c-prac); background: #f0f6f1; }
+.construye::before { content: "Construye"; }
+.prueba { border-left: 3px solid var(--c-prac); background: #fff; border: 1px solid var(--c-prac); border-left-width: 3px; }
+.prueba::before { content: "Pruébalo"; }
+.dime { border: 1.4px solid var(--tinta); background: #fff; }
+.dime::before { content: "Me dices"; }
+.construye::before, .prueba::before, .dime::before { display: block; font-weight: 800; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1.5mm; }
+.construye > :last-child, .prueba > :last-child, .dime > :last-child { margin-bottom: 0; }
+/* La clase de tipo también la llevan el h2 y la entrada del índice: sin la barra lateral */
+h2.planteamiento, h2.teoria, h2.practica { border-left: 0; padding-left: 0; margin-left: 0; }
+.idx li.planteamiento, .idx li.teoria, .idx li.practica { border-left: 0; margin-left: 0; padding-left: 4mm; }
+/* Etiqueta del tipo como píldora de color: se ve de un vistazo en qué tipo de página estás */
+.planteamiento h2[data-etq]::before, .teoria h2[data-etq]::before, .practica h2[data-etq]::before,
+h2.planteamiento[data-etq]::before, h2.teoria[data-etq]::before, h2.practica[data-etq]::before {
+  display: table; color: #fff !important; padding: 1mm 2.6mm; border-radius: 2px; margin-bottom: 4mm; font-size: 7.8pt; font-weight: 800; }
+.planteamiento h2[data-etq]::before, h2.planteamiento[data-etq]::before { background: var(--c-plant); }
+.teoria h2[data-etq]::before, h2.teoria[data-etq]::before { background: #b08c00; }
+.practica h2[data-etq]::before, h2.practica[data-etq]::before { background: var(--c-prac); }
+
+/* Etiquetas temáticas bajo el título: ## Título {etq="Práctica · API" tags="Backend, IA"} */
+p.tags { margin: -3mm 0 4.5mm; }
+p.tags span { display: inline-block; border: 1px solid var(--tinta); color: var(--tinta); font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 0.4mm 2mm; margin-right: 1.5mm; border-radius: 2px; }
+
+/* Puente tras una decisión: qué nos obliga a construir */
+.entonces { break-inside: avoid; border-left: 3px solid var(--c-plant); background: #eef3fa; padding: 3mm 4mm; margin: 4mm 0; }
+.entonces::before { content: "Entonces nos falta"; display: block; font-weight: 800; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1.5mm; color: var(--c-plant); }
+/* Qué mirar en el código que te ha dado Claude */
+.revisa { break-inside: avoid; border: 1px dashed var(--c-prac); padding: 3mm 4mm; margin: 4mm 0; }
+.revisa::before { content: "Qué mirar en el código"; display: block; font-weight: 800; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1.5mm; color: var(--c-prac); }
+/* Qué funciona al acabar el capítulo */
+.funciona { break-inside: avoid; background: var(--negro); color: #eee; padding: 3.5mm 4.5mm; margin: 4mm 0; border-left: 3px solid var(--c-prac); }
+.funciona::before { content: "Qué funciona al acabar"; display: block; font-weight: 800; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1.5mm; color: #7fd49b; }
+.funciona strong { color: #fff; }
+.funciona code { background: #333; color: var(--amarillo); }
+.entonces > :last-child, .revisa > :last-child, .funciona > :last-child { margin-bottom: 0; }
+/* Prueba con orden y resultado separados: dentro, **Orden** (bloque de código) y **Debe salir** */
+.prueba strong { display: block; margin-top: 1.5mm; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.4px; color: var(--c-prac); }
+.prueba strong:first-child { margin-top: 0; }
+.prueba pre { margin: 1mm 0 2mm; }
+/* Sesión: cuánto lleva y dónde parar */
+.sesion { break-inside: avoid; font-size: 8.4pt; border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea); padding: 2mm 0; margin: 3mm 0 5mm; color: #333; }
+.sesion::before { content: "Sesión · "; font-weight: 800; }
+
+/* Cuarto tipo: Referencia (gris): mapa del repo, contratos, arranque, registro de decisiones, cobertura */
+:root { --c-ref: #5f6368; }
+.referencia { border-left: 3px solid var(--c-ref); padding-left: 5mm; margin-left: -1mm; }
+h2.referencia { border-left: 0; padding-left: 0; margin-left: 0; }
+.referencia h2[data-etq]::before, h2.referencia[data-etq]::before { display: table; color: #fff !important; padding: 1mm 2.6mm; border-radius: 2px; margin-bottom: 4mm; font-size: 7.8pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; background: var(--c-ref); }
+.leyenda .referencia::before, .idx li.referencia::before { background: var(--c-ref); }
+.idx li.referencia { border-left: 0; margin-left: 0; padding-left: 4mm; }
+.leyenda span.referencia { border: 0; padding: 0; margin-left: 0; }
+
+/* Cierre de práctica: qué acabas de construir. Uso: ::: construido  …  ::: (va después de la última prueba, antes del commit) */
+.construido { break-inside: avoid; border-left: 3px solid var(--c-prac); background: #f6f6f1; padding: 3mm 4mm; margin: 4mm 0; }
+.construido::before { content: "Qué acabas de construir"; display: block; font-weight: 800; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1.5mm; color: var(--c-prac); }
+.construido > :last-child { margin-bottom: 0; }
+.construido ul { margin: 1mm 0 1.5mm 4mm; padding: 0; }
+
+/* Color por área: cada etiqueta temática tiene el suyo (IA en rojo, Backend en azul…) */
+p.tags span.t-ia { color: #b3261e; border-color: #b3261e; background: #b3261e14; }
+p.tags span.t-backend { color: #1d4ed8; border-color: #1d4ed8; background: #1d4ed814; }
+p.tags span.t-frontend { color: #7e22ce; border-color: #7e22ce; background: #7e22ce14; }
+p.tags span.t-infra { color: #57534e; border-color: #57534e; background: #57534e14; }
+p.tags span.t-bases-de-datos { color: #0f766e; border-color: #0f766e; background: #0f766e14; }
+p.tags span.t-evals { color: #92400e; border-color: #92400e; background: #92400e14; }
+p.tags span.t-rag { color: #15803d; border-color: #15803d; background: #15803d14; }
+p.tags span.t-agentes { color: #be185d; border-color: #be185d; background: #be185d14; }
+p.tags span.t-datos { color: #0e7490; border-color: #0e7490; background: #0e749014; }
+p.tags span.t-prompt { color: #c2410c; border-color: #c2410c; background: #c2410c14; }
+p.tags span.t-ml { color: #4338ca; border-color: #4338ca; background: #4338ca14; }
+p.tags span.t-seguridad { color: #4d7c0f; border-color: #4d7c0f; background: #4d7c0f14; }
+p.tags span.t-observabilidad { color: #0369a1; border-color: #0369a1; background: #0369a114; }
+p.tags span.t-arquitectura { color: #1f2937; border-color: #1f2937; background: #1f293714; }
+
+/* Tabla de opciones: la fila con ★ es la elegida. Uso: | ★ `stream-json` | ... | */
+tr.elegida td { background: #e4f1e6; font-weight: 700; border-top: 1.5px solid var(--c-prac); border-bottom: 1.5px solid var(--c-prac); }
+tr.elegida td:first-child { border-left: 4px solid var(--c-prac); }
+/* Fila de aviso: la que lleva ⚠ es la que falla sin avisar */
+tr.peligro td { background: #fbe9e7; font-weight: 700; border-top: 1.5px solid #b3261e; border-bottom: 1.5px solid #b3261e; }
+tr.peligro td:first-child { border-left: 4px solid #b3261e; }
+
+/* mapa «Dónde estás» al abrir cada capítulo */
+.mapa { border: 1px solid #d6d3cb; border-left: 4px solid #2e7d32; background: #f8f8f4; border-radius: 4px; padding: 7px 11px; margin: 8px 0 14px; font-size: 8.6pt; line-height: 1.35; break-inside: avoid; }
+.mapa p { margin: 2px 0; }
+.mapa-t { color: #44413a; }
+.mapa-p { display: flex; gap: 4px; flex-wrap: wrap; margin: 5px 0; }
+.mapa-p span { border: 1px solid #cfcbc0; border-radius: 10px; padding: 1px 8px; color: #6b675d; background: #fff; }
+.mapa-p span small { margin-left: 5px; color: #8a8678; }
+.mapa-p span.hecha { background: #e4f1e6; border-color: #7fb487; color: #1f5c28; }
+.mapa-p span.aqui { background: #2e7d32; border-color: #2e7d32; color: #fff; font-weight: 700; }
+.mapa-p span.aqui small { color: #d8ecd9; }
+.mapa-c { margin: 3px 0 3px 16px; padding: 0; columns: 2; column-gap: 18px; }
+.mapa-c li { margin: 0; color: #8a8678; break-inside: avoid; }
+.mapa-c li.hecha { color: #1f5c28; }
+.mapa-c li.hecha::marker { content: "✓ "; }
+.mapa-c li.aqui { color: #111; font-weight: 700; }
+.mapa-h { color: #44413a; }
+/* el mapa vive en la página negra del capítulo: colores fijos para que se lea */
+.mapa, .mapa p, .mapa li, .mapa b, .mapa small { color: #3b3830 !important; }
+.mapa b { color: #111 !important; }
+.mapa-p span { color: #6b675d !important; }
+.mapa-p span.hecha { color: #1f5c28 !important; }
+.mapa-p span.aqui, .mapa-p span.aqui small { color: #fff !important; }
+.mapa-c li { color: #8a8678 !important; }
+.mapa-c li.hecha { color: #1f5c28 !important; }
+.mapa-c li.aqui { color: #111 !important; }
+
+/* las tablas largas pueden partirse entre páginas (las filas no) */
+table:has(tr:nth-child(8)) { break-inside: auto; }

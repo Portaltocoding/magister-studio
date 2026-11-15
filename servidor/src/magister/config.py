@@ -49,6 +49,15 @@ class Ajustes(BaseSettings):
     umbral_fuentes: float = 0.85  # por debajo, la búsqueda no cuenta como «hay fuentes» (medido con e5-small)
     procesar_fondo: bool = True  # la API procesa las versiones recibidas y pendientes en segundo plano
 
+    # Material (Parte IV)
+    salidas: str = str(RAIZ_SERVIDOR.parent / "salidas")
+    pandoc: str = str(Path.home() / "AppData" / "Local" / "Pandoc")  # carpeta de pandoc si no está en el PATH
+    marp: str = "@marp-team/marp-cli@4.5.1"
+    trabajos_en_api: bool = True  # el trabajador corre dentro de la API (o aparte con magister-trabajador)
+    trabajos_lease_s: int = 120
+    trabajos_intentos: int = 5
+    duracion_guion_min: int = 8
+
     # Research (Parte III)
     research_pasos: int = 12
     research_llamadas: int = 8

@@ -31,3 +31,11 @@ Este repo es la herramienta construida siguiendo el libro de punta a punta, para
 | III | Research por defecto | Flujo fijo; el agente se elige con `"sistema": "agente"` | La regla del libro: el agente solo si gana en pass^3 |
 | III | Banco del retriever | Se genera con `python -m evals.banco_rag sintetico` sobre tus fuentes | No hay corpus tuyo todavía |
 | III | Tarea de fondo | Un bucle en el `lifespan` procesa recibidas y pendientes cada 2 s y recalcula el apoyo de los planes al acabar cada pasada | La Parte IV la convierte en trabajos con cola |
+| IV | Reglas de tono y rúbrica | Las de la tabla de la Parte IV, en `docs/tono.md`; la rúbrica con anclas escritas por mí como provisionales | El libro pide las tuyas: cámbialas y recalibra |
+| IV | Plantilla de apuntes | Un hueco `{{bloques}}` que monta el código, en vez de seis huecos fijos | Una lección puede tener de 2 a 6 bloques |
+| IV | Lógica de completitud | En `magister/material/completitud_logica.py` (y `evals/completitud/logica.py` la reexporta) | El trabajador no puede importar de `evals/` |
+| IV | Trabajador | Dentro de la API por defecto; `magister-trabajador` sigue existiendo | Un proceso menos para usarlo cada día |
+| IV | Similitud de preguntas | Solapamiento de palabras, no coseno de embeddings | Sin cargar el modelo en la auditoría; el umbral se ajusta con `evals.duplicados.umbral` |
+| IV | Vídeo | Solo el guion; ni Piper ni el montaje con HyperFrames | El libro lo deja como ampliación |
+| IV | Etiquetar | Modo propio en la barra lateral («Etiquetar tono») | Hace falta para calibrar el juez |
+| IV | Juez de tono | Sin calibrar todavía | Necesita tus etiquetas |

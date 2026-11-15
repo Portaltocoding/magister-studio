@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from magister.api.rutas_conversaciones import rutas as rutas_conversaciones
 from magister.api.rutas_fuentes import rutas as rutas_fuentes
+from magister.api.rutas_material import rutas as rutas_material
 from magister.api.rutas_research import rutas as rutas_research
 from magister.api.rutas_plan import rutas as rutas_plan
 from magister.api.seguridad import Proteccion
@@ -20,7 +21,7 @@ from magister.datos import sesion
 from magister.datos.sesion import sesion_por_peticion
 from magister.flujo.grafo import iniciar as iniciar_grafo
 
-VERSION_CONTRATO = "0.3"
+VERSION_CONTRATO = "0.4"
 
 registro = logging.getLogger("uvicorn.error")
 
@@ -45,11 +46,16 @@ async def ciclo_de_vida(_: FastAPI):
         await recalcular_apoyo_por_versiones(buscador, ids)
 
     fondo = asyncio.create_task(bucle_de_fondo(al_quedar_listas)) if ajustes.procesar_fondo else None
+    from magister.trabajos.trabajador import bucle as bucle_trabajos
+
+    # El trabajador de la cola corre dentro de la API salvo que se lance aparte (magister-trabajador).
+    trabajador = asyncio.create_task(bucle_trabajos()) if ajustes.trabajos_en_api else None
     async with AsyncSqliteSaver.from_conn_string(ajustes.checkpoints) as saver:
         iniciar_grafo(saver, buscador)
         yield
-    if fondo is not None:
-        fondo.cancel()
+    for tarea in (fondo, trabajador):
+        if tarea is not None:
+            tarea.cancel()
     iniciar_grafo(None)
     await sesion.cerrar()
 
@@ -94,3 +100,4 @@ app.include_router(rutas_conversaciones)
 app.include_router(rutas_plan)
 app.include_router(rutas_fuentes)
 app.include_router(rutas_research)
+app.include_router(rutas_material)
