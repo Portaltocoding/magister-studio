@@ -16,7 +16,9 @@ function leerRuta(): { modo: IdModo; conversacion: number | null } {
 
 function escribirRuta(modo: IdModo, conversacion: number | null) {
   const ruta = modo === 'libre' && conversacion != null ? `#/conversacion/${conversacion}` : `#/${modo}`
-  if (window.location.hash !== ruta) window.history.replaceState(null, '', ruta)
+  // #/fichas/3/L2 lleva a una lección: el panel lo lee y luego limpia la ruta.
+  if (window.location.hash !== ruta && !window.location.hash.startsWith(`${ruta}/`))
+    window.history.replaceState(null, '', ruta)
 }
 
 // Tres zonas: la barra lateral y la barra de sesión no cambian;

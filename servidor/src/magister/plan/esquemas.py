@@ -14,7 +14,7 @@ Nivel = Literal["nada", "basico", "intermedio", "avanzado"]
 class Perfil(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    tema: str | None = Field(None, description="Qué quiere aprender, en pocas palabras. null si aún no lo ha dicho.")
+    tema: str | None = Field(None, description="Nombre corto de lo que quiere aprender, de 2 a 8 palabras, sin listas ni paréntesis (por ejemplo «Conceptos de fullstack senior»). null si aún no lo ha dicho.")
     objetivo: str | None = Field(
         None, description="Para qué lo quiere (una entrevista, un proyecto, curiosidad). null si no lo ha dicho."
     )

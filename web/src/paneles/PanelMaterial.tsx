@@ -86,11 +86,18 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   const control = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    const [, temaRuta, claveRuta] = window.location.hash.replace(/^#\/?/, '').split('/')
     listarPlanes().then((ps) => {
       setPlanes(ps)
-      if (ps.length) verPlan(ps[0].tema_id).then(setPlan)
+      const elegido = ps.find((p) => p.tema_id === Number(temaRuta)) ?? ps[0]
+      if (elegido)
+        verPlan(elegido.tema_id).then((v) => {
+          setPlan(v)
+          if (claveRuta && v.lecciones.some((l) => l.clave === claveRuta)) setClave(claveRuta)
+        })
+      if (temaRuta) window.history.replaceState(null, '', `#/${modoVista === 'video' ? 'video' : 'fichas'}`)
     })
-  }, [])
+  }, [modoVista])
 
   const cargar = useCallback(() => {
     if (!plan || !clave) return

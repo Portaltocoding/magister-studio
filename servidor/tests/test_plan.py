@@ -160,3 +160,12 @@ def test_propiedades(plan, disp, horas_inicio) -> None:
         for d in lec.depende_de:
             assert ultima[d] < primera[lec.clave]
     assert abs(sum(s.horas for s in c.sesiones) - plan.total_horas) < 0.05
+
+
+def test_nombre_corto_del_tema() -> None:
+    from magister.datos.plan import nombre_corto
+
+    largo = ("Conceptos que un fullstack senior debe dominar (mapa de bloques: red/web, backend y APIs, bases de datos, "
+             "arquitectura, frontend, seguridad, DevOps, calidad)")
+    assert nombre_corto(largo) == "Conceptos que un fullstack senior debe dominar"
+    assert nombre_corto("Redes") == "Redes" and len(nombre_corto("palabra " * 20)) <= 60

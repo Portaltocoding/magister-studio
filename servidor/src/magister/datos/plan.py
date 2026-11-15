@@ -130,7 +130,16 @@ class SesionFila(Base):
     estado: Mapped[str] = mapped_column(String(10), server_default="pendiente")
 
 
+def nombre_corto(nombre: str, maximo: int = 60) -> str:
+    """El nombre de un tema cabe en una línea: sin lo que va entre paréntesis ni tras dos puntos, y cortado en palabra."""
+    corto = nombre.split("(")[0].split(":")[0].strip(" .,;-") or nombre.strip()
+    if len(corto) <= maximo:
+        return corto
+    return corto[:maximo].rsplit(" ", 1)[0].rstrip(" .,;-")
+
+
 async def tema_por_nombre_o_nuevo(s: AsyncSession, nombre: str) -> Tema:
+    nombre = nombre_corto(nombre)
     tema = await s.scalar(select(Tema).where(func.lower(Tema.nombre) == nombre.strip().lower()))
     if tema is None:
         tema = Tema(nombre=nombre.strip()[:200])

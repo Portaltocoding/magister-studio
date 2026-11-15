@@ -35,6 +35,11 @@ function rejilla(mes: Date): Date[] {
   return Array.from({ length: 42 }, (_, i) => new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + i))
 }
 
+// Una sesión del plan lleva a su lección en Fichas (apuntes, fichas y diapositivas).
+const abrirLeccion = (x: SesionVista) => {
+  if (x.tema_id != null) window.location.hash = `#/fichas/${x.tema_id}/${x.clave}`
+}
+
 const vacio = (fecha: string) => ({ fecha, hora: '', titulo: '', tipo: 'deber' as Tipo, quien: '', notas: '' })
 
 // Calendario: un mes de verdad. Lo tuyo (deberes, exámenes, clases, notas) va delante;
@@ -156,7 +161,15 @@ export default function PanelCalendario() {
                   {lista.length > 3 && <span className="nota-linea">+{lista.length - 3} más</span>}
                   {verPlan &&
                     (sesiones[f] ?? []).map((x) => (
-                      <span key={`s${x.id}`} className={`fondo-plan ${x.estado === 'hecha' ? 'pastilla-hecha' : ''}`} title={`${x.tema}: ${x.titulo}`}>
+                      <span
+                        key={`s${x.id}`}
+                        className={`fondo-plan ${x.estado === 'hecha' ? 'pastilla-hecha' : ''}`}
+                        title={`${x.clave} ${x.titulo} (${x.tema}). Pulsa para abrirla`}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          abrirLeccion(x)
+                        }}
+                      >
                         {x.clave} {x.titulo}
                       </span>
                     ))}
@@ -219,8 +232,12 @@ export default function PanelCalendario() {
                               cargar()
                             }}
                           />{' '}
-                          {x.inicio ?? ''} {x.tema} · {x.clave} {x.titulo} · {x.horas} h
+                          {x.inicio ? `${x.inicio.slice(0, 5)} · ` : ''}
+                          <strong>{x.clave}</strong> {x.titulo} <span className="nota">· {x.horas} h</span>
                         </label>
+                        <button className="boton-mini" onClick={() => abrirLeccion(x)} title={x.tema}>
+                          Abrir →
+                        </button>
                       </li>
                     ))}
                   </ul>

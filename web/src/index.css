@@ -489,3 +489,9 @@ body { overflow: hidden; }
 .cuestionario-pregunta h2 {
   text-transform: none; letter-spacing: normal; text-align: left; color: var(--texto); font-weight: 650;
 }
+
+/* ===== Sesiones del plan que llevan a su lección ===== */
+.fondo-plan { cursor: pointer; }
+.fondo-plan:hover { opacity: 0.95; outline: 1px solid var(--acento); }
+.item-plan { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.item-plan label { flex: 1; min-width: 0; }
