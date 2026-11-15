@@ -127,3 +127,15 @@ def test_secretos_desde_ficheros(tmp_path) -> None:
     a = Ajustes(_env_file=None, dir_secretos=str(tmp_path), canario="")
     leer_secretos(a)
     assert a.canario == "mg-secreto"
+
+
+async def test_agenda(cliente) -> None:
+    e = (await cliente.post("/api/eventos", json={"fecha": "2026-11-20", "hora": "09:30", "titulo": "Ejercicios del tema 3",
+                                                  "tipo": "deber", "quien": "Prof. García"})).json()
+    assert e["hora"] == "09:30" and not e["hecho"]
+    lista = (await cliente.get("/api/eventos", params={"desde": "2026-11-01", "hasta": "2026-11-30"})).json()
+    assert [x["titulo"] for x in lista] == ["Ejercicios del tema 3"]
+    assert (await cliente.get("/api/eventos/pendientes")).json()[0]["id"] == e["id"]
+    hecho = (await cliente.patch(f"/api/eventos/{e['id']}", json={"hecho": True})).json()
+    assert hecho["hecho"] and (await cliente.get("/api/eventos/pendientes")).json() == []
+    assert (await cliente.delete(f"/api/eventos/{e['id']}")).status_code == 204

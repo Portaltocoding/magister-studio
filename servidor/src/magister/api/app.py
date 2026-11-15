@@ -9,6 +9,7 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from magister.api.rutas_agenda import rutas as rutas_agenda
 from magister.api.rutas_conversaciones import rutas as rutas_conversaciones
 from magister.api.rutas_fuentes import rutas as rutas_fuentes
 from magister.api.rutas_material import rutas as rutas_material
@@ -121,6 +122,7 @@ app.include_router(rutas_material)
 app.include_router(rutas_practica)
 app.include_router(rutas_tutor)
 app.include_router(rutas_produccion)
+app.include_router(rutas_agenda)
 
 # La API sirve también la página (web/dist) si está construida: un solo puerto, http://localhost:8000.
 _dist = __import__("pathlib").Path(__file__).resolve().parents[4] / "web" / "dist"

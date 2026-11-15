@@ -56,3 +56,4 @@ Este repo es la herramienta construida siguiendo el libro de punta a punta, para
 | VI | Garak, Playwright y el incidente provocado | Pendientes | Herramientas externas; el libro las deja como ampliación o práctica tuya |
 | VI | Design doc | Borrador en `docs/design-doc.md` | El libro pide que lo escribas tú |
 | VI | Pares de preferencia para afinar | Pendientes | El generador solo guarda la versión aceptada de cada bloque |
+| v1.1 | Calendario | Mes completo con tus eventos (deber, examen, clase, nota) delante y el plan y los repasos detrás con poca opacidad; tabla `eventos` | Pedido tuyo después de la v1.0 |

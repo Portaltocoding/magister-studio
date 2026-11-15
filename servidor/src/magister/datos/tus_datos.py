@@ -12,12 +12,12 @@ from magister.datos.sesion import nueva_sesion
 
 TABLAS = ["temas", "conversaciones", "mensajes", "mensajes_citas", "planes", "lecciones", "conceptos", "dependencias", "sesiones",
           "materiales", "bloques_material", "preguntas", "preguntas_concepto", "intentos", "servidas", "etiquetas",
-          "llamadas", "puntuaciones", "candidatos_banco"]
+          "llamadas", "puntuaciones", "candidatos_banco", "eventos"]
 # Lo que borra `borrar-todo` (las fuentes, solo con --fuentes). El orden respeta las claves foráneas.
 BORRAR = ["candidatos_banco", "puntuaciones", "llamadas", "servidas", "intentos", "etiquetas", "banco_tono", "preguntas_concepto",
           "preguntas", "bloques_material", "materiales", "trabajos", "propuestas", "tareas_research", "lecciones_apoyo",
           "lecciones_fragmentos", "sesiones", "dependencias", "conceptos", "lecciones", "planes", "mensajes_citas", "mensajes",
-          "conversaciones", "temas", "cache_respuestas", "alertas"]
+          "conversaciones", "temas", "cache_respuestas", "alertas", "eventos"]
 FUENTES = ["busquedas", "fragmentos", "versiones", "documentos", "fuentes"]
 
 LEEME = """Exportación de Magister Studio
