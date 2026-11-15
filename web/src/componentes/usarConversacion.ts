@@ -11,6 +11,8 @@ export const aBurbuja = (m: Mensaje): Burbuja => ({
   contenido: m.contenido,
   estado: m.estado,
   citas: m.citas,
+  traza: m.traza_id ?? undefined,
+  voto: m.voto ?? null,
 })
 
 export const NOMBRE_FASE: Record<string, string> = {

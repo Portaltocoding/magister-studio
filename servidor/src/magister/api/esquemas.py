@@ -48,6 +48,8 @@ class MensajeSalida(Salida):
     estado: Literal["completo", "interrumpido", "error"]
     creado_en: datetime
     citas: list[dict] = []
+    traza_id: str | None = None
+    voto: bool | None = None
 
 
 class DecisionEntrada(BaseModel):

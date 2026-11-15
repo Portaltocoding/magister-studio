@@ -96,6 +96,7 @@ async def guardar_respuesta(
     ms_primer_token: int | None,
     ms_total: int,
     cuenta: bool = True,
+    traza_id: str | None = None,
 ) -> int:
     """Guarda la respuesta del tutor con una sesión nueva (no la de la petición)."""
     async with nueva_sesion() as s:
@@ -109,6 +110,7 @@ async def guardar_respuesta(
             ms_primer_token=ms_primer_token,
             ms_total=ms_total,
             cuenta=cuenta,
+            traza_id=traza_id,
         )
         s.add(m)
         await s.execute(update(Conversacion).where(Conversacion.id == cid).values(actualizada_en=func.now()))
@@ -131,6 +133,14 @@ async def guardar_citas(mensaje_id: int, citas: list[dict], busqueda_id: int | N
                 continue  # una cita inventada no se guarda; ya va marcada como dudosa en el fin
             s.add(MensajeCita(mensaje_id=mensaje_id, fragmento_id=c["fragmento_id"], cita_literal=c["cita_literal"],
                               dudosa=c["dudosa"], busqueda_id=busqueda_id))
+
+
+async def votos_de_trazas(s: AsyncSession, trazas: list[str]) -> dict[str, bool]:
+    if not trazas:
+        return {}
+    filas = (await s.execute(text("select traza_id, valor from puntuaciones where nombre = 'feedback_usuario' "
+                                  "and traza_id = any(:t)"), {"t": trazas})).all()
+    return {t: v >= 0.5 for t, v in filas}
 
 
 async def citas_de_mensajes(s: AsyncSession, ids: list[int]) -> dict[int, list[dict]]:

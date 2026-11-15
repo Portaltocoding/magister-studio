@@ -22,6 +22,7 @@ RUNBOOKS = "docs/runbooks"
 class Feedback(BaseModel):
     bien: bool
     comentario: str | None = Field(None, max_length=2000)
+    otra: bool = False  # pidió otra explicación
 
 
 class Triaje(BaseModel):
@@ -37,7 +38,9 @@ async def feedback(traza_id: str, cuerpo: Feedback, s: AsyncSession = Depends(se
     if not cuerpo.bien:
         entrada = await s.scalar(text(
             "select contenido from mensajes m where m.rol = 'usuario' and m.creado_en <= now() order by m.id desc limit 1")) or ""
-        await juez_online.candidato(traza_id, "feedback", entrada, None, cuerpo.comentario)
+        await juez_online.candidato(traza_id, "otra_explicacion" if cuerpo.otra else "feedback", entrada, None, cuerpo.comentario)
+    if cuerpo.otra:
+        await puntuar(traza_id, "otra_explicacion", 1.0, cuerpo.comentario, sobrescribir=True)
     return {"traza_id": traza_id, "id": f"fb-{traza_id}"}
 
 

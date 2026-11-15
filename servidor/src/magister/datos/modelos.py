@@ -81,4 +81,5 @@ class Mensaje(Base):
     cuenta: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     ms_primer_token: Mapped[int | None] = mapped_column(Integer)
     ms_total: Mapped[int | None] = mapped_column(Integer)
+    traza_id: Mapped[str | None] = mapped_column(String(64))
     creado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())

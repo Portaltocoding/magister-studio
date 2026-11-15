@@ -1,24 +1,64 @@
 import { useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
 
-// Pulgar arriba o abajo junto a cada respuesta, con comentario opcional (feedback_usuario de la traza).
-export default function Valorar({ traza }: { traza: string }) {
-  const [voto, setVoto] = useState<boolean | null>(null)
+interface Props {
+  traza: string
+  inicial: boolean | null
+  alPedirOtra?: (texto: string) => void
+}
 
-  const votar = async (bien: boolean) => {
-    const comentario = bien ? null : window.prompt('¿Qué ha fallado? (opcional)') || null
-    await pedir(`/api/trazas/${traza}/feedback`, enviarJson({ bien, comentario }))
+// Me sirve o no me sirve, junto a cada respuesta. «No me sirve» pide qué falla y puede pedir otra explicación.
+export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
+  const [voto, setVoto] = useState<boolean | null>(inicial)
+  const [abierto, setAbierto] = useState(false)
+  const [comentario, setComentario] = useState('')
+  const [hecho, setHecho] = useState(false)
+
+  const votar = async (bien: boolean, otra = false) => {
+    await pedir(`/api/trazas/${traza}/feedback`, enviarJson({ bien, comentario: comentario.trim() || null, otra }))
     setVoto(bien)
+    setAbierto(false)
+    setHecho(true)
+    if (otra && alPedirOtra)
+      alPedirOtra(
+        `Esa explicación no me ha servido${comentario.trim() ? `: ${comentario.trim()}` : ''}. Explícamelo de otra forma.`,
+      )
   }
 
   return (
-    <span className="valorar">
-      <button aria-pressed={voto === true} aria-label="Buena respuesta" onClick={() => votar(true)}>
-        bien
+    <div className="valorar">
+      <button className={`voto voto-bien ${voto === true ? 'votado' : ''}`} aria-pressed={voto === true} onClick={() => votar(true)}>
+        ✓ Me sirve
       </button>
-      <button aria-pressed={voto === false} aria-label="Mala respuesta" onClick={() => votar(false)}>
-        mal
+      <button
+        className={`voto voto-mal ${voto === false ? 'votado' : ''}`}
+        aria-pressed={voto === false}
+        onClick={() => setAbierto(!abierto)}
+      >
+        ✗ No me sirve
       </button>
-    </span>
+      {hecho && !abierto && <span className="nota">Anotado, gracias.</span>}
+      {abierto && (
+        <div className="valorar-caja">
+          <textarea
+            autoFocus
+            placeholder="¿Qué ha fallado? (opcional: demasiado largo, no entiendo X, falta un ejemplo...)"
+            aria-label="Qué ha fallado"
+            value={comentario}
+            onChange={(e) => setComentario(e.target.value)}
+          />
+          <div className="botones">
+            <button className="boton" onClick={() => votar(false)}>
+              Enviar
+            </button>
+            {alPedirOtra && (
+              <button className="boton boton-principal" onClick={() => votar(false, true)}>
+                Enviar y pedir otra explicación
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

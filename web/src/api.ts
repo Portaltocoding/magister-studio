@@ -17,6 +17,8 @@ export interface Mensaje {
   estado: Estado
   creado_en: string
   citas?: CitaInfo[]
+  traza_id?: string | null
+  voto?: boolean | null
 }
 
 export interface Conversacion {

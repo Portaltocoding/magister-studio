@@ -13,6 +13,7 @@ export interface Burbuja {
   tiempos?: { primero: number | null; total: number }
   citas?: CitaInfo[]
   traza?: string
+  voto?: boolean | null
 }
 
 interface Props {
@@ -108,7 +109,9 @@ export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeho
                 primer trozo {b.tiempos.primero ?? '·'} ms · total {b.tiempos.total} ms
               </small>
             )}
-            {b.rol === 'tutor' && b.traza && b.estado === 'completo' && <Valorar traza={b.traza} />}
+            {b.rol === 'tutor' && b.traza && b.estado === 'completo' && (
+              <Valorar traza={b.traza} inicial={b.voto ?? null} alPedirOtra={escribiendo ? undefined : alEnviar} />
+            )}
           </div>
         ))}
         <div ref={final} />

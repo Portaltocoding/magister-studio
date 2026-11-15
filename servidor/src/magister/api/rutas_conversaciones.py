@@ -73,10 +73,12 @@ async def listar_mensajes(cid: int, s: AsyncSession = Depends(sesion_por_peticio
         raise HTTPException(404, "conversación no encontrada")
     mensajes = await dc.listar_mensajes(s, cid)
     citas = await dc.citas_de_mensajes(s, [m.id for m in mensajes if m.rol == "tutor"])
+    votos = await dc.votos_de_trazas(s, [m.traza_id for m in mensajes if m.traza_id])
     salida = []
     for m in mensajes:
         x = MensajeSalida.model_validate(m)
         x.citas = citas.get(m.id, [])
+        x.voto = votos.get(m.traza_id) if m.traza_id else None
         salida.append(x)
     return salida
 
@@ -96,7 +98,10 @@ class Preparado:
 
 def guardador(cid: int, cuenta: bool):
     async def guardar(texto: str, estado: str, ms_primer: int | None, ms_total: int, extra: dict) -> int:
-        mid = await dc.guardar_respuesta(cid, texto, estado, ajustes.modelo, ajustes.motor, ms_primer, ms_total, cuenta)
+        from magister.cerebro.modelo import traza_actual
+
+        mid = await dc.guardar_respuesta(cid, texto, estado, ajustes.modelo, ajustes.motor, ms_primer, ms_total, cuenta,
+                                         traza_actual.get())
         if extra.get("citas"):
             await dc.guardar_citas(mid, extra["citas"], extra.get("busqueda_id"))
         return mid

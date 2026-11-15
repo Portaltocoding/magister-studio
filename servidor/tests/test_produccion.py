@@ -139,3 +139,11 @@ async def test_agenda(cliente) -> None:
     hecho = (await cliente.patch(f"/api/eventos/{e['id']}", json={"hecho": True})).json()
     assert hecho["hecho"] and (await cliente.get("/api/eventos/pendientes")).json() == []
     assert (await cliente.delete(f"/api/eventos/{e['id']}")).status_code == 204
+
+
+async def test_el_voto_vuelve_con_el_mensaje(cliente) -> None:
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "voto"})).json()["id"]
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "hola"}, headers={"X-Request-Id": "traza-voto"})
+    await cliente.post("/api/trazas/traza-voto/feedback", json={"bien": False, "comentario": "corto", "otra": True})
+    tutor = [m for m in (await cliente.get(f"/api/conversaciones/{cid}/mensajes")).json() if m["rol"] == "tutor"][0]
+    assert tutor["traza_id"] == "traza-voto" and tutor["voto"] is False
