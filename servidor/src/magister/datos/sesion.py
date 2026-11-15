@@ -13,7 +13,7 @@ _fabrica: async_sessionmaker[AsyncSession] | None = None
 def configurar(url: str | None = None) -> None:
     """Crea el motor. Los tests lo llaman con la base de pruebas."""
     global _motor, _fabrica
-    _motor = create_async_engine(url or ajustes.db_url, pool_pre_ping=True)
+    _motor = create_async_engine(url or (ajustes.db_url_sim if ajustes.simulado else ajustes.db_url), pool_pre_ping=True)
     _fabrica = async_sessionmaker(_motor, expire_on_commit=False)
 
 

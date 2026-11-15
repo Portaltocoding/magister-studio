@@ -18,6 +18,10 @@ class Recalcular(BaseModel):
     desde: date
 
 
+class Reajuste(BaseModel):
+    sesiones: list[dict]
+
+
 class EstadoSesion(BaseModel):
     estado: Literal["pendiente", "hecha", "saltada"]
 
@@ -59,3 +63,21 @@ async def ver_calendario(
 ) -> list[dict]:
     inicio = desde or date.today() - timedelta(days=date.today().weekday())
     return await planes.calendario(s, inicio, hasta or inicio + timedelta(days=27))
+
+
+@rutas.post("/temas/{tema_id}/plan/reajuste")
+async def proponer_reajuste(tema_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    from datetime import datetime, timezone
+
+    r = await planes.proponer_reajuste(s, tema_id, datetime.now(timezone.utc))
+    if r is None:
+        raise HTTPException(404, "este tema no tiene plan aceptado")
+    return r
+
+
+@rutas.post("/temas/{tema_id}/plan/reajuste/aceptar")
+async def aceptar_reajuste(tema_id: int, cuerpo: Reajuste, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    r = await planes.aplicar_reajuste(s, tema_id, cuerpo.sesiones, date.today())
+    if r is None:
+        raise HTTPException(404, "este tema no tiene plan aceptado")
+    return r

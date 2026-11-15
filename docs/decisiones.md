@@ -39,3 +39,10 @@ Este repo es la herramienta construida siguiendo el libro de punta a punta, para
 | IV | Vídeo | Solo el guion; ni Piper ni el montaje con HyperFrames | El libro lo deja como ampliación |
 | IV | Etiquetar | Modo propio en la barra lateral («Etiquetar tono») | Hace falta para calibrar el juez |
 | IV | Juez de tono | Sin calibrar todavía | Necesita tus etiquetas |
+| V | Programador por defecto | FSRS (ADR-0013) | Gana a Leitner con margen sin entrenar; el modelo propio espera a tus datos |
+| V | `p_predicha` | Tabla `servidas` con la apuesta al servir; el intento la copia | El contrato pide escribirla al servir y `intentos` es inmutable |
+| V | Conceptos en la cola | Los que tienen preguntas activas (material generado); hasta 10 nuevos al día | Sin material no hay qué preguntar |
+| V | Predicciones del walk-forward | CSV en vez de parquet | Sin dependencia nueva (pyarrow) |
+| V | Experimento de programadores | Columna `brazo` creada y respetada al programar, pero sin asignación automática ni sondas | El ADR del experimento lo escribes tú antes de lanzarlo |
+| V | Modo Tutor | Tarjeta «Hoy» y sesión idea a idea con comprobación por bloque, saltar y marcar, y cierre | Está en `docs/tutor.md` y en el plan maestro, aún no como práctica del libro |
+| V | Reajuste | La carga de repasos se reserva como media por día de la semana | `calendarizar` trabaja con disponibilidad semanal |

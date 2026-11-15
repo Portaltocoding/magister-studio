@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  enviarJson,
   hoyIso,
+  pedir,
   lanzarResearch,
   listarPlanes,
   marcarSesion,
@@ -28,6 +30,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   const [tema, setTema] = useState<number | null>(temaInicial ?? null)
   const [vista, setVista] = useState<VistaPlan | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [reajuste, setReajuste] = useState<{ cambios: string[]; avisos: string[]; texto: string; sesiones: unknown[] | null } | null>(null)
 
   useEffect(() => {
     listarPlanes()
@@ -101,6 +104,33 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
           {aviso}
         </p>
       )}
+      {reajuste && (
+        <section className="propuesta">
+          <h2>Reajuste propuesto</h2>
+          {reajuste.texto && <p>{reajuste.texto}</p>}
+          <ul className="nota">
+            {[...reajuste.cambios, ...reajuste.avisos].map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+          <div className="botones">
+            <button
+              className="boton boton-principal"
+              onClick={async () => {
+                if (tema == null || !reajuste.sesiones) return
+                setVista(await pedir<VistaPlan>(`/api/temas/${tema}/plan/reajuste/aceptar`, enviarJson({ sesiones: reajuste.sesiones })))
+                setReajuste(null)
+                setAviso('Reajuste aplicado.')
+              }}
+            >
+              Aceptar
+            </button>
+            <button className="boton" onClick={() => setReajuste(null)}>
+              Rechazar
+            </button>
+          </div>
+        </section>
+      )}
       {vista && (
         <>
           <p className="nota">
@@ -108,6 +138,18 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
             fin previsto {fechaCorta(vista.fin)}{' '}
             <button className="boton-mini" onClick={atrasado}>
               Me he atrasado
+            </button>{' '}
+            <button
+              className="boton-mini"
+              onClick={async () => {
+                if (tema == null) return
+                setAviso('Calculando el reajuste…')
+                const r = await pedir<NonNullable<typeof reajuste>>(`/api/temas/${tema}/plan/reajuste`, { method: 'POST' })
+                setAviso(r.cambios.length ? null : 'Tu calendario ya cuadra con tus repasos.')
+                setReajuste(r.cambios.length ? r : null)
+              }}
+            >
+              Reajustar con mis repasos
             </button>
           </p>
           <div className="dos-columnas">

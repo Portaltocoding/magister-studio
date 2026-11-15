@@ -234,3 +234,31 @@ label.boton-mini { display: inline-block; }
 .estado-bloqueado { background: #e8c1bc; color: #7a2b22; }
 .critica { width: 100%; min-height: 60px; font: inherit; margin: 8px 0; padding: 8px; border: 1px solid var(--borde); border-radius: 6px; background: var(--fondo); color: var(--texto); }
 a.boton-mini { text-decoration: none; display: inline-block; }
+
+/* v0.5: práctica y progreso */
+.practica { max-width: 760px; text-align: left; }
+.enunciado { font-size: 1.15rem; text-transform: none; letter-spacing: 0; color: var(--texto); font-weight: 500; }
+.correccion { border-left: 4px solid var(--borde); padding: 4px 14px; margin-top: 10px; }
+.nota-fallo { border-color: #b4544a; }
+.nota-parcial { border-color: #c08a2e; }
+.nota-bien, .nota-perfecta { border-color: var(--ok); }
+.fila-lecciones { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+.chip { border: 0; cursor: default; }
+button.chip { cursor: pointer; font: inherit; font-size: 0.8rem; color: var(--texto); }
+.concepto-nuevo { background: var(--activo); }
+.concepto-flojo { background: #e8c1bc; color: #5c1f18; }
+.concepto-aprendiendo { background: #e8d9b5; color: #4a3a0f; }
+.concepto-dominado { background: #bfd8c1; color: #1f4a24; }
+.barras { display: flex; gap: 4px; align-items: flex-end; height: 120px; border-bottom: 1px solid var(--borde); }
+.barra-dia { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.barra-dia span { width: 100%; background: var(--ok); border-radius: 3px 3px 0 0; min-height: 1px; }
+.barra-dia small { font-size: 0.7rem; color: var(--suave); }
+.fiabilidad svg { width: 180px; height: 180px; border: 1px solid var(--borde); background: var(--panel); }
+.fiabilidad circle { fill: var(--ok); opacity: 0.8; }
+.fiabilidad .diagonal { stroke: var(--suave); stroke-dasharray: 3 3; }
+
+/* Modo Tutor */
+.tarjeta-hoy { margin: 16px auto; max-width: 480px; align-items: center; text-align: center; cursor: default; }
+.sesion-tutor { max-width: 800px; }
+.sesion-tutor > .barra { margin: 6px 0 16px; }
+.comprobar { border: 1px solid var(--borde); border-radius: 10px; padding: 10px 14px; margin: 12px 0; text-align: left; }

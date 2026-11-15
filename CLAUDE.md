@@ -17,6 +17,7 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 - `flujo` (el grafo de LangGraph) importa de `cerebro`, `plan` y `datos`.
 - `cerebro` y `datos` solo importan de `magister.config`, para leer sus ajustes.
 - `material` importa de `cerebro`, `plan`, `tono` y `datos`; `tono` importa solo de `cerebro`; `trabajos` importa de `material` y `datos`; `api` importa además de `trabajos`.
+- `aprender` importa de `cerebro`, `plan`, `tono`, `datos` y `config`; `api` y `flujo` importan de `aprender`.
 - `plan` es código puro: no importa de `datos`, `cerebro` ni `config`.
 - `cerebro` y `datos` nunca importan de `api` ni el uno del otro.
 - Las evals viven en `servidor/evals/` y se lanzan con `uv run python -m evals.<modulo>`.
@@ -39,6 +40,15 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 4. Un juez que no devuelve JSON válido o cita algo que no está en el texto devuelve `FalloJuez`, nunca un suspenso.
 5. Todo trabajo largo va por la cola de `trabajos/`; los nodos son idempotentes (upsert, no insert).
 6. Las pruebas no llaman a `claude`; los harness de jueces (`evals.tono`, `evals.fidelidad`) sí, y solo a mano.
+
+## Aprender (Parte V)
+
+1. `intentos` no se actualiza ni se borra; solo `nota_usuario` admite un `UPDATE`.
+2. Toda columna de un modelo se calcula con `estado_en` o `features_en`, que solo leen intentos anteriores al momento dado.
+3. `p_predicha` se escribe al servir la pregunta (tabla `servidas`), nunca después de corregir.
+4. Los reintentos (`tipo = reintento`) no entran en el programador ni en el modelo.
+5. Nada de `date.today()` ni `datetime.now()` dentro de funciones de dominio: el momento entra como argumento.
+6. El contrato manda: `docs/contratos/aprender.md`.
 
 ## Estilo
 

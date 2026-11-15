@@ -58,6 +58,14 @@ class Ajustes(BaseSettings):
     trabajos_intentos: int = 5
     duracion_guion_min: int = 8
 
+    # Aprender (Parte V)
+    programador: str = "fsrs"  # leitner, fsrs o modelo (ADR-0013)
+    retencion: float = 0.9
+    inicio_dia: str = "04:00"
+    zona: str = "Europe/Madrid"
+    nuevos_dia: int = 10  # conceptos nuevos que entran en la cola cada día
+    simulado: bool = False  # si es verdadero, la sesión usa la base de simulación
+
     # Research (Parte III)
     research_pasos: int = 12
     research_llamadas: int = 8
