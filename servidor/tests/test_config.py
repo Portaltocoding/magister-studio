@@ -1,7 +1,9 @@
 from magister.config import Ajustes
 
 
-def test_ajustes_por_defecto() -> None:
+def test_ajustes_por_defecto(monkeypatch) -> None:
+    for v in ("MAGISTER_MOTOR", "MAGISTER_TIMEOUT_S", "MAGISTER_MODELO"):
+        monkeypatch.delenv(v, raising=False)
     ajustes = Ajustes(_env_file=None)
 
     assert ajustes.motor == "cli"
