@@ -40,5 +40,10 @@ async def base():
 
 @pytest.fixture
 async def cliente(base):
+    from magister.cerebro.estructura import eco
+    from magister.flujo.grafo import iniciar
+
+    iniciar(None)  # un grafo con InMemorySaver nuevo: los ids se reinician en cada test
+    eco.vaciar()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://prueba") as c:
         yield c

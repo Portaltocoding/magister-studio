@@ -47,11 +47,16 @@ class Tema(Base):
 
 class Conversacion(Base):
     __tablename__ = "conversaciones"
-    __table_args__ = (Index("ix_conversaciones_actualizada", "actualizada_en"),)
+    __table_args__ = (
+        Index("ix_conversaciones_actualizada", "actualizada_en"),
+        CheckConstraint("tipo in ('libre', 'plan', 'tutor')", name="ck_conversaciones_tipo"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     tema_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("temas.id", ondelete="SET NULL"))
     titulo: Mapped[str] = mapped_column(String(200))
+    # libre: Estudio libre; plan: diagnóstico que acaba en un plan; tutor: sesión guiada (v0.5)
+    tipo: Mapped[str] = mapped_column(String(10), server_default="libre")
     creada_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
     actualizada_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
 

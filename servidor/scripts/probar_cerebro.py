@@ -12,7 +12,7 @@ async def principal(pregunta: str) -> None:
     t0 = time.perf_counter()
     primero = None
     n = 0
-    async for trozo in generar(cargar("libre").texto, [Turno("usuario", pregunta)]):
+    async for trozo in generar(cargar("conversar").texto, [Turno("usuario", pregunta)]):
         if primero is None:
             primero = time.perf_counter() - t0
         n += 1

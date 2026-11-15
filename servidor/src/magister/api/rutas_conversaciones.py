@@ -1,6 +1,8 @@
-"""Temas, conversaciones y mensajes (v0.1)."""
+"""Temas, conversaciones y mensajes. Los mensajes pasan por el grafo (`flujo`)."""
 
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.sse import EventSourceResponse, ServerSentEvent
@@ -10,19 +12,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from magister.api.esquemas import (
     ConversacionEntrada,
     ConversacionSalida,
+    DecisionEntrada,
     MensajeEntrada,
     MensajeSalida,
     TemaEntrada,
     TemaSalida,
 )
 from magister.api.flujo import flujo_tutor
-from magister.cerebro.modelo import Turno, generar
-from magister.cerebro.prompts import cargar
 from magister.config import ajustes
 from magister.datos import conversaciones as dc
 from magister.datos.sesion import sesion_por_peticion
+from magister.flujo import ejecutar
 
 rutas = APIRouter(prefix="/api")
+
+
+def hoy() -> date:
+    return date.today()
 
 
 @rutas.post("/temas", status_code=201)
@@ -51,7 +57,7 @@ async def crear_conversacion(
 ) -> ConversacionSalida:
     if cuerpo.tema_id is not None and await dc.obtener_tema(s, cuerpo.tema_id) is None:
         raise HTTPException(404, "tema no encontrado")
-    c = await dc.crear_conversacion(s, cuerpo.titulo.strip(), cuerpo.tema_id)
+    c = await dc.crear_conversacion(s, cuerpo.titulo.strip(), cuerpo.tema_id, cuerpo.tipo)
     return ConversacionSalida.model_validate(c)
 
 
@@ -68,30 +74,65 @@ async def listar_mensajes(cid: int, s: AsyncSession = Depends(sesion_por_peticio
     return [MensajeSalida.model_validate(m) for m in await dc.listar_mensajes(s, cid)]
 
 
+@rutas.get("/conversaciones/{cid}/propuesta")
+async def propuesta_pendiente(cid: int) -> dict | None:
+    """El plan propuesto que espera tu decisión, o null. Sirve para recuperarlo al recargar."""
+    return await ejecutar.propuesta_pendiente(cid)
+
+
+@dataclass
+class Preparado:
+    tipo: str
+    turnos: list[dict]
+    cuenta: bool
+
+
+def guardador(cid: int, cuenta: bool):
+    async def guardar(texto: str, estado: str, ms_primer: int | None, ms_total: int) -> int:
+        return await dc.guardar_respuesta(cid, texto, estado, ajustes.modelo, ajustes.motor, ms_primer, ms_total, cuenta)
+
+    return guardar
+
+
 async def preparar_mensaje(
     cid: int, cuerpo: MensajeEntrada, s: AsyncSession = Depends(sesion_por_peticion)
-) -> list[Turno]:
+) -> Preparado:
     """Corre antes de abrir el flujo: así el 404 es un 404 y no un evento.
 
     Guarda la pregunta y confirma antes de llamar al modelo; devuelve el historial
     completo y cierra la transacción para no tenerla abierta durante el flujo.
     """
-    if await dc.obtener_conversacion(s, cid) is None:
+    c = await dc.obtener_conversacion(s, cid)
+    if c is None:
         raise HTTPException(404, "conversación no encontrada")
+    tipo = c.tipo
     await dc.guardar_pregunta(s, cid, cuerpo.contenido, cuerpo.cuenta)
-    return [Turno(m.rol, m.contenido) for m in await dc.historial_completo(s, cid)]  # type: ignore[arg-type]
+    turnos = [{"rol": m.rol, "contenido": m.contenido} for m in await dc.historial_completo(s, cid)]
+    return Preparado(tipo, turnos, cuerpo.cuenta)
 
 
 @rutas.post("/conversaciones/{cid}/mensajes", response_class=EventSourceResponse)
 async def enviar_mensaje(
-    cid: int, cuerpo: MensajeEntrada, historial: list[Turno] = Depends(preparar_mensaje)
+    cid: int, cuerpo: MensajeEntrada, p: Preparado = Depends(preparar_mensaje)
 ) -> AsyncIterator[ServerSentEvent]:
-    async def guardar(texto: str, estado: str, ms_primer: int | None, ms_total: int) -> int:
-        return await dc.guardar_respuesta(
-            cid, texto, estado, ajustes.modelo, ajustes.motor, ms_primer, ms_total, cuerpo.cuenta
-        )
+    fase_inicial = "diagnostico" if p.tipo == "plan" else "estudio"
+    eventos = ejecutar.mensaje(cid, cuerpo.contenido, p.turnos, hoy(), fase_inicial)
+    async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid}):
+        yield evento
 
-    async for evento in flujo_tutor(
-        generar(cargar("libre").texto, historial), guardar, {"conversacion_id": cid}
-    ):
+
+async def preparar_decision(cid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> list[dict]:
+    if await dc.obtener_conversacion(s, cid) is None:
+        raise HTTPException(404, "conversación no encontrada")
+    if not await ejecutar.pendiente_de_decision(cid):
+        raise HTTPException(409, "no hay ningún plan pendiente de decisión")
+    return [{"rol": m.rol, "contenido": m.contenido} for m in await dc.historial_completo(s, cid)]
+
+
+@rutas.post("/conversaciones/{cid}/plan/decision", response_class=EventSourceResponse)
+async def decidir_plan(
+    cid: int, cuerpo: DecisionEntrada, turnos: list[dict] = Depends(preparar_decision)
+) -> AsyncIterator[ServerSentEvent]:
+    eventos = ejecutar.decision(cid, cuerpo.model_dump(), hoy(), turnos)
+    async for evento in flujo_tutor(eventos, guardador(cid, True), {"conversacion_id": cid}):
         yield evento

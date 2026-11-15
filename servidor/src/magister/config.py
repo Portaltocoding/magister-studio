@@ -30,5 +30,11 @@ class Ajustes(BaseSettings):
     # LangGraph (conversación de diagnóstico)
     checkpoints: str = str(RAIZ_SERVIDOR / "checkpoints.sqlite")
 
+    # Plan (Parte II)
+    reintentos: int = 2  # reintentos dentro de estructurar (3 intentos)
+    holgura: float = 0.15  # criterio general
+    horas_max_leccion: float = 4.0  # criterio general
+    partir_lecciones: bool = True  # una lección puede ocupar varios días
+
 
 ajustes = Ajustes()

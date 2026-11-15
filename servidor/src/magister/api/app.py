@@ -10,13 +10,15 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from magister.api.rutas_conversaciones import rutas as rutas_conversaciones
+from magister.api.rutas_plan import rutas as rutas_plan
 from magister.api.seguridad import Proteccion
 from magister.config import ajustes
 from magister.datos import conversaciones as dc
 from magister.datos import sesion
 from magister.datos.sesion import sesion_por_peticion
+from magister.flujo.grafo import iniciar as iniciar_grafo
 
-VERSION_CONTRATO = "0.1"
+VERSION_CONTRATO = "0.2"
 
 registro = logging.getLogger("uvicorn.error")
 
@@ -25,7 +27,13 @@ registro = logging.getLogger("uvicorn.error")
 async def ciclo_de_vida(_: FastAPI):
     if not ajustes.token:
         registro.warning("MAGISTER_TOKEN está vacío: la API no exige token. Ponlo en servidor/.env.")
-    yield
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+    # El checkpointer se abre una vez: las pausas del grafo sobreviven a un reinicio (ADR-0004).
+    async with AsyncSqliteSaver.from_conn_string(ajustes.checkpoints) as saver:
+        iniciar_grafo(saver)
+        yield
+    iniciar_grafo(None)
     await sesion.cerrar()
 
 
@@ -66,3 +74,4 @@ async def pulso(n: int = 5, juntos: int = 0) -> AsyncIterator[ServerSentEvent]:
 
 
 app.include_router(rutas_conversaciones)
+app.include_router(rutas_plan)

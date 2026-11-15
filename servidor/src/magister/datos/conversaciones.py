@@ -33,8 +33,10 @@ async def obtener_tema(s: AsyncSession, tema_id: int) -> Tema | None:
     return await s.get(Tema, tema_id)
 
 
-async def crear_conversacion(s: AsyncSession, titulo: str, tema_id: int | None) -> Conversacion:
-    c = Conversacion(titulo=titulo, tema_id=tema_id)
+async def crear_conversacion(
+    s: AsyncSession, titulo: str, tema_id: int | None, tipo: str = "libre"
+) -> Conversacion:
+    c = Conversacion(titulo=titulo, tema_id=tema_id, tipo=tipo)
     s.add(c)
     await s.commit()
     await s.refresh(c)
