@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from magister.api.rutas_conversaciones import rutas as rutas_conversaciones
+from magister.api.rutas_fuentes import rutas as rutas_fuentes
+from magister.api.rutas_research import rutas as rutas_research
 from magister.api.rutas_plan import rutas as rutas_plan
 from magister.api.seguridad import Proteccion
 from magister.config import ajustes
@@ -18,7 +20,7 @@ from magister.datos import sesion
 from magister.datos.sesion import sesion_por_peticion
 from magister.flujo.grafo import iniciar as iniciar_grafo
 
-VERSION_CONTRATO = "0.2"
+VERSION_CONTRATO = "0.3"
 
 registro = logging.getLogger("uvicorn.error")
 
@@ -30,9 +32,24 @@ async def ciclo_de_vida(_: FastAPI):
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
     # El checkpointer se abre una vez: las pausas del grafo sobreviven a un reinicio (ADR-0004).
+    from magister.flujo.fuentes import recalcular_apoyo_por_versiones
+    from magister.fuentes.buscar import BuscadorHibrido
+    from magister.fuentes.ingesta import bucle_de_fondo
+    from magister.research.tareas import cortar_en_curso
+
+    # api construye el buscador y lo inyecta: flujo no importa magister.fuentes.
+    buscador = BuscadorHibrido()
+    await cortar_en_curso()
+
+    async def al_quedar_listas(ids: list[int]) -> None:
+        await recalcular_apoyo_por_versiones(buscador, ids)
+
+    fondo = asyncio.create_task(bucle_de_fondo(al_quedar_listas)) if ajustes.procesar_fondo else None
     async with AsyncSqliteSaver.from_conn_string(ajustes.checkpoints) as saver:
-        iniciar_grafo(saver)
+        iniciar_grafo(saver, buscador)
         yield
+    if fondo is not None:
+        fondo.cancel()
     iniciar_grafo(None)
     await sesion.cerrar()
 
@@ -75,3 +92,5 @@ async def pulso(n: int = 5, juntos: int = 0) -> AsyncIterator[ServerSentEvent]:
 
 app.include_router(rutas_conversaciones)
 app.include_router(rutas_plan)
+app.include_router(rutas_fuentes)
+app.include_router(rutas_research)

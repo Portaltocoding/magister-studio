@@ -2,9 +2,17 @@ from magister.config import ajustes
 from magister.datos.plan import guardar_plan
 from magister.flujo.comun import decir, fase, perfil_de
 from magister.flujo.estado import Estado
+from magister.flujo.fuentes import calcular_apoyo
 
 
-async def guardar(estado: Estado) -> dict:
+def hacer_guardar(buscador=None):
+    async def nodo(estado: Estado) -> dict:
+        return await guardar(estado, buscador)
+
+    return nodo
+
+
+async def guardar(estado: Estado, buscador=None) -> dict:
     fase("guardar")
     perfil = perfil_de(estado)
     tema_id, plan_id = await guardar_plan(
@@ -16,6 +24,7 @@ async def guardar(estado: Estado) -> dict:
         estado.get("version_prompt"),
         ajustes.modelo,
     )
+    await calcular_apoyo(buscador, plan_id, tema_id)
     decir(
         "Hecho: plan guardado. Lo tienes en **Roadmap** y las sesiones en **Calendario**. "
         "Cuando quieras, sigue preguntándome aquí o empieza una sesión con el **Tutor**."

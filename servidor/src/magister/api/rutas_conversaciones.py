@@ -71,7 +71,14 @@ async def borrar_conversacion(cid: int, s: AsyncSession = Depends(sesion_por_pet
 async def listar_mensajes(cid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> list[MensajeSalida]:
     if await dc.obtener_conversacion(s, cid) is None:
         raise HTTPException(404, "conversación no encontrada")
-    return [MensajeSalida.model_validate(m) for m in await dc.listar_mensajes(s, cid)]
+    mensajes = await dc.listar_mensajes(s, cid)
+    citas = await dc.citas_de_mensajes(s, [m.id for m in mensajes if m.rol == "tutor"])
+    salida = []
+    for m in mensajes:
+        x = MensajeSalida.model_validate(m)
+        x.citas = citas.get(m.id, [])
+        salida.append(x)
+    return salida
 
 
 @rutas.get("/conversaciones/{cid}/propuesta")
@@ -88,8 +95,11 @@ class Preparado:
 
 
 def guardador(cid: int, cuenta: bool):
-    async def guardar(texto: str, estado: str, ms_primer: int | None, ms_total: int) -> int:
-        return await dc.guardar_respuesta(cid, texto, estado, ajustes.modelo, ajustes.motor, ms_primer, ms_total, cuenta)
+    async def guardar(texto: str, estado: str, ms_primer: int | None, ms_total: int, extra: dict) -> int:
+        mid = await dc.guardar_respuesta(cid, texto, estado, ajustes.modelo, ajustes.motor, ms_primer, ms_total, cuenta)
+        if extra.get("citas"):
+            await dc.guardar_citas(mid, extra["citas"], extra.get("busqueda_id"))
+        return mid
 
     return guardar
 

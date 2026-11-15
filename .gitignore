@@ -20,3 +20,4 @@ servidor/checkpoints.sqlite*
 servidor/datos_locales/
 *.log
 servidor/evals/resultados/
+servidor/crudo/

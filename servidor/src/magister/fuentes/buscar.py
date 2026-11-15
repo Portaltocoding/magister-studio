@@ -1,0 +1,170 @@
+"""Búsqueda densa (pgvector, coseno), léxica (tsvector en castellano) e híbrida con RRF.
+
+Las dos vías comparten una sola función de filtros: versiones `lista`, la configuración
+del índice pedida (la activa por defecto), tipos de fuente y tema (el tema N y lo que
+no tiene tema). Lo que viaja son ids y rangos; el texto se hidrata al final, en una
+consulta, conservando el orden de la fusión.
+"""
+
+import asyncio
+import time
+from sqlalchemy import text
+
+from magister.cerebro.contratos import Consulta, Filtros, Recuperado, ResultadoBusqueda
+from magister.datos import repositorio_fuentes as rf
+from magister.datos.fuentes import Busqueda
+from magister.datos.sesion import nueva_sesion
+from magister.fuentes.embeber import embeber
+from magister.fuentes.fusion import rrf
+from magister.fuentes.reranker import reordenar
+
+
+def _filtros_sql(filtros: Filtros | None) -> tuple[str, dict]:
+    condiciones = ["v.estado = 'lista'", "f.config_id = :config_id"]
+    valores: dict = {}
+    if filtros and filtros.tema_id is not None:
+        condiciones.append("(d.tema_id = :tema_id or d.tema_id is null)")
+        valores["tema_id"] = filtros.tema_id
+    if filtros and filtros.fuente_tipos:
+        condiciones.append("fu.tipo = any(:tipos)")
+        valores["tipos"] = list(filtros.fuente_tipos)
+    # Una copia marcada como duplicada no ocupa hueco en el top-k.
+    condiciones.append("v.duplicado_de is null")
+    return " and ".join(condiciones), valores
+
+
+DESDE = """from fragmentos f
+  join versiones v on v.id = f.version_id
+  join documentos d on d.id = v.documento_id
+  join fuentes fu on fu.id = d.fuente_id"""
+
+
+def _vector(v: list[float]) -> str:
+    return "[" + ",".join(f"{x:.6f}" for x in v) + "]"
+
+
+async def _config(indice: str | None) -> tuple[int, dict]:
+    async with nueva_sesion() as s:
+        c = await rf.configuracion(s, indice)
+        if c is None:
+            raise ValueError(f"no existe la configuración del índice {indice or '(activa)'}")
+        return c.id, c.params
+
+
+async def buscar_densa(consulta: str, k: int, filtros: Filtros | None, indice: str | None = None) -> list[tuple[int, float]]:
+    config_id, params = await _config(indice)
+    vec = (await asyncio.to_thread(embeber, [consulta], "consulta", params))[0]
+    donde, valores = _filtros_sql(filtros)
+    sql = text(
+        f"select f.id, 1 - (f.embedding <=> cast(:v as vector)) as p {DESDE} "
+        f"where {donde} and f.embedding is not null order by f.embedding <=> cast(:v as vector) limit :k"
+    )
+    async with nueva_sesion() as s:
+        filas = (await s.execute(sql, {**valores, "v": _vector(vec), "k": k, "config_id": config_id})).all()
+    return [(int(i), float(p)) for i, p in filas]
+
+
+async def buscar_lexica(consulta: str, k: int, filtros: Filtros | None, indice: str | None = None) -> list[tuple[int, float]]:
+    config_id, _ = await _config(indice)
+    donde, valores = _filtros_sql(filtros)
+    sql = text(
+        f"select f.id, ts_rank_cd(f.lexico, q, 1) as p {DESDE}, websearch_to_tsquery('spanish', :q) q "
+        f"where {donde} and f.lexico @@ q order by p desc, f.id limit :k"
+    )
+    async with nueva_sesion() as s:
+        filas = (await s.execute(sql, {**valores, "q": consulta, "k": k, "config_id": config_id})).all()
+    return [(int(i), float(p)) for i, p in filas]
+
+
+async def hidratar(pares: list[tuple[int, float]]) -> list[Recuperado]:
+    if not pares:
+        return []
+    sql = text(
+        f"select f.id, f.texto, d.titulo, d.uri, fu.tipo, v.id {DESDE} where f.id = any(:ids)"
+    )
+    async with nueva_sesion() as s:
+        filas = {r[0]: r for r in (await s.execute(sql, {"ids": [i for i, _ in pares]})).all()}
+    salida = []
+    for n, (fid, p) in enumerate(pares, start=1):
+        if fid in filas:
+            _, texto, titulo, uri, tipo, vid = filas[fid]
+            salida.append(Recuperado(fid, n, p, texto, titulo, uri, tipo, vid))
+    return salida
+
+
+def _como_recuperados(pares: list[tuple[int, float]]) -> list[Recuperado]:
+    return [Recuperado(fid, n, p, "", "", "", "", 0) for n, (fid, p) in enumerate(pares, start=1)]
+
+
+class BuscadorHibrido:
+    """Cumple `cerebro.contratos.Buscador`. Deja una traza en `busquedas` en cada llamada."""
+
+    async def buscar(
+        self,
+        consulta: str,
+        k: int,
+        filtros: Filtros | None = None,
+        params: Consulta | None = None,
+        consulta_original: str | None = None,
+    ) -> ResultadoBusqueda:
+        params = params or Consulta()
+        t0 = time.perf_counter()
+        config_id, _ = await _config(params.indice)
+        densa: list[tuple[int, float]] = []
+        lexica: list[tuple[int, float]] = []
+        n = max(params.n_candidatos, k)
+        if params.via in ("densa", "hibrida"):
+            densa = await buscar_densa(consulta, n, filtros, params.indice)
+        if params.via in ("lexica", "hibrida"):
+            lexica = await buscar_lexica(consulta, n, filtros, params.indice)
+        if params.via == "hibrida":
+            fusion = rrf(_como_recuperados(densa), _como_recuperados(lexica))
+            pares = [(r.fragmento_id, r.puntuacion) for r in fusion]
+        else:
+            pares = densa or lexica
+        rerank: list[Recuperado] | None = None
+        ms_reranker = None
+        if params.reranker and pares:
+            candidatos = await hidratar(pares[: params.n_candidatos])
+            t1 = time.perf_counter()
+            rerank = await asyncio.to_thread(reordenar, consulta, candidatos)
+            ms_reranker = int((time.perf_counter() - t1) * 1000)
+            recuperados = rerank[:k]
+        else:
+            recuperados = await hidratar(pares[:k])
+        ms = int((time.perf_counter() - t0) * 1000)
+        async with nueva_sesion() as s, s.begin():
+            b = Busqueda(
+                consulta=consulta_original or consulta,
+                consulta_reescrita=consulta if consulta_original and consulta_original != consulta else None,
+                config_id=config_id,
+                via=params.via,
+                densa=[[i, n + 1] for n, (i, _) in enumerate(densa)],
+                lexica=[[i, n + 1] for n, (i, _) in enumerate(lexica)],
+                fusion=[[i, n + 1] for n, (i, _) in enumerate(pares[:k])],
+                reranker=[[r.fragmento_id, r.rango] for r in rerank] if rerank is not None else None,
+                ms=ms,
+                ms_reranker=ms_reranker,
+            )
+            s.add(b)
+            await s.flush()
+            busqueda_id = b.id
+        return ResultadoBusqueda(recuperados, busqueda_id, dict(densa))
+
+    async def indice_fuentes(self, tema_id: int | None, max_caracteres: int = 6000) -> str:
+        """Títulos de documento y encabezados del tema, para orientar al planificador."""
+        donde = "v.estado = 'lista'" + (" and d.tema_id = :tema" if tema_id is not None else "")
+        sql = text(
+            f"select d.titulo, v.texto from versiones v join documentos d on d.id = v.documento_id "
+            f"where {donde} order by d.titulo limit 60"
+        )
+        async with nueva_sesion() as s:
+            filas = (await s.execute(sql, {"tema": tema_id} if tema_id is not None else {})).all()
+        lineas: list[str] = []
+        for titulo, texto in filas:
+            lineas.append(f"- {titulo}")
+            for linea in (texto or "").splitlines():
+                if linea.startswith(("# ", "## ")):
+                    lineas.append(f"  {linea.strip()}")
+        salida = "\n".join(lineas)
+        return salida[:max_caracteres]

@@ -21,3 +21,13 @@ Este repo es la herramienta construida siguiendo el libro de punta a punta, para
 | II | Banco de peticiones | 8 casos provisionales en `evals/banco/plan-v1.yaml` | El libro pide que escribas tú los 30; estos son para que el harness funcione |
 | II | Mensaje con plan pendiente | Cuenta como «cambiar» con ese texto | Si escribes en vez de pulsar un botón, no se pierde |
 | II | Sesiones | Se marcan hecha o saltada desde Roadmap y Calendario (`PATCH /api/sesiones/{id}`) | Para que «Me he atrasado» sepa qué está hecho |
+| III | Estudio libre sin fuentes | Si la mejor similitud es menor que 0,85, dice «No lo encuentro en tus fuentes» y responde con conocimiento general; con fuentes, cita cada afirmación y puede añadir «Fuera de tus fuentes:» | Una herramienta de estudio no puede quedarse muda si aún no has subido nada |
+| III | Umbral de «hay fuentes» | 0,85 de similitud densa | Medido: lo ajeno da 0,78 a 0,81 y lo relacionado 0,89 a 0,91 |
+| III | MinHash | Escrito a mano (128 funciones, 5-gramas de palabras, 16 bandas de 8) | Sin dependencia nueva |
+| III | Versión nueva de un documento | Retira las versiones vivas anteriores (no las borra) | Si no, la búsqueda trae el texto viejo y el nuevo |
+| III | Duplicados en la búsqueda | Las versiones marcadas `duplicado_de` no entran en la búsqueda | Que dos copias no ocupen dos huecos del top-k |
+| III | OCR y audio | No se montan: los escaneados van a cuarentena | Tesseract y faster-whisper son dependencias del sistema; queda como ampliación |
+| III | RAGAS | Juez propio con `claude -p` (`evals/fidelidad.py`): faithfulness por afirmaciones; comprobado con el ejemplo de Einstein (0,5) | RAGAS arrastra langchain y dos trampas de versiones en Windows |
+| III | Research por defecto | Flujo fijo; el agente se elige con `"sistema": "agente"` | La regla del libro: el agente solo si gana en pass^3 |
+| III | Banco del retriever | Se genera con `python -m evals.banco_rag sintetico` sobre tus fuentes | No hay corpus tuyo todavía |
+| III | Tarea de fondo | Un bucle en el `lifespan` procesa recibidas y pendientes cada 2 s y recalcula el apoyo de los planes al acabar cada pasada | La Parte IV la convierte en trabajos con cola |

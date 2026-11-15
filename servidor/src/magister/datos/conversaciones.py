@@ -115,3 +115,31 @@ async def guardar_respuesta(
         await s.commit()
         await s.refresh(m)
         return m.id
+
+
+async def guardar_citas(mensaje_id: int, citas: list[dict], busqueda_id: int | None) -> None:
+    from magister.datos.fuentes import MensajeCita
+
+    async with nueva_sesion() as s, s.begin():
+        vistos: set[int] = set()
+        for c in citas:
+            if c["fragmento_id"] in vistos:
+                continue
+            vistos.add(c["fragmento_id"])
+            existe = await s.scalar(text("select 1 from fragmentos where id = :i"), {"i": c["fragmento_id"]})
+            if not existe:
+                continue  # una cita inventada no se guarda; ya va marcada como dudosa en el fin
+            s.add(MensajeCita(mensaje_id=mensaje_id, fragmento_id=c["fragmento_id"], cita_literal=c["cita_literal"],
+                              dudosa=c["dudosa"], busqueda_id=busqueda_id))
+
+
+async def citas_de_mensajes(s: AsyncSession, ids: list[int]) -> dict[int, list[dict]]:
+    from magister.datos.fuentes import MensajeCita
+
+    filas = (await s.scalars(select(MensajeCita).where(MensajeCita.mensaje_id.in_(ids)))).all() if ids else []
+    salida: dict[int, list[dict]] = {}
+    for c in filas:
+        salida.setdefault(c.mensaje_id, []).append(
+            {"fragmento_id": c.fragmento_id, "cita_literal": c.cita_literal, "dudosa": c.dudosa}
+        )
+    return salida

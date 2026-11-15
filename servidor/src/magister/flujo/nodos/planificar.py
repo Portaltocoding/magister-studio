@@ -9,7 +9,14 @@ from magister.plan.reglas import es_solo_capacidad, presupuesto
 from magister.plan.reglas import reglas_plan as construir_reglas
 
 
-async def planificar(estado: Estado) -> dict:
+def hacer_planificar(buscador=None):
+    async def nodo(estado: Estado) -> dict:
+        return await planificar(estado, buscador)
+
+    return nodo
+
+
+async def planificar(estado: Estado, buscador=None) -> dict:
     fase("planificar")
     perfil = perfil_de(estado)
     hoy = hoy_de(estado)
@@ -20,7 +27,7 @@ async def planificar(estado: Estado) -> dict:
         perfil=perfil_json(perfil),
         horas_max=f"{reglas.horas_max_leccion:g}",
         presupuesto=f"{tope:g}",
-        fuentes=await fuentes_plan.contexto_para_plan(perfil.tema or ""),
+        fuentes=await fuentes_plan.contexto_para_plan(buscador, perfil.tema or ""),
         hoy=hoy.isoformat(),
     )
     fallidos: list[Intento] = []

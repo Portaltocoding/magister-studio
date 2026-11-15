@@ -104,7 +104,11 @@ async def estructurar(
         salida: dict | None
         info: dict = {}
         if ajustes.motor == "eco":
-            salida = eco.siguiente(Modelo)
+            try:
+                salida = eco.siguiente(Modelo)
+            except FileNotFoundError:
+                intentos.append(Intento([f"el motor eco no tiene fijo para {Modelo.__name__}"]))
+                continue
         else:
             try:
                 salida, info = await _llamar_cli(sistema, texto, esquema)

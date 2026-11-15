@@ -1,6 +1,7 @@
 import EstudioLibre from './EstudioLibre.tsx'
 import type { IdModo } from './modos.ts'
 import PanelCalendario from './paneles/PanelCalendario.tsx'
+import PanelFuentes from './paneles/PanelFuentes.tsx'
 import PanelPlan from './paneles/PanelPlan.tsx'
 
 interface Props {
@@ -40,7 +41,7 @@ export default function Central({
     case 'calendario':
       return <PanelCalendario />
     case 'temas':
-      return <Pendiente texto="Tus documentos y de dónde sale cada cita." />
+      return <PanelFuentes />
     case 'proyectos':
       return <Pendiente texto="El camino que sale de lo que construyes y su diario de decisiones." />
     case 'fichas':
