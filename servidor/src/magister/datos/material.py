@@ -45,6 +45,7 @@ class Trabajo(Base):
     total: Mapped[int] = mapped_column(Integer, server_default="0")
     avisos: Mapped[list] = mapped_column(JSONB, server_default="[]")
     error: Mapped[str | None] = mapped_column(Text)
+    traza_id: Mapped[str | None] = mapped_column(String(64))
     creado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
     empezado_en: Mapped[datetime | None] = mapped_column(Fecha)
     acabado_en: Mapped[datetime | None] = mapped_column(Fecha)

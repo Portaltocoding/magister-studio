@@ -262,3 +262,9 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.8rem; color: var(--te
 .sesion-tutor { max-width: 800px; }
 .sesion-tutor > .barra { margin: 6px 0 16px; }
 .comprobar { border: 1px solid var(--borde); border-radius: 10px; padding: 10px 14px; margin: 12px 0; text-align: left; }
+
+/* v1.0 */
+.alerta { margin-right: auto; color: #b4544a; font-size: 0.85rem; }
+.valorar { display: inline-flex; gap: 4px; margin-top: 4px; align-items: center; }
+.valorar button { font: inherit; font-size: 0.8rem; border: 1px solid var(--borde); border-radius: 4px; background: transparent; color: var(--suave); cursor: pointer; padding: 0 6px; }
+.valorar button[aria-pressed="true"] { color: var(--texto); border-color: var(--texto); }

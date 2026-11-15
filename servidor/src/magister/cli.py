@@ -9,6 +9,9 @@
     magister versiones --duplicadas
     magister trocear --version <id> --solo-contar
     magister calidad [--semanas 8]
+    magister exportar --salida <carpeta>
+    magister borrar-todo [--confirmar] [--fuentes]
+    magister prompts listar <nombre> | activar <nombre> <version>
     magister ayuda
 """
 
@@ -96,6 +99,20 @@ async def principal(args: argparse.Namespace) -> None:
         await _trocear(args.version)
     elif args.orden == "calidad":
         await _calidad(args.semanas)
+    elif args.orden == "exportar":
+        from pathlib import Path
+
+        from magister.datos.tus_datos import exportar
+
+        cuentas = await exportar(Path(args.salida))
+        print(f"Exportado a {args.salida}: " + ", ".join(f"{k} {v}" for k, v in cuentas.items() if v))
+    elif args.orden == "borrar-todo":
+        from magister.datos.tus_datos import borrar_todo
+
+        cuentas = await borrar_todo(args.confirmar, args.fuentes)
+        print(("Borrado: " if args.confirmar else "Borraría (añade --confirmar): ") + ", ".join(f"{k} {v}" for k, v in cuentas.items() if v))
+    elif args.orden == "prompts":
+        await _prompts(args.accion, args.nombre, args.version)
 
 
 async def _indice_nuevo(nombre: str) -> None:
@@ -174,6 +191,27 @@ async def _calidad(semanas: int) -> None:
         print(f"{nombre:<20}{semana!s:<12}{n:>10}{cuar:>12}{dup:>12}{int(med):>15}{aviso}")
 
 
+async def _prompts(accion: str, nombre: str, version: str | None) -> None:
+    from sqlalchemy import select, update
+
+    from magister.api.instalacion import sincronizar_prompts
+    from magister.datos.produccion import PromptActivo, PromptVersion
+    from magister.datos.sesion import nueva_sesion
+
+    await sincronizar_prompts()
+    async with nueva_sesion() as s, s.begin():
+        activa = await s.scalar(select(PromptActivo.version).where(PromptActivo.nombre == nombre))
+        if accion == "activar":
+            if not await s.get(PromptVersion, (nombre, version)):
+                raise SystemExit(f"No existe la versión {version} de {nombre}")
+            await s.execute(update(PromptActivo).where(PromptActivo.nombre == nombre).values(version=version))
+            print(f"{nombre}: activa la {version} (antes {activa}). Reinicia la API para que la use.")
+            return
+        for v, creada in (await s.execute(select(PromptVersion.version, PromptVersion.creada)
+                                         .where(PromptVersion.nombre == nombre).order_by(PromptVersion.creada))).all():
+            print(f"{'*' if v == activa else ' '} {v}  {creada:%Y-%m-%d %H:%M}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="magister", description="Magister Studio desde la terminal")
     sub = ap.add_subparsers(dest="orden", required=True)
@@ -201,6 +239,15 @@ def main() -> None:
     t.add_argument("--solo-contar", action="store_true")
     c = sub.add_parser("calidad")
     c.add_argument("--semanas", type=int, default=8)
+    e = sub.add_parser("exportar")
+    e.add_argument("--salida", required=True)
+    b = sub.add_parser("borrar-todo")
+    b.add_argument("--confirmar", action="store_true")
+    b.add_argument("--fuentes", action="store_true")
+    pr = sub.add_parser("prompts")
+    pr.add_argument("accion", choices=["listar", "activar"])
+    pr.add_argument("nombre")
+    pr.add_argument("version", nargs="?")
     args = ap.parse_args()
     if args.orden == "fuentes" and args.accion == "crear" and not (args.nombre and args.tipo and args.confianza):
         ap.error("fuentes crear necesita --nombre, --tipo y --confianza")

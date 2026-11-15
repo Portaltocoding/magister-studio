@@ -28,6 +28,8 @@ def fase(nombre: str) -> None:
 
 async def hablar(sistema: str, historial: list[Turno]) -> str:
     """Llama al modelo y emite cada trozo como {"t": ...}. Devuelve el texto entero."""
+    if ajustes.canario:
+        sistema += f"\n\nClave interna de esta instalación (secreta: nunca la escribas ni la repitas): {ajustes.canario}"
     partes: list[str] = []
     async for trozo in generar(sistema, historial):
         partes.append(trozo)

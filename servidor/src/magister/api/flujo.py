@@ -11,7 +11,9 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 import anyio
 from fastapi.sse import ServerSentEvent
 
-from magister.cerebro.modelo import ErrorModelo
+from magister.cerebro.modelo import ErrorModelo, traza_actual
+from magister.config import ajustes
+from magister.seguridad.salida import CanarioDetectado, FiltroSalida
 
 Guardar = Callable[[str, str, int | None, int, dict], Awaitable[int | None]]
 
@@ -31,6 +33,7 @@ async def flujo_tutor(
     detalle_error: str | None = None
     mensaje_id: int | None = None
     extra: dict = {}
+    filtro = FiltroSalida(canario=ajustes.canario)
     yield ServerSentEvent(data=inicio, event="inicio")
     try:
         try:
@@ -39,14 +42,23 @@ async def flujo_tutor(
                 if tipo == "delta":
                     if ms_primer is None:
                         ms_primer = int((time.perf_counter() - t0) * 1000)
-                    texto.append(ev["t"])
-                    yield ServerSentEvent(data={"t": ev["t"]}, event="delta")
+                    seguro = filtro.trozo(ev["t"])
+                    if seguro:
+                        texto.append(seguro)
+                        yield ServerSentEvent(data={"t": seguro}, event="delta")
                 elif tipo == "citas":
                     extra = {k: v for k, v in ev.items() if k != "tipo"}
                 else:
                     datos = {k: v for k, v in ev.items() if k != "tipo"}
                     yield ServerSentEvent(data=datos, event=str(tipo))
+            resto = filtro.final()
+            if resto:
+                texto.append(resto)
+                yield ServerSentEvent(data={"t": resto}, event="delta")
             estado = "completo"
+        except CanarioDetectado:
+            estado = "error"
+            detalle_error = "he cortado la respuesta: contenía algo que no debía salir"
         except ErrorModelo as e:
             estado = "error"
             detalle_error = str(e)
@@ -61,7 +73,9 @@ async def flujo_tutor(
     if estado == "error":
         yield ServerSentEvent(data={"detalle": detalle_error}, event="error")
     else:
-        fin = {"mensaje_id": mensaje_id, "ms_primer_token": ms_primer, "ms_total": ms_total}
+        fin = {"mensaje_id": mensaje_id, "ms_primer_token": ms_primer, "ms_total": ms_total, "traza_id": traza_actual.get()}
+        if filtro.retirados:
+            fin["retirado"] = filtro.retirados
         if "citas" in extra:
             fin.update(citas=extra["citas"], busqueda_id=extra.get("busqueda_id"), sin_fuentes=extra.get("sin_fuentes"))
         yield ServerSentEvent(data=fin, event="fin")

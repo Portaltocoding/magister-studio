@@ -28,6 +28,18 @@ def ic_proporcion(k: int, n: int) -> tuple[float, float]:
     return lo, hi
 
 
+def intervalo_proporcion(k: int, n: int, confianza: float = 0.95) -> tuple[float, float]:
+    """Intervalo exacto de Clopper-Pearson de una proporción k/n."""
+    if n == 0:
+        return 0.0, 1.0
+    from scipy.stats import beta
+
+    a = (1 - confianza) / 2
+    lo = 0.0 if k == 0 else float(beta.ppf(a, k, n - k + 1))
+    hi = 1.0 if k == n else float(beta.ppf(1 - a, k + 1, n - k))
+    return lo, hi
+
+
 def tabla_de(a: Sequence, b: Sequence, categorias: Sequence | None = None) -> list[list[int]]:
     cats = list(categorias) if categorias is not None else sorted(set(a) | set(b))
     idx = {c: i for i, c in enumerate(cats)}

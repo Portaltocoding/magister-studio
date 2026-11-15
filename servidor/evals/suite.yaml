@@ -1,0 +1,25 @@
+# Los bancos de las Partes II a V, con el comando de cada uno y la tarea del enrutador que mide.
+# `uv run python -m evals.suite` los ejecuta todos con el motor de verdad (gasta cuota).
+bancos:
+  - nombre: plan
+    tarea: planificar
+    comando: python -m evals.correr
+  - nombre: retriever
+    tarea: null
+    comando: python -m evals.rag
+    requiere: evals/banco_rag.jsonl
+  - nombre: fidelidad
+    tarea: juez
+    comando: python -m evals.fidelidad --comprobar
+  - nombre: corrector
+    tarea: corregir
+    comando: python -m evals.corrector.medir
+  - nombre: research
+    tarea: null
+    comando: python -m evals.research --sistema fijo --repeticiones 1
+  - nombre: olvido
+    tarea: null
+    comando: python -m evals.olvido informe
+  - nombre: criterios_v05
+    tarea: null
+    comando: python -m evals.criterios_v05

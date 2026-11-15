@@ -25,3 +25,8 @@ servidor/crudo/
 salidas/
 servidor/evals/olvido/
 servidor/evals/corrector/resultados/
+secretos/
+.env.compose
+copias/
+afinar/datos/
+afinar/*.gguf

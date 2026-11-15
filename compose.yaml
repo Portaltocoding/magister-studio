@@ -1,4 +1,8 @@
-# Postgres 16 con pgvector para Magister Studio.
+# Magister Studio con Docker Compose.
+#
+#   docker compose up -d                      solo la base (Postgres 16 con pgvector): para usarlo desde Windows
+#   docker compose --profile docker up -d     todo dentro de Docker: base, API y web en http://localhost:8080
+#
 # Puerto 5433 y nombres propios para no chocar con el Postgres del repo magister.
 services:
   db:
@@ -18,5 +22,38 @@ services:
       interval: 2s
       retries: 15
 
+  api:
+    profiles: ["docker"]
+    build: ./servidor
+    env_file: .env.compose
+    secrets: [claude_token, postgres_password, canario]
+    volumes:
+      - magister-studio-api:/datos
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/salud')\""]
+      interval: 10s
+      retries: 10
+
+  web:
+    profiles: ["docker"]
+    build: ./web
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+secrets:
+  claude_token:
+    file: ./secretos/claude_token
+  postgres_password:
+    file: ./secretos/postgres_password
+  canario:
+    file: ./secretos/canario
+
 volumes:
   magister-studio-datos:
+  magister-studio-api:

@@ -5,6 +5,7 @@ import PanelEtiquetar from './paneles/PanelEtiquetar.tsx'
 import PanelMaterial from './paneles/PanelMaterial.tsx'
 import PanelPractica from './paneles/PanelPractica.tsx'
 import PanelProgreso from './paneles/PanelProgreso.tsx'
+import PanelTriaje from './paneles/PanelTriaje.tsx'
 import PanelTutor from './paneles/PanelTutor.tsx'
 import PanelFuentes from './paneles/PanelFuentes.tsx'
 import PanelPlan from './paneles/PanelPlan.tsx'
@@ -58,6 +59,8 @@ export default function Central({
       return <PanelPractica />
     case 'progreso':
       return <PanelProgreso />
+    case 'triaje':
+      return <PanelTriaje />
     case 'etiquetar':
       return <PanelEtiquetar />
     case 'construccion':

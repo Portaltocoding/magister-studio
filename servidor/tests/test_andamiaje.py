@@ -92,8 +92,8 @@ async def test_token_correcto_pasa_y_salud_es_libre(con_token: str) -> None:
 @pytest.mark.anyio
 async def test_cuerpo_de_mas_de_64_kib_da_413() -> None:
     async with cliente() as c:
-        grande = await c.post("/api/salud", content=b"x" * (64 * 1024 + 1))
-        justo = await c.post("/api/salud", content=b"x" * (64 * 1024))
+        grande = await c.post("/api/salud", content=b"x" * (64 * 1024 + 1), headers={"Content-Type": "application/json"})
+        justo = await c.post("/api/salud", content=b"x" * (64 * 1024), headers={"Content-Type": "application/json"})
 
     assert grande.status_code == 413
     assert grande.json() == {"detail": "el cuerpo pasa del máximo de 64 KiB"}

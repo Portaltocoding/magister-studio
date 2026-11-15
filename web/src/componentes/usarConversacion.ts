@@ -71,6 +71,7 @@ export function usarConversacion(abrirFlujo: AbrirFlujo, alPlan?: (p: Propuesta)
                 estado: 'completo',
                 tiempos: { primero: ev.ms_primer_token, total: ev.ms_total },
                 citas: ev.citas,
+                traza: ev.traza_id ?? undefined,
               }))
               break
             case 'error':

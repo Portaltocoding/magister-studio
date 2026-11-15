@@ -65,9 +65,13 @@ class Web:
         raise RuntimeError("la búsqueda web no respondió")
 
     async def descargar(self, url: str) -> tuple[str, bytes]:
+        from magister.seguridad.politica import comprobar_url
+
+        comprobar_url(url)
         async with httpx.AsyncClient(timeout=PLAZO, follow_redirects=True, headers={"User-Agent": "Magister/0.3"}) as c:
             async with c.stream("GET", url) as r:
                 r.raise_for_status()
+                comprobar_url(str(r.url))
                 trozos: list[bytes] = []
                 total = 0
                 async for t in r.aiter_bytes():

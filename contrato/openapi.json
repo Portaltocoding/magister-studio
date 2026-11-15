@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Magister",
-    "version": "0.5"
+    "version": "1.0"
   },
   "paths": {
     "/api/salud": {
@@ -2288,6 +2288,217 @@
           }
         }
       }
+    },
+    "/api/trazas/{traza_id}/feedback": {
+      "post": {
+        "summary": "Feedback",
+        "description": "Votar dos veces la misma traza sobrescribe: una sola puntuación `feedback_usuario`.",
+        "operationId": "feedback_api_trazas__traza_id__feedback_post",
+        "parameters": [
+          {
+            "name": "traza_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Traza Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Feedback"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Feedback Api Trazas  Traza Id  Feedback Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alertas": {
+      "get": {
+        "summary": "Alertas",
+        "operationId": "alertas_api_alertas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Alertas Api Alertas Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alertas/{aid}/resolver": {
+      "post": {
+        "summary": "Resolver",
+        "operationId": "resolver_api_alertas__aid__resolver_post",
+        "parameters": [
+          {
+            "name": "aid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Aid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Resolver Api Alertas  Aid  Resolver Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidatos": {
+      "get": {
+        "summary": "Candidatos",
+        "operationId": "candidatos_api_candidatos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Candidatos Api Candidatos Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidatos/{cid}": {
+      "post": {
+        "summary": "Triar",
+        "operationId": "triar_api_candidatos__cid__post",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Triaje"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Triar Api Candidatos  Cid  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estado": {
+      "get": {
+        "summary": "Estado",
+        "description": "La salud ampliada: base, Langfuse, trabajador, alertas y gasto de hoy.",
+        "operationId": "estado_api_estado_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Estado Api Estado Get"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2492,6 +2703,31 @@
           "veredicto"
         ],
         "title": "EtiquetaEntrada"
+      },
+      "Feedback": {
+        "properties": {
+          "bien": {
+            "type": "boolean",
+            "title": "Bien"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bien"
+        ],
+        "title": "Feedback"
       },
       "FuenteEntrada": {
         "properties": {
@@ -2842,6 +3078,46 @@
           "nombre"
         ],
         "title": "TemaSalida"
+      },
+      "Triaje": {
+        "properties": {
+          "accion": {
+            "type": "string",
+            "enum": [
+              "aceptar",
+              "descartar"
+            ],
+            "title": "Accion"
+          },
+          "banco": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z_]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Banco"
+          },
+          "respuesta_buena": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Respuesta Buena"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accion"
+        ],
+        "title": "Triaje"
       },
       "ValidationError": {
         "properties": {

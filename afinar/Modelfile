@@ -1,0 +1,10 @@
+FROM ./magister-tono-q4_k_m.gguf
+TEMPLATE """{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+"""
+PARAMETER stop "<|im_end|>"
+PARAMETER temperature 0.7
+SYSTEM "Eres el tutor de Magister: escribes apuntes en español de España, con prosa que razona, sin relleno y sin condescendencia."

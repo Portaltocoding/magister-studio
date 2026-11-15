@@ -72,7 +72,7 @@ async def juzgar(bloque: str, sospechas: list[Hallazgo] | None = None, plantilla
         bloque=bloque,
     )
     try:
-        v = await estructurar(sistema, "Devuelve el veredicto.", Veredicto, reintentos=1)
+        v = await estructurar(sistema, "Devuelve el veredicto.", Veredicto, reintentos=1, cachear=True)
     except ErrorEstructura as e:
         return FalloJuez(f"sin veredicto válido: {e}")
     plano = _normal(bloque)

@@ -40,6 +40,14 @@ class Proteccion:
         ruta = scope["path"]
         cabeceras = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]}
 
+        metodo = scope.get("method", "GET")
+        tipo = cabeceras.get("content-type", "")
+        con_cuerpo = cabeceras.get("content-length", "0") not in ("", "0") or "transfer-encoding" in cabeceras
+        if (ruta.startswith("/api/") and metodo in ("POST", "PUT", "PATCH") and con_cuerpo
+                and not tipo.startswith("application/json") and not tipo.startswith("multipart/form-data")):
+            await _responder(send, 415, "las rutas que escriben solo aceptan application/json")
+            return
+
         if ajustes.token and ruta.startswith("/api/") and ruta not in RUTAS_LIBRES:
             recibido = cabeceras.get("x-magister-token", "")
             if not hmac.compare_digest(recibido.encode(), ajustes.token.encode()):

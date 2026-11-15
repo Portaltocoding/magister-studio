@@ -74,7 +74,9 @@ def _pdf(crudo: bytes, nombre: str) -> Extraido:
 def _html(crudo: bytes, nombre: str) -> Extraido:
     import trafilatura
 
-    html = crudo.decode("utf-8", "replace")
+    from magister.seguridad.entrada import canonicalizar, html_a_texto
+
+    html = html_a_texto(crudo.decode("utf-8", "replace"))
     texto = trafilatura.extract(html, include_tables=True, output_format="markdown") or ""
     meta_obj = trafilatura.extract_metadata(html)
     meta: dict = {}
@@ -85,7 +87,7 @@ def _html(crudo: bytes, nombre: str) -> Extraido:
             if valor:
                 meta[campo] = str(valor)
         titulo = meta.get("title") or nombre
-    return Extraido(crudo, texto, meta, f"trafilatura {trafilatura.__version__}", titulo)
+    return Extraido(crudo, canonicalizar(texto), meta, f"trafilatura {trafilatura.__version__}", titulo)
 
 
 def _txt(crudo: bytes, nombre: str) -> Extraido:
