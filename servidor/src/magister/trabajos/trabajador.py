@@ -54,7 +54,8 @@ async def ejecutar_uno(quien: str) -> bool:
 
             await juzgar(t.parametros)
         elif t.tipo == "material":
-            await ejecutar(t.id, t.plan_id, t.leccion_clave, t.parametros.get("tipos", ["apuntes"]))
+            await ejecutar(t.id, t.plan_id, t.leccion_clave, t.parametros.get("tipos", ["apuntes"]),
+                           t.parametros.get("preferencias"))
         else:
             await cola.terminar(t.id, "fallido", f"tipo de trabajo desconocido: {t.tipo}")
             return True

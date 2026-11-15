@@ -118,3 +118,24 @@ async def test_estudio_pasa_al_plan_y_vuelve() -> None:
                                     "hoy": "2026-11-09"}, "q")
     assert nodos == ["recuperar", "responder"]
     _ = Command
+
+
+async def test_el_diagnostico_ofrece_opciones() -> None:
+    from magister.cerebro.estructura import eco
+    from magister.plan.esquemas import Perfil
+
+    g = construir_grafo(InMemorySaver(), BuscadorFalso())
+    eco.encolar(Perfil, [{"tema": "redes"}])
+    vistas = []
+    async for modo, datos in g.astream(estudio("hazme un plan de redes"), {"configurable": {"thread_id": "o"}},
+                                       stream_mode=["custom", "updates"]):
+        if modo == "custom" and "opciones" in datos:
+            vistas.append(datos["opciones"])
+    assert vistas and vistas[0]["campo"] == "objetivo" and len(vistas[0]["opciones"]) == 4
+
+
+def test_las_preferencias_llegan_a_los_prompts() -> None:
+    from magister.material.preferencias import rango, texto, texto_preguntas
+
+    assert "A fondo" in texto({"profundidad": "fondo", "enfoque": "en TypeScript"}) and "TypeScript" in texto({"enfoque": "TypeScript"})
+    assert "Entre 4 y 6" in texto_preguntas({"cantidad": "pocas", "preguntas": "practicas"}) and rango({}) == (6, 10)

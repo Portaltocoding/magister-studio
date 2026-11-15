@@ -10,6 +10,7 @@ from magister.cerebro.prompts import cargar
 from magister.datos.material import Pregunta, PreguntaConcepto
 from magister.datos.sesion import nueva_sesion
 from magister.material.modelos import EntradaMaterial, ListaPreguntas, PreguntaGen
+from magister.material.preferencias import texto_preguntas
 from magister.tono.hallazgo import Hallazgo
 
 FANTASMA_MIN, FANTASMA_MAX = 40, 90
@@ -36,7 +37,8 @@ def _reglas(entrada: EntradaMaterial, claves_bloques: set[str]):
 
 async def generar_preguntas(entrada: EntradaMaterial, apuntes: str, claves_bloques: set[str]) -> list[PreguntaGen]:
     conceptos = "\n".join(f"- {c.id}: {c.nombre} · {'núcleo' if c.nucleo else 'ampliación'}" for c in entrada.conceptos)
-    sistema = cargar("preguntas").rellenar(conceptos=conceptos, apuntes=apuntes[:20000])
+    sistema = cargar("preguntas").rellenar(conceptos=conceptos, apuntes=apuntes[:20000],
+                                         preferencias=texto_preguntas(entrada.preferencias))
     lista = await estructurar(sistema, "Devuelve las preguntas.", ListaPreguntas, _reglas(entrada, claves_bloques))
     return lista.preguntas
 

@@ -29,3 +29,7 @@ Conceptos que explica: {conceptos}
 <fuentes>
 {fuentes}
 </fuentes>
+
+<preferencias_del_alumno>
+{preferencias}
+</preferencias_del_alumno>

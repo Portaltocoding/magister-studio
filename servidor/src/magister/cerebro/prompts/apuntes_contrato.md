@@ -21,4 +21,8 @@ Ya vistos en lecciones anteriores: {previos}
 {fuentes}
 </fuentes>
 
+<preferencias_del_alumno>
+{preferencias}
+</preferencias_del_alumno>
+
 {errores}

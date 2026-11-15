@@ -53,6 +53,7 @@ export type EventoTutor =
   | { tipo: 'fase'; nodo: string }
   | ({ tipo: 'plan' } & Propuesta)
   | { tipo: 'guardado'; plan_id: number; tema_id: number }
+  | { tipo: 'opciones'; campo: string; opciones: { valor: string; etiqueta: string }[] }
 
 export interface ConceptoPlan {
   id: string

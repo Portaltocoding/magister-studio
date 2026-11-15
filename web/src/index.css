@@ -455,3 +455,37 @@ body { overflow: hidden; }
   font: inherit; font-size: 0.9rem; min-height: 64px; padding: 8px 10px; border: 1px solid var(--borde);
   border-radius: 8px; background: var(--fondo); color: var(--texto);
 }
+
+/* ===== Cuestionarios y respuestas rápidas ===== */
+.cuestionario {
+  background: var(--tarjeta, var(--fondo)); border: 1px solid var(--borde); border-radius: 14px;
+  padding: 22px 24px; margin: 16px 0; box-shadow: 0 2px 10px rgb(0 0 0 / 0.08); max-width: 760px; width: 100%;
+}
+.cuestionario-cabecera { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.puntos-paso { display: flex; gap: 6px; }
+.punto { width: 8px; height: 8px; border-radius: 50%; background: var(--borde); }
+.punto.hecho { background: var(--acento); opacity: 0.55; }
+.punto.actual { background: var(--acento); }
+.cuestionario-pregunta h2 { margin: 6px 0 10px; font-size: 1.25rem; }
+.cuestionario-pregunta textarea { width: 100%; min-height: 80px; }
+.opciones { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin: 12px 0; }
+.opcion {
+  font: inherit; text-align: left; display: flex; flex-direction: column; gap: 2px; cursor: pointer;
+  padding: 12px 14px; border-radius: 10px; border: 1.5px solid var(--borde); background: transparent; color: var(--texto);
+  transition: border-color 120ms, background 120ms;
+}
+.opcion small { opacity: 0.7; }
+.opcion:hover { border-color: var(--acento); }
+.opcion.elegida { border-color: var(--acento); background: color-mix(in srgb, var(--acento) 16%, transparent); }
+.campo-fecha, .campo-otro {
+  font: inherit; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--borde); background: transparent; color: var(--texto);
+}
+.campo-otro { width: 100%; margin-bottom: 10px; }
+.resumen-respuestas { display: grid; gap: 8px; margin: 8px 0 16px; }
+.resumen-respuestas dt { font-size: 0.8rem; opacity: 0.7; }
+.resumen-respuestas dd { margin: 0; font-weight: 600; }
+.respuestas-rapidas { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.opcion-chip { flex-direction: row; padding: 7px 14px; border-radius: 999px; font-size: 0.9rem; }
+.cuestionario-pregunta h2 {
+  text-transform: none; letter-spacing: normal; text-align: left; color: var(--texto); font-weight: 650;
+}

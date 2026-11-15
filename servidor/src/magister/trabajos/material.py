@@ -18,7 +18,7 @@ from magister.trabajos import cola
 TIPOS = ("apuntes", "preguntas", "diapositivas", "guion")
 
 
-async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str]) -> list[int]:
+async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], preferencias: dict | None = None) -> list[int]:
     async def progreso(nodo: str, paso: int, total: int) -> None:
         await cola.fase(trabajo_id, nodo, paso, total)
 
@@ -29,6 +29,7 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str]) 
     entrada = await entrada_de_leccion(plan_id, clave)
     await enriquecer(plan_id, clave, entrada.titulo, entrada.objetivos)
     entrada = await entrada_de_leccion(plan_id, clave)
+    entrada.preferencias = preferencias or {}
     materiales: list[int] = []
 
     mid = await almacen.nuevo_material(plan_id, clave, "apuntes", trabajo_id)

@@ -26,7 +26,9 @@ export default function Marco() {
   const [modo, setModo] = useState<IdModo>(inicial.modo)
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([])
   const [activa, setActiva] = useState<number | null>(inicial.conversacion)
-  const [tipoNueva, setTipoNueva] = useState<'libre' | 'plan'>('libre')
+  const [tipoNueva, setTipoNueva] = useState<'libre' | 'plan'>(() =>
+    window.location.hash.startsWith('#/nuevo-plan') ? 'plan' : 'libre',
+  )
 
   const recargar = useCallback(() => {
     listarConversaciones()

@@ -10,6 +10,8 @@ import {
   type ResumenPlan,
   type VistaPlan,
 } from '../api.ts'
+import Cuestionario, { type Respuestas } from '../componentes/Cuestionario.tsx'
+import { PREGUNTAS_MATERIAL } from '../componentes/cuestionarios.ts'
 
 interface MaterialInfo {
   id: number
@@ -80,6 +82,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   const [vistas, setVistas] = useState<Set<string>>(new Set())
   const [texto, setTexto] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [preguntando, setPreguntando] = useState<null | { forzar: boolean }>(null)
   const control = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -130,13 +133,19 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     }
   }
 
-  const generar = async (forzar: boolean) => {
+  const generar = async (forzar: boolean, r: Respuestas) => {
     if (!plan || !clave) return
     setError(null)
+    setPreguntando(null)
+    const tipos = Array.from(new Set(['apuntes', ...((r.tipos as string[]) ?? [])]))
+    const preferencias = {
+      profundidad: r.profundidad, preguntas: r.preguntas, cantidad: r.cantidad,
+      enfoque: (r.enfoque as string | undefined)?.trim() || null,
+    }
     try {
       const r = await pedir<{ trabajo_id: number }>(
         `/api/planes/${plan.plan_id}/lecciones/${clave}/material`,
-        enviarJson({ forzar }),
+        enviarJson({ forzar, tipos, preferencias }),
       )
       seguir(r.trabajo_id)
     } catch (e) {
@@ -178,11 +187,11 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         </select>
         {clave && (
           <>
-            <button className="boton boton-principal" disabled={!!enCurso} onClick={() => generar(false)}>
+            <button className="boton boton-principal" disabled={!!enCurso} onClick={() => setPreguntando({ forzar: false })}>
               {apuntes ? 'Generar si ha cambiado' : 'Generar el material'}
             </button>
             {apuntes && (
-              <button className="boton" disabled={!!enCurso} onClick={() => generar(true)}>
+              <button className="boton" disabled={!!enCurso} onClick={() => setPreguntando({ forzar: true })}>
                 Rehacer
               </button>
             )}
@@ -190,6 +199,19 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         )}
       </div>
       {error && <p role="alert">{error}</p>}
+      {preguntando && clave && (
+        <Cuestionario
+          key={`${clave}-${preguntando.forzar}`}
+          titulo={`Material de ${clave}`}
+          preguntas={modoVista === 'video'
+            ? PREGUNTAS_MATERIAL.map((q) => (q.id === 'tipos' ? { ...q, porDefecto: ['apuntes', 'guion'] } : q))
+            : PREGUNTAS_MATERIAL}
+          boton={preguntando.forzar ? 'Rehacer el material' : 'Generar el material'}
+          alTerminar={(r) => generar(preguntando.forzar, r)}
+          alSaltar={() => setPreguntando(null)}
+          textoSaltar="Cancelar"
+        />
+      )}
 
       {trabajo && (enCurso || trabajo.estado === 'fallido') && (
         <div className="progreso" role="status">

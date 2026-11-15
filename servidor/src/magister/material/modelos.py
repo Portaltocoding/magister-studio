@@ -30,6 +30,7 @@ class EntradaMaterial(BaseModel):
     previos: list[str] = Field(default_factory=list, description="ids de conceptos de lecciones anteriores")
     fragmentos: list[FragmentoFuente] = []
     perfil: dict = {}
+    preferencias: dict = {}
 
 
 class Definicion(BaseModel):
@@ -63,4 +64,4 @@ class PreguntaGen(BaseModel):
 
 
 class ListaPreguntas(BaseModel):
-    preguntas: list[PreguntaGen] = Field(min_length=3, max_length=12)
+    preguntas: list[PreguntaGen] = Field(min_length=3, max_length=14)

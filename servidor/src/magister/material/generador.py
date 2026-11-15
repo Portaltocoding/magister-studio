@@ -38,6 +38,7 @@ from magister.material import almacen
 from magister.material.completitud import ampliar_si_falta, informe_completitud
 from magister.material.entrada import EntradaMaterial, fuentes_delimitadas
 from magister.material.modelos import Contrato
+from magister.material.preferencias import texto as texto_preferencias
 from magister.tono import juez as juez_tono
 from magister.tono import lint as lint_tono
 from magister.tono.hallazgo import Hallazgo
@@ -112,6 +113,7 @@ def construir(progreso: Progreso | None = None, cancelado: Callable[[], Awaitabl
         sistema = cargar("apuntes_contrato").rellenar(
             tema=entrada.tema, titulo=entrada.titulo, objetivos="; ".join(entrada.objetivos), conceptos=conceptos,
             previos=", ".join(entrada.previos) or "(ninguno)", fuentes=fuentes_delimitadas(entrada, 6000),
+            preferencias=texto_preferencias(entrada.preferencias),
             errores=("<errores_del_contrato_anterior>\n" + "\n".join(errores) + "\n</errores_del_contrato_anterior>") if errores else "",
         )
         c = await estructurar(sistema, "Devuelve el contrato.", Contrato)
@@ -150,6 +152,7 @@ def construir(progreso: Progreso | None = None, cancelado: Callable[[], Awaitabl
             bloques=" · ".join(f"{x['clave']} {x['titulo']}" for x in c["bloques"]), clave=b["clave"], titulo_bloque=b["titulo"],
             proposito=b["proposito"], conceptos=", ".join(nombres.get(x, x) for x in b["conceptos"]),
             anteriores=anteriores[-4000:] or "(es el primero)", fuentes=fuentes_delimitadas(entrada),
+            preferencias=texto_preferencias(entrada.preferencias),
         )
         texto = await escribir_texto(sistema, "Escribe el bloque.")
         return {"i": i, "texto_actual": texto, "hallazgos": []}

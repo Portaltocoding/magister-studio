@@ -30,9 +30,17 @@ FICHEROS = {"pdf": "apuntes.pdf", "md": "apuntes.md", "contacto": "contacto.png"
             "diapositivas_pdf": "diapositivas.pdf", "guion": "guion.md"}
 
 
+class Preferencias(BaseModel):
+    profundidad: Literal["intro", "estandar", "fondo"] = "estandar"
+    preguntas: Literal["conceptuales", "practicas", "mezcla"] = "mezcla"
+    cantidad: Literal["pocas", "normal", "muchas"] = "normal"
+    enfoque: str | None = Field(None, max_length=300)
+
+
 class PedirMaterial(BaseModel):
     tipos: list[Literal["apuntes", "preguntas", "diapositivas", "guion"]] = ["apuntes", "preguntas", "diapositivas", "guion"]
     forzar: bool = False
+    preferencias: Preferencias = Preferencias()
 
 
 @rutas.post("/planes/{plan_id}/lecciones/{clave}/material", status_code=202)
@@ -45,9 +53,10 @@ async def pedir_material(plan_id: int, clave: str, cuerpo: PedirMaterial, s: Asy
     await s.close()
     clave_trabajo = cola.clave_idempotencia(
         plan_id=plan_id, leccion=clave, fuentes=list(fuentes), prompts={n: cargar(n).version for n in PROMPTS},
-        modelo=ajustes.modelo, tipos=sorted(cuerpo.tipos), forzar=datetime.now().isoformat() if cuerpo.forzar else None,
+        modelo=ajustes.modelo, tipos=sorted(cuerpo.tipos), preferencias=cuerpo.preferencias.model_dump(), forzar=datetime.now().isoformat() if cuerpo.forzar else None,
     )
-    tid, nuevo = await cola.encolar("material", plan_id, clave, {"tipos": cuerpo.tipos}, clave_trabajo)
+    tid, nuevo = await cola.encolar("material", plan_id, clave,
+                                    {"tipos": cuerpo.tipos, "preferencias": cuerpo.preferencias.model_dump()}, clave_trabajo)
     return {"trabajo_id": tid, "nuevo": nuevo}
 
 

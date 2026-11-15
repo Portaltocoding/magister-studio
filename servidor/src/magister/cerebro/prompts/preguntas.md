@@ -1,6 +1,6 @@
 Escribes las preguntas de repaso de una lección a partir de sus apuntes, con el esquema dado. Son para recuperar de memoria, no para releer.
 
-Cuotas (de 6 a 10 preguntas en total):
+Cuotas (respeta el número y el tipo que pide el alumno, abajo):
 - Al menos una por cada concepto del núcleo.
 - 2 de cálculo si la lección tiene números o fórmulas; si no, 2 de escenario.
 - 1 de «encuentra el fallo»: un razonamiento con un error típico que hay que señalar.
@@ -19,3 +19,7 @@ Conceptos (id: nombre · núcleo):
 <apuntes>
 {apuntes}
 </apuntes>
+
+<lo_que_pide_el_alumno>
+{preferencias}
+</lo_que_pide_el_alumno>

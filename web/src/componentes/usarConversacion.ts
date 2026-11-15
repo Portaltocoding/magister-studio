@@ -45,6 +45,7 @@ export function usarConversacion(
   const [burbujas, setBurbujas] = useState<Burbuja[]>([])
   const [escribiendo, setEscribiendo] = useState(false)
   const [fase, setFase] = useState<string | null>(null)
+  const [opciones, setOpciones] = useState<{ valor: string; etiqueta: string }[]>([])
   const control = useRef<AbortController | null>(null)
 
   const actualizarUltima = (cambio: (b: Burbuja) => Burbuja) =>
@@ -58,6 +59,7 @@ export function usarConversacion(
       nuevas.push({ clave: claveNueva(), rol: 'tutor', contenido: '', estado: 'llegando' })
       setBurbujas((previas) => [...previas, ...nuevas])
       setEscribiendo(true)
+      setOpciones([])
       const c = new AbortController()
       control.current = c
       let empezo = false
@@ -74,6 +76,9 @@ export function usarConversacion(
               break
             case 'plan':
               alPlan?.(ev)
+              break
+            case 'opciones':
+              setOpciones(ev.opciones)
               break
             case 'guardado':
               alGuardado?.(ev.plan_id, ev.tema_id)
@@ -128,5 +133,5 @@ export function usarConversacion(
 
   const parar = useCallback(() => control.current?.abort(), [])
 
-  return { burbujas, setBurbujas, escribiendo, fase, enviar, correr, parar }
+  return { burbujas, setBurbujas, escribiendo, fase, opciones, enviar, correr, parar }
 }

@@ -9,6 +9,8 @@ import {
   verPlan,
   type Propuesta,
 } from './api.ts'
+import Cuestionario from './componentes/Cuestionario.tsx'
+import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
 import { aBurbuja, usarConversacion } from './componentes/usarConversacion.ts'
 import Mascota from './Mascota.tsx'
@@ -27,6 +29,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   const [error, setError] = useState<string | null>(null)
   const [propuesta, setPropuesta] = useState<Propuesta | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [aMano, setAMano] = useState(false)
   const buscarAlGuardar = useRef(false)
   const alGuardado = useCallback(async (planId: number, temaId: number) => {
     if (!buscarAlGuardar.current) return
@@ -45,7 +48,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     },
     [conversacionId, noCuenta],
   )
-  const { burbujas, setBurbujas, escribiendo, fase, enviar: mandar, correr, parar } = usarConversacion(
+  const { burbujas, setBurbujas, escribiendo, fase, opciones, enviar: mandar, correr, parar } = usarConversacion(
     abrir,
     setPropuesta,
     alGuardado,
@@ -108,6 +111,15 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
 
   const pie = (
     <>
+      {opciones.length > 0 && !escribiendo && !propuesta && (
+        <div className="respuestas-rapidas" aria-label="Respuestas rápidas">
+          {opciones.map((o) => (
+            <button key={o.valor} className="opcion opcion-chip" onClick={() => alEnviar(o.valor)}>
+              {o.etiqueta}
+            </button>
+          ))}
+        </div>
+      )}
       {fase && (
         <p className="fase" role="status">
           {fase}…
@@ -137,6 +149,22 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
       )}
     </>
   )
+
+  if (conversacionId == null && !pendiente && tipo === 'plan' && !aMano) {
+    return (
+      <div className="libre">
+        <Mascota />
+        {error && <p role="alert">{error}</p>}
+        <Cuestionario
+          titulo="Nuevo plan"
+          preguntas={PREGUNTAS_PLAN}
+          boton="Prepárame el plan"
+          alTerminar={(r) => alEnviar(mensajePlan(r))}
+          alSaltar={() => setAMano(true)}
+        />
+      </div>
+    )
+  }
 
   if (conversacionId == null && !pendiente) {
     return (
