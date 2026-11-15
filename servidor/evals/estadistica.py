@@ -1,14 +1,16 @@
-"""Estadística compartida por todas las evals (contrato del índice del libro).
+"""Estadística compartida por todas las evals. Funciones puras, solo biblioteca estándar.
 
-- `margen_wilson`: tasa con su intervalo al 95 %, con el número de casos (no de ejecuciones).
-- `kappa_ponderada`: acuerdo entre dos etiquetadores en una escala ordinal (Parte IV).
-- `bootstrap_pareado`: diferencia entre dos versiones sobre los mismos casos (Parte IV).
-- `brier`, `log_loss`, `auc`, `calibracion`: métricas del modelo de olvido (Parte V).
+Ningún número de una eval lo calcula el modelo: sale de aquí, con tests.
+
+- Tasas: `margen_wilson`, `ic_proporcion`.
+- Acuerdo: `kappa(tabla)`, `kappa_ponderada(tabla)`, `tabla_de(a, b)`, `spearman`.
+- Comparar versiones: `mcnemar`, `binomial_cola`, `bootstrap_ic`, `bootstrap_pareado`.
+- Modelo de olvido (Parte V): `brier`, `log_loss`, `auc`, `calibracion`.
 """
 
 import math
 import random
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 
 def margen_wilson(aciertos: int, n: int, z: float = 1.96) -> tuple[float, float, float]:
@@ -20,38 +22,92 @@ def margen_wilson(aciertos: int, n: int, z: float = 1.96) -> tuple[float, float,
     return p, max(0.0, centro - medio), min(1.0, centro + medio)
 
 
-def kappa_ponderada(a: Sequence[int], b: Sequence[int], categorias: Sequence[int] | None = None) -> float:
-    """Kappa de Cohen con pesos cuadráticos."""
-    if len(a) != len(b) or not a:
-        raise ValueError("hacen falta dos listas de la misma longitud")
-    cats = sorted(set(categorias or []) | set(a) | set(b))
-    k = len(cats)
+def ic_proporcion(k: int, n: int) -> tuple[float, float]:
+    """Intervalo de Wilson al 95 % de una proporción k/n."""
+    _, lo, hi = margen_wilson(k, n)
+    return lo, hi
+
+
+def tabla_de(a: Sequence, b: Sequence, categorias: Sequence | None = None) -> list[list[int]]:
+    cats = list(categorias) if categorias is not None else sorted(set(a) | set(b))
+    idx = {c: i for i, c in enumerate(cats)}
+    t = [[0] * len(cats) for _ in cats]
+    for x, y in zip(a, b, strict=True):
+        t[idx[x]][idx[y]] += 1
+    return t
+
+
+def kappa(tabla: Sequence[Sequence[int]]) -> float:
+    """Kappa de Cohen sin ponderar. Filas: un anotador; columnas: el otro."""
+    n = sum(map(sum, tabla))
+    k = len(tabla)
+    po = sum(tabla[i][i] for i in range(k)) / n
+    filas = [sum(r) / n for r in tabla]
+    cols = [sum(tabla[i][j] for i in range(k)) / n for j in range(k)]
+    pe = sum(filas[i] * cols[i] for i in range(k))
+    return 1.0 if pe == 1 else (po - pe) / (1 - pe)
+
+
+def kappa_ponderada(tabla: Sequence[Sequence[int]], pesos: str = "cuadraticos") -> float:
+    n = sum(map(sum, tabla))
+    k = len(tabla)
     if k == 1:
         return 1.0
-    idx = {c: i for i, c in enumerate(cats)}
-    n = len(a)
-    obs = [[0.0] * k for _ in range(k)]
-    for x, y in zip(a, b, strict=True):
-        obs[idx[x]][idx[y]] += 1 / n
-    fa = [sum(obs[i]) for i in range(k)]
-    fb = [sum(obs[i][j] for i in range(k)) for j in range(k)]
-    peso = lambda i, j: ((i - j) ** 2) / ((k - 1) ** 2)  # noqa: E731
-    o = sum(peso(i, j) * obs[i][j] for i in range(k) for j in range(k))
-    e = sum(peso(i, j) * fa[i] * fb[j] for i in range(k) for j in range(k))
-    return 1.0 if e == 0 else 1 - o / e
+    w = (lambda i, j: ((i - j) / (k - 1)) ** 2) if pesos == "cuadraticos" else (lambda i, j: abs(i - j) / (k - 1))
+    filas = [sum(r) / n for r in tabla]
+    cols = [sum(tabla[i][j] for i in range(k)) / n for j in range(k)]
+    obs = sum(w(i, j) * tabla[i][j] / n for i in range(k) for j in range(k))
+    esp = sum(w(i, j) * filas[i] * cols[j] for i in range(k) for j in range(k))
+    return 1.0 if esp == 0 else 1 - obs / esp
 
 
-def bootstrap_pareado(
-    a: Sequence[float], b: Sequence[float], repeticiones: int = 2000, semilla: int = 7
-) -> tuple[float, float, float]:
-    """Diferencia media b - a con intervalo al 95 % remuestreando casos emparejados."""
-    if len(a) != len(b) or not a:
-        raise ValueError("hacen falta dos listas emparejadas")
+def _rangos(x: Sequence[float]) -> list[float]:
+    orden = sorted(range(len(x)), key=lambda i: x[i])
+    r = [0.0] * len(x)
+    i = 0
+    while i < len(orden):
+        j = i
+        while j + 1 < len(orden) and x[orden[j + 1]] == x[orden[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            r[orden[k]] = (i + j) / 2 + 1
+        i = j + 1
+    return r
+
+
+def spearman(a: Sequence[float], b: Sequence[float]) -> float:
+    ra, rb = _rangos(a), _rangos(b)
+    ma, mb = sum(ra) / len(ra), sum(rb) / len(rb)
+    cov = sum((x - ma) * (y - mb) for x, y in zip(ra, rb, strict=True))
+    va = math.sqrt(sum((x - ma) ** 2 for x in ra))
+    vb = math.sqrt(sum((y - mb) ** 2 for y in rb))
+    return cov / (va * vb) if va and vb else 0.0
+
+
+def mcnemar(b: int, c: int) -> float:
+    """Estadístico chi cuadrado de McNemar (sin corrección) con los discordantes b y c."""
+    return 0.0 if b + c == 0 else (b - c) ** 2 / (b + c)
+
+
+def binomial_cola(k: int, n: int, p: float = 0.5) -> float:
+    """P(X >= k) para X ~ Binomial(n, p): la prueba exacta de los discordantes."""
+    return sum(math.comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(k, n + 1))
+
+
+def bootstrap_ic(casos: Sequence, metrica: Callable[[Sequence], float], n: int = 10000, semilla: int = 7) -> tuple[float, float]:
     rng = random.Random(semilla)
-    diffs = [y - x for x, y in zip(a, b, strict=True)]
-    n = len(diffs)
-    medias = sorted(sum(diffs[rng.randrange(n)] for _ in range(n)) / n for _ in range(repeticiones))
-    return sum(diffs) / n, medias[int(0.025 * repeticiones)], medias[int(0.975 * repeticiones) - 1]
+    m = len(casos)
+    valores = sorted(metrica([casos[rng.randrange(m)] for _ in range(m)]) for _ in range(n))
+    return valores[int(0.025 * n)], valores[int(0.975 * n) - 1]
+
+
+def bootstrap_pareado(casos: Sequence[tuple[float, float]], n: int = 10000, semilla: int = 7) -> tuple[float, float, float]:
+    """Diferencia media (b - a) con su IC al 95 % remuestreando pares."""
+    diffs = [b - a for a, b in casos]
+    if not diffs:
+        raise ValueError("hacen falta pares")
+    lo, hi = bootstrap_ic(diffs, lambda xs: sum(xs) / len(xs), n, semilla)
+    return sum(diffs) / len(diffs), lo, hi
 
 
 def brier(p: Sequence[float], y: Sequence[int]) -> float:
@@ -80,6 +136,4 @@ def calibracion(p: Sequence[float], y: Sequence[int], cubos: int = 10) -> list[t
     grupos: list[list[tuple[float, int]]] = [[] for _ in range(cubos)]
     for pi, yi in zip(p, y, strict=True):
         grupos[min(cubos - 1, int(pi * cubos))].append((pi, yi))
-    return [
-        (sum(x for x, _ in g) / len(g), sum(z for _, z in g) / len(g), len(g)) for g in grupos if g
-    ]
+    return [(sum(x for x, _ in g) / len(g), sum(z for _, z in g) / len(g), len(g)) for g in grupos if g]

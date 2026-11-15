@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Magister",
-    "version": "0.3"
+    "version": "0.4"
   },
   "paths": {
     "/api/salud": {
@@ -1275,6 +1275,505 @@
           }
         }
       }
+    },
+    "/api/planes/{plan_id}/lecciones/{clave}/material": {
+      "post": {
+        "summary": "Pedir Material",
+        "operationId": "pedir_material_api_planes__plan_id__lecciones__clave__material_post",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PedirMaterial"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Pedir Material Api Planes  Plan Id  Lecciones  Clave  Material Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Material De Leccion",
+        "operationId": "material_de_leccion_api_planes__plan_id__lecciones__clave__material_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Material De Leccion Api Planes  Plan Id  Lecciones  Clave  Material Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trabajos/{tid}": {
+      "get": {
+        "summary": "Ver Trabajo",
+        "operationId": "ver_trabajo_api_trabajos__tid__get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Trabajo Api Trabajos  Tid  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trabajos/{tid}/cancelar": {
+      "post": {
+        "summary": "Cancelar",
+        "operationId": "cancelar_api_trabajos__tid__cancelar_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cancelar Api Trabajos  Tid  Cancelar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trabajos/{tid}/eventos": {
+      "get": {
+        "summary": "Eventos Trabajo",
+        "operationId": "eventos_trabajo_api_trabajos__tid__eventos_get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materiales/{mid}": {
+      "get": {
+        "summary": "Ver Material",
+        "operationId": "ver_material_api_materiales__mid__get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Material Api Materiales  Mid  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materiales/{mid}/fichero/{nombre}": {
+      "get": {
+        "summary": "Fichero",
+        "operationId": "fichero_api_materiales__mid__fichero__nombre__get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          },
+          {
+            "name": "nombre",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Nombre"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/banco/repartir": {
+      "post": {
+        "summary": "Repartir",
+        "operationId": "repartir_api_banco_repartir_post",
+        "parameters": [
+          {
+            "name": "semilla",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20261115,
+              "title": "Semilla"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Repartir Api Banco Repartir Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/etiquetar/siguiente": {
+      "get": {
+        "summary": "Siguiente",
+        "description": "Un bloque sin versión ni autor, en el orden aleatorio del reparto.",
+        "operationId": "siguiente_api_etiquetar_siguiente_get",
+        "parameters": [
+          {
+            "name": "ronda",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Ronda"
+            }
+          },
+          {
+            "name": "particion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Particion"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Siguiente Api Etiquetar Siguiente Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/etiquetas": {
+      "post": {
+        "summary": "Etiquetar",
+        "operationId": "etiquetar_api_etiquetas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EtiquetaEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Etiquetar Api Etiquetas Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trabajos-salud": {
+      "get": {
+        "summary": "Salud Trabajos",
+        "operationId": "salud_trabajos_api_trabajos_salud_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Salud Trabajos Api Trabajos Salud Get"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1425,6 +1924,61 @@
         ],
         "title": "EstadoSesion"
       },
+      "EtiquetaEntrada": {
+        "properties": {
+          "material_id": {
+            "type": "integer",
+            "title": "Material Id"
+          },
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "razonamiento",
+              "economia",
+              "trato",
+              "completitud"
+            ],
+            "title": "Dimension"
+          },
+          "veredicto": {
+            "type": "boolean",
+            "title": "Veredicto"
+          },
+          "critica": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Critica"
+          },
+          "ronda": {
+            "type": "integer",
+            "enum": [
+              1,
+              2
+            ],
+            "title": "Ronda",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "material_id",
+          "clave",
+          "dimension",
+          "veredicto"
+        ],
+        "title": "EtiquetaEntrada"
+      },
       "FuenteEntrada": {
         "properties": {
           "nombre": {
@@ -1543,6 +2097,36 @@
           "creado_en"
         ],
         "title": "MensajeSalida"
+      },
+      "PedirMaterial": {
+        "properties": {
+          "tipos": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "apuntes",
+                "preguntas",
+                "diapositivas",
+                "guion"
+              ]
+            },
+            "type": "array",
+            "title": "Tipos",
+            "default": [
+              "apuntes",
+              "preguntas",
+              "diapositivas",
+              "guion"
+            ]
+          },
+          "forzar": {
+            "type": "boolean",
+            "title": "Forzar",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PedirMaterial"
       },
       "Recalcular": {
         "properties": {

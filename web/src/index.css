@@ -221,3 +221,16 @@ h2 {
 .lista-propuestas { padding-left: 18px; }
 .tarjeta input, .tarjeta select, .fila input, .fila select { font: inherit; font-size: 0.85rem; padding: 4px 6px; border: 1px solid var(--borde); border-radius: 4px; background: var(--fondo); color: var(--texto); }
 label.boton-mini { display: inline-block; }
+
+/* v0.4: material */
+.progreso { border: 1px solid var(--borde); border-radius: 8px; padding: 8px 12px; margin: 8px 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.progreso p { margin: 0; }
+.progreso .barra { width: 200px; }
+.fichas > li { margin-bottom: 12px; }
+.fantasma { color: var(--suave); border-left: 3px solid var(--borde); padding-left: 10px; }
+.apuntes { text-align: left; line-height: 1.6; max-width: 760px; }
+.apuntes blockquote { margin: 0; padding: 6px 12px; background: var(--panel); border-radius: 6px; }
+.estado-revisar { background: #e8d9b5; color: #6b5115; }
+.estado-bloqueado { background: #e8c1bc; color: #7a2b22; }
+.critica { width: 100%; min-height: 60px; font: inherit; margin: 8px 0; padding: 8px; border: 1px solid var(--borde); border-radius: 6px; background: var(--fondo); color: var(--texto); }
+a.boton-mini { text-decoration: none; display: inline-block; }

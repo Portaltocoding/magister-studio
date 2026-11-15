@@ -16,6 +16,7 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 - `api` importa de `flujo` y `datos` (ADR-0005).
 - `flujo` (el grafo de LangGraph) importa de `cerebro`, `plan` y `datos`.
 - `cerebro` y `datos` solo importan de `magister.config`, para leer sus ajustes.
+- `material` importa de `cerebro`, `plan`, `tono` y `datos`; `tono` importa solo de `cerebro`; `trabajos` importa de `material` y `datos`; `api` importa además de `trabajos`.
 - `plan` es código puro: no importa de `datos`, `cerebro` ni `config`.
 - `cerebro` y `datos` nunca importan de `api` ni el uno del otro.
 - Las evals viven en `servidor/evals/` y se lanzan con `uv run python -m evals.<modulo>`.
@@ -29,6 +30,15 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 5. Las pruebas no usan red: búsquedas web y páginas, con mocks.
 6. Todo texto que venga de la web es no confiable: se delimita y nunca da órdenes.
 7. `cerebro` y `flujo` no importan de `fuentes` ni de `research`: reciben el `Buscador` inyectado. `api` importa de `flujo`, `datos`, `fuentes` y `research`, y es quien construye el buscador.
+
+## Material (Parte IV)
+
+1. El modelo escribe contenido; el formato (esqueleto del motor, Marp, guion) lo monta el código. Toda salida estructurada pasa por `estructurar`.
+2. Las plantillas de prompt van en `cerebro/prompts/`, con versión = SHA-256 (12 caracteres); cada salida guarda las versiones que la produjeron. Las variantes en prueba, en `cerebro/prompts/experimentos/`.
+3. Ningún número de una eval lo calcula el modelo: la estadística está en `evals/estadistica.py`, con tests.
+4. Un juez que no devuelve JSON válido o cita algo que no está en el texto devuelve `FalloJuez`, nunca un suspenso.
+5. Todo trabajo largo va por la cola de `trabajos/`; los nodos son idempotentes (upsert, no insert).
+6. Las pruebas no llaman a `claude`; los harness de jueces (`evals.tono`, `evals.fidelidad`) sí, y solo a mano.
 
 ## Estilo
 

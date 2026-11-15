@@ -80,6 +80,11 @@ class ConceptoFila(Base):
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     nombre: Mapped[str] = mapped_column(String(300))
     leccion_clave: Mapped[str] = mapped_column(String(20))
+    # Ampliada en la Parte IV: sinónimos, núcleo y dependencias entre conceptos.
+    sinonimos: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
+    nucleo: Mapped[bool] = mapped_column(server_default=text("true"))
+    depende_de: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
+    enriquecido_en: Mapped[datetime | None] = mapped_column(Fecha)
 
 
 class DependenciaFila(Base):

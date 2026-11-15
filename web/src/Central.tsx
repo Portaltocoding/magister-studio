@@ -1,6 +1,8 @@
 import EstudioLibre from './EstudioLibre.tsx'
 import type { IdModo } from './modos.ts'
 import PanelCalendario from './paneles/PanelCalendario.tsx'
+import PanelEtiquetar from './paneles/PanelEtiquetar.tsx'
+import PanelMaterial from './paneles/PanelMaterial.tsx'
 import PanelFuentes from './paneles/PanelFuentes.tsx'
 import PanelPlan from './paneles/PanelPlan.tsx'
 
@@ -45,13 +47,15 @@ export default function Central({
     case 'proyectos':
       return <Pendiente texto="El camino que sale de lo que construyes y su diario de decisiones." />
     case 'fichas':
-      return <Pendiente texto="Fichas de repaso desde una lección." />
+      return <PanelMaterial key="fichas" vista="fichas" />
     case 'video':
-      return <Pendiente texto="El guion por escenas y el vídeo montado con voz y subtítulos." />
+      return <PanelMaterial key="video" vista="video" />
     case 'repaso':
       return <Pendiente texto="Qué toca repasar, cuando tú quieras." />
     case 'progreso':
       return <Pendiente texto="El porcentaje del camino, el dominio por concepto, los días estudiados y el tiempo." />
+    case 'etiquetar':
+      return <PanelEtiquetar />
     case 'construccion':
       return <Pendiente texto="El método de este libro aplicado a otro tema." />
     case 'hablar':
