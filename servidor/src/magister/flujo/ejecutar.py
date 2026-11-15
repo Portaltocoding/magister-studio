@@ -43,6 +43,8 @@ async def _correr(entrada: dict | Command, cid: int) -> AsyncIterator[dict]:
                 yield {"tipo": "fase", "nodo": datos["fase"]}
             elif "citas" in datos:
                 yield {"tipo": "citas", **datos}
+            elif "guardado" in datos:
+                yield {"tipo": "guardado", **datos["guardado"]}
         elif modo == "updates" and "__interrupt__" in datos:
             for interrupcion in datos["__interrupt__"]:
                 yield {"tipo": "plan", **interrupcion.value}

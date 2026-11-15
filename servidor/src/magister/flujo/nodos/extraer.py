@@ -11,7 +11,7 @@ async def extraer(estado: Estado) -> dict:
     actual = perfil_de(estado)
     sistema = cargar("extraer_perfil").rellenar(
         perfil=perfil_json(actual),
-        turnos=turnos_recientes(estado, 2),
+        turnos=turnos_recientes(estado, 8),
         mensaje=estado.get("mensaje", ""),
         hoy=hoy.isoformat(),
         dia_semana=DIAS[hoy.weekday()],

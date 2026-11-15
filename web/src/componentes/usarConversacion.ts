@@ -15,6 +15,7 @@ export const aBurbuja = (m: Mensaje): Burbuja => ({
 
 export const NOMBRE_FASE: Record<string, string> = {
   extraer: 'Entendiendo lo que quieres',
+  a_diagnostico: 'Pasando a preparar tu plan',
   preguntar: 'Pensando la siguiente pregunta',
   planificar: 'Preparando el plan',
   calendarizar: 'Montando el calendario',
@@ -34,7 +35,11 @@ export const NOMBRE_FASE: Record<string, string> = {
 type AbrirFlujo = (texto: string, signal: AbortSignal) => AsyncIterable<EventoTutor>
 
 // Estado de un hilo que se alimenta de un flujo SSE del tutor.
-export function usarConversacion(abrirFlujo: AbrirFlujo, alPlan?: (p: Propuesta) => void) {
+export function usarConversacion(
+  abrirFlujo: AbrirFlujo,
+  alPlan?: (p: Propuesta) => void,
+  alGuardado?: (plan_id: number, tema_id: number) => void,
+) {
   const [burbujas, setBurbujas] = useState<Burbuja[]>([])
   const [escribiendo, setEscribiendo] = useState(false)
   const [fase, setFase] = useState<string | null>(null)
@@ -67,6 +72,9 @@ export function usarConversacion(abrirFlujo: AbrirFlujo, alPlan?: (p: Propuesta)
               break
             case 'plan':
               alPlan?.(ev)
+              break
+            case 'guardado':
+              alGuardado?.(ev.plan_id, ev.tema_id)
               break
             case 'fin':
               actualizarUltima((b) => ({
@@ -108,7 +116,7 @@ export function usarConversacion(abrirFlujo: AbrirFlujo, alPlan?: (p: Propuesta)
         alAcabar?.()
       }
     },
-    [alPlan],
+    [alPlan, alGuardado],
   )
 
   const enviar = useCallback(

@@ -50,6 +50,7 @@ export type EventoTutor =
   | { tipo: 'error'; detalle: string }
   | { tipo: 'fase'; nodo: string }
   | ({ tipo: 'plan' } & Propuesta)
+  | { tipo: 'guardado'; plan_id: number; tema_id: number }
 
 export interface ConceptoPlan {
   id: string

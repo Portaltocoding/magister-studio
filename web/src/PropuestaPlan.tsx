@@ -4,7 +4,7 @@ import type { Propuesta } from './api.ts'
 interface Props {
   propuesta: Propuesta
   ocupado: boolean
-  alAceptar: () => void
+  alAceptar: (buscarFuentes: boolean) => void
   alCambiar: (texto: string) => void
 }
 
@@ -78,7 +78,17 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
             disabled={bloqueado}
             onClick={() => {
               setPulsado(true)
-              alAceptar()
+              alAceptar(true)
+            }}
+          >
+            Aceptar y buscar fuentes
+          </button>
+          <button
+            className="boton"
+            disabled={bloqueado}
+            onClick={() => {
+              setPulsado(true)
+              alAceptar(false)
             }}
           >
             Aceptar

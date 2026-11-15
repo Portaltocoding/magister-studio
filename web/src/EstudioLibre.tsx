@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { crearConversacion, decidir, enviar, listarMensajes, propuestaPendiente, type Propuesta } from './api.ts'
+import {
+  crearConversacion,
+  decidir,
+  enviar,
+  lanzarResearch,
+  listarMensajes,
+  propuestaPendiente,
+  verPlan,
+  type Propuesta,
+} from './api.ts'
 import Hilo from './componentes/Hilo.tsx'
 import { aBurbuja, usarConversacion } from './componentes/usarConversacion.ts'
 import Mascota from './Mascota.tsx'
@@ -17,6 +26,17 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   const [noCuenta, setNoCuenta] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [propuesta, setPropuesta] = useState<Propuesta | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const buscarAlGuardar = useRef(false)
+  const alGuardado = useCallback(async (planId: number, temaId: number) => {
+    if (!buscarAlGuardar.current) return
+    buscarAlGuardar.current = false
+    const vista = await verPlan(temaId)
+    const claves = vista.lecciones.filter((l) => l.sin_material).map((l) => l.clave)
+    if (!claves.length) return setAviso('Todas las lecciones tienen ya material en tus fuentes.')
+    await lanzarResearch(planId, claves)
+    setAviso(`Buscando fuentes para ${claves.length} lecciones. Las propuestas te llegarán a «Temas y fuentes» para que las apruebes.`)
+  }, [])
 
   const abrir = useCallback(
     (texto: string, signal: AbortSignal) => {
@@ -28,6 +48,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   const { burbujas, setBurbujas, escribiendo, fase, enviar: mandar, correr, parar } = usarConversacion(
     abrir,
     setPropuesta,
+    alGuardado,
   )
   const [pendiente, setPendiente] = useState<string | null>(null)
   // La que acabamos de crear aquí: no se recarga desde la API, o borraría la respuesta que está llegando.
@@ -96,9 +117,17 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
         <PropuestaPlan
           propuesta={propuesta}
           ocupado={escribiendo}
-          alAceptar={() => resolver('aceptar')}
+          alAceptar={(buscar) => {
+            buscarAlGuardar.current = buscar
+            resolver('aceptar')
+          }}
           alCambiar={(t) => resolver('cambiar', t)}
         />
+      )}
+      {aviso && (
+        <p className="nota" role="status">
+          {aviso}
+        </p>
       )}
       {tipo === 'libre' && (
         <label className="interruptor" title="Para explorar o equivocarte a propósito sin falsear tu perfil">

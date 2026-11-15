@@ -26,12 +26,30 @@ from magister.flujo.nodos.planificar import hacer_planificar
 from magister.flujo.nodos.preguntar import preguntar
 from magister.flujo.nodos.proponer import proponer
 from magister.flujo.nodos.rag import aclarar, hacer_recuperar, reescribir, responder, tras_reescribir
+from magister.flujo.comun import decir, fase
+from magister.flujo.intencion import deja_plan, pide_plan
 from magister.plan.esquemas import Perfil
 from magister.plan.perfil import huecos
 
 
 def enrutar_entrada(estado: Estado) -> str:
-    return "estudio" if estado.get("fase") == "estudio" else "extraer"
+    """Estudio libre que pide un plan pasa al diagnóstico; un diagnóstico que se deja vuelve a estudio."""
+    mensaje = estado.get("mensaje", "")
+    if estado.get("fase") == "estudio":
+        return "a_diagnostico" if pide_plan(mensaje) else "estudio"
+    if deja_plan(mensaje):
+        return "a_estudio"
+    return "extraer"
+
+
+async def a_diagnostico(estado: Estado) -> dict:
+    fase("a_diagnostico")
+    return {"fase": "diagnostico", "plan": None, "sesiones": []}
+
+
+async def a_estudio(estado: Estado) -> dict:
+    decir("Vale, dejamos el plan. Seguimos con lo que quieras.")
+    return {"fase": "estudio"}
 
 
 def tras_extraer(estado: Estado) -> str:
@@ -56,17 +74,22 @@ def construir_grafo(
     g.add_node("explicar_fallo", explicar_fallo)
     g.add_node("proponer", proponer, destinations=("guardar", "extraer"))
     g.add_node("guardar", hacer_guardar(buscador))
-    finales = ["preguntar", "negociar", "explicar_fallo", "guardar"]
+    g.add_node("a_diagnostico", a_diagnostico)
+    g.add_node("a_estudio", a_estudio)
+    g.add_edge("a_diagnostico", "extraer")
+    finales = ["preguntar", "negociar", "explicar_fallo", "guardar", "a_estudio"]
     if buscador is None:
         g.add_node("conversar", conversar)
-        g.add_conditional_edges(START, enrutar_entrada, {"extraer": "extraer", "estudio": "conversar"})
+        g.add_conditional_edges(START, enrutar_entrada, {"extraer": "extraer", "estudio": "conversar",
+                                                         "a_diagnostico": "a_diagnostico", "a_estudio": "a_estudio"})
         finales.append("conversar")
     else:
         g.add_node("reescribir", reescribir)
         g.add_node("aclarar", aclarar)
         g.add_node("recuperar", hacer_recuperar(buscador))
         g.add_node("responder", responder)
-        g.add_conditional_edges(START, enrutar_entrada, {"extraer": "extraer", "estudio": "reescribir"})
+        g.add_conditional_edges(START, enrutar_entrada, {"extraer": "extraer", "estudio": "reescribir",
+                                                         "a_diagnostico": "a_diagnostico", "a_estudio": "a_estudio"})
         g.add_conditional_edges("reescribir", tras_reescribir, ["aclarar", "recuperar"])
         g.add_edge("recuperar", "responder")
         finales += ["aclarar", "responder"]

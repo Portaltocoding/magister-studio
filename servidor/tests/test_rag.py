@@ -77,3 +77,44 @@ def test_citas_comprobadas() -> None:
     assert por_id[999].dudosa
     otra = comprobar("Los gatos maúllan por la noche [101].", fragmentos)
     assert otra[0].dudosa
+
+
+def test_intencion_de_plan() -> None:
+    from magister.flujo.intencion import deja_plan, pide_plan
+
+    for si in ("y podemos hacer un plan con ello un research organizarlo en el calendario y demás?", "hazme un roadmap",
+               "quiero un plan de estudio para esto", "organízalo en el calendario", "un plan para 3 meses"):
+        assert pide_plan(si), si
+    for no in ("¿qué es un plan de ejecución en Postgres?", "explícame el calendario juliano", "hola"):
+        assert not pide_plan(no), no
+    assert deja_plan("déjalo, mejor otra cosa") and not deja_plan("sigue")
+
+
+async def test_estudio_pasa_al_plan_y_vuelve() -> None:
+    from langgraph.types import Command
+
+    from magister.cerebro.estructura import eco
+    from magister.plan.esquemas import Perfil, Plan
+
+    g = construir_grafo(InMemorySaver(), BuscadorFalso())
+    turnos = [{"rol": "usuario", "contenido": "conceptos de un fullstack senior"}, {"rol": "tutor", "contenido": "..."},
+              {"rol": "usuario", "contenido": "¿podemos hacer un plan con ello?"}]
+    eco.encolar(Perfil, [{"tema": "fullstack senior"}])
+    nodos, texto, _ = await correr(g, estudio("¿podemos hacer un plan con ello?", turnos), "p")
+    assert nodos == ["a_diagnostico", "extraer", "preguntar"] and texto
+    # La siguiente respuesta sigue en el diagnóstico (no vuelve a estudio) y acaba en propuesta.
+    eco.encolar(Plan, ["plan_ok.json"])
+    nodos, _, _ = await correr(g, {"mensaje": "1,5 h entre semana, sin fecha", "turnos": turnos, "hoy": "2026-11-09"}, "p")
+    assert nodos[:2] == ["extraer", "planificar"]
+    estado = await g.aget_state({"configurable": {"thread_id": "p"}})
+    assert any(t.interrupts for t in estado.tasks)
+    # Dejarlo vuelve a estudio.
+    g2 = construir_grafo(InMemorySaver(), BuscadorFalso())
+    eco.encolar(Perfil, [{"tema": "x"}])
+    await correr(g2, estudio("hazme un plan", None), "q")
+    nodos, texto, _ = await correr(g2, {"mensaje": "déjalo", "turnos": [], "hoy": "2026-11-09"}, "q")
+    assert texto.startswith("Vale, dejamos el plan")
+    nodos, _, _ = await correr(g2, {"mensaje": "qué es un índice", "turnos": [{"rol": "usuario", "contenido": "qué es un índice"}],
+                                    "hoy": "2026-11-09"}, "q")
+    assert nodos == ["recuperar", "responder"]
+    _ = Command
