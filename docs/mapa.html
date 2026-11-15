@@ -1,0 +1,258 @@
+
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de Magister</title>
+<style>
+:root {
+  --fondo: #f6f7f9; --texto: #1b1f24; --suave: #5b6570; --borde: #d5dae0; --tarjeta: #ffffff;
+  --front: #dbeafe; --front-b: #3b82f6;
+  --back: #dcfce7; --back-b: #16a34a;
+  --ia: #ede9fe; --ia-b: #7c3aed;
+  --datos: #fef3c7; --datos-b: #d97706;
+  --prod: #fee2e2; --prod-b: #dc2626;
+  --libro: #e5e7eb; --libro-b: #6b7280;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #12151a; --texto: #e7eaee; --suave: #9aa4af; --borde: #2c333b; --tarjeta: #1a1f26;
+    --front: #1e3a5f; --front-b: #60a5fa;
+    --back: #14432a; --back-b: #4ade80;
+    --ia: #36275e; --ia-b: #a78bfa;
+    --datos: #4a3510; --datos-b: #fbbf24;
+    --prod: #5a1d1d; --prod-b: #f87171;
+    --libro: #2a2f36; --libro-b: #9ca3af;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 4px; }
+h2 { font-size: 18px; margin: 36px 0 10px; }
+p.sub { color: var(--suave); margin: 0 0 18px; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1.5px solid; font-size: 13px; }
+.front { background: var(--front); border-color: var(--front-b); }
+.back  { background: var(--back);  border-color: var(--back-b); }
+.ia    { background: var(--ia);    border-color: var(--ia-b); }
+.datos { background: var(--datos); border-color: var(--datos-b); }
+.prod  { background: var(--prod);  border-color: var(--prod-b); }
+.libro { background: var(--libro); border-color: var(--libro-b); }
+.arbol { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 8px; font-family: ui-monospace, Consolas, monospace; font-size: 13.5px; }
+.fila { display: flex; gap: 12px; justify-content: space-between; align-items: baseline; padding: 4px 10px; border-left: 5px solid; border-radius: 4px; margin: 3px 0; flex-wrap: wrap; }
+.fila .nota { font-family: system-ui, sans-serif; font-size: 13px; color: var(--suave); }
+.n1 { margin-left: 22px; } .n2 { margin-left: 44px; }
+.estado { font-family: system-ui, sans-serif; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--suave); white-space: nowrap; }
+.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.parte { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 12px; }
+.parte h3 { margin: 0; font-size: 16px; }
+.parte .hito { color: var(--suave); font-size: 13.5px; margin: 2px 0 8px; }
+.pieza { padding: 5px 10px; border-left: 5px solid; border-radius: 4px; margin: 4px 0; font-size: 14px; }
+.pieza small { color: var(--suave); display: block; font-size: 12.5px; }
+.flujo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 12px; }
+.flujo .caja { padding: 6px 12px; border-radius: 8px; border: 1.5px solid; }
+.flujo .flecha { color: var(--suave); }
+.pie { color: var(--suave); font-size: 13px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mapa de Magister</h1>
+  <p class="sub">Qué hay en el repo, qué capa del producto es cada cosa y en qué parte del libro se construye. El color indica la capa.</p>
+
+  <div class="leyenda">
+    <span class="chip front">Front (web, React)</span>
+    <span class="chip back">Back (API, servidor)</span>
+    <span class="chip ia">IA (cerebro, modelo, tutor)</span>
+    <span class="chip datos">Datos (Postgres, vectores)</span>
+    <span class="chip prod">Producción (observar, proteger, desplegar)</span>
+    <span class="chip libro">Libro, docs y herramientas</span>
+  </div>
+
+  <h2>1. El repo hoy</h2>
+  <div class="arbol">
+    <div class="fila libro" style="border-left-color:var(--libro-b)"><span>magister/</span><span class="nota">CLAUDE.md, README.md: las reglas y el arranque del proyecto</span></div>
+
+    <div class="fila back n1" style="border-left-color:var(--back-b)"><span>servidor/</span><span class="nota">Python 3.12, uv, FastAPI, SQLAlchemy 2, Alembic</span><span class="estado">esqueleto</span></div>
+    <div class="fila back n2" style="border-left-color:var(--back-b)"><span>src/magister/api/</span><span class="nota">rutas HTTP y el flujo SSE; puede importar de cerebro y datos</span><span class="estado">vacío</span></div>
+    <div class="fila ia n2" style="border-left-color:var(--ia-b)"><span>src/magister/cerebro/</span><span class="nota">decide qué decir; hoy, el adaptador <code>generar()</code> sobre <code>claude -p</code></span><span class="estado">vacío</span></div>
+    <div class="fila datos n2" style="border-left-color:var(--datos-b)"><span>src/magister/datos/</span><span class="nota">modelos, sesiones y migraciones en Postgres 16 + pgvector</span><span class="estado">vacío</span></div>
+    <div class="fila back n2" style="border-left-color:var(--back-b)"><span>src/magister/config.py</span><span class="nota">ajustes desde variables MAGISTER_*</span><span class="estado">hecho</span></div>
+    <div class="fila back n2" style="border-left-color:var(--back-b)"><span>tests/</span><span class="nota">uv run pytest</span><span class="estado">test_config</span></div>
+
+    <div class="fila front n1" style="border-left-color:var(--front-b)"><span>web/</span><span class="nota">React, Vite, TypeScript: pinta el stream</span><span class="estado">vacío</span></div>
+
+    <div class="fila libro n1" style="border-left-color:var(--libro-b)"><span>docs/</span><span class="nota">criterios.md y adr/0001 (arquitectura de la v0.1)</span></div>
+    <div class="fila libro n1" style="border-left-color:var(--libro-b)"><span>scripts/</span><span class="nota">medir_cli.py</span></div>
+    <div class="fila libro n1" style="border-left-color:var(--libro-b)"><span>previo/</span><span class="nota">el libro (partes/, evals/, _motor/), los PDF y el solucionario</span></div>
+  </div>
+
+  <h2>2. Cómo se conecta, v0.1</h2>
+  <div class="flujo">
+    <span class="caja front">Navegador (web)</span><span class="flecha">→ HTTP + SSE →</span>
+    <span class="caja back">API (FastAPI)</span><span class="flecha">→</span>
+    <span class="caja ia">Cerebro: <code>generar()</code></span><span class="flecha">→</span>
+    <span class="caja ia"><code>claude -p</code></span><span class="flecha">→</span>
+    <span class="caja ia">tu suscripción</span>
+  </div>
+  <div class="flujo" style="margin-top:8px">
+    <span class="caja back">API</span><span class="flecha">→ guarda y lee →</span>
+    <span class="caja datos">Datos (Postgres en Docker)</span>
+  </div>
+  <p class="sub" style="margin-top:8px">Regla de dependencias: <b>api</b> importa de <b>cerebro</b> y <b>datos</b>; cerebro y datos solo importan de <code>config</code> y nunca entre sí.</p>
+
+  <h2>3. Las seis partes del libro y sus piezas</h2>
+  <div class="rejilla">
+
+    <div class="parte">
+      <h3>Parte I · v0.1</h3>
+      <div class="hito">Una conversación con streaming guardada en Postgres</div>
+      <div class="pieza front" style="border-left-color:var(--front-b)">Interfaz<small>página React que pinta la respuesta por trozos</small></div>
+      <div class="pieza back" style="border-left-color:var(--back-b)">API<small>FastAPI y SSE entre el navegador y el cerebro</small></div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Cerebro<small>el modelo detrás de <code>generar()</code></small></div>
+      <div class="pieza datos" style="border-left-color:var(--datos-b)">Datos<small>temas, conversaciones, mensajes, migraciones</small></div>
+    </div>
+
+    <div class="parte">
+      <h3>Parte II · v0.2</h3>
+      <div class="hito">Un plan de estudio con calendario a partir de una conversación</div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Cerebro como grafo<small>LangGraph: conversar, extraer, planificar, calendarizar</small></div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Planificador<small>diagnóstico, plan estructurado validado, calendario</small></div>
+      <div class="pieza datos" style="border-left-color:var(--datos-b)">Datos: planes y calendario</div>
+      <div class="pieza front" style="border-left-color:var(--front-b)">Interfaz: panel del plan</div>
+    </div>
+
+    <div class="parte">
+      <h3>Parte III · v0.3</h3>
+      <div class="hito">El tutor lee tus fuentes y cita de dónde saca cada cosa</div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Fuentes y recuperación<small>ingesta, troceado, recuperación híbrida, citas</small></div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Agente de research</div>
+      <div class="pieza datos" style="border-left-color:var(--datos-b)">Datos: fuentes y vectores (pgvector)</div>
+    </div>
+
+    <div class="parte">
+      <h3>Parte IV · v0.4</h3>
+      <div class="hito">Fichas, preguntas y diapositivas con tu tono</div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Material<small>fichas, preguntas de repaso, diapositivas, guion de vídeo</small></div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Tono y evaluación<small>guardián del tono y eval de completitud</small></div>
+      <div class="pieza back" style="border-left-color:var(--back-b)">Trabajos en segundo plano</div>
+      <div class="pieza front" style="border-left-color:var(--front-b)">Interfaz: estado de la generación larga</div>
+    </div>
+
+    <div class="parte">
+      <h3>Parte V · v0.5</h3>
+      <div class="hito">Te pregunta, te corrige y reajusta el calendario</div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Aprendizaje<small>preguntar y corregir, modelo de olvido, repaso espaciado</small></div>
+      <div class="pieza datos" style="border-left-color:var(--datos-b)">Datos: estado de cada concepto</div>
+      <div class="pieza front" style="border-left-color:var(--front-b)">Interfaz: práctica y progreso</div>
+    </div>
+
+    <div class="parte">
+      <h3>Parte VI · v1.0</h3>
+      <div class="hito">Verlo, pagarlo, protegerlo y desplegarlo</div>
+      <div class="pieza prod" style="border-left-color:var(--prod-b)">Observabilidad<small>ver qué pasa</small></div>
+      <div class="pieza prod" style="border-left-color:var(--prod-b)">Coste y latencia</div>
+      <div class="pieza prod" style="border-left-color:var(--prod-b)">Seguridad<small>atacar tu propio tutor</small></div>
+      <div class="pieza prod" style="border-left-color:var(--prod-b)">Despliegue</div>
+      <div class="pieza ia" style="border-left-color:var(--ia-b)">Dentro del modelo y afinado del tono</div>
+    </div>
+  </div>
+
+  <h2>4. Qué parte toca qué capa</h2>
+  <div class="arbol">
+    <div class="fila front" style="border-left-color:var(--front-b)"><span>Front</span><span class="nota">Partes I, II, IV, V</span></div>
+    <div class="fila back" style="border-left-color:var(--back-b)"><span>Back</span><span class="nota">Partes I, IV</span></div>
+    <div class="fila ia" style="border-left-color:var(--ia-b)"><span>IA</span><span class="nota">Partes I a VI: es el centro del producto</span></div>
+    <div class="fila datos" style="border-left-color:var(--datos-b)"><span>Datos</span><span class="nota">Partes I, II, III, V</span></div>
+    <div class="fila prod" style="border-left-color:var(--prod-b)"><span>Producción</span><span class="nota">Parte VI</span></div>
+  </div>
+
+  <h2>5. El repo final, v1.0</h2>
+  <p class="sub">Cómo quedaría el repo al terminar el libro. Los nombres salen de las rutas que el propio libro va construyendo; son el plan, no el estado de hoy, y pueden moverse al construir.</p>
+  <div class="arbol">
+    <div class="fila libro " style="border-left-color:var(--libro-b)"><span>magister/</span><span class="nota">CLAUDE.md, README.md, compose.yaml, .github/workflows/ci.yaml</span><span class="estado">I a VI</span></div>
+    <div class="fila back n1" style="border-left-color:var(--back-b)"><span>servidor/</span><span class="nota">pyproject.toml, uv.lock, .env.example, Dockerfile, Caddyfile (despliegue)</span><span class="estado">I, VI</span></div>
+    <div class="fila back n2" style="border-left-color:var(--back-b)"><span>src/magister/api/</span><span class="nota">app.py, rutas JSON, SSE, rutas_practica.py</span><span class="estado">I a V</span></div>
+    <div class="fila ia n2" style="border-left-color:var(--ia-b)"><span>src/magister/cerebro/</span><span class="nota">modelo.py (<code>generar()</code>), estructura.py, prompts/</span><span class="estado">I, II</span></div>
+    <div class="fila ia n2" style="border-left-color:var(--ia-b)"><span>src/magister/flujo/</span><span class="nota">grafo.py y nodos/: conversar, extraer, planificar, calendarizar (LangGraph)</span><span class="estado">II</span></div>
+    <div class="fila ia n2" style="border-left-color:var(--ia-b)"><span>src/magister/plan/</span><span class="nota">esquemas.py, reglas.py, perfil.py, dependencias.py, calendario.py</span><span class="estado">II</span></div>
+    <div class="fila ia n2" style="border-left-color:var(--ia-b)"><span>src/magister/fuentes/ y research/</span><span class="nota">ingesta, troceado, recuperación híbrida con citas, agente de research</span><span class="estado">III</span></div>
+    <div class="fila ia n2" style="border-left-color:var(--ia-b)"><span>src/magister/material/</span><span class="nota">fichas (motor_fichas/), preguntas.py, diapositivas.py</span><span class="estado">IV</span></div>
+    <div class="fila ia n2" style="border-left-color:var(--ia-b)"><span>src/magister/tono/</span><span class="nota">lint.py: el guardián del tono</span><span class="estado">IV</span></div>
+    <div class="fila back n2" style="border-left-color:var(--back-b)"><span>src/magister/trabajos/</span><span class="nota">trabajos en segundo plano</span><span class="estado">IV</span></div>
+    <div class="fila ia n2" style="border-left-color:var(--ia-b)"><span>src/magister/aprender/</span><span class="nota">preguntar y corregir, modelo de olvido, repaso, reajuste del calendario</span><span class="estado">V</span></div>
+    <div class="fila datos n2" style="border-left-color:var(--datos-b)"><span>src/magister/datos/</span><span class="nota">modelos.py, sesiones; vectores con pgvector</span><span class="estado">I, II, III, V</span></div>
+    <div class="fila prod n2" style="border-left-color:var(--prod-b)"><span>src/magister/observar/</span><span class="nota">trazas.py, metricas.py</span><span class="estado">VI</span></div>
+    <div class="fila prod n2" style="border-left-color:var(--prod-b)"><span>src/magister/seguridad/</span><span class="nota">entrada.py, politica.py, salida.py</span><span class="estado">VI</span></div>
+    <div class="fila back n2" style="border-left-color:var(--back-b)"><span>src/magister/config.py y cli.py</span><span class="nota">ajustes MAGISTER_* y línea de comandos</span><span class="estado">I</span></div>
+    <div class="fila datos n1" style="border-left-color:var(--datos-b)"><span>servidor/migraciones/versions/</span><span class="nota">una migración de Alembic por cambio del esquema</span><span class="estado">I a V</span></div>
+    <div class="fila back n1" style="border-left-color:var(--back-b)"><span>servidor/tests/</span><span class="nota">test_chat_eco, test_estructura, test_calendario, test_banco, fijos/</span><span class="estado">I a V</span></div>
+    <div class="fila ia n1" style="border-left-color:var(--ia-b)"><span>servidor/evals/</span><span class="nota">estadistica.py, olvido.py, banco/, tono/, resultados/: medir el planificador, la recuperación, el tono y el olvido</span><span class="estado">II a V</span></div>
+    <div class="fila back n1" style="border-left-color:var(--back-b)"><span>servidor/crudo/ y scripts/</span><span class="nota">documentos sin procesar y scripts de prueba (probar_cerebro.py, linea_base.sql)</span><span class="estado">III</span></div>
+    <div class="fila front n1" style="border-left-color:var(--front-b)"><span>web/</span><span class="nota">Dockerfile, dist/ (la compilación)</span><span class="estado">I, VI</span></div>
+    <div class="fila front n2" style="border-left-color:var(--front-b)"><span>src/api.ts, Cita.tsx, PropuestaPlan.tsx</span><span class="nota">el cliente de la API, citas y propuesta de plan</span><span class="estado">I a III</span></div>
+    <div class="fila front n2" style="border-left-color:var(--front-b)"><span>src/paneles/</span><span class="nota">PanelPlan, PanelFuentes, PanelMaterial, PanelPractica, PanelProgreso, PanelPropuestas, PanelEtiquetar</span><span class="estado">II a V</span></div>
+    <div class="fila libro n1" style="border-left-color:var(--libro-b)"><span>docs/</span><span class="nota">criterios.md, adr/ (una decisión por fichero), mapa.html, design doc del tutor</span><span class="estado">I a VI</span></div>
+    <div class="fila libro n1" style="border-left-color:var(--libro-b)"><span>previo/</span><span class="nota">el libro, los PDF y el solucionario (no es parte del producto)</span><span class="estado">—</span></div>
+  </div>
+
+  <h3 style="font-size:16px;margin:22px 0 8px">Cómo se conecta, v1.0</h3>
+  <div class="flujo">
+    <span class="caja front">Navegador (web, paneles)</span>
+    <span class="flecha">→ HTTP + SSE →</span>
+    <span class="caja back">API (FastAPI)</span>
+    <span class="flecha">→</span>
+    <span class="caja ia">flujo: el grafo de LangGraph</span>
+    <span class="flecha">→</span>
+    <span class="caja ia">cerebro: <code>generar()</code></span>
+    <span class="flecha">→</span>
+    <span class="caja ia"><code>claude -p</code> u otra suscripción</span>
+  </div>
+  <div class="flujo" style="margin-top:8px">
+    <span class="caja ia">flujo</span>
+    <span class="flecha">→ llama a →</span>
+    <span class="caja ia">plan</span>
+    <span class="caja ia">aprender</span>
+    <span class="caja ia">material</span>
+    <span class="caja ia">tono</span>
+    <span class="caja ia">fuentes y research</span>
+  </div>
+  <div class="flujo" style="margin-top:8px">
+    <span class="caja ia">flujo, plan, aprender, fuentes</span>
+    <span class="flecha">→ guardan y leen →</span>
+    <span class="caja datos">datos: Postgres + pgvector</span>
+    <span class="flecha">← migraciones de Alembic</span>
+  </div>
+  <div class="flujo" style="margin-top:8px">
+    <span class="caja back">API</span>
+    <span class="flecha">→ encola →</span>
+    <span class="caja back">trabajos</span>
+    <span class="flecha">→ ejecutan →</span>
+    <span class="caja ia">material y fuentes</span>
+    <span class="flecha">→ avisan por SSE →</span>
+    <span class="caja front">Navegador</span>
+  </div>
+  <div class="flujo" style="margin-top:8px">
+    <span class="caja prod">seguridad/entrada</span>
+    <span class="flecha">→</span>
+    <span class="caja back">API</span>
+    <span class="flecha">→</span>
+    <span class="caja prod">seguridad/salida</span>
+    <span class="flecha">· y <b>observar</b> registra trazas y métricas de todo el recorrido</span>
+  </div>
+  <div class="flujo" style="margin-top:8px">
+    <span class="caja libro">compose.yaml</span>
+    <span class="flecha">levanta →</span>
+    <span class="caja datos">Postgres</span>
+    <span class="caja back">servidor</span>
+    <span class="caja front">web</span>
+    <span class="flecha">· <b>Caddyfile</b> expone la web y la API · <b>ci.yaml</b> pasa pytest, build y evals</span>
+  </div>
+  <p class="sub" style="margin-top:8px">Lo que se mantiene de la v0.1: <b>api</b> importa de las demás piezas, y <b>cerebro</b> y <b>datos</b> solo importan de <code>config</code>. Cómo se extiende esa regla a <code>flujo</code>, <code>plan</code>, <code>aprender</code> y el resto es una decisión pendiente (un ADR cuando toque), no algo ya fijado en <code>CLAUDE.md</code>.</p>
+
+  <p class="pie">Basado en <code>CLAUDE.md</code>, la estructura real de <code>servidor/</code> y <code>web/</code> y el «Mapa del producto» del capítulo 1. El estado de cada carpeta es el de hoy y cambia al construir.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# Variante B: Caddy delante de las dos mitades. Entrada: http://localhost:8080
+# Se arranca desde la raíz del repo, leyendo el token del mismo fichero que la API:
+#   caddy run --config proxy/Caddyfile --envfile servidor/.env
+
+# ":8080" y no "localhost:8080": con un nombre de host Caddy activaría HTTPS local.
+:8080 {
+	# Solo este equipo. Sin bind, Caddy escucha en todas las interfaces y, como pone el token,
+	# cualquiera en tu red llegaría a la API con permiso.
+	bind 127.0.0.1
+
+	# La API (uvicorn en el 8000). flush_interval -1 envía cada trozo en cuanto llega,
+	# para que los eventos SSE no se acumulen hasta el final.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000 {
+			flush_interval -1
+			# El token lo pone el proxy; la página no lo conoce.
+			header_up X-Magister-Token {env.MAGISTER_TOKEN}
+		}
+	}
+
+	# Todo lo demás, a la página (Vite en el 5173).
+	handle {
+		reverse_proxy localhost:5173
+	}
+}

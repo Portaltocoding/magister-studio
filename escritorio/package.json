@@ -1,0 +1,15 @@
+{
+  "name": "magister-escritorio",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Magister como aplicación de escritorio: sirve web/dist y arranca la API",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "comprobar": "electron . --comprobar",
+    "dev": "electron . --dev"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3"
+  }
+}
