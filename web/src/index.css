@@ -394,3 +394,34 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   font: inherit; font-size: 0.9rem; padding: 7px 9px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto);
 }
 .formulario textarea { min-height: 60px; resize: vertical; }
+
+/* ===== Desplazamiento: la página entera, sin cajas con barra propia ===== */
+:root { color-scheme: light dark; }
+html { scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--borde); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--suave); }
+* { scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
+
+.vista-hilo { height: auto; min-height: calc(100vh - 140px); }
+.hilo { min-height: auto; }
+.mensajes { overflow: visible; flex: none; padding-bottom: 12px; }
+/* La caja de escribir, fija abajo mientras lees. */
+/* Solo la caja de escribir va fija; la fase, la propuesta y la casilla siguen al último mensaje. */
+.vista-hilo .entrada-hilo {
+  position: sticky; bottom: 0; z-index: 2; background: var(--fondo); padding: 10px 0 16px;
+  box-shadow: 0 -12px 16px -8px var(--fondo);
+}
+.vista-hilo .propuesta { max-height: none; overflow: visible; }
+.libre .mensajes { display: none; }
+/* La barra lateral se desplaza sola si hace falta, con barra fina y discreta. */
+.lateral { overflow-y: auto; scrollbar-gutter: stable; }
+
+/* ===== La ventana fija; solo se desplaza la zona central (y la barra lateral si no cabe) ===== */
+html, body, #root { height: 100%; }
+body { overflow: hidden; }
+.marco { height: 100vh; min-height: 0; }
+.central { overflow-y: auto; min-height: 0; scrollbar-gutter: stable; }
+.lateral { position: static; max-height: none; height: 100vh; overflow-y: auto; }
+.vista-hilo { min-height: 100%; }

@@ -32,8 +32,20 @@ export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeho
   const final = useRef<HTMLDivElement>(null)
   const [cita, setCita] = useState<{ id: number; info?: CitaInfo } | null>(null)
 
+  const pegado = useRef(true)
+
   useEffect(() => {
-    final.current?.scrollIntoView({ block: 'end' })
+    const zona = final.current?.closest('.central')
+    if (!zona) return
+    const alDesplazar = () => {
+      pegado.current = zona.scrollTop + zona.clientHeight >= zona.scrollHeight - 160
+    }
+    zona.addEventListener('scroll', alDesplazar, { passive: true })
+    return () => zona.removeEventListener('scroll', alDesplazar)
+  }, [])
+
+  useEffect(() => {
+    if (pegado.current) final.current?.scrollIntoView({ block: 'end' })
   }, [burbujas])
 
   const mandar = () => {
