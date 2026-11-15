@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Magister",
-    "version": "0.4"
+    "version": "0.5"
   },
   "paths": {
     "/api/salud": {
@@ -672,6 +672,98 @@
                     "additionalProperties": true
                   },
                   "title": "Response Ver Calendario Api Calendario Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/temas/{tema_id}/plan/reajuste": {
+      "post": {
+        "summary": "Proponer Reajuste",
+        "operationId": "proponer_reajuste_api_temas__tema_id__plan_reajuste_post",
+        "parameters": [
+          {
+            "name": "tema_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tema Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Proponer Reajuste Api Temas  Tema Id  Plan Reajuste Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/temas/{tema_id}/plan/reajuste/aceptar": {
+      "post": {
+        "summary": "Aceptar Reajuste",
+        "operationId": "aceptar_reajuste_api_temas__tema_id__plan_reajuste_aceptar_post",
+        "parameters": [
+          {
+            "name": "tema_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tema Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reajuste"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Aceptar Reajuste Api Temas  Tema Id  Plan Reajuste Aceptar Post"
                 }
               }
             }
@@ -1774,6 +1866,428 @@
           }
         }
       }
+    },
+    "/api/practica/cola": {
+      "get": {
+        "summary": "Ver Cola",
+        "operationId": "ver_cola_api_practica_cola_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Ver Cola Api Practica Cola Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/practica/siguiente": {
+      "get": {
+        "summary": "Ver Siguiente",
+        "operationId": "ver_siguiente_api_practica_siguiente_get",
+        "parameters": [
+          {
+            "name": "concepto_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Concepto Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Ver Siguiente Api Practica Siguiente Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/practica/intentos": {
+      "post": {
+        "summary": "Intentar",
+        "operationId": "intentar_api_practica_intentos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntentoEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/practica/intentos/{intento_id}": {
+      "patch": {
+        "summary": "Corregir Nota",
+        "operationId": "corregir_nota_api_practica_intentos__intento_id__patch",
+        "parameters": [
+          {
+            "name": "intento_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intento Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotaUsuario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Corregir Nota Api Practica Intentos  Intento Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/progreso/conceptos": {
+      "get": {
+        "summary": "Conceptos",
+        "operationId": "conceptos_api_progreso_conceptos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Conceptos Api Progreso Conceptos Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/progreso/carga": {
+      "get": {
+        "summary": "Carga",
+        "operationId": "carga_api_progreso_carga_get",
+        "parameters": [
+          {
+            "name": "dias",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 14,
+              "title": "Dias"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Carga Api Progreso Carga Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/progreso/calibracion": {
+      "get": {
+        "summary": "Calibracion",
+        "operationId": "calibracion_api_progreso_calibracion_get",
+        "parameters": [
+          {
+            "name": "fuente",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "usuario",
+                "modelo"
+              ],
+              "type": "string",
+              "default": "usuario",
+              "title": "Fuente"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Calibracion Api Progreso Calibracion Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/progreso/resumen": {
+      "get": {
+        "summary": "Resumen",
+        "operationId": "resumen_api_progreso_resumen_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Resumen Api Progreso Resumen Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hoy": {
+      "get": {
+        "summary": "Hoy",
+        "operationId": "hoy_api_hoy_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Hoy Api Hoy Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tutor/leccion/{material_id}": {
+      "get": {
+        "summary": "Leccion",
+        "operationId": "leccion_api_tutor_leccion__material_id__get",
+        "parameters": [
+          {
+            "name": "material_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Material Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Leccion Api Tutor Leccion  Material Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tutor/servir/{pregunta_id}": {
+      "post": {
+        "summary": "Servir",
+        "description": "Sirve una pregunta concreta de la sesión y apuesta `p_predicha` antes de corregir.",
+        "operationId": "servir_api_tutor_servir__pregunta_id__post",
+        "parameters": [
+          {
+            "name": "pregunta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pregunta Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Servir Api Tutor Servir  Pregunta Id  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2026,6 +2540,69 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "IntentoEntrada": {
+        "properties": {
+          "pregunta_id": {
+            "type": "string",
+            "title": "Pregunta Id"
+          },
+          "concepto_id": {
+            "type": "string",
+            "title": "Concepto Id"
+          },
+          "respuesta": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Respuesta"
+          },
+          "confianza": {
+            "type": "number",
+            "enum": [
+              0.25,
+              0.5,
+              0.75,
+              0.95
+            ],
+            "title": "Confianza"
+          },
+          "clave": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 8,
+            "title": "Clave"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "espaciado",
+              "reintento"
+            ],
+            "title": "Tipo",
+            "default": "espaciado"
+          },
+          "latencia_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latencia Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pregunta_id",
+          "concepto_id",
+          "respuesta",
+          "confianza",
+          "clave"
+        ],
+        "title": "IntentoEntrada"
+      },
       "MensajeEntrada": {
         "properties": {
           "contenido": {
@@ -2098,6 +2675,25 @@
         ],
         "title": "MensajeSalida"
       },
+      "NotaUsuario": {
+        "properties": {
+          "nota_usuario": {
+            "type": "string",
+            "enum": [
+              "fallo",
+              "parcial",
+              "bien",
+              "perfecta"
+            ],
+            "title": "Nota Usuario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nota_usuario"
+        ],
+        "title": "NotaUsuario"
+      },
       "PedirMaterial": {
         "properties": {
           "tipos": {
@@ -2127,6 +2723,23 @@
         },
         "type": "object",
         "title": "PedirMaterial"
+      },
+      "Reajuste": {
+        "properties": {
+          "sesiones": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Sesiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sesiones"
+        ],
+        "title": "Reajuste"
       },
       "Recalcular": {
         "properties": {

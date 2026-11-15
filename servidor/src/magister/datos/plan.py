@@ -85,6 +85,10 @@ class ConceptoFila(Base):
     nucleo: Mapped[bool] = mapped_column(server_default=text("true"))
     depende_de: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
     enriquecido_en: Mapped[datetime | None] = mapped_column(Fecha)
+    # Parte V: de dónde sale el concepto, si lo aprobaste y su brazo del experimento.
+    origen: Mapped[str] = mapped_column(String(10), server_default="plan")
+    aprobado: Mapped[bool] = mapped_column(server_default=text("true"))
+    brazo: Mapped[str | None] = mapped_column(String(10))
 
 
 class DependenciaFila(Base):

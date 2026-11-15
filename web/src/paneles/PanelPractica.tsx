@@ -1,0 +1,205 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Markdown from 'react-markdown'
+import { enviarJson, flujo, pedir } from '../api.ts'
+
+interface EnCola {
+  concepto_id: string
+  nombre: string
+  p: number
+  minutos: number
+  nuevo: boolean
+}
+
+interface Servida {
+  pregunta_id: string
+  concepto_id: string
+  nombre: string
+  enunciado: string
+  quedan: number
+}
+
+type EventoCorreccion =
+  | { tipo: 'nota'; nota: string; ideas_ausentes: string[]; errores: { afirmacion: string; por_que: string }[] }
+  | { tipo: 'delta'; t: string }
+  | { tipo: 'fin'; intento_id: string; proxima_fecha: string | null }
+  | { tipo: 'error'; detalle: string }
+
+const CONFIANZAS: [number, string][] = [
+  [0.25, 'No lo sé'],
+  [0.5, 'Dudo'],
+  [0.75, 'Bastante seguro'],
+  [0.95, 'Seguro'],
+]
+const NOTAS = ['fallo', 'parcial', 'bien', 'perfecta']
+const nueva = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
+
+// Repaso: lo que toca hoy, una pregunta cada vez, respondida de memoria y corregida en flujo.
+export default function PanelPractica({ concepto }: { concepto?: string }) {
+  const [cola, setCola] = useState<EnCola[] | null>(null)
+  const [pregunta, setPregunta] = useState<Servida | null>(null)
+  const [respuesta, setRespuesta] = useState('')
+  const [confianza, setConfianza] = useState<number | null>(null)
+  const [nota, setNota] = useState<Extract<EventoCorreccion, { tipo: 'nota' }> | null>(null)
+  const [explicacion, setExplicacion] = useState('')
+  const [fin, setFin] = useState<{ intento_id: string; proxima_fecha: string | null } | null>(null)
+  const [corrigiendo, setCorrigiendo] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const servidaEn = useRef(Date.now())
+
+  const cargar = useCallback(() => {
+    pedir<EnCola[]>('/api/practica/cola').then(setCola)
+  }, [])
+
+  useEffect(cargar, [cargar])
+
+  const siguiente = async () => {
+    setNota(null)
+    setExplicacion('')
+    setFin(null)
+    setRespuesta('')
+    setConfianza(null)
+    setError(null)
+    const p = await pedir<Servida | null>(`/api/practica/siguiente${concepto ? `?concepto_id=${concepto}` : ''}`)
+    setPregunta(p)
+    servidaEn.current = Date.now()
+    cargar()
+  }
+
+  const enviar = async (tipo: 'espaciado' | 'reintento' = 'espaciado') => {
+    if (!pregunta || confianza == null || !respuesta.trim()) return
+    setCorrigiendo(true)
+    setExplicacion('')
+    try {
+      for await (const ev of flujo<EventoCorreccion>(
+        '/api/practica/intentos',
+        {
+          pregunta_id: pregunta.pregunta_id,
+          concepto_id: pregunta.concepto_id,
+          respuesta,
+          confianza,
+          clave: nueva(),
+          tipo,
+          latencia_ms: Date.now() - servidaEn.current,
+        },
+      )) {
+        if (ev.tipo === 'nota') setNota(ev)
+        else if (ev.tipo === 'delta') setExplicacion((x) => x + ev.t)
+        else if (ev.tipo === 'fin') setFin(ev)
+        else if (ev.tipo === 'error') setError(ev.detalle)
+      }
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setCorrigiendo(false)
+    }
+  }
+
+  const minutos = cola ? Math.round(cola.reduce((a, c) => a + c.minutos, 0)) : 0
+
+  return (
+    <div className="panel">
+      <h1>Repaso</h1>
+      {cola && (
+        <p className="nota">
+          {cola.length ? `${cola.length} conceptos para hoy · unos ${minutos} minutos` : 'Nada que repasar hoy.'}
+          {cola.some((c) => c.nuevo) ? ` · ${cola.filter((c) => c.nuevo).length} nuevos` : ''}
+        </p>
+      )}
+      {cola && cola.length === 0 && (
+        <p className="vacio">Genera el material de una lección en Fichas y sus conceptos entrarán en el repaso.</p>
+      )}
+      {!pregunta && cola && cola.length > 0 && (
+        <button className="boton boton-principal" onClick={siguiente}>
+          Empezar
+        </button>
+      )}
+      {pregunta && (
+        <section className="practica">
+          <p className="nota-linea">{pregunta.nombre}</p>
+          <h2 className="enunciado">{pregunta.enunciado}</h2>
+          <textarea
+            className="critica"
+            placeholder="Responde de memoria, con tus palabras"
+            aria-label="Tu respuesta"
+            value={respuesta}
+            disabled={!!nota}
+            onChange={(e) => setRespuesta(e.target.value)}
+          />
+          {!nota && (
+            <>
+              <div className="fila" role="radiogroup" aria-label="¿Cómo de seguro estás?">
+                {CONFIANZAS.map(([v, t]) => (
+                  <button key={v} className="boton" aria-pressed={confianza === v} onClick={() => setConfianza(v)}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="boton boton-principal"
+                disabled={corrigiendo || confianza == null || !respuesta.trim()}
+                onClick={() => enviar()}
+              >
+                {corrigiendo ? 'Corrigiendo…' : 'Enviar'}
+              </button>
+            </>
+          )}
+          {nota && (
+            <div className={`correccion nota-${nota.nota}`}>
+              <p>
+                <strong>Nota: {nota.nota}</strong>
+                {nota.ideas_ausentes.length > 0 && <> · Faltaba: {nota.ideas_ausentes.join('; ')}</>}
+              </p>
+              {nota.errores.map((e, i) => (
+                <p key={i} className="aviso-dudosa">
+                  «{e.afirmacion}»: {e.por_que}
+                </p>
+              ))}
+              <Markdown>{explicacion}</Markdown>
+              {fin && (
+                <div className="fila">
+                  {fin.proxima_fecha && (
+                    <span className="nota">
+                      Próximo repaso: {new Date(fin.proxima_fecha).toLocaleDateString('es-ES')}
+                    </span>
+                  )}
+                  <label className="nota">
+                    No estoy de acuerdo, mi nota es{' '}
+                    <select
+                      defaultValue=""
+                      onChange={(e) =>
+                        e.target.value &&
+                        pedir(`/api/practica/intentos/${fin.intento_id}`, enviarJson({ nota_usuario: e.target.value }, 'PATCH'))
+                      }
+                    >
+                      <option value="">·</option>
+                      {NOTAS.map((n) => (
+                        <option key={n}>{n}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {nota.nota !== 'perfecta' && (
+                    <button
+                      className="boton-mini"
+                      onClick={() => {
+                        setNota(null)
+                        setExplicacion('')
+                        setFin(null)
+                        setRespuesta('')
+                      }}
+                    >
+                      Reintentar (no cuenta)
+                    </button>
+                  )}
+                  <button className="boton boton-principal" onClick={siguiente}>
+                    Siguiente
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {error && <p role="alert">{error}</p>}
+        </section>
+      )}
+    </div>
+  )
+}

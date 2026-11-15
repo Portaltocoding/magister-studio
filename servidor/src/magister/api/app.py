@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from magister.api.rutas_conversaciones import rutas as rutas_conversaciones
 from magister.api.rutas_fuentes import rutas as rutas_fuentes
 from magister.api.rutas_material import rutas as rutas_material
+from magister.api.rutas_practica import rutas as rutas_practica
+from magister.api.rutas_tutor import rutas as rutas_tutor
 from magister.api.rutas_research import rutas as rutas_research
 from magister.api.rutas_plan import rutas as rutas_plan
 from magister.api.seguridad import Proteccion
@@ -21,7 +23,7 @@ from magister.datos import sesion
 from magister.datos.sesion import sesion_por_peticion
 from magister.flujo.grafo import iniciar as iniciar_grafo
 
-VERSION_CONTRATO = "0.4"
+VERSION_CONTRATO = "0.5"
 
 registro = logging.getLogger("uvicorn.error")
 
@@ -101,3 +103,5 @@ app.include_router(rutas_plan)
 app.include_router(rutas_fuentes)
 app.include_router(rutas_research)
 app.include_router(rutas_material)
+app.include_router(rutas_practica)
+app.include_router(rutas_tutor)

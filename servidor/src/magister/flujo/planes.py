@@ -182,3 +182,48 @@ async def calendario(s: AsyncSession, desde: date, hasta: date) -> list[dict]:
                     }
                 )
     return [{"fecha": d.isoformat(), "sesiones": v} for d, v in sorted(dias.items())]
+
+
+async def proponer_reajuste(s: AsyncSession, tema_id: int, ahora) -> dict | None:
+    """El reajuste propuesto: reserva la carga de repasos y reparte lo pendiente. No aplica nada."""
+    from magister.aprender.progreso import conceptos as estado_conceptos
+    from magister.aprender.reajuste import diferencias, prever_carga, reajustar
+    from magister.cerebro.modelo import Turno, generar
+
+    fila = await dp.plan_aceptado(s, tema_id)
+    if fila is None:
+        return None
+    perfil = Perfil.model_validate(fila.perfil)
+    plan = await _plan_pydantic(s, fila.id)
+    antes = [{"fecha": x.fecha.isoformat(), "clave": x.leccion_clave} for x in await dp.sesiones(s, fila.id) if x.estado == "pendiente"]
+    hechas: dict[str, float] = defaultdict(float)
+    for x in await dp.sesiones(s, fila.id):
+        if x.estado == "hecha":
+            hechas[x.leccion_clave] += x.horas
+    estados = [c for c in await estado_conceptos(ahora) if c["plan_id"] == fila.id]
+    por_leccion: dict[str, list[str]] = defaultdict(list)
+    for c in estados:
+        por_leccion[c["leccion_clave"]].append(c["estado"])
+    dominadas = {k for k, v in por_leccion.items() if v and all(e == "dominado" for e in v)}
+    carga = {x.fecha: x.minutos / 60 for x in await prever_carga(ahora, 28)}
+    inicios = [a_hora(h) for h in (perfil.inicio_por_dia or [None] * 7)]
+    nuevo, avisos = reajustar(plan, perfil.horas_por_dia or [0] * 7, inicios, ahora.date(), perfil.plazo, dict(hechas), carga,
+                              dominadas, reglas_calendario())
+    if isinstance(nuevo, NoCabe):
+        return {"cambios": [], "avisos": [nuevo.mensaje()], "sesiones": None, "texto": nuevo.mensaje()}
+    despues = [x.a_dict() for x in nuevo.sesiones]
+    cambios = diferencias(antes, [{"fecha": x["fecha"], "clave": x["clave"]} for x in despues])
+    texto = ""
+    if cambios:
+        sistema = ("Eres el tutor. Explica al alumno en tres o cuatro frases, en español de España y tuteando, este cambio de su "
+                   "calendario. No decides nada: el cambio ya está calculado. Sin el carácter de la raya larga.")
+        texto = "".join([t async for t in generar(sistema, [Turno("usuario", "\n".join(cambios + avisos))])]).strip()
+    return {"cambios": cambios, "avisos": avisos, "sesiones": despues, "texto": texto, "plan_id": fila.id}
+
+
+async def aplicar_reajuste(s: AsyncSession, tema_id: int, sesiones: list[dict], hoy) -> dict | None:
+    fila = await dp.plan_aceptado(s, tema_id)
+    if fila is None:
+        return None
+    await dp.sustituir_pendientes(s, fila.id, sesiones)
+    return await vista_por_id(s, fila.id, hoy)

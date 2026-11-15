@@ -3,6 +3,9 @@ import type { IdModo } from './modos.ts'
 import PanelCalendario from './paneles/PanelCalendario.tsx'
 import PanelEtiquetar from './paneles/PanelEtiquetar.tsx'
 import PanelMaterial from './paneles/PanelMaterial.tsx'
+import PanelPractica from './paneles/PanelPractica.tsx'
+import PanelProgreso from './paneles/PanelProgreso.tsx'
+import PanelTutor from './paneles/PanelTutor.tsx'
 import PanelFuentes from './paneles/PanelFuentes.tsx'
 import PanelPlan from './paneles/PanelPlan.tsx'
 
@@ -24,6 +27,7 @@ export default function Central({
   alNuevoPlan,
   alCrearConversacion,
   alCambiarConversaciones,
+  irA,
 }: Props) {
   switch (modo) {
     case 'libre':
@@ -37,7 +41,7 @@ export default function Central({
         />
       )
     case 'tutor':
-      return <Pendiente texto="El tutor prepara la sesión desde tus fuentes y te lleva." />
+      return <PanelTutor irA={irA} />
     case 'roadmap':
       return <PanelPlan alNuevoPlan={alNuevoPlan} />
     case 'calendario':
@@ -51,9 +55,9 @@ export default function Central({
     case 'video':
       return <PanelMaterial key="video" vista="video" />
     case 'repaso':
-      return <Pendiente texto="Qué toca repasar, cuando tú quieras." />
+      return <PanelPractica />
     case 'progreso':
-      return <Pendiente texto="El porcentaje del camino, el dominio por concepto, los días estudiados y el tiempo." />
+      return <PanelProgreso />
     case 'etiquetar':
       return <PanelEtiquetar />
     case 'construccion':
