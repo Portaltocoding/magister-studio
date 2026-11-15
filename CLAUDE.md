@@ -11,11 +11,14 @@ Magister Studio: el tutor personal construido siguiendo el libro de `magister` (
 
 ## Módulos y dependencias
 
-El paquete `magister` contiene `api`, `cerebro` y `datos`.
+El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 
-- `api` importa de `cerebro` y `datos`.
+- `api` importa de `flujo` y `datos` (ADR-0005).
+- `flujo` (el grafo de LangGraph) importa de `cerebro`, `plan` y `datos`.
 - `cerebro` y `datos` solo importan de `magister.config`, para leer sus ajustes.
+- `plan` es código puro: no importa de `datos`, `cerebro` ni `config`.
 - `cerebro` y `datos` nunca importan de `api` ni el uno del otro.
+- Las evals viven en `servidor/evals/` y se lanzan con `uv run python -m evals.<modulo>`.
 
 ## Estilo
 

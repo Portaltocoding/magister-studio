@@ -1,0 +1,227 @@
+{
+ "razonamiento": "Del modelo relacional a las consultas y de ahí al rendimiento.",
+ "lecciones": [
+  {
+   "clave": "L1",
+   "titulo": "Modelo relacional",
+   "horas": 2,
+   "depende_de": [],
+   "objetivos": [
+    "Explicar modelo relacional"
+   ],
+   "conceptos": [
+    {
+     "id": "modelo-relacional",
+     "nombre": "Modelo relacional"
+    },
+    {
+     "id": "clave-primaria",
+     "nombre": "Clave primaria"
+    }
+   ]
+  },
+  {
+   "clave": "L2",
+   "titulo": "SELECT básico",
+   "horas": 3,
+   "depende_de": [
+    "L1"
+   ],
+   "objetivos": [
+    "Explicar select básico"
+   ],
+   "conceptos": [
+    {
+     "id": "select",
+     "nombre": "Select"
+    },
+    {
+     "id": "where",
+     "nombre": "Where"
+    }
+   ]
+  },
+  {
+   "clave": "L3",
+   "titulo": "Agregación",
+   "horas": 3,
+   "depende_de": [
+    "L2"
+   ],
+   "objetivos": [
+    "Explicar agregación"
+   ],
+   "conceptos": [
+    {
+     "id": "group-by",
+     "nombre": "Group by"
+    }
+   ]
+  },
+  {
+   "clave": "L4",
+   "titulo": "JOINs",
+   "horas": 4,
+   "depende_de": [
+    "L3"
+   ],
+   "objetivos": [
+    "Explicar joins"
+   ],
+   "conceptos": [
+    {
+     "id": "inner-join",
+     "nombre": "Inner join"
+    },
+    {
+     "id": "left-join",
+     "nombre": "Left join"
+    }
+   ]
+  },
+  {
+   "clave": "L5",
+   "titulo": "Subconsultas",
+   "horas": 3,
+   "depende_de": [
+    "L4"
+   ],
+   "objetivos": [
+    "Explicar subconsultas"
+   ],
+   "conceptos": [
+    {
+     "id": "subconsulta",
+     "nombre": "Subconsulta"
+    }
+   ]
+  },
+  {
+   "clave": "L6",
+   "titulo": "Diseño y normalización",
+   "horas": 3,
+   "depende_de": [
+    "L4"
+   ],
+   "objetivos": [
+    "Explicar diseño y normalización"
+   ],
+   "conceptos": [
+    {
+     "id": "normalizacion",
+     "nombre": "Normalizacion"
+    }
+   ]
+  },
+  {
+   "clave": "L7",
+   "titulo": "Transacciones",
+   "horas": 3,
+   "depende_de": [
+    "L6"
+   ],
+   "objetivos": [
+    "Explicar transacciones"
+   ],
+   "conceptos": [
+    {
+     "id": "transaccion",
+     "nombre": "Transaccion"
+    },
+    {
+     "id": "acid",
+     "nombre": "Acid"
+    }
+   ]
+  },
+  {
+   "clave": "L8",
+   "titulo": "Índices",
+   "horas": 3,
+   "depende_de": [
+    "L5",
+    "L6"
+   ],
+   "objetivos": [
+    "Explicar índices"
+   ],
+   "conceptos": [
+    {
+     "id": "indice-btree",
+     "nombre": "Indice btree"
+    }
+   ]
+  },
+  {
+   "clave": "L9",
+   "titulo": "Restricciones",
+   "horas": 3,
+   "depende_de": [
+    "L6"
+   ],
+   "objetivos": [
+    "Explicar restricciones"
+   ],
+   "conceptos": [
+    {
+     "id": "restriccion-check",
+     "nombre": "Restriccion check"
+    }
+   ]
+  },
+  {
+   "clave": "L10",
+   "titulo": "Funciones de ventana",
+   "horas": 3,
+   "depende_de": [
+    "L5"
+   ],
+   "objetivos": [
+    "Explicar funciones de ventana"
+   ],
+   "conceptos": [
+    {
+     "id": "ventana",
+     "nombre": "Ventana"
+    }
+   ]
+  },
+  {
+   "clave": "L11",
+   "titulo": "Planes de ejecución",
+   "horas": 1.5,
+   "depende_de": [
+    "L8",
+    "L9"
+   ],
+   "objetivos": [
+    "Explicar planes de ejecución"
+   ],
+   "conceptos": [
+    {
+     "id": "explain",
+     "nombre": "Explain"
+    }
+   ]
+  },
+  {
+   "clave": "L12",
+   "titulo": "Repaso de entrevista",
+   "horas": 1.5,
+   "depende_de": [
+    "L7",
+    "L10",
+    "L11"
+   ],
+   "objetivos": [
+    "Explicar repaso de entrevista"
+   ],
+   "conceptos": [
+    {
+     "id": "preguntas-entrevista",
+     "nombre": "Preguntas entrevista"
+    }
+   ]
+  }
+ ]
+}

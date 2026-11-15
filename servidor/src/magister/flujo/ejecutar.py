@@ -1,0 +1,69 @@
+"""Correr el grafo de una conversación y traducir su flujo a eventos sencillos.
+
+Eventos que salen: {"tipo": "fase", "nodo"}, {"tipo": "delta", "t"} y
+{"tipo": "plan", ...propuesta}. Errores del modelo salen como ErrorModelo.
+"""
+
+from collections.abc import AsyncIterator
+from datetime import date
+
+from langgraph.types import Command
+
+from magister.flujo.grafo import grafo
+
+
+def _config(cid: int) -> dict:
+    return {"configurable": {"thread_id": str(cid)}}
+
+
+async def pendiente_de_decision(cid: int) -> bool:
+    estado = await grafo().aget_state(_config(cid))
+    return any(t.interrupts for t in estado.tasks)
+
+
+async def propuesta_pendiente(cid: int) -> dict | None:
+    estado = await grafo().aget_state(_config(cid))
+    for tarea in estado.tasks:
+        for interrupcion in tarea.interrupts:
+            return interrupcion.value
+    return None
+
+
+async def fase_actual(cid: int) -> str | None:
+    estado = await grafo().aget_state(_config(cid))
+    return (estado.values or {}).get("fase")
+
+
+async def _correr(entrada: dict | Command, cid: int) -> AsyncIterator[dict]:
+    async for modo, datos in grafo().astream(entrada, _config(cid), stream_mode=["custom", "updates"]):
+        if modo == "custom":
+            if "t" in datos:
+                yield {"tipo": "delta", "t": datos["t"]}
+            elif "fase" in datos:
+                yield {"tipo": "fase", "nodo": datos["fase"]}
+        elif modo == "updates" and "__interrupt__" in datos:
+            for interrupcion in datos["__interrupt__"]:
+                yield {"tipo": "plan", **interrupcion.value}
+
+
+async def mensaje(
+    cid: int, texto: str, turnos: list[dict], hoy: date, fase_inicial: str
+) -> AsyncIterator[dict]:
+    """Un mensaje del alumno. Si había un plan propuesto, el mensaje cuenta como «cambiar»."""
+    if await pendiente_de_decision(cid):
+        async for ev in decision(cid, {"accion": "cambiar", "texto": texto}, hoy, turnos):
+            yield ev
+        return
+    entrada: dict = {"conversacion_id": cid, "mensaje": texto, "turnos": turnos, "hoy": hoy.isoformat()}
+    if await fase_actual(cid) is None:
+        entrada["fase"] = fase_inicial
+    async for ev in _correr(entrada, cid):
+        yield ev
+
+
+async def decision(cid: int, cuerpo: dict, hoy: date, turnos: list[dict] | None = None) -> AsyncIterator[dict]:
+    actualizar: dict = {"hoy": hoy.isoformat()}
+    if turnos is not None:
+        actualizar["turnos"] = turnos
+    async for ev in _correr(Command(resume=cuerpo, update=actualizar), cid):
+        yield ev

@@ -24,8 +24,8 @@ export interface Modo {
 export const MODOS: Modo[] = [
   { id: 'libre', nombre: 'Estudio libre', encendido: true },
   { id: 'tutor', nombre: 'Tutor', encendido: false },
-  { id: 'roadmap', nombre: 'Roadmap', encendido: false },
-  { id: 'calendario', nombre: 'Calendario', encendido: false },
+  { id: 'roadmap', nombre: 'Roadmap', encendido: true },
+  { id: 'calendario', nombre: 'Calendario', encendido: true },
   { id: 'temas', nombre: 'Temas y fuentes', encendido: false },
   { id: 'proyectos', nombre: 'Proyectos', encendido: false },
   { id: 'fichas', nombre: 'Fichas', encendido: false },

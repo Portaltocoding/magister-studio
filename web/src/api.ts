@@ -16,6 +16,7 @@ export interface Conversacion {
   id: number
   titulo: string
   tema_id: number | null
+  tipo: 'libre' | 'plan' | 'tutor'
   creada_en: string
   actualizada_en: string
 }
@@ -30,6 +31,39 @@ export type EventoTutor =
   | { tipo: 'delta'; t: string }
   | { tipo: 'fin'; mensaje_id: number | null; ms_primer_token: number | null; ms_total: number }
   | { tipo: 'error'; detalle: string }
+  | { tipo: 'fase'; nodo: string }
+  | ({ tipo: 'plan' } & Propuesta)
+
+export interface ConceptoPlan {
+  id: string
+  nombre: string
+}
+
+export interface LeccionPlan {
+  clave: string
+  titulo: string
+  objetivos: string[]
+  conceptos: ConceptoPlan[]
+  horas: number
+  depende_de: string[]
+}
+
+export interface SesionPlan {
+  fecha: string
+  inicio: string | null
+  clave: string
+  horas: number
+}
+
+export interface Propuesta {
+  tema: string | null
+  razonamiento: string
+  lecciones: LeccionPlan[]
+  total_horas: number
+  capacidad_horas: number
+  sesiones: SesionPlan[]
+  fin: string | null
+}
 
 export class ErrorApi extends Error {
   codigo: number
@@ -112,11 +146,79 @@ export async function* flujo<E extends { tipo: string }>(
 export const listarTemas = () => pedir<Tema[]>('/api/temas')
 export const crearTema = (nombre: string) => pedir<Tema>('/api/temas', enviarJson({ nombre }))
 export const listarConversaciones = () => pedir<Conversacion[]>('/api/conversaciones')
-export const crearConversacion = (titulo: string, tema_id: number | null = null) =>
-  pedir<Conversacion>('/api/conversaciones', enviarJson({ titulo, tema_id }))
+export const crearConversacion = (titulo: string, tema_id: number | null = null, tipo: 'libre' | 'plan' = 'libre') =>
+  pedir<Conversacion>('/api/conversaciones', enviarJson({ titulo, tema_id, tipo }))
 export const borrarConversacion = (id: number) => pedir<void>(`/api/conversaciones/${id}`, { method: 'DELETE' })
 export const listarMensajes = (cid: number) => pedir<Mensaje[]>(`/api/conversaciones/${cid}/mensajes`)
 
 export function enviar(cid: number, contenido: string, signal: AbortSignal, cuenta = true) {
   return flujo<EventoTutor>(`/api/conversaciones/${cid}/mensajes`, { contenido, cuenta }, signal)
+}
+
+// v0.2: el plan
+
+export const propuestaPendiente = (cid: number) => pedir<Propuesta | null>(`/api/conversaciones/${cid}/propuesta`)
+
+export function decidir(cid: number, accion: 'aceptar' | 'cambiar', texto: string | null, signal: AbortSignal) {
+  return flujo<EventoTutor>(`/api/conversaciones/${cid}/plan/decision`, { accion, texto }, signal)
+}
+
+export interface SesionVista {
+  id: number
+  clave: string
+  titulo: string
+  inicio: string | null
+  horas: number
+  estado: 'pendiente' | 'hecha' | 'saltada'
+  tema?: string
+  tema_id?: number
+}
+
+export interface LeccionVista extends LeccionPlan {
+  horas_hechas: number
+  estado: 'pendiente' | 'empezada' | 'hecha'
+}
+
+export interface VistaPlan {
+  plan_id: number
+  tema_id: number
+  version: number
+  razonamiento: string
+  total_horas: number
+  horas_hechas: number
+  progreso: number
+  lecciones: LeccionVista[]
+  semanas: { lunes: string; dias: { fecha: string; hoy: boolean; sesiones: SesionVista[] }[] }[]
+  fin: string | null
+  hoy: string
+}
+
+export interface ResumenPlan {
+  plan_id: number
+  tema_id: number
+  tema: string
+  version: number
+  lecciones: number
+  total_horas: number
+  horas_hechas: number
+  progreso: number
+  fin: string | null
+}
+
+export const listarPlanes = () => pedir<ResumenPlan[]>('/api/planes')
+export const verPlan = (temaId: number) => pedir<VistaPlan>(`/api/temas/${temaId}/plan`)
+export const recalcularPlan = (temaId: number, desde: string) =>
+  pedir<VistaPlan>(`/api/temas/${temaId}/plan/recalcular`, enviarJson({ desde }))
+export const marcarSesion = (id: number, estado: SesionVista['estado']) =>
+  pedir<{ id: number; estado: string }>(`/api/sesiones/${id}`, enviarJson({ estado }, 'PATCH'))
+export const verCalendario = (desde?: string, hasta?: string) => {
+  const q = new URLSearchParams()
+  if (desde) q.set('desde', desde)
+  if (hasta) q.set('hasta', hasta)
+  return pedir<{ fecha: string; sesiones: SesionVista[] }[]>(`/api/calendario?${q}`)
+}
+
+export const hoyIso = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

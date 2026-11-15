@@ -1,0 +1,81 @@
+# Banco de peticiones del planificador (v1, provisional).
+# El libro pide que lo escribas tú a mano (30 casos: 12 celdas x 2 y 6 trampa), porque si
+# Claude escribe el examen se parece a lo que Claude sabe resolver. Estos 8 casos sirven
+# para que el harness funcione desde el primer día; sustitúyelos por los tuyos.
+# espera: cabe | no_cabe | pregunta
+
+- clave: bd-basico-15h-mes
+  estrato: {horas: media, plazo: si, nivel: base}
+  tema: bases de datos
+  peticion: >
+    Quiero preparar bases de datos para una entrevista de backend
+    dentro de un mes. Sé SQL básico de la universidad. Tengo hora y
+    media al día, entre semana, a partir de las seis de la tarde.
+  perfil_esperado:
+    nivel: basico
+    horas_por_dia: [1.5, 1.5, 1.5, 1.5, 1.5, 0, 0]
+    inicio_por_dia: ["18:00", "18:00", "18:00", "18:00", "18:00", null, null]
+    plazo_dias: 30
+  espera: cabe
+
+- clave: python-cero-1h-sin-plazo
+  estrato: {horas: pocas, plazo: no, nivel: cero}
+  tema: python
+  peticion: >
+    Quiero aprender Python desde cero por curiosidad, sin prisa y sin fecha.
+    Puedo una hora todos los días.
+  perfil_esperado:
+    nivel: nada
+    horas_por_dia: [1, 1, 1, 1, 1, 1, 1]
+  espera: cabe
+
+- clave: ml-intermedio-3h-6sem
+  estrato: {horas: muchas, plazo: si, nivel: base}
+  tema: machine learning
+  peticion: >
+    Tengo base de estadística y algo de scikit-learn. Quiero dominar machine learning
+    clásico para un proyecto en el trabajo en seis semanas. Tres horas al día de lunes a viernes.
+  perfil_esperado:
+    nivel: intermedio
+    horas_por_dia: [3, 3, 3, 3, 3, 0, 0]
+    plazo_dias: 42
+  espera: cabe
+
+- clave: redes-finde-2meses
+  estrato: {horas: pocas, plazo: si, nivel: cero}
+  tema: redes
+  peticion: >
+    No sé nada de redes y quiero entender cómo funciona internet para una certificación
+    dentro de dos meses. Solo puedo los sábados y domingos, dos horas cada día.
+  perfil_esperado:
+    nivel: nada
+    horas_por_dia: [0, 0, 0, 0, 0, 2, 2]
+    plazo_dias: 60
+  espera: cabe
+
+- clave: trampa-kubernetes-semana
+  estrato: {horas: pocas, plazo: si, nivel: cero, trampa: imposible}
+  tema: kubernetes
+  peticion: >
+    Quiero dominar Kubernetes a nivel experto para una entrevista dentro de una semana.
+    No lo he usado nunca. Tengo media hora al día entre semana.
+  espera: no_cabe
+
+- clave: trampa-ia-vaga
+  estrato: {trampa: faltan-datos}
+  peticion: Quiero aprender IA.
+  espera: pregunta
+
+- clave: trampa-sin-horas
+  estrato: {trampa: faltan-datos}
+  peticion: >
+    Quiero preparar el examen de cálculo de la universidad, que es dentro de tres semanas.
+    Sé derivar pero las integrales se me dan fatal.
+  espera: pregunta
+
+- clave: trampa-dos-temas
+  estrato: {trampa: ambiguo}
+  peticion: >
+    Quiero aprender React y también Docker, para cambiar de trabajo en dos meses.
+    Sé JavaScript. Dos horas al día entre semana.
+  espera: cabe

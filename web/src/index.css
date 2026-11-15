@@ -173,3 +173,34 @@ h2 {
   border-radius: 6px; background: var(--fondo); color: var(--texto); resize: vertical;
 }
 .interruptor { font-size: 0.8rem; color: var(--suave); display: flex; gap: 6px; align-items: center; }
+
+/* v0.2: fases, propuesta y paneles del plan */
+.fase { color: var(--suave); font-size: 0.85rem; margin: 0; animation: latido 1.6s infinite; }
+.propuesta, .panel section { text-align: left; }
+.propuesta { border: 1px solid var(--borde); border-radius: 10px; padding: 12px 16px; background: var(--panel); max-height: 55vh; overflow-y: auto; }
+.razonamiento { font-style: italic; color: var(--suave); }
+.lecciones { padding-left: 20px; }
+.lecciones > li { margin-bottom: 10px; }
+.lecciones ul { margin: 4px 0; padding-left: 18px; font-size: 0.9rem; }
+.nota-linea { color: var(--suave); font-size: 0.8rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--activo); }
+.botones { display: flex; gap: 8px; }
+.panel { max-width: 1100px; margin: 0 auto; }
+.cabecera-panel { display: flex; justify-content: space-between; align-items: center; }
+.tarjetas { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.tarjeta { font: inherit; color: var(--texto); text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border: 1px solid var(--borde); border-radius: 10px; background: var(--fondo); cursor: pointer; min-width: 220px; }
+.tarjeta[aria-pressed="true"] { border-color: var(--texto); }
+.barra { display: block; height: 6px; background: var(--activo); border-radius: 3px; overflow: hidden; }
+.barra > span { display: block; height: 100%; background: var(--ok); }
+.dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 900px) { .dos-columnas { grid-template-columns: 1fr; } }
+.semana h3 { font-size: 0.85rem; margin: 12px 0 4px; }
+.dia { display: grid; grid-template-columns: 110px 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--borde); font-size: 0.9rem; }
+.dia ul { list-style: none; margin: 0; padding: 0; }
+.dia-hoy { background: var(--activo); border-radius: 6px; }
+.dia-fecha { color: var(--suave); }
+.sesion-hecha { text-decoration: line-through; color: var(--suave); }
+.sesion-saltada { color: var(--suave); font-style: italic; }
+.dia select { margin-left: 8px; font: inherit; font-size: 0.75rem; background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); border-radius: 4px; }
+.leccion-hecha > strong { color: var(--ok); }

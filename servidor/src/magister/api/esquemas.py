@@ -22,12 +22,15 @@ class TemaSalida(Salida):
 class ConversacionEntrada(BaseModel):
     titulo: str = Field(min_length=1, max_length=200)
     tema_id: int | None = None
+    # libre: Estudio libre; plan: conversación de diagnóstico que acaba en un plan
+    tipo: Literal["libre", "plan"] = "libre"
 
 
 class ConversacionSalida(Salida):
     id: int
     titulo: str
     tema_id: int | None
+    tipo: str
     creada_en: datetime
     actualizada_en: datetime
 
@@ -44,3 +47,8 @@ class MensajeSalida(Salida):
     contenido: str
     estado: Literal["completo", "interrumpido", "error"]
     creado_en: datetime
+
+
+class DecisionEntrada(BaseModel):
+    accion: Literal["aceptar", "cambiar"]
+    texto: str | None = Field(None, max_length=5000)

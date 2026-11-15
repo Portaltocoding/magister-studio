@@ -1,21 +1,34 @@
 import EstudioLibre from './EstudioLibre.tsx'
 import type { IdModo } from './modos.ts'
+import PanelCalendario from './paneles/PanelCalendario.tsx'
+import PanelPlan from './paneles/PanelPlan.tsx'
 
 interface Props {
   modo: IdModo
   conversacionId: number | null
+  tipoConversacion: 'libre' | 'plan'
+  alNuevoPlan: () => void
   alCrearConversacion: (id: number) => void
   alCambiarConversaciones: () => void
   irA: (modo: IdModo) => void
 }
 
 // Recibe el modo como dato; no sabe nada de la barra lateral.
-export default function Central({ modo, conversacionId, alCrearConversacion, alCambiarConversaciones }: Props) {
+export default function Central({
+  modo,
+  conversacionId,
+  tipoConversacion,
+  alNuevoPlan,
+  alCrearConversacion,
+  alCambiarConversaciones,
+}: Props) {
   switch (modo) {
     case 'libre':
       return (
         <EstudioLibre
+          key={tipoConversacion}
           conversacionId={conversacionId}
+          tipo={tipoConversacion}
           alCrear={alCrearConversacion}
           alCambiar={alCambiarConversaciones}
         />
@@ -23,9 +36,9 @@ export default function Central({ modo, conversacionId, alCrearConversacion, alC
     case 'tutor':
       return <Pendiente texto="El tutor prepara la sesión desde tus fuentes y te lleva." />
     case 'roadmap':
-      return <Pendiente texto="Tus temas con lecciones partidas en ideas clave, dependencias y avance." />
+      return <PanelPlan alNuevoPlan={alNuevoPlan} />
     case 'calendario':
-      return <Pendiente texto="Tus lecciones y repasos repartidos por días." />
+      return <PanelCalendario />
     case 'temas':
       return <Pendiente texto="Tus documentos y de dónde sale cada cita." />
     case 'proyectos':

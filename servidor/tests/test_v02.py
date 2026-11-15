@@ -1,0 +1,77 @@
+from datetime import date
+
+import pytest
+from sse import eventos_sse
+
+pytestmark = pytest.mark.anyio
+
+PETICION = (
+    "Quiero preparar bases de datos para una entrevista de backend dentro de un mes. "
+    "Sé SQL básico de la universidad. Tengo hora y media al día, entre semana, a partir de las seis de la tarde."
+)
+
+
+@pytest.fixture(autouse=True)
+def hoy_fijo(monkeypatch):
+    from magister.api import rutas_conversaciones
+
+    monkeypatch.setattr(rutas_conversaciones, "hoy", lambda: date(2026, 11, 9))
+
+
+async def test_v02_de_la_peticion_al_calendario(cliente) -> None:
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "Plan BD", "tipo": "plan"})).json()["id"]
+    r = await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": PETICION})
+    ev = eventos_sse(r.text)
+    nombres = [e for e, _ in ev]
+    assert nombres[0] == "inicio" and nombres[-1] == "fin"
+    fases = [d["nodo"] for e, d in ev if e == "fase"]
+    assert fases == ["extraer", "planificar", "calendarizar"]
+    plan = next(d for e, d in ev if e == "plan")
+    assert plan["fin"] == "2026-11-18" and len(plan["lecciones"]) == 4
+
+    pendiente = (await cliente.get(f"/api/conversaciones/{cid}/propuesta")).json()
+    assert pendiente["total_horas"] == 12
+
+    r = await cliente.post(f"/api/conversaciones/{cid}/plan/decision", json={"accion": "aceptar"})
+    ev = eventos_sse(r.text)
+    assert [d["nodo"] for e, d in ev if e == "fase"] == ["guardar"]
+    assert ev[-1][0] == "fin"
+
+    otra = await cliente.post(f"/api/conversaciones/{cid}/plan/decision", json={"accion": "aceptar"})
+    assert otra.status_code == 409
+
+    tema_id = (await cliente.get("/api/conversaciones")).json()[0]["tema_id"]
+    assert tema_id is not None
+    vista = (await cliente.get(f"/api/temas/{tema_id}/plan")).json()
+    assert len(vista["lecciones"]) == 4
+    assert sum(len(lec["conceptos"]) for lec in vista["lecciones"]) == 5
+    sesiones = [x for s in vista["semanas"] for d in s["dias"] for x in d["sesiones"]]
+    dias = {d["fecha"] for s in vista["semanas"] for d in s["dias"]}
+    assert len(dias) == 8 and vista["fin"] == "2026-11-18"
+
+    # Marcar la primera sesión como hecha y recalcular desde el 12-nov: no se toca lo hecho.
+    await cliente.patch(f"/api/sesiones/{sesiones[0]['id']}", json={"estado": "hecha"})
+    nueva = (await cliente.post(f"/api/temas/{tema_id}/plan/recalcular", json={"desde": "2026-11-12"})).json()
+    estados = [x["estado"] for s in nueva["semanas"] for d in s["dias"] for x in d["sesiones"]]
+    assert estados.count("hecha") == 1
+    assert nueva["fin"] == "2026-11-20"
+
+    planes = (await cliente.get("/api/planes")).json()
+    assert planes[0]["tema"] == "bases de datos"
+
+
+async def test_mensaje_con_plan_pendiente_es_un_cambio(cliente) -> None:
+    from magister.cerebro.estructura import eco
+    from magister.plan.esquemas import Plan
+
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "Plan", "tipo": "plan"})).json()["id"]
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": PETICION})
+    eco.encolar(Plan, ["plan_ok.json"])
+    r = await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "menos horas"})
+    fases = [d["nodo"] for e, d in eventos_sse(r.text) if e == "fase"]
+    assert fases[0] == "extraer" and "calendarizar" in fases
+
+
+async def test_tema_sin_plan_da_404(cliente) -> None:
+    t = (await cliente.post("/api/temas", json={"nombre": "Redes"})).json()
+    assert (await cliente.get(f"/api/temas/{t['id']}/plan")).status_code == 404

@@ -51,7 +51,7 @@ async def test_mensaje_vacio_da_422(cliente) -> None:
 
 
 async def test_el_historial_llega_al_cerebro(cliente, monkeypatch) -> None:
-    from magister.api import rutas_conversaciones as rc
+    from magister.flujo import comun as rc
 
     vistos = []
 
@@ -67,7 +67,7 @@ async def test_el_historial_llega_al_cerebro(cliente, monkeypatch) -> None:
 
 
 async def test_error_del_modelo_es_evento_y_fila(cliente, monkeypatch) -> None:
-    from magister.api import rutas_conversaciones as rc
+    from magister.flujo import comun as rc
     from magister.cerebro.modelo import ErrorModelo
 
     async def roto(sistema, historial):

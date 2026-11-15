@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Magister",
-    "version": "0.1"
+    "version": "0.2"
   },
   "paths": {
     "/api/salud": {
@@ -340,6 +340,354 @@
           }
         }
       }
+    },
+    "/api/conversaciones/{cid}/propuesta": {
+      "get": {
+        "summary": "Propuesta Pendiente",
+        "description": "El plan propuesto que espera tu decisión, o null. Sirve para recuperarlo al recargar.",
+        "operationId": "propuesta_pendiente_api_conversaciones__cid__propuesta_get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Propuesta Pendiente Api Conversaciones  Cid  Propuesta Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversaciones/{cid}/plan/decision": {
+      "post": {
+        "summary": "Decidir Plan",
+        "operationId": "decidir_plan_api_conversaciones__cid__plan_decision_post",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes": {
+      "get": {
+        "summary": "Listar Planes",
+        "operationId": "listar_planes_api_planes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Planes Api Planes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/temas/{tema_id}/plan": {
+      "get": {
+        "summary": "Ver Plan",
+        "operationId": "ver_plan_api_temas__tema_id__plan_get",
+        "parameters": [
+          {
+            "name": "tema_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tema Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Plan Api Temas  Tema Id  Plan Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/temas/{tema_id}/plan/recalcular": {
+      "post": {
+        "summary": "Recalcular",
+        "operationId": "recalcular_api_temas__tema_id__plan_recalcular_post",
+        "parameters": [
+          {
+            "name": "tema_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tema Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Recalcular"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Recalcular Api Temas  Tema Id  Plan Recalcular Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sesiones/{sesion_id}": {
+      "patch": {
+        "summary": "Marcar Sesion",
+        "operationId": "marcar_sesion_api_sesiones__sesion_id__patch",
+        "parameters": [
+          {
+            "name": "sesion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sesion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstadoSesion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Marcar Sesion Api Sesiones  Sesion Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendario": {
+      "get": {
+        "summary": "Ver Calendario",
+        "operationId": "ver_calendario_api_calendario_get",
+        "parameters": [
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Ver Calendario Api Calendario Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -362,6 +710,15 @@
               }
             ],
             "title": "Tema Id"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "libre",
+              "plan"
+            ],
+            "title": "Tipo",
+            "default": "libre"
           }
         },
         "type": "object",
@@ -391,6 +748,10 @@
             ],
             "title": "Tema Id"
           },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
           "creada_en": {
             "type": "string",
             "format": "date-time",
@@ -407,10 +768,58 @@
           "id",
           "titulo",
           "tema_id",
+          "tipo",
           "creada_en",
           "actualizada_en"
         ],
         "title": "ConversacionSalida"
+      },
+      "DecisionEntrada": {
+        "properties": {
+          "accion": {
+            "type": "string",
+            "enum": [
+              "aceptar",
+              "cambiar"
+            ],
+            "title": "Accion"
+          },
+          "texto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accion"
+        ],
+        "title": "DecisionEntrada"
+      },
+      "EstadoSesion": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "hecha",
+              "saltada"
+            ],
+            "title": "Estado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado"
+        ],
+        "title": "EstadoSesion"
       },
       "HTTPValidationError": {
         "properties": {
@@ -487,6 +896,20 @@
           "creado_en"
         ],
         "title": "MensajeSalida"
+      },
+      "Recalcular": {
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date",
+            "title": "Desde"
+          }
+        },
+        "type": "object",
+        "required": [
+          "desde"
+        ],
+        "title": "Recalcular"
       },
       "Salud": {
         "properties": {

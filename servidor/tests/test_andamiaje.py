@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from magister.api.app import app
+from magister.api.app import VERSION_CONTRATO, app
 from magister.config import ajustes
 
 
@@ -46,9 +46,9 @@ async def test_cabeceras_del_sobre() -> None:
         nueva = await c.get("/api/salud")
         propia = await c.get("/api/salud", headers={"X-Request-Id": "abc123"})
 
-    assert nueva.headers["X-Magister-Version"] == "0.1"
+    assert nueva.headers["X-Magister-Version"] == VERSION_CONTRATO
     assert nueva.headers["X-Request-Id"]
-    assert propia.headers["X-Magister-Version"] == "0.1"
+    assert propia.headers["X-Magister-Version"] == VERSION_CONTRATO
     assert propia.headers["X-Request-Id"] == "abc123"
 
 
@@ -75,7 +75,7 @@ async def test_token_falta_o_no_coincide_da_401(con_token: str) -> None:
     for r in (sin, malo):
         assert r.status_code == 401
         assert r.json() == {"detail": "falta el token o no es válido"}
-        assert r.headers["X-Magister-Version"] == "0.1"
+        assert r.headers["X-Magister-Version"] == VERSION_CONTRATO
         assert r.headers["X-Request-Id"]
 
 

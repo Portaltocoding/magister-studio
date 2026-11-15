@@ -1,0 +1,75 @@
+{
+ "razonamiento": "Modelo relacional, consultas, y sobre ellas joins e índices.",
+ "lecciones": [
+  {
+   "clave": "L1",
+   "titulo": "Modelo relacional",
+   "horas": 3,
+   "depende_de": [],
+   "objetivos": [
+    "Explicar qué es una clave primaria y una foránea"
+   ],
+   "conceptos": [
+    {
+     "id": "clave-primaria",
+     "nombre": "Clave primaria"
+    },
+    {
+     "id": "clave-foranea",
+     "nombre": "Clave foránea"
+    }
+   ]
+  },
+  {
+   "clave": "L2",
+   "titulo": "Consultas básicas",
+   "horas": 3,
+   "depende_de": [
+    "L1"
+   ],
+   "objetivos": [
+    "Escribir un SELECT con WHERE y ORDER BY"
+   ],
+   "conceptos": [
+    {
+     "id": "select-where",
+     "nombre": "SELECT y WHERE"
+    }
+   ]
+  },
+  {
+   "clave": "L3",
+   "titulo": "JOINs",
+   "horas": 3,
+   "depende_de": [
+    "L2"
+   ],
+   "objetivos": [
+    "Escribir un INNER JOIN y un LEFT JOIN"
+   ],
+   "conceptos": [
+    {
+     "id": "join",
+     "nombre": "JOIN"
+    }
+   ]
+  },
+  {
+   "clave": "L4",
+   "titulo": "Índices",
+   "horas": 3,
+   "depende_de": [
+    "L2"
+   ],
+   "objetivos": [
+    "Explicar cuándo un índice B-tree acelera una consulta"
+   ],
+   "conceptos": [
+    {
+     "id": "indice-btree",
+     "nombre": "Índice B-tree"
+    }
+   ]
+  }
+ ]
+}

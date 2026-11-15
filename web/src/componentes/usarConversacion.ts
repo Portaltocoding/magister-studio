@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { ErrorApi, type EventoTutor, type Mensaje } from '../api.ts'
+import { ErrorApi, type EventoTutor, type Mensaje, type Propuesta } from '../api.ts'
 import type { Burbuja } from './Hilo.tsx'
 
 let contador = 0
@@ -12,45 +12,83 @@ export const aBurbuja = (m: Mensaje): Burbuja => ({
   estado: m.estado,
 })
 
+export const NOMBRE_FASE: Record<string, string> = {
+  extraer: 'Entendiendo lo que quieres',
+  preguntar: 'Pensando la siguiente pregunta',
+  planificar: 'Preparando el plan',
+  calendarizar: 'Montando el calendario',
+  negociar: 'Viendo si cabe',
+  explicar_fallo: 'Revisando el plan',
+  guardar: 'Guardando',
+  buscar: 'Buscando en tus fuentes',
+  preparar: 'Preparando la lección',
+  comprobar: 'Comprobando tu respuesta',
+  corregir: 'Corrigiendo',
+}
+
+type AbrirFlujo = (texto: string, signal: AbortSignal) => AsyncIterable<EventoTutor>
+
 // Estado de un hilo que se alimenta de un flujo SSE del tutor.
-// `abrirFlujo` recibe el texto y la señal de cancelación y devuelve los eventos.
-export function usarConversacion(abrirFlujo: (texto: string, signal: AbortSignal) => AsyncIterable<EventoTutor>) {
+export function usarConversacion(abrirFlujo: AbrirFlujo, alPlan?: (p: Propuesta) => void) {
   const [burbujas, setBurbujas] = useState<Burbuja[]>([])
   const [escribiendo, setEscribiendo] = useState(false)
+  const [fase, setFase] = useState<string | null>(null)
   const control = useRef<AbortController | null>(null)
 
   const actualizarUltima = (cambio: (b: Burbuja) => Burbuja) =>
     setBurbujas((previas) => (previas.length ? [...previas.slice(0, -1), cambio(previas[previas.length - 1])] : previas))
 
-  const enviar = useCallback(
-    async (texto: string, alAcabar?: () => void) => {
-      const propia: Burbuja = { clave: claveNueva(), rol: 'usuario', contenido: texto, estado: 'completo' }
-      const tutor: Burbuja = { clave: claveNueva(), rol: 'tutor', contenido: '', estado: 'llegando' }
-      setBurbujas((previas) => [...previas, propia, tutor])
+  // `propia` es el texto que se pinta como mensaje del alumno (null si no hay, como al aceptar un plan).
+  const correr = useCallback(
+    async (propia: string | null, flujo: (signal: AbortSignal) => AsyncIterable<EventoTutor>, alAcabar?: () => void) => {
+      const nuevas: Burbuja[] = []
+      if (propia !== null) nuevas.push({ clave: claveNueva(), rol: 'usuario', contenido: propia, estado: 'completo' })
+      nuevas.push({ clave: claveNueva(), rol: 'tutor', contenido: '', estado: 'llegando' })
+      setBurbujas((previas) => [...previas, ...nuevas])
       setEscribiendo(true)
       const c = new AbortController()
       control.current = c
       let empezo = false
       try {
-        for await (const ev of abrirFlujo(texto, c.signal)) {
+        for await (const ev of flujo(c.signal)) {
           empezo = true
-          if (ev.tipo === 'delta') actualizarUltima((b) => ({ ...b, contenido: b.contenido + ev.t }))
-          else if (ev.tipo === 'fin')
-            actualizarUltima((b) => ({
-              ...b,
-              clave: ev.mensaje_id ? `m-${ev.mensaje_id}` : b.clave,
-              estado: 'completo',
-              tiempos: { primero: ev.ms_primer_token, total: ev.ms_total },
-            }))
-          else if (ev.tipo === 'error') actualizarUltima((b) => ({ ...b, contenido: ev.detalle, estado: 'error' }))
+          switch (ev.tipo) {
+            case 'delta':
+              setFase(null)
+              actualizarUltima((b) => ({ ...b, contenido: b.contenido + ev.t }))
+              break
+            case 'fase':
+              setFase(NOMBRE_FASE[ev.nodo] ?? ev.nodo)
+              break
+            case 'plan':
+              alPlan?.(ev)
+              break
+            case 'fin':
+              actualizarUltima((b) => ({
+                ...b,
+                clave: ev.mensaje_id ? `m-${ev.mensaje_id}` : b.clave,
+                estado: 'completo',
+                tiempos: { primero: ev.ms_primer_token, total: ev.ms_total },
+              }))
+              break
+            case 'error':
+              actualizarUltima((b) => ({ ...b, contenido: ev.detalle, estado: 'error' }))
+              break
+            default:
+              break // un evento desconocido no rompe el cliente
+          }
         }
+        // Sin texto (por ejemplo, solo se propuso un plan): se quita la burbuja vacía.
+        setBurbujas((previas) => {
+          const u = previas[previas.length - 1]
+          return u && u.rol === 'tutor' && !u.contenido && u.estado !== 'error' ? previas.slice(0, -1) : previas
+        })
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') {
           actualizarUltima((b) => ({ ...b, estado: 'interrumpido' }))
         } else if (!empezo && e instanceof ErrorApi) {
-          // Falló antes del flujo (404, 422): se retiran las dos burbujas optimistas.
           setBurbujas((previas) => [
-            ...previas.slice(0, -2),
+            ...previas.slice(0, -nuevas.length),
             { clave: claveNueva(), rol: 'tutor', contenido: `No se pudo enviar: ${e.message}`, estado: 'error' },
           ])
         } else {
@@ -58,14 +96,20 @@ export function usarConversacion(abrirFlujo: (texto: string, signal: AbortSignal
         }
       } finally {
         setEscribiendo(false)
+        setFase(null)
         control.current = null
         alAcabar?.()
       }
     },
-    [abrirFlujo],
+    [alPlan],
+  )
+
+  const enviar = useCallback(
+    (texto: string, alAcabar?: () => void) => correr(texto, (signal) => abrirFlujo(texto, signal), alAcabar),
+    [abrirFlujo, correr],
   )
 
   const parar = useCallback(() => control.current?.abort(), [])
 
-  return { burbujas, setBurbujas, escribiendo, enviar, parar }
+  return { burbujas, setBurbujas, escribiendo, fase, enviar, correr, parar }
 }
