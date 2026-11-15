@@ -25,3 +25,9 @@ class Estado(TypedDict, total=False):
     tema_id: int | None
     plan_id: int | None
     version_prompt: str | None
+    # Rama de estudio con fuentes (Parte III)
+    consulta: str | None
+    aclaracion: str | None
+    recuperados: list[dict]
+    busqueda_id: int | None
+    citas: list[dict]

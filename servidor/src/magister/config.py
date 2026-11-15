@@ -36,5 +36,24 @@ class Ajustes(BaseSettings):
     horas_max_leccion: float = 4.0  # criterio general
     partir_lecciones: bool = True  # una lección puede ocupar varios días
 
+    # Fuentes y RAG (Parte III)
+    embeddings: str = "local"  # local = sentence-transformers; falso = vectores por hash (pruebas)
+    embeddings_modelo: str = "intfloat/multilingual-e5-small"
+    reranker_modelo: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    config_indice: str = "v1"
+    crudo: str = str(RAIZ_SERVIDOR / "crudo")
+    validez_min: float = 0.85
+    paginas_min: float = 0.9
+    umbral_apoyo: float = 0.85  # similitud densa mínima para contar un fragmento como apoyo (medido: lo ajeno da 0,78-0,81)
+    min_apoyo: int = 2  # fragmentos por encima del umbral para no estar «sin material»
+    umbral_fuentes: float = 0.85  # por debajo, la búsqueda no cuenta como «hay fuentes» (medido con e5-small)
+    procesar_fondo: bool = True  # la API procesa las versiones recibidas y pendientes en segundo plano
+
+    # Research (Parte III)
+    research_pasos: int = 12
+    research_llamadas: int = 8
+    research_propuestas: int = 5
+    research_segundos: int = 180
+
 
 ajustes = Ajustes()

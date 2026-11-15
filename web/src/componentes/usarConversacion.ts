@@ -10,6 +10,7 @@ export const aBurbuja = (m: Mensaje): Burbuja => ({
   rol: m.rol,
   contenido: m.contenido,
   estado: m.estado,
+  citas: m.citas,
 })
 
 export const NOMBRE_FASE: Record<string, string> = {
@@ -69,6 +70,7 @@ export function usarConversacion(abrirFlujo: AbrirFlujo, alPlan?: (p: Propuesta)
                 clave: ev.mensaje_id ? `m-${ev.mensaje_id}` : b.clave,
                 estado: 'completo',
                 tiempos: { primero: ev.ms_primer_token, total: ev.ms_total },
+                citas: ev.citas,
               }))
               break
             case 'error':

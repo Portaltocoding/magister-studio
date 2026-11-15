@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { hoyIso, listarPlanes, marcarSesion, recalcularPlan, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
+import {
+  hoyIso,
+  lanzarResearch,
+  listarPlanes,
+  marcarSesion,
+  recalcularPlan,
+  verPlan,
+  type ResumenPlan,
+  type VistaPlan,
+} from '../api.ts'
 
 interface Props {
   alNuevoPlan: () => void
@@ -112,8 +121,20 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                     </strong>{' '}
                     <span className="nota-linea">
                       {l.horas_hechas}/{l.horas} h · {l.estado}
-                      {l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''}
-                    </span>
+                      {l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''} ·{' '}
+                      {l.sin_material ? 'sin material' : `${l.fuentes} fragmentos de tus fuentes`}
+                    </span>{' '}
+                    {l.sin_material && (
+                      <button
+                        className="boton-mini"
+                        onClick={async () => {
+                          await lanzarResearch(vista.plan_id, [l.clave])
+                          setAviso(`Buscando fuentes para ${l.clave}. Las propuestas aparecerán en Temas y fuentes.`)
+                        }}
+                      >
+                        Buscar fuentes
+                      </button>
+                    )}
                     <ul>
                       {l.objetivos.map((o) => (
                         <li key={o}>{o}</li>

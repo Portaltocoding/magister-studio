@@ -47,6 +47,7 @@ class MensajeSalida(Salida):
     contenido: str
     estado: Literal["completo", "interrumpido", "error"]
     creado_en: datetime
+    citas: list[dict] = []
 
 
 class DecisionEntrada(BaseModel):

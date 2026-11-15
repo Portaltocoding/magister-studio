@@ -204,3 +204,20 @@ h2 {
 .sesion-saltada { color: var(--suave); font-style: italic; }
 .dia select { margin-left: 8px; font: inherit; font-size: 0.75rem; background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); border-radius: 4px; }
 .leccion-hecha > strong { color: var(--ok); }
+
+/* v0.3: citas y fuentes */
+.marca-cita { font: inherit; font-size: 0.72rem; vertical-align: super; padding: 0 4px; margin: 0 1px; border: 1px solid var(--borde); border-radius: 4px; background: var(--fondo); color: var(--texto); cursor: pointer; }
+.cita-dudosa { border-color: #c08a2e; color: #c08a2e; }
+.panel-cita { position: fixed; right: 0; top: 0; bottom: 0; width: min(440px, 92vw); background: var(--fondo); border-left: 1px solid var(--borde); padding: 16px; overflow-y: auto; z-index: 10; box-shadow: -6px 0 18px rgba(0, 0, 0, 0.12); text-align: left; }
+.texto-fragmento { white-space: pre-wrap; line-height: 1.55; font-size: 0.92rem; }
+.contexto { color: var(--suave); }
+.fragmento-citado { background: var(--panel); }
+.aviso-dudosa { color: #c08a2e; font-size: 0.85rem; }
+.fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tabla { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+.tabla th, .tabla td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--borde); }
+.estado-cuarentena { color: #b4544a; }
+.estado-lista { color: var(--ok); }
+.lista-propuestas { padding-left: 18px; }
+.tarjeta input, .tarjeta select, .fila input, .fila select { font: inherit; font-size: 0.85rem; padding: 4px 6px; border: 1px solid var(--borde); border-radius: 4px; background: var(--fondo); color: var(--texto); }
+label.boton-mini { display: inline-block; }

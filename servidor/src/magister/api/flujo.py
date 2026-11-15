@@ -13,7 +13,7 @@ from fastapi.sse import ServerSentEvent
 
 from magister.cerebro.modelo import ErrorModelo
 
-Guardar = Callable[[str, str, int | None, int], Awaitable[int | None]]
+Guardar = Callable[[str, str, int | None, int, dict], Awaitable[int | None]]
 
 
 async def flujo_tutor(
@@ -21,13 +21,16 @@ async def flujo_tutor(
     guardar: Guardar,
     inicio: dict,
 ) -> AsyncIterator[ServerSentEvent]:
-    """`guardar(texto, estado, ms_primer_token, ms_total)` devuelve el id guardado (o None)."""
+    """`guardar(texto, estado, ms_primer_token, ms_total, extra)` devuelve el id guardado (o None).
+
+    `extra` lleva las citas y la traza de búsqueda, que viajan en el evento `fin`."""
     t0 = time.perf_counter()
     ms_primer: int | None = None
     texto: list[str] = []
     estado = "interrumpido"
     detalle_error: str | None = None
     mensaje_id: int | None = None
+    extra: dict = {}
     yield ServerSentEvent(data=inicio, event="inicio")
     try:
         try:
@@ -38,6 +41,8 @@ async def flujo_tutor(
                         ms_primer = int((time.perf_counter() - t0) * 1000)
                     texto.append(ev["t"])
                     yield ServerSentEvent(data={"t": ev["t"]}, event="delta")
+                elif tipo == "citas":
+                    extra = {k: v for k, v in ev.items() if k != "tipo"}
                 else:
                     datos = {k: v for k, v in ev.items() if k != "tipo"}
                     yield ServerSentEvent(data=datos, event=str(tipo))
@@ -52,10 +57,11 @@ async def flujo_tutor(
             contenido = f"[error] {detalle_error}"
         if contenido or estado != "completo":
             with anyio.CancelScope(shield=True):
-                mensaje_id = await guardar(contenido, estado, ms_primer, ms_total)
+                mensaje_id = await guardar(contenido, estado, ms_primer, ms_total, extra)
     if estado == "error":
         yield ServerSentEvent(data={"detalle": detalle_error}, event="error")
     else:
-        yield ServerSentEvent(
-            data={"mensaje_id": mensaje_id, "ms_primer_token": ms_primer, "ms_total": ms_total}, event="fin"
-        )
+        fin = {"mensaje_id": mensaje_id, "ms_primer_token": ms_primer, "ms_total": ms_total}
+        if "citas" in extra:
+            fin.update(citas=extra["citas"], busqueda_id=extra.get("busqueda_id"), sin_fuentes=extra.get("sin_fuentes"))
+        yield ServerSentEvent(data=fin, event="fin")

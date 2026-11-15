@@ -4,12 +4,19 @@
 export type Rol = 'usuario' | 'tutor'
 export type Estado = 'completo' | 'interrumpido' | 'error'
 
+export interface CitaInfo {
+  fragmento_id: number
+  cita_literal: string
+  dudosa: boolean
+}
+
 export interface Mensaje {
   id: number
   rol: Rol
   contenido: string
   estado: Estado
   creado_en: string
+  citas?: CitaInfo[]
 }
 
 export interface Conversacion {
@@ -29,7 +36,15 @@ export interface Tema {
 export type EventoTutor =
   | { tipo: 'inicio'; conversacion_id: number | null }
   | { tipo: 'delta'; t: string }
-  | { tipo: 'fin'; mensaje_id: number | null; ms_primer_token: number | null; ms_total: number }
+  | {
+      tipo: 'fin'
+      mensaje_id: number | null
+      ms_primer_token: number | null
+      ms_total: number
+      citas?: CitaInfo[]
+      busqueda_id?: number | null
+      sin_fuentes?: boolean
+    }
   | { tipo: 'error'; detalle: string }
   | { tipo: 'fase'; nodo: string }
   | ({ tipo: 'plan' } & Propuesta)
@@ -177,6 +192,8 @@ export interface SesionVista {
 export interface LeccionVista extends LeccionPlan {
   horas_hechas: number
   estado: 'pendiente' | 'empezada' | 'hecha'
+  fuentes: number
+  sin_material: boolean
 }
 
 export interface VistaPlan {
@@ -222,3 +239,77 @@ export const hoyIso = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+// v0.3: fuentes, búsqueda, citas y research
+
+export interface Fuente {
+  id: number
+  nombre: string
+  tipo: 'vault' | 'pdf' | 'libro' | 'web' | 'audio'
+  confianza: number
+}
+
+export interface VersionInfo {
+  id: number
+  estado: 'recibida' | 'pendiente' | 'lista' | 'cuarentena' | 'retirada'
+  motivo: string | null
+  extractor: string | null
+  duplicado_de: number | null
+  ingerida_en: string | null
+}
+
+export interface DocumentoInfo {
+  id: number
+  titulo: string
+  uri: string
+  tema_id: number | null
+  version: VersionInfo | null
+  fragmentos: number
+}
+
+export interface FragmentoInfo {
+  id: number
+  texto: string
+  antes: string
+  despues: string
+  documento: { id: number; titulo: string; uri: string }
+  fuente: Fuente
+  version: VersionInfo
+}
+
+export interface PropuestaInfo {
+  id: number
+  url: string
+  titulo: string | null
+  plan_id: number
+  leccion_clave: string
+  motivo: string
+  estado: string
+  creada_en: string
+}
+
+export const listarFuentes = () => pedir<Fuente[]>('/api/fuentes')
+export const crearFuente = (nombre: string, tipo: Fuente['tipo'], confianza: number) =>
+  pedir<Fuente>('/api/fuentes', enviarJson({ nombre, tipo, confianza }))
+export const listarDocumentos = (fid: number) => pedir<DocumentoInfo[]>(`/api/fuentes/${fid}/documentos`)
+export const verFragmento = (id: number) => pedir<FragmentoInfo>(`/api/fragmentos/${id}`)
+export const estadoIndice = () =>
+  pedir<{ fuentes: number; documentos: number; versiones_listas: number; fragmentos: number }>('/api/fuentes/estado')
+
+export function subirFichero(fid: number, fichero: File, temaId: number | null) {
+  const datos = new FormData()
+  datos.append('fichero', fichero)
+  if (temaId != null) datos.append('tema_id', String(temaId))
+  return pedir<{ version_id: number }>(`/api/fuentes/${fid}/documentos`, { method: 'POST', body: datos })
+}
+
+export const subirUrl = (fid: number, url: string, tema_id: number | null) =>
+  pedir<{ version_id: number }>(`/api/fuentes/${fid}/documentos`, enviarJson({ url, tema_id }))
+
+export const lanzarResearch = (plan_id: number, leccion_claves: string[]) =>
+  pedir<{ tareas: number[] }>('/api/research', enviarJson({ plan_id, leccion_claves }))
+export const verResearch = (id: number) =>
+  pedir<{ estado: string; motivo_fin: string | null; pasos: number }>(`/api/research/${id}`)
+export const listarPropuestas = () => pedir<PropuestaInfo[]>('/api/propuestas?estado=pendiente')
+export const decidirPropuesta = (id: number, accion: 'aprobar' | 'rechazar') =>
+  pedir<{ estado: string }>(`/api/propuestas/${id}`, enviarJson({ accion }))

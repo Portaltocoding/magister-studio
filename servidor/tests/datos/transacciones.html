@@ -1,0 +1,6 @@
+<html><head><title>Transacciones y ACID</title></head><body><article>
+<h1>Transacciones y ACID</h1>
+<p>Una transacción agrupa varias operaciones que se aplican todas o ninguna. Las siglas ACID resumen sus garantías: atomicidad, consistencia, aislamiento y durabilidad.</p>
+<p>El aislamiento decide qué ve una transacción de las demás mientras están abiertas. Postgres usa por defecto el nivel read committed, en el que cada sentencia ve lo confirmado antes de empezar.</p>
+<p>Para evitar que dos personas cambien la misma fila a la vez se puede bloquear con SELECT FOR UPDATE o usar el nivel serializable y reintentar si hay conflicto.</p>
+</article></body></html>

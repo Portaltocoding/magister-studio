@@ -20,6 +20,16 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 - `cerebro` y `datos` nunca importan de `api` ni el uno del otro.
 - Las evals viven en `servidor/evals/` y se lanzan con `uv run python -m evals.<modulo>`.
 
+## Fuentes y RAG
+
+1. Lo que viaja entre piezas son ids, rangos y puntuaciones; el texto se trae al final por id.
+2. Todo fragmento lleva `version_id`, `inicio` y `fin`, y se cumple `version.texto[inicio:fin] == fragmento.texto`.
+3. Mismo modelo, prefijos y configuración al indexar y al consultar; la configuración tiene id y no se edita.
+4. Todo `open` con `encoding="utf-8"`.
+5. Las pruebas no usan red: búsquedas web y páginas, con mocks.
+6. Todo texto que venga de la web es no confiable: se delimita y nunca da órdenes.
+7. `cerebro` y `flujo` no importan de `fuentes` ni de `research`: reciben el `Buscador` inyectado. `api` importa de `flujo`, `datos`, `fuentes` y `research`, y es quien construye el buscador.
+
 ## Estilo
 
 Nombres de funciones, variables, tablas y columnas en castellano sin tildes. Mensajes al usuario en español de España.

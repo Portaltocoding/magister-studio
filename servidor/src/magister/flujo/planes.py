@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from magister.datos import plan as dp
+from magister.datos import repositorio_fuentes as rf
 from magister.flujo.nodos.calendarizar import reglas_calendario
 from magister.plan.calendario import NoCabe, a_hora, calendarizar
 from magister.plan.esquemas import Concepto, Leccion, Perfil, Plan
@@ -57,6 +58,7 @@ async def vista_por_id(s: AsyncSession, plan_id: int, hoy: date) -> dict | None:
     cons = await dp.conceptos(s, plan_id)
     deps = await dp.dependencias(s, plan_id)
     ses = await dp.sesiones(s, plan_id)
+    apoyo = await rf.apoyo_de_plan(s, plan_id)
     titulos = {lec.clave: lec.titulo for lec in lecs}
     hechas: dict[str, float] = defaultdict(float)
     programadas: dict[str, float] = defaultdict(float)
@@ -78,6 +80,8 @@ async def vista_por_id(s: AsyncSession, plan_id: int, hoy: date) -> dict | None:
                 "estado": estado,
                 "depende_de": [d.depende_de for d in deps if d.leccion_clave == lec.clave],
                 "conceptos": [{"id": c.id, "nombre": c.nombre} for c in cons if c.leccion_clave == lec.clave],
+                "fuentes": apoyo.get(lec.clave, (0, True))[0],
+                "sin_material": apoyo.get(lec.clave, (0, True))[1],
             }
         )
     semanas: dict[date, dict[date, list]] = defaultdict(lambda: defaultdict(list))

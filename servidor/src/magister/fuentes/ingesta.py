@@ -1,0 +1,324 @@
+"""La tubería de entrada: crudo → extraer → validar → hash → versión → fragmentos.
+
+Cada documento va en su transacción; el trabajo pesado (PyMuPDF, MinHash, embeddings)
+corre con `asyncio.to_thread` para no bloquear el bucle de la API.
+"""
+
+import asyncio
+import hashlib
+import logging
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal
+
+import httpx
+from sqlalchemy import select, update
+
+from magister.config import ajustes
+from magister.datos import repositorio_fuentes as rf
+from magister.datos.fuentes import Documento, Fuente, Version
+from magister.datos.sesion import nueva_sesion
+from magister.fuentes import duplicados as dup
+from magister.fuentes.embeber import embeber
+from magister.fuentes.extraer import FORMATOS, FormatoNoAdmitido, extraer_bytes, tipo_de
+from magister.fuentes.trocear import trocear
+from magister.fuentes.validar import validar
+
+registro = logging.getLogger("magister.ingesta")
+
+Salida = Literal["nueva", "sin_cambios", "cuarentena", "error", "recibida"]
+MAX_DESCARGA = 20 * 1024 * 1024
+
+
+@dataclass
+class Resultado:
+    salida: Salida
+    uri: str
+    version_id: int | None = None
+    motivo: str | None = None
+
+
+def carpeta_crudo() -> Path:
+    p = Path(ajustes.crudo)
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def guardar_crudo(crudo: bytes) -> str:
+    h = hashlib.sha256(crudo).hexdigest()
+    ruta = carpeta_crudo() / h
+    if not ruta.exists():
+        ruta.write_bytes(crudo)
+    return h
+
+
+def leer_crudo(h: str) -> bytes:
+    return (carpeta_crudo() / h).read_bytes()
+
+
+async def descargar(url: str) -> tuple[bytes, str]:
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": "Magister/0.3"}) as c:
+        r = await c.get(url)
+        r.raise_for_status()
+        if len(r.content) > MAX_DESCARGA:
+            raise ValueError("la página pasa de 20 MB")
+        tipo = "pdf" if "pdf" in r.headers.get("content-type", "") or url.lower().endswith(".pdf") else "html"
+        return r.content, tipo
+
+
+def _preparar(crudo: bytes, nombre: str, tipo: str | None):
+    e = extraer_bytes(crudo, nombre, tipo)
+    texto = dup.normalizar(e.texto)
+    e.texto = texto
+    problemas = validar(e)
+    firma = dup.firma(texto) if not problemas else None
+    return e, dup.hash_texto(texto), problemas, firma
+
+
+async def _retirar_anteriores(s, version: Version) -> None:
+    """Una versión nueva sustituye a las vivas del mismo documento (se retiran, no se borran)."""
+    for vieja in await rf.versiones_de_documento(s, version.documento_id):
+        if vieja.id != version.id and vieja.estado in ("pendiente", "lista"):
+            await rf.retirar_version(s, vieja.id, f"sustituida por la versión {version.id}")
+
+
+async def _marcar_duplicado(s, version: Version, fuente: Fuente) -> None:
+    if not version.minhash:
+        return
+    mis_bandas = set(dup.bandas(version.minhash))
+    for vid, firma, confianza, texto in await rf.candidatos_duplicado(s, fuente.id):
+        if vid == version.id or not mis_bandas & set(dup.bandas(firma)):
+            continue
+        j = await asyncio.to_thread(dup.jaccard, version.texto or "", texto or "")
+        if j < dup.UMBRAL:
+            continue
+        if confianza >= fuente.confianza:
+            version.duplicado_de = vid
+        else:
+            await s.execute(update(Version).where(Version.id == vid).values(duplicado_de=version.id))
+        return
+
+
+async def ingerir_bytes(
+    fuente_id: int, uri: str, crudo: bytes, nombre: str, tema_id: int | None = None, tipo: str | None = None
+) -> Resultado:
+    try:
+        crudo_hash = await asyncio.to_thread(guardar_crudo, crudo)
+        e, h, problemas, firma = await asyncio.to_thread(_preparar, crudo, nombre, tipo)
+    except FormatoNoAdmitido as ex:
+        return Resultado("error", uri, motivo=str(ex))
+    except Exception as ex:  # noqa: BLE001 un fichero roto no para la carpeta
+        registro.exception("no se pudo extraer %s", uri)
+        return Resultado("error", uri, motivo=f"{type(ex).__name__}: {ex}")
+    async with nueva_sesion() as s, s.begin():
+        fuente = await rf.fuente_por_id(s, fuente_id)
+        if fuente is None:
+            return Resultado("error", uri, motivo="la fuente no existe")
+        doc = await rf.documento_o_nuevo(s, fuente_id, uri, e.titulo, tema_id)
+        if await rf.version_con_hash(s, doc.id, h):
+            return Resultado("sin_cambios", uri)
+        estado = "cuarentena" if problemas else "pendiente"
+        v = Version(
+            documento_id=doc.id,
+            hash=h,
+            crudo_hash=crudo_hash,
+            crudo_tipo=tipo or tipo_de(nombre),
+            texto=e.texto,
+            metadatos=e.metadatos,
+            extractor=e.extractor,
+            estado=estado,
+            motivo="; ".join(p.motivo for p in problemas) or None,
+            minhash=firma,
+        )
+        s.add(v)
+        await s.flush()
+        if estado == "pendiente":
+            await _retirar_anteriores(s, v)
+            await _marcar_duplicado(s, v, fuente)
+        return Resultado("nueva" if estado == "pendiente" else "cuarentena", uri, v.id, v.motivo)
+
+
+async def ingerir(fuente_id: int, uri: str, tema_id: int | None = None) -> Resultado:
+    """Un fichero local o una URL."""
+    if uri.startswith(("http://", "https://")):
+        try:
+            crudo, tipo = await descargar(uri)
+        except Exception as ex:  # noqa: BLE001
+            return Resultado("error", uri, motivo=f"no se pudo descargar: {ex}")
+        return await ingerir_bytes(fuente_id, uri, crudo, uri, tema_id, tipo)
+    ruta = Path(uri).expanduser().resolve()
+    crudo = await asyncio.to_thread(ruta.read_bytes)
+    return await ingerir_bytes(fuente_id, str(ruta), crudo, ruta.name, tema_id)
+
+
+def ficheros(carpeta: Path) -> list[Path]:
+    base = carpeta.resolve()
+    salida = []
+    for p in sorted(base.rglob("*")):
+        if p.is_symlink() or not p.is_file() or p.suffix.lower() not in FORMATOS:
+            continue
+        if any(parte.startswith(".") for parte in p.relative_to(base).parts):
+            continue  # .obsidian, .git...
+        salida.append(p)
+    return salida
+
+
+async def ingerir_ruta(fuente_id: int, ruta: str, tema_id: int | None = None) -> list[Resultado]:
+    if ruta.startswith(("http://", "https://")):
+        return [await ingerir(fuente_id, ruta, tema_id)]
+    p = Path(ruta).expanduser()
+    if p.is_dir():
+        return [await ingerir(fuente_id, str(f), tema_id) for f in ficheros(p)]
+    return [await ingerir(fuente_id, str(p), tema_id)]
+
+
+async def reingerir(fuente_id: int, carpeta: str, tema_id: int | None = None) -> dict[str, int]:
+    resultados = await ingerir_ruta(fuente_id, carpeta, tema_id)
+    vivos = {r.uri for r in resultados}
+    base = str(Path(carpeta).expanduser().resolve())
+    retiradas = 0
+    async with nueva_sesion() as s, s.begin():
+        docs = (await s.scalars(select(Documento).where(Documento.fuente_id == fuente_id))).all()
+        for d in docs:
+            if d.uri.startswith(base) and d.uri not in vivos and not Path(d.uri).exists():
+                for v in await rf.versiones_de_documento(s, d.id):
+                    if v.estado in ("pendiente", "lista"):
+                        await rf.retirar_version(s, v.id, "el fichero ya no existe")
+                        retiradas += 1
+    resumen: dict[str, int] = {}
+    for r in resultados:
+        resumen[r.salida] = resumen.get(r.salida, 0) + 1
+    resumen["retiradas"] = retiradas
+    return resumen
+
+
+# Subida por la API: se guarda el crudo y se procesa en segundo plano.
+
+
+async def recibir(fuente_id: int, crudo: bytes, nombre: str, uri: str, tema_id: int | None, tipo: str | None) -> int:
+    crudo_hash = await asyncio.to_thread(guardar_crudo, crudo)
+    async with nueva_sesion() as s, s.begin():
+        doc = await rf.documento_o_nuevo(s, fuente_id, uri, Path(nombre).stem if "://" not in nombre else nombre, tema_id)
+        v = Version(
+            documento_id=doc.id,
+            crudo_hash=crudo_hash,
+            crudo_tipo=tipo or tipo_de(nombre),
+            estado="recibida",
+            metadatos={"nombre": nombre},
+        )
+        s.add(v)
+        await s.flush()
+        return v.id
+
+
+async def procesar_recibida(version_id: int) -> None:
+    async with nueva_sesion() as s:
+        v = await s.get(Version, version_id)
+        if v is None or v.estado != "recibida":
+            return
+        doc = await s.get(Documento, v.documento_id)
+        crudo_hash, tipo, nombre = v.crudo_hash, v.crudo_tipo, v.metadatos.get("nombre", "documento")
+    try:
+        crudo = await asyncio.to_thread(leer_crudo, crudo_hash)
+        e, h, problemas, firma = await asyncio.to_thread(_preparar, crudo, nombre, tipo)
+    except Exception as ex:  # noqa: BLE001
+        async with nueva_sesion() as s, s.begin():
+            await s.execute(
+                update(Version).where(Version.id == version_id).values(estado="cuarentena", motivo=f"no se pudo extraer: {ex}")
+            )
+        return
+    async with nueva_sesion() as s, s.begin():
+        v = await s.get(Version, version_id)
+        fuente = await s.get(Fuente, doc.fuente_id)
+        if await rf.version_con_hash(s, v.documento_id, h):
+            v.estado, v.motivo = "retirada", "sin cambios"
+            return
+        if e.titulo and doc is not None:
+            await s.execute(update(Documento).where(Documento.id == doc.id).values(titulo=e.titulo[:500]))
+        v.hash, v.texto, v.extractor, v.minhash = h, e.texto, e.extractor, firma
+        v.metadatos = {**v.metadatos, **e.metadatos}
+        v.estado = "cuarentena" if problemas else "pendiente"
+        v.motivo = "; ".join(p.motivo for p in problemas) or None
+        await s.flush()
+        if v.estado == "pendiente":
+            await _retirar_anteriores(s, v)
+            await _marcar_duplicado(s, v, fuente)
+
+
+# De pendiente a lista: trocear, embeber e insertar fragmentos en la misma transacción.
+
+
+async def indexar_version(version_id: int, nombre_config: str | None = None) -> int:
+    t0 = time.perf_counter()
+    async with nueva_sesion() as s:
+        v = await s.get(Version, version_id)
+        if v is None or v.texto is None:
+            return 0
+        doc = await s.get(Documento, v.documento_id)
+        fuente = await s.get(Fuente, doc.fuente_id)
+        conf = await rf.configuracion(s, nombre_config)
+        if conf is None:
+            raise RuntimeError("no hay configuración del índice activa")
+        texto, titulo, tipo, params, config_id = v.texto, doc.titulo, fuente.tipo, conf.params, conf.id
+    trozos = await asyncio.to_thread(trocear, texto, titulo, tipo, params)
+    vectores = await asyncio.to_thread(embeber, [t.texto_indexado for t in trozos], "pasaje", params) if trozos else []
+    async with nueva_sesion() as s, s.begin():
+        await rf.insertar_fragmentos(
+            s,
+            [
+                {
+                    "version_id": version_id,
+                    "config_id": config_id,
+                    "orden": t.orden,
+                    "inicio": t.inicio,
+                    "fin": t.fin,
+                    "texto": t.texto,
+                    "texto_indexado": t.texto_indexado,
+                    "embedding": vec,
+                }
+                for t, vec in zip(trozos, vectores, strict=True)
+            ],
+        )
+        if nombre_config is None:
+            await s.execute(update(Version).where(Version.id == version_id).values(estado="lista"))
+    registro.info("versión %s: %d fragmentos en %.1f s", version_id, len(trozos), time.perf_counter() - t0)
+    return len(trozos)
+
+
+async def procesar_pendientes(al_quedar_lista=None) -> int:
+    """Una pasada: recibidas → pendiente/cuarentena, pendientes → lista. Devuelve cuántas tocó."""
+    hechas = 0
+    async with nueva_sesion() as s:
+        recibidas = await rf.versiones_por_estado(s, "recibida")
+    for vid in recibidas:
+        await procesar_recibida(vid)
+        hechas += 1
+    async with nueva_sesion() as s:
+        pendientes = await rf.versiones_por_estado(s, "pendiente")
+    listas: list[int] = []
+    for vid in pendientes:
+        try:
+            await indexar_version(vid)
+        except Exception as ex:  # noqa: BLE001
+            registro.exception("no se pudo indexar la versión %s", vid)
+            async with nueva_sesion() as s, s.begin():
+                await s.execute(update(Version).where(Version.id == vid).values(estado="cuarentena", motivo=f"no se pudo indexar: {ex}"))
+            continue
+        hechas += 1
+        listas.append(vid)
+    if listas and al_quedar_lista is not None:
+        await al_quedar_lista(listas)
+    return hechas
+
+
+async def bucle_de_fondo(al_quedar_lista=None, pausa: float = 2.0) -> None:
+    while True:
+        try:
+            if not await procesar_pendientes(al_quedar_lista):
+                await asyncio.sleep(pausa)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            registro.exception("fallo en la tarea de fondo de la ingesta")
+            await asyncio.sleep(pausa * 5)

@@ -21,6 +21,13 @@ def sin_token(monkeypatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def sin_modelos_locales(monkeypatch, tmp_path) -> None:
+    # Embeddings por hash y crudo en una carpeta temporal: las pruebas no cargan modelos.
+    monkeypatch.setattr(ajustes, "embeddings", "falso")
+    monkeypatch.setattr(ajustes, "crudo", str(tmp_path / "crudo"))
+
+
+@pytest.fixture(autouse=True)
 def motor_eco(monkeypatch) -> None:
     # Ningún test gasta cuota: el motor se fuerza aquí, no por variable de entorno,
     # porque `ajustes` se crea al importar el paquete.
@@ -31,7 +38,8 @@ def motor_eco(monkeypatch) -> None:
 async def base():
     """La base de pruebas (MAGISTER_DB_URL_PRUEBAS), vacía en cada test."""
     sesion.configurar(ajustes.db_url_pruebas)
-    tablas = ", ".join(t.name for t in reversed(Base.metadata.sorted_tables))
+    # configuraciones guarda la fila v1 de la migración: no se vacía.
+    tablas = ", ".join(t.name for t in reversed(Base.metadata.sorted_tables) if t.name != "configuraciones")
     async with sesion.motor().begin() as c:
         await c.execute(text(f"TRUNCATE {tablas} RESTART IDENTITY CASCADE"))
     yield sesion
