@@ -71,3 +71,47 @@ async def ver_estilo(plan_id: int) -> dict:
 @rutas.put("/planes/{plan_id}/estilo-examen")
 async def poner_estilo(plan_id: int, cuerpo: Estilo) -> dict:
     return {"estilo": await estudio.poner_estilo_examen(plan_id, cuerpo.estilo)}
+
+
+
+class Parrafo(BaseModel):
+    clave: str = Field(max_length=10)
+    parrafo: str = Field(min_length=3, max_length=4000)
+    accion: Literal["facil", "ejemplo", "porque", "clave", "pregunta"]
+    pregunta: str | None = Field(None, max_length=500)
+
+
+@rutas.post("/estudio/{mid}/parrafo")
+async def parrafo(mid: int, cuerpo: Parrafo) -> dict:
+    """La mascota ayuda con el párrafo que estás leyendo (respuesta corta)."""
+    try:
+        return {"texto": await estudio.ayuda_parrafo(mid, cuerpo.clave, cuerpo.parrafo, cuerpo.accion, cuerpo.pregunta)}
+    except ValueError as e:
+        raise _400(e) from e
+
+
+class Nodo(BaseModel):
+    id: str = Field(max_length=40)
+    texto: str = Field(max_length=60)
+    x: float
+    y: float
+
+
+class Flecha(BaseModel):
+    de: str = Field(max_length=40)
+    a: str = Field(max_length=40)
+
+
+class Mapa(BaseModel):
+    nodos: list[Nodo] = Field(default_factory=list, max_length=80)
+    flechas: list[Flecha] = Field(default_factory=list, max_length=160)
+
+
+@rutas.get("/estudio/{mid}/mapa")
+async def ver_mapa(mid: int) -> dict:
+    return await estudio.ver_mapa(mid)
+
+
+@rutas.put("/estudio/{mid}/mapa")
+async def guardar_mapa(mid: int, cuerpo: Mapa) -> dict:
+    return await estudio.guardar_mapa(mid, cuerpo.model_dump())

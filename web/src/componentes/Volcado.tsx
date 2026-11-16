@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { enviarJson, pedir } from '../api.ts'
 import Pensando from './Pensando.tsx'
 import { Reconocedor, type Reconocimiento } from './voz.ts'
@@ -24,11 +24,13 @@ interface Props {
   alcance?: string[]
   alEstudiar?: (claveApartado: string) => void
   alCerrar?: () => void
+  // Lo que tienes delante al reexplicar (tu mapa de palabras clave).
+  apoyo?: ReactNode
 }
 
 const ESTADO = { bien: 'Bien', flojo: 'Flojo', falta: 'Te falta' }
 
-export default function Volcado({ planId, clave, titulo, alcance, alEstudiar, alCerrar }: Props) {
+export default function Volcado({ planId, clave, titulo, alcance, alEstudiar, alCerrar, apoyo }: Props) {
   const [texto, setTexto] = useState('')
   const [parcial, setParcial] = useState('')
   const [dictando, setDictando] = useState(false)
@@ -141,6 +143,12 @@ export default function Volcado({ planId, clave, titulo, alcance, alEstudiar, al
           ? 'Antes de la pausa, explícate con tus palabras lo que has estudiado en esta sesión. Lo que no te salga es lo que repasarás.'
           : 'Sin mirar nada, como si te examinaras: la estructura, las ideas y los detalles que recuerdes. Di también «aquí no me acuerdo». Tus lagunas marcan lo que estudias después.'}
       </p>
+      {apoyo && (
+        <div className="volcado-apoyo">
+          <p className="nota">Mira tu mapa y reconstruye la explicación con tus palabras:</p>
+          {apoyo}
+        </div>
+      )}
       <div className="volcado-entrada">
         <textarea
           rows={9}

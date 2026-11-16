@@ -255,3 +255,53 @@ async def poner_estilo_examen(plan_id: int, estilo: str) -> str:
         raise ValueError("estilo desconocido")
     await _guardar(f"estilo_examen_{plan_id}", estilo)
     return estilo
+
+
+
+# ---- La mascota, compañera de lectura: ayuda con un párrafo ----
+
+PEDIDOS = {
+    "facil": "Dímelo más fácil: lo mismo que dice el párrafo, en palabras sencillas.",
+    "ejemplo": "Un ejemplo concreto y cotidiano de lo que dice el párrafo.",
+    "porque": "¿Por qué es así? La razón de fondo de lo que afirma el párrafo.",
+    "clave": "Las 2 o 3 palabras clave del párrafo y cómo se conectan, en una frase.",
+}
+
+
+async def ayuda_parrafo(mid: int, clave_bloque: str, parrafo: str, accion: str, pregunta: str | None = None) -> str:
+    """Una respuesta corta sobre un párrafo. Las de serie (fácil, ejemplo, por qué, clave) se guardan."""
+    import hashlib
+
+    from magister.cerebro.modelo import Turno, generar
+
+    m, bloques = await _material(mid)
+    b = next((x for x in bloques if x.clave == clave_bloque), None)
+    if b is None:
+        raise ValueError("ese apartado no existe")
+    if accion == "pregunta" and not (pregunta or "").strip():
+        raise ValueError("falta la pregunta")
+    huella = hashlib.sha256(f"{accion}|{parrafo}".encode()).hexdigest()[:16]
+    clave = f"parrafo_{mid}_{huella}"
+    if accion != "pregunta":
+        hecho = await _leer(clave)
+        if hecho and hecho.get("version") == _version(m):
+            return hecho["texto"]
+    titulos = {x["clave"]: x["titulo"] for x in (m.contrato or {}).get("bloques", [])}
+    pedido = PEDIDOS.get(accion) or f"Su pregunta sobre el párrafo: {pregunta}"
+    sistema = cargar("parrafo").rellenar(pedido=pedido, alumno=await alumno(m.plan_id), titulo=titulos.get(b.clave, b.titulo),
+                                         apartado=b.texto[:8000], parrafo=parrafo[:3000])
+    texto = "".join([t async for t in generar(sistema, [Turno("usuario", pregunta or pedido)])]).strip()
+    if accion != "pregunta":
+        await _guardar(clave, {"texto": texto, "version": _version(m)})
+    return texto
+
+
+# ---- Tu mapa de palabras clave (lo construyes tú mientras estudias) ----
+
+async def ver_mapa(mid: int) -> dict:
+    return (await _leer(f"mapa_{mid}")) or {"nodos": [], "flechas": []}
+
+
+async def guardar_mapa(mid: int, mapa: dict) -> dict:
+    await _guardar(f"mapa_{mid}", mapa)
+    return mapa

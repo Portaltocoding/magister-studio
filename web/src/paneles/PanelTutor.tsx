@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import Volcado from '../componentes/Volcado.tsx'
-import Pensando from '../componentes/Pensando.tsx'
+import Companera from '../componentes/Companera.tsx'
+import MapaConceptos, { usarMapa } from '../componentes/MapaConceptos.tsx'
 import Calentamiento, { ApuestasRevisadas, guardarCalentamiento, leerCalentamiento, type Apuestas, type DatosCalentamiento } from '../componentes/Calentamiento.tsx'
 import Markdown from 'react-markdown'
 import { flujo, listarPlanes, marcarSesion, pedir, rutaExamen, verPlan, type HitoExamen } from '../api.ts'
@@ -82,7 +83,27 @@ const CONFIANZAS: [number, string][] = [
   [0.95, 'Seguro'],
 ]
 
-const POMODORO = 25 * 60
+
+// El ritmo del foco no va escrito en piedra: cada cuánto paras y cuándo reexplicas lo eliges tú.
+interface Ritmo {
+  pausa: number // minutos; 0 = sin aviso
+  reexplicar: 'pausa' | 'idea' | 'dos' | 'pedir'
+}
+const RITMO_DEFECTO: Ritmo = { pausa: 25, reexplicar: 'pausa' }
+function leerRitmo(): Ritmo {
+  try {
+    return { ...RITMO_DEFECTO, ...JSON.parse(localStorage.getItem('magister-ritmo') ?? '{}') }
+  } catch {
+    return RITMO_DEFECTO
+  }
+}
+function guardarRitmo(r: Ritmo) {
+  try {
+    localStorage.setItem('magister-ritmo', JSON.stringify(r))
+  } catch {
+    /* sin almacenamiento */
+  }
+}
 const DESCANSO = 5 * 60
 
 const claveAvance = (mid: number) => `magister-foco-${mid}`
@@ -259,19 +280,13 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   const [apuestas, setApuestas] = useState<Apuestas>(previo?.apuestas ?? {})
   // Cada 25 minutos: reexplicar lo que llevas antes de la pausa.
   const [reexplicando, setReexplicando] = useState(false)
-  const [facil, setFacil] = useState<Record<string, string[] | 'cargando'>>({})
-  const pedirFacil = async (clave: string) => {
-    setFacil((f) => ({ ...f, [clave]: 'cargando' }))
-    try {
-      const r = await pedir<{ frases: string[] }>(`/api/estudio/${mid}/facil/${clave}`)
-      setFacil((f) => ({ ...f, [clave]: r.frases }))
-    } catch {
-      setFacil((f) => {
-        const { [clave]: _, ...resto } = f
-        return resto
-      })
-    }
-  }
+  const [ritmo, setRitmo] = useState<Ritmo>(leerRitmo)
+  const [verRitmo, setVerRitmo] = useState(false)
+  const [verMapa, setVerMapa] = useState(false)
+  const { mapa, cambiar: cambiarMapa, anadir: anadirAlMapa } = usarMapa(mid)
+  const [papel, setPapel] = useState<HTMLDivElement | null>(null)
+  const [seleccion, setSeleccion] = useState<{ texto: string; x: number; y: number } | null>(null)
+  const ideasDesdeReexplicar = useRef(0)
 
   const b = bloques[i]
   const ultimo = i === bloques.length - 1
@@ -288,7 +303,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   }, [pausado, descanso, cerrada])
 
   useEffect(() => {
-    if (segundos > 0 && segundos % POMODORO === 0) setAvisoPausa(true)
+    if (ritmo.pausa > 0 && segundos > 0 && segundos % (ritmo.pausa * 60) === 0) setAvisoPausa(true)
   }, [segundos])
 
   useEffect(() => {
@@ -312,9 +327,16 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   const ir = useCallback(
     (d: number) => {
       if (d > 0 && (!puedeSeguir || ultimo)) return
+      if (d > 0 && leccion.plan_id != null && (ritmo.reexplicar === 'idea' || ritmo.reexplicar === 'dos')) {
+        ideasDesdeReexplicar.current += 1
+        if (ideasDesdeReexplicar.current >= (ritmo.reexplicar === 'idea' ? 1 : 2)) {
+          ideasDesdeReexplicar.current = 0
+          setReexplicando(true)
+        }
+      }
       setI((x) => Math.max(0, Math.min(bloques.length - 1, x + d)))
     },
-    [puedeSeguir, ultimo, bloques.length],
+    [puedeSeguir, ultimo, bloques.length, ritmo.reexplicar, leccion.plan_id],
   )
 
   const teclas = useCallback(
@@ -327,6 +349,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
       if (e.key === 'ArrowRight') ir(1)
       else if (e.key === 'ArrowLeft') ir(-1)
       else if (e.key === 'g' && hayGlosario) setGlosario((g) => !g)
+      else if (e.key === 'm') setVerMapa((v) => !v)
       else return false
       return true
     },
@@ -372,11 +395,50 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
         </button>
       }
       herramientas={
-        hayGlosario && (
-          <button className="foco-boton" aria-pressed={glosario} onClick={() => setGlosario(!glosario)} title="Términos y fórmulas (G)">
-            {leccion.formulas.length ? 'Términos y fórmulas' : 'Términos'}
+        <>
+          {hayGlosario && (
+            <button className="foco-boton" aria-pressed={glosario} onClick={() => { setGlosario(!glosario); setVerMapa(false) }} title="Términos y fórmulas (G)">
+              {leccion.formulas.length ? 'Términos y fórmulas' : 'Términos'}
+            </button>
+          )}
+          <button className="foco-boton" aria-pressed={verMapa} onClick={() => { setVerMapa(!verMapa); setGlosario(false) }} title="Tu mapa de palabras clave (M)">
+            Mi mapa{mapa?.nodos.length ? ` · ${mapa.nodos.length}` : ''}
           </button>
-        )
+          {leccion.plan_id != null && !cerrada && !calentando && (
+            <button className="foco-boton" onClick={() => setReexplicando(true)} title="Explícate sin mirar lo que llevas">
+              Reexplicar
+            </button>
+          )}
+          <span className="foco-ritmo">
+            <button className="foco-boton" aria-expanded={verRitmo} onClick={() => setVerRitmo(!verRitmo)} title="Cada cuánto paras y cuándo reexplicas">
+              Ritmo
+            </button>
+            {verRitmo && (
+              <span className="foco-ritmo-caja">
+                <label>
+                  Pausa
+                  <select value={ritmo.pausa} onChange={(e) => { const r = { ...ritmo, pausa: Number(e.target.value) }; setRitmo(r); guardarRitmo(r) }}>
+                    {[15, 25, 40, 50].map((m) => (
+                      <option key={m} value={m}>
+                        cada {m} min
+                      </option>
+                    ))}
+                    <option value={0}>sin aviso</option>
+                  </select>
+                </label>
+                <label>
+                  Reexplicar
+                  <select value={ritmo.reexplicar} onChange={(e) => { const r = { ...ritmo, reexplicar: e.target.value as Ritmo['reexplicar'] }; setRitmo(r); guardarRitmo(r) }}>
+                    <option value="pausa">en cada pausa</option>
+                    <option value="idea">al acabar cada idea</option>
+                    <option value="dos">cada dos ideas</option>
+                    <option value="pedir">solo cuando yo quiera</option>
+                  </select>
+                </label>
+              </span>
+            )}
+          </span>
+        </>
       }
       aviso={
         avisoPausa &&
@@ -384,7 +446,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
         !cerrada && (
           <div className="foco-aviso" role="status">
             Llevas {Math.round(segundos / 60)} minutos concentrado. Una pausa corta ahora hace que lo siguiente entre mejor.
-            {leccion.plan_id != null && (
+            {leccion.plan_id != null && ritmo.reexplicar === 'pausa' && (
               <button className="boton boton-principal" onClick={() => { setAvisoPausa(false); setReexplicando(true) }} title="Explícate sin mirar lo que llevas; luego la pausa">
                 Reexplica lo que llevas
               </button>
@@ -398,7 +460,24 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
           </div>
         )
       }
-      lateral={glosario && <Glosario leccion={leccion} alCerrar={() => setGlosario(false)} />}
+      lateral={
+        glosario ? (
+          <Glosario leccion={leccion} alCerrar={() => setGlosario(false)} />
+        ) : verMapa && mapa ? (
+          <aside className="foco-glosario foco-mapa" aria-label="Tu mapa de palabras clave">
+            <div className="foco-glosario-cabecera">
+              <strong>Tu mapa</strong>
+              <button className="foco-boton" onClick={() => setVerMapa(false)}>
+                Cerrar
+              </button>
+            </div>
+            <p className="nota">
+              Pocas palabras y una flecha solo si sabes explicar la relación. Selecciona texto en los apuntes para traerlo aquí.
+            </p>
+            <MapaConceptos mapa={mapa} alCambiar={cambiarMapa} />
+          </aside>
+        ) : null
+      }
       pie={
         calentando ? (
           <>
@@ -457,6 +536,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
           clave={leccion.leccion_clave}
           titulo={leccion.titulo}
           alcance={bloques.slice(0, i + 1).map((x) => x.clave)}
+          apoyo={mapa && mapa.nodos.length > 0 ? <MapaConceptos mapa={mapa} soloVer /> : undefined}
           alEstudiar={(k) => {
             const n = bloques.findIndex((x) => x.clave === k)
             if (n >= 0) setI(n)
@@ -532,23 +612,38 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
             Idea {i + 1} de {bloques.length}
           </span>
           <h1>{b.titulo}</h1>
-          <div className="foco-facil">
-            {facil[b.clave] === 'cargando' ? (
-              <Pensando texto="Buscando una forma más sencilla…" />
-            ) : facil[b.clave] ? (
-              <div className="foco-facil-caja">
-                <span className="foco-etq">Más fácil, en tres frases</span>
-                {(facil[b.clave] as string[]).map((f) => (
-                  <p key={f}>{f}</p>
-                ))}
-              </div>
-            ) : (
-              <button className="boton-mini" onClick={() => pedirFacil(b.clave)} title="Si el texto se te atasca: tres frases sencillas (no cambia tus apuntes)">
-                Dímelo más fácil
+          <div
+            className="foco-papel-envoltura"
+            ref={setPapel}
+            onMouseUp={() => {
+              const sel = window.getSelection()
+              const t = sel?.toString().trim() ?? ''
+              if (t.length >= 2 && t.length <= 60 && sel?.rangeCount) {
+                const r = sel.getRangeAt(0).getBoundingClientRect()
+                const caja = papel?.getBoundingClientRect()
+                if (caja) setSeleccion({ texto: t, x: r.left - caja.left + r.width / 2, y: r.top - caja.top })
+              } else setSeleccion(null)
+            }}
+          >
+            <TextoLibro markdown={b.texto} className="foco-papel" />
+            {seleccion && (
+              <button
+                className="al-mapa"
+                style={{ left: seleccion.x, top: seleccion.y }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  anadirAlMapa([seleccion.texto])
+                  setSeleccion(null)
+                  setVerMapa(true)
+                  setGlosario(false)
+                  window.getSelection()?.removeAllRanges()
+                }}
+              >
+                + Al mapa
               </button>
             )}
+            <Companera key={b.clave} mid={mid} claveBloque={b.clave} papel={papel} alPalabras={(ps) => anadirAlMapa(ps)} />
           </div>
-          <TextoLibro markdown={b.texto} className="foco-papel" />
           {b.pregunta && !comprobado[b.clave] && (
             <Comprobar key={b.clave} pregunta={b.pregunta} alAcabar={(n) => setComprobado((c) => ({ ...c, [b.clave]: n }))} />
           )}

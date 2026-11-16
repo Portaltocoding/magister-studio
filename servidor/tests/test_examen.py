@@ -228,3 +228,13 @@ async def test_estilo_de_examen_y_repasos_de_tema(cliente):
     assert (await cliente.get("/api/planes/1/estilo-examen")).json()["estilo"] == "oral"
     assert (await cliente.put("/api/planes/1/estilo-examen", json={"estilo": "otro"})).status_code == 422
     assert isinstance((await cliente.get("/api/estudio/repasos-de-tema")).json(), list)
+
+
+
+@pytest.mark.anyio
+async def test_tu_mapa_se_guarda(cliente):
+    mapa = {"nodos": [{"id": "a", "texto": "índice", "x": 10, "y": 20}, {"id": "b", "texto": "B-tree", "x": 120, "y": 20}],
+            "flechas": [{"de": "a", "a": "b"}]}
+    assert (await cliente.put("/api/estudio/77/mapa", json=mapa)).status_code == 200
+    assert (await cliente.get("/api/estudio/77/mapa")).json()["flechas"] == [{"de": "a", "a": "b"}]
+    assert (await cliente.get("/api/estudio/78/mapa")).json() == {"nodos": [], "flechas": []}
