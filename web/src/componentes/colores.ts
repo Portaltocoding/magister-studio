@@ -9,6 +9,8 @@ export interface Acento {
 }
 
 export const ACENTOS: Acento[] = [
+  // Por defecto, un gris cálido que juega con el negro de la cabecera: sobrio.
+  { id: 'gris', nombre: 'Gris', color: '#bdb9b0' },
   { id: 'amarillo', nombre: 'Amarillo', color: '#f2c200' },
   { id: 'naranja', nombre: 'Naranja', color: '#f08a24' },
   { id: 'rojo', nombre: 'Rojo', color: '#e0533d' },
@@ -23,9 +25,10 @@ export interface AjusteColores {
   acento: string
 }
 
-const CLAVE = 'magister-acento'
+// v2: el gris pasa a ser el acento por defecto.
+const CLAVE = 'magister-acento-v2'
 const EVENTO = 'magister-acento'
-const INICIAL: AjusteColores = { modo: 'fijo', acento: 'amarillo' }
+const INICIAL: AjusteColores = { modo: 'fijo', acento: 'gris' }
 
 function leer(): AjusteColores {
   try {
@@ -69,4 +72,6 @@ export const variables = (a: Acento) =>
     '--t-acento': a.color,
     // El fondo del código en línea, un tono claro del mismo acento.
     '--t-resalte': `color-mix(in srgb, ${a.color} 30%, #fff)`,
+    // El acento como texto sobre el papel crema (etiquetas de los bloques): oscurecido para que se lea.
+    '--t-acento-tinta': `color-mix(in srgb, ${a.color} 45%, #23211c)`,
   }) as CSSProperties

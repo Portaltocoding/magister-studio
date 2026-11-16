@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { listarConversaciones, type Conversacion } from './api.ts'
 import BarraLateral from './BarraLateral.tsx'
 import BarraSesion from './BarraSesion.tsx'
+import { acentoDe, usarColores, variables } from './componentes/colores.ts'
 import Central from './Central.tsx'
 import { MODOS, type IdModo } from './modos.ts'
 
@@ -31,6 +32,8 @@ export default function Marco() {
   const [activa, setActiva] = useState<number | null>(inicial.conversacion)
   // En el móvil la barra lateral se pliega y se abre con «Menú».
   const [menu, setMenu] = useState(false)
+  // El acento elegido vale para toda la app (Progreso, Tutor, foco), no solo para Lecciones.
+  const [colores] = usarColores()
   useEffect(() => setMenu(false), [modo, activa])
   const [tipoNueva, setTipoNueva] = useState<'libre' | 'plan'>(() =>
     window.location.hash.startsWith('#/nuevo-plan') ? 'plan' : 'libre',
@@ -58,7 +61,7 @@ export default function Marco() {
   const tipo: 'libre' | 'plan' = actual ? (actual.tipo === 'plan' ? 'plan' : 'libre') : tipoNueva
 
   return (
-    <div className={`marco ${menu ? 'menu-abierto' : ''}`}>
+    <div className={`marco ${menu ? 'menu-abierto' : ''}`} style={variables(acentoDe(colores, null))}>
       {menu && <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />}
       <BarraLateral
         modoActivo={modo}
