@@ -35,6 +35,7 @@ class Preferencias(BaseModel):
     preguntas: Literal["conceptuales", "practicas", "mezcla"] = "mezcla"
     cantidad: Literal["pocas", "normal", "muchas"] = "normal"
     enfoque: str | None = Field(None, max_length=300)
+    estilo: Literal["libro", "ficha"] = "libro"
 
 
 class PedirMaterial(BaseModel):
@@ -58,6 +59,48 @@ async def pedir_material(plan_id: int, clave: str, cuerpo: PedirMaterial, s: Asy
     tid, nuevo = await cola.encolar("material", plan_id, clave,
                                     {"tipos": cuerpo.tipos, "preferencias": cuerpo.preferencias.model_dump()}, clave_trabajo)
     return {"trabajo_id": tid, "nuevo": nuevo}
+
+
+@rutas.get("/planes/{plan_id}/materiales")
+async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    """Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha."""
+    filas = (await s.execute(text(
+        "select distinct on (leccion_clave, tipo) leccion_clave, tipo, estado from materiales "
+        "where plan_id = :p order by leccion_clave, tipo, id desc"), {"p": plan_id})).all()
+    fichas = dict((await s.execute(text(
+        "select leccion_clave, count(*) from preguntas where plan_id = :p and estado = 'activa' and not sonda "
+        "group by leccion_clave"), {"p": plan_id})).all())
+    en_marcha = set((await s.scalars(text(
+        "select leccion_clave from trabajos where plan_id = :p and tipo = 'material' and estado in ('pendiente', 'en_curso')"),
+        {"p": plan_id})).all())
+    salida: dict[str, dict] = {}
+    for clave, tipo, estado in filas:
+        salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})["tipos"][tipo] = estado
+    for clave in set(fichas) | en_marcha:
+        salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})
+    for clave, d in salida.items():
+        d["fichas"] = fichas.get(clave, 0)
+        d["en_marcha"] = clave in en_marcha
+    return salida
+
+
+class CambiarEstilo(BaseModel):
+    estilo: Literal["libro", "ficha"]
+
+
+@rutas.post("/materiales/{mid}/estilo")
+async def cambiar_estilo(mid: int, cuerpo: CambiarEstilo, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    """Vuelve a pintar los apuntes en otro estilo, sin llamar al modelo."""
+    from magister.material import almacen
+    from magister.material.render import pintar
+
+    m = await s.get(Material, mid)
+    if m is None or m.tipo != "apuntes":
+        raise HTTPException(404, "apuntes no encontrados")
+    await s.close()
+    md = await almacen.montar_markdown(mid, cuerpo.estilo)
+    r = await pintar(md, m.plan_id, m.leccion_clave, estilo=cuerpo.estilo)
+    return {"estilo": cuerpo.estilo, "paginas": r.paginas, "error": r.error}
 
 
 @rutas.get("/trabajos/{tid}")
@@ -89,6 +132,10 @@ def _material(m: Material, con_texto: bool = False) -> dict:
     if con_texto:
         salida["texto"] = m.texto
         salida["contrato"] = m.contrato
+    if m.tipo == "apuntes":
+        from magister.material.almacen import estilo_de
+
+        salida["estilo"] = estilo_de(m)
     return salida
 
 

@@ -66,7 +66,7 @@ def test_plantilla_falla_con_hueco() -> None:
         montar("{{titulo}} {{falta}}", {"titulo": "x"})
     md = montar_apuntes("Índices", "Magister · BD", "a.pdf", [{"termino": "Índice", "ingles": "index", "definicion": "Una estructura."}],
                         [("Por qué", "Texto.")], [{"enunciado": "¿Qué?", "fantasma": "Esto."}])
-    assert "## Por qué {.nb}" in md and "::: fantasma" in md and "**Índice** (index)" in md
+    assert "## Por qué {etq=" in md and "::: teoria" in md and "::: fantasma" in md and "**Índice** · *index*" in md
 
 
 ENTRADA = EntradaMaterial(
@@ -116,10 +116,14 @@ def test_guion_por_escenas() -> None:
 
 def test_diapositivas_marp() -> None:
     p = Presentacion(diapositivas=[Diapositiva(titulo="Uno", lineas=["Una línea corta"], nota="Lo que digo."),
-                                   Diapositiva(titulo="Dos", lineas=["a", "b", "c", "d"], nota="Más.")])
-    marp = montar_marp(p, "Lección")
-    assert marp.startswith("---\nmarp: true")
-    assert any(h.regla == "lineas" for h in auditar_diapositivas(marp))
+                                   Diapositiva(titulo="Dos", lineas=["Recurso: entidad con URL", "b"], clave="La idea.",
+                                               nota="Más."),
+                                   Diapositiva(titulo="Tres", lineas=["x " * 20], nota="")])
+    marp = montar_marp(p, "Lección", "L2", "Tema")
+    assert marp.startswith("---\nmarp: true") and "_class: portada" in marp and "###### 2" in marp
+    assert "- **Recurso**: entidad con URL" in marp and "> La idea." in marp
+    reglas = [h.regla for h in auditar_diapositivas(marp)]
+    assert reglas == ["palabras"]
 
 
 def test_completitud_determinista() -> None:
@@ -197,6 +201,6 @@ async def test_generador_con_eco_y_reanudar(base, monkeypatch, tmp_path) -> None
     final = await generar_apuntes(mid, entrada)
     assert [b.clave for b in await almacen.bloques(mid)] == ["b1", "b2"]
     m = await almacen.material(mid)
-    assert "## Claves {.nb}" in m.texto and m.estado in ("listo", "revisar")
+    assert "## Claves {" in m.texto and "::: capitulo" in m.texto and m.estado in ("listo", "revisar")
     assert final["contrato"]["bloques"][0]["clave"] == "b1"
     eco.vaciar()

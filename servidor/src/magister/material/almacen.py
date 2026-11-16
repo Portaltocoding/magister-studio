@@ -59,21 +59,21 @@ async def bloques(material_id: int) -> list[BloqueMaterial]:
     return sorted(filas, key=lambda b: int(b.clave[1:]) if b.clave[1:].isdigit() else 99)
 
 
-async def datos_leccion(plan_id: int, clave: str) -> tuple[str, str]:
+async def datos_leccion(plan_id: int, clave: str) -> tuple[str, str, list[str]]:
     async with nueva_sesion() as s:
         lec = await s.get(LeccionFila, (plan_id, clave))
         plan = await s.get(PlanFila, plan_id)
         tema = await s.get(Tema, plan.tema_id) if plan else None
-    return (lec.titulo if lec else clave), (tema.nombre if tema else "")
+    return (lec.titulo if lec else clave), (tema.nombre if tema else ""), list(lec.objetivos or []) if lec else []
 
 
-async def montar_markdown(material_id: int) -> str:
+async def montar_markdown(material_id: int, estilo: str | None = None) -> str:
     async with nueva_sesion() as s:
         m = await s.get(Material, material_id)
         preguntas = (await s.scalars(select(Pregunta).where(
             Pregunta.plan_id == m.plan_id, Pregunta.leccion_clave == m.leccion_clave, Pregunta.estado != "retirada"
         ).order_by(Pregunta.id))).all()
-    titulo, tema = await datos_leccion(m.plan_id, m.leccion_clave)
+    titulo, tema, objetivos = await datos_leccion(m.plan_id, m.leccion_clave)
     contrato = m.contrato or {}
     titulos = {b["clave"]: b["titulo"] for b in contrato.get("bloques", [])}
     lista = [(titulos.get(b.clave, b.titulo), b.texto) for b in await bloques(material_id)]
@@ -81,10 +81,20 @@ async def montar_markdown(material_id: int) -> str:
         titulo=titulo, pie=f"Magister · {tema}", salida=str(carpeta_salidas(m.plan_id, m.leccion_clave) / "apuntes.pdf"),
         definiciones=contrato.get("definiciones", []), bloques=lista,
         repaso=[{"enunciado": p.enunciado, "fantasma": p.fantasma} for p in preguntas if not p.sonda],
+        clave=m.leccion_clave, objetivos=objetivos, tema=tema, estilo=estilo or estilo_de(m),
     )
+    informes = [x for x in (m.informes or []) if x.get("nodo") != "estilo"]
+    if estilo:
+        informes.append({"nodo": "estilo", "estilo": estilo})
     async with nueva_sesion() as s, s.begin():
-        await s.execute(update(Material).where(Material.id == material_id).values(texto=md, actualizado_en=func.now()))
+        await s.execute(update(Material).where(Material.id == material_id).values(
+            texto=md, actualizado_en=func.now(), **({"informes": informes} if estilo else {})))
     return md
+
+
+def estilo_de(m: Material) -> str:
+    """El estilo con que se pintó por última vez (va en los informes, sin columna nueva)."""
+    return next((x["estilo"] for x in reversed(m.informes or []) if x.get("nodo") == "estilo"), "libro")
 
 
 async def escribir_markdown(material_id: int) -> Path:

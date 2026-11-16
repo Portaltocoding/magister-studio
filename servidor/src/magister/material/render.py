@@ -13,6 +13,7 @@ from pathlib import Path
 
 from magister.config import ajustes
 from magister.material.almacen import carpeta_salidas
+from magister.material.plantillas import ESTILOS
 
 MOTOR = Path(__file__).parent / "motor_pdf"
 GIT_BIN = Path("C:/Program Files/Git/mingw64/bin")
@@ -27,9 +28,11 @@ class Render:
     error: str | None = None
 
 
-def _entorno() -> dict:
+def _entorno(estilo: str = "libro") -> dict:
     extra = [ajustes.pandoc, str(GIT_BIN)]
-    return {**os.environ, "PATH": os.pathsep.join([*extra, os.environ.get("PATH", "")]), "PYTHONUTF8": "1"}
+    # La maqueta del libro (practica.css), no la de las fichas generales.
+    return {**os.environ, "PATH": os.pathsep.join([*extra, os.environ.get("PATH", "")]), "PYTHONUTF8": "1",
+            "FICHA_CSS": ESTILOS.get(estilo, "practica.css")}
 
 
 def _avisos(salida: str) -> list[dict]:
@@ -43,7 +46,7 @@ def _avisos(salida: str) -> list[dict]:
     return avisos
 
 
-async def pintar(markdown: str, plan_id: int, clave: str, nombre: str = "apuntes") -> Render:
+async def pintar(markdown: str, plan_id: int, clave: str, nombre: str = "apuntes", estilo: str = "libro") -> Render:
     carpeta = carpeta_salidas(plan_id, clave)
     trabajo = carpeta / f".{nombre}"
     trabajo.mkdir(exist_ok=True)
@@ -54,7 +57,7 @@ async def pintar(markdown: str, plan_id: int, clave: str, nombre: str = "apuntes
     try:
         proc = await asyncio.create_subprocess_exec(
             sys.executable, str(MOTOR / "build_win.py"), str(trabajo),
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=_entorno(), cwd=str(MOTOR),
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=_entorno(estilo), cwd=str(MOTOR),
         )
         salida, _ = await asyncio.wait_for(proc.communicate(), timeout=300)
     except (TimeoutError, OSError) as e:

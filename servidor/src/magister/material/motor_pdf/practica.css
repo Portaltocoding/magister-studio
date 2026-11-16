@@ -238,3 +238,6 @@ tr.peligro td:first-child { border-left: 4px solid #b3261e; }
 
 /* las tablas largas pueden partirse entre páginas (las filas no) */
 table:has(tr:nth-child(8)) { break-inside: auto; }
+
+/* Magister Studio: la etiqueta no se separa de su título. */
+h2 { break-inside: avoid; }

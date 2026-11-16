@@ -50,11 +50,12 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], 
         for h in hallazgos:
             await cola.aviso(trabajo_id, f"preguntas.{h.regla}", h.por_que)
         await almacen.actualizar(mid, informes=[*(m.informes or []), {"nodo": "preguntas", "hallazgos": [h.model_dump() for h in hallazgos]}])
-        await almacen.montar_markdown(mid)
 
+    estilo = (preferencias or {}).get("estilo", "libro")
+    await almacen.montar_markdown(mid, estilo)
     m = await almacen.material(mid)
     await progreso("pintar", 0, 1)
-    r = await pintar(m.texto or "", plan_id, clave)
+    r = await pintar(m.texto or "", plan_id, clave, estilo=estilo)
     rutas = {"md": str(almacen.carpeta_salidas(plan_id, clave) / "apuntes.md")}
     if r.pdf:
         rutas["pdf"] = str(r.pdf)
@@ -75,7 +76,7 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], 
         did = await almacen.nuevo_material(plan_id, clave, "diapositivas", trabajo_id)
         materiales.append(did)
         p = await generar_diapositivas(m.texto or "")
-        marp = montar_marp(p, entrada.titulo)
+        marp = montar_marp(p, entrada.titulo, clave, entrada.tema)
         hallazgos = auditar_diapositivas(marp) + lint.revisar(marp, "diapositivas")
         rutas_d = await pintar_marp(marp, plan_id, clave)
         estado = "bloqueado" if lint.vetos(hallazgos) else "listo"

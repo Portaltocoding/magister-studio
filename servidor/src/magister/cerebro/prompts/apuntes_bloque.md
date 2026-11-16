@@ -10,6 +10,20 @@ Tono (es lo que más importa):
 
 Escribe solo el texto del bloque, en Markdown, sin el título (lo pone el código). Entre 150 y 350 palabras.
 
+Formato para que se lea fácil (como el libro):
+- Subapartados con `###` si el bloque tiene dos ideas distintas.
+- Términos clave en **negrita** la primera vez; código, rutas y comandos entre comillas invertidas.
+- Si hay un error típico, ponlo en una caja, como mucho una por bloque:
+  ::: aviso
+  **El error típico**
+  Qué se hace mal y por qué falla.
+  :::
+- Si hay una idea que hay que llevarse, ciérralo con una frase en caja, como mucho una:
+  ::: frase
+  La idea en una frase.
+  :::
+- Tablas solo para comparar opciones; bloques de código con ``` y líneas cortas.
+
 <leccion>
 Lección: {titulo}
 Objetivos: {objetivos}

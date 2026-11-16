@@ -12,6 +12,8 @@ import {
 } from '../api.ts'
 import Cuestionario, { type Respuestas } from '../componentes/Cuestionario.tsx'
 import { PREGUNTAS_MATERIAL } from '../componentes/cuestionarios.ts'
+import LectorLibro from '../componentes/LectorLibro.tsx'
+import Tarjetas, { type Ficha } from '../componentes/Tarjetas.tsx'
 
 interface MaterialInfo {
   id: number
@@ -19,14 +21,6 @@ interface MaterialInfo {
   estado: 'generando' | 'listo' | 'revisar' | 'bloqueado'
   motivo: string | null
   ficheros: string[]
-}
-
-interface PreguntaInfo {
-  id: string
-  tipo: string
-  enunciado: string
-  fantasma: string
-  donde: string | null
 }
 
 interface Trabajo {
@@ -41,8 +35,14 @@ interface Trabajo {
 
 interface MaterialLeccion {
   materiales: Record<string, MaterialInfo>
-  preguntas: PreguntaInfo[]
+  preguntas: Ficha[]
   ultimo_trabajo: Trabajo | null
+}
+
+interface EstadoLeccion {
+  tipos: Record<string, string>
+  fichas: number
+  en_marcha: boolean
 }
 
 type EventoTrabajo =
@@ -50,6 +50,8 @@ type EventoTrabajo =
   | { tipo: 'aviso'; regla: string; detalle: string }
   | { tipo: 'fin'; materiales: number[] }
   | { tipo: 'error'; detalle: string }
+
+type Pestana = 'apuntes' | 'fichas' | 'diapositivas' | 'guion'
 
 const NODOS: Record<string, string> = {
   pendiente: 'En cola',
@@ -72,50 +74,83 @@ const NODOS: Record<string, string> = {
 
 const fichero = (m: MaterialInfo, nombre: string) => `/api/materiales/${m.id}/fichero/${nombre}`
 
-// Fichas y Vídeo: material de una lección generado en segundo plano, con su progreso.
+function estadoLeccion(e: EstadoLeccion | undefined): { clase: string; texto: string } {
+  if (!e) return { clase: 'sin', texto: 'Sin material' }
+  if (e.en_marcha) return { clase: 'marcha', texto: 'Generando' }
+  if (e.tipos.apuntes === 'listo') return { clase: 'listo', texto: `Listo · ${e.fichas} fichas` }
+  if (e.tipos.apuntes) return { clase: 'revisar', texto: `Por revisar · ${e.fichas} fichas` }
+  return { clase: 'sin', texto: 'Sin material' }
+}
+
+// Fichas y Vídeo: cada lección como un bloque de aprendizaje (apuntes, fichas, diapositivas y guion).
 export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 'video' }) {
   const [planes, setPlanes] = useState<ResumenPlan[]>([])
   const [plan, setPlan] = useState<VistaPlan | null>(null)
+  const [estados, setEstados] = useState<Record<string, EstadoLeccion>>({})
   const [clave, setClave] = useState<string | null>(null)
   const [datos, setDatos] = useState<MaterialLeccion | null>(null)
   const [trabajo, setTrabajo] = useState<Trabajo | null>(null)
-  const [vistas, setVistas] = useState<Set<string>>(new Set())
-  const [texto, setTexto] = useState<string | null>(null)
+  const [textos, setTextos] = useState<Partial<Record<'apuntes' | 'guion', string>>>({})
+  const [estilo, setEstilo] = useState<string>('libro')
+  const [contrato, setContrato] = useState<Record<string, string>>({})
+  const [pestana, setPestana] = useState<Pestana>(modoVista === 'video' ? 'guion' : 'apuntes')
   const [error, setError] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
   const [preguntando, setPreguntando] = useState<null | { forzar: boolean }>(null)
   const control = useRef<AbortController | null>(null)
+  const raiz = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const [, temaRuta, claveRuta] = window.location.hash.replace(/^#\/?/, '').split('/')
+    const [, temaRuta, claveRuta, pestanaRuta] = window.location.hash.replace(/^#\/?/, '').split('/')
+    if (['apuntes', 'fichas', 'diapositivas', 'guion'].includes(pestanaRuta)) setPestana(pestanaRuta as Pestana)
     listarPlanes().then((ps) => {
       setPlanes(ps)
       const elegido = ps.find((p) => p.tema_id === Number(temaRuta)) ?? ps[0]
       if (elegido)
         verPlan(elegido.tema_id).then((v) => {
           setPlan(v)
-          if (claveRuta && v.lecciones.some((l) => l.clave === claveRuta)) setClave(claveRuta)
+          const valida = claveRuta && v.lecciones.some((l) => l.clave === claveRuta)
+          setClave(valida ? claveRuta : (v.lecciones[0]?.clave ?? null))
         })
       if (temaRuta) window.history.replaceState(null, '', `#/${modoVista === 'video' ? 'video' : 'fichas'}`)
     })
   }, [modoVista])
 
+  const cargarEstados = useCallback(() => {
+    if (plan) pedir<Record<string, EstadoLeccion>>(`/api/planes/${plan.plan_id}/materiales`).then(setEstados)
+  }, [plan])
+  useEffect(cargarEstados, [cargarEstados])
+
   const cargar = useCallback(() => {
     if (!plan || !clave) return
+    setTextos({})
     pedir<MaterialLeccion>(`/api/planes/${plan.plan_id}/lecciones/${clave}/material`).then((d) => {
       setDatos(d)
       const t = d.ultimo_trabajo
       if (t && ['pendiente', 'en_curso'].includes(t.estado)) seguir(t.id)
       else setTrabajo(t)
-      const objetivo = modoVista === 'video' ? d.materiales.guion : d.materiales.apuntes
-      if (objetivo) pedir<{ texto: string }>(`/api/materiales/${objetivo.id}`).then((m) => setTexto(m.texto))
-      else setTexto(null)
+      if (d.materiales.apuntes)
+        pedir<{ texto: string; estilo?: string; contrato?: { bloques?: { clave: string; titulo: string }[] } }>(
+          `/api/materiales/${d.materiales.apuntes.id}`,
+        ).then((m) => {
+          setTextos((x) => ({ ...x, apuntes: m.texto }))
+          setEstilo(m.estilo ?? 'libro')
+          setContrato(Object.fromEntries((m.contrato?.bloques ?? []).map((b) => [b.clave, b.titulo])))
+        })
+      if (d.materiales.guion)
+        pedir<{ texto: string }>(`/api/materiales/${d.materiales.guion.id}`).then((m) =>
+          setTextos((x) => ({ ...x, guion: m.texto })),
+        )
     })
     // seguir se define abajo; se vuelve a suscribir si recargas con un trabajo en curso
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan, clave, modoVista])
+  }, [plan, clave])
 
   useEffect(cargar, [cargar])
   useEffect(() => () => control.current?.abort(), [])
+  useEffect(() => {
+    raiz.current?.closest('.central')?.scrollTo({ top: 0 })
+  }, [clave, pestana])
 
   async function seguir(id: number) {
     control.current?.abort()
@@ -133,6 +168,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         else if (ev.tipo === 'fin') {
           setTrabajo((t) => t && { ...t, estado: 'hecho' })
           cargar()
+          cargarEstados()
         }
       }
     } catch (e) {
@@ -146,16 +182,34 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     setPreguntando(null)
     const tipos = Array.from(new Set(['apuntes', ...((r.tipos as string[]) ?? [])]))
     const preferencias = {
-      profundidad: r.profundidad, preguntas: r.preguntas, cantidad: r.cantidad,
+      profundidad: r.profundidad,
+      preguntas: r.preguntas,
+      cantidad: r.cantidad,
+      estilo: r.estilo ?? 'libro',
       enfoque: (r.enfoque as string | undefined)?.trim() || null,
     }
     try {
-      const r = await pedir<{ trabajo_id: number }>(
+      const res = await pedir<{ trabajo_id: number }>(
         `/api/planes/${plan.plan_id}/lecciones/${clave}/material`,
         enviarJson({ forzar, tipos, preferencias }),
       )
-      seguir(r.trabajo_id)
+      seguir(res.trabajo_id)
+      cargarEstados()
     } catch (e) {
+      setError(String((e as Error).message))
+    }
+  }
+
+  const cambiarEstilo = async (nuevo: string) => {
+    if (!datos?.materiales.apuntes) return
+    setAviso('Volviendo a pintar el PDF…')
+    try {
+      await pedir(`/api/materiales/${datos.materiales.apuntes.id}/estilo`, enviarJson({ estilo: nuevo }))
+      setEstilo(nuevo)
+      setAviso(`PDF en estilo ${nuevo === 'libro' ? 'Libro' : 'Ficha general'}.`)
+      cargar()
+    } catch (e) {
+      setAviso(null)
       setError(String((e as Error).message))
     }
   }
@@ -164,162 +218,196 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   const apuntes = datos?.materiales.apuntes
   const diapos = datos?.materiales.diapositivas
   const guion = datos?.materiales.guion
+  const leccion = plan?.lecciones.find((l) => l.clave === clave)
+  const temaNombre = planes.find((p) => p.plan_id === plan?.plan_id)?.tema ?? ''
+  const pestanas: { id: Pestana; nombre: string; hay: boolean }[] = [
+    { id: 'apuntes', nombre: 'Apuntes', hay: !!textos.apuntes },
+    { id: 'fichas', nombre: `Fichas${datos?.preguntas.length ? ` (${datos.preguntas.length})` : ''}`, hay: !!datos?.preguntas.length },
+    { id: 'diapositivas', nombre: 'Diapositivas', hay: !!diapos?.ficheros.includes('html') },
+    { id: 'guion', nombre: 'Guion', hay: !!textos.guion },
+  ]
+
+  if (!planes.length)
+    return (
+      <div className="panel">
+        <h1>{modoVista === 'video' ? 'Vídeo' : 'Fichas'}</h1>
+        <p className="vacio">Primero acepta un plan en Roadmap.</p>
+      </div>
+    )
 
   return (
-    <div className="panel">
-      <h1>{modoVista === 'video' ? 'Vídeo' : 'Fichas'}</h1>
-      {!planes.length && <p className="vacio">Primero acepta un plan en Roadmap.</p>}
-      <div className="fila">
-        <select
-          aria-label="Plan"
-          value={plan?.tema_id ?? ''}
-          onChange={(e) => {
-            setClave(null)
-            verPlan(Number(e.target.value)).then(setPlan)
-          }}
-        >
-          {planes.map((p) => (
-            <option key={p.plan_id} value={p.tema_id}>
-              {p.tema}
-            </option>
-          ))}
-        </select>
-        <select aria-label="Lección" value={clave ?? ''} onChange={(e) => setClave(e.target.value || null)}>
-          <option value="">Elige una lección</option>
-          {plan?.lecciones.map((l) => (
-            <option key={l.clave} value={l.clave}>
-              {l.clave} · {l.titulo}
-            </option>
-          ))}
-        </select>
-        {clave && (
+    <div className="bloques" ref={raiz}>
+      <aside className="bloques-lista" aria-label="Lecciones">
+        {planes.length > 1 ? (
+          <select
+            aria-label="Plan"
+            value={plan?.tema_id ?? ''}
+            onChange={(e) =>
+              verPlan(Number(e.target.value)).then((v) => {
+                setPlan(v)
+                setClave(v.lecciones[0]?.clave ?? null)
+              })
+            }
+          >
+            {planes.map((p) => (
+              <option key={p.plan_id} value={p.tema_id}>
+                {p.tema}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="bloques-plan">{temaNombre}</p>
+        )}
+        <ol>
+          {plan?.lecciones.map((l) => {
+            const e = estadoLeccion(estados[l.clave])
+            return (
+              <li key={l.clave}>
+                <button className={l.clave === clave ? 'activa' : ''} onClick={() => setClave(l.clave)}>
+                  <span className="bloques-clave">{l.clave}</span>
+                  <span className="bloques-titulo">
+                    {l.titulo}
+                    <small className={`estado-leccion ${e.clase}`}>{e.texto}</small>
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+      </aside>
+
+      <section className="bloque-vista">
+        {leccion && (
+          <header className="bloque-cabecera">
+            <span className="bloque-num">{leccion.clave.replace(/\D/g, '') || leccion.clave}</span>
+            <div className="bloque-datos">
+              <span className="lb-etq">
+                {leccion.clave} · {temaNombre}
+              </span>
+              <h1>{leccion.titulo}</h1>
+              {leccion.objetivos.length > 0 && (
+                <p className="bloque-objetivos">Con qué saldrás: {leccion.objetivos.join('; ')}</p>
+              )}
+              <div className="bloque-acciones">
+                <button
+                  className="boton boton-principal"
+                  disabled={!!enCurso}
+                  onClick={() => setPreguntando({ forzar: !!apuntes })}
+                >
+                  {apuntes ? 'Rehacer el material' : 'Generar el material'}
+                </button>
+                {apuntes?.ficheros.includes('pdf') && (
+                  <a className="boton" href={fichero(apuntes, 'pdf')} target="_blank" rel="noreferrer">
+                    Apuntes en PDF
+                  </a>
+                )}
+                {diapos?.ficheros.includes('diapositivas_pdf') && (
+                  <a className="boton" href={fichero(diapos, 'diapositivas_pdf')} target="_blank" rel="noreferrer">
+                    Diapositivas en PDF
+                  </a>
+                )}
+                {apuntes && (
+                  <label className="estilo-pdf">
+                    Estilo del PDF
+                    <select value={estilo} onChange={(e) => cambiarEstilo(e.target.value)} disabled={!!enCurso}>
+                      <option value="libro">Libro</option>
+                      <option value="ficha">Ficha general</option>
+                    </select>
+                  </label>
+                )}
+              </div>
+              {apuntes && apuntes.estado !== 'listo' && apuntes.motivo && (
+                <p className="nota">Por revisar: {apuntes.motivo}</p>
+              )}
+            </div>
+          </header>
+        )}
+
+        {error && <p role="alert">{error}</p>}
+        {aviso && (
+          <p className="nota" role="status">
+            {aviso}
+          </p>
+        )}
+        {preguntando && clave && (
+          <Cuestionario
+            key={`${clave}-${preguntando.forzar}`}
+            titulo={`Material de ${clave}`}
+            preguntas={
+              modoVista === 'video'
+                ? PREGUNTAS_MATERIAL.map((q) => (q.id === 'tipos' ? { ...q, porDefecto: ['apuntes', 'guion'] } : q))
+                : PREGUNTAS_MATERIAL
+            }
+            boton={preguntando.forzar ? 'Rehacer el material' : 'Generar el material'}
+            alTerminar={(r) => generar(preguntando.forzar, r)}
+            alSaltar={() => setPreguntando(null)}
+            textoSaltar="Cancelar"
+          />
+        )}
+
+        {trabajo && (enCurso || trabajo.estado === 'fallido') && (
+          <div className="progreso" role="status">
+            <p>
+              {trabajo.estado === 'fallido'
+                ? `Falló: ${trabajo.error}`
+                : `${NODOS[trabajo.nodo ?? ''] ?? trabajo.nodo ?? 'En cola'}${trabajo.total > 1 ? ` · bloque ${trabajo.paso + 1} de ${trabajo.total}` : ''}`}
+            </p>
+            {enCurso && (
+              <>
+                <span className="barra">
+                  <span style={{ width: `${trabajo.total ? ((trabajo.paso + 1) / trabajo.total) * 100 : 5}%` }} />
+                </span>
+                <button className="boton-mini" onClick={() => pedir(`/api/trabajos/${trabajo.id}/cancelar`, { method: 'POST' })}>
+                  Cancelar
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {datos && apuntes && (
           <>
-            <button className="boton boton-principal" disabled={!!enCurso} onClick={() => setPreguntando({ forzar: false })}>
-              {apuntes ? 'Generar si ha cambiado' : 'Generar el material'}
-            </button>
-            {apuntes && (
-              <button className="boton" disabled={!!enCurso} onClick={() => setPreguntando({ forzar: true })}>
-                Rehacer
-              </button>
+            <nav className="pestanas" role="tablist">
+              {pestanas.map((p) => (
+                <button
+                  key={p.id}
+                  role="tab"
+                  aria-selected={pestana === p.id}
+                  className={pestana === p.id ? 'activa' : ''}
+                  disabled={!p.hay}
+                  onClick={() => setPestana(p.id)}
+                >
+                  {p.nombre}
+                </button>
+              ))}
+            </nav>
+            {pestana === 'apuntes' && textos.apuntes && (
+              <LectorLibro markdown={textos.apuntes} raiz={raiz.current?.closest('.central')} />
+            )}
+            {pestana === 'fichas' && <Tarjetas key={clave} fichas={datos.preguntas} bloques={contrato} />}
+            {pestana === 'diapositivas' && diapos?.ficheros.includes('html') && (
+              <div className="visor-diapositivas">
+                <iframe title="Diapositivas" src={fichero(diapos, 'html')} />
+                <p className="nota">Pulsa dentro y usa las flechas para pasar. F abre en pantalla completa.</p>
+              </div>
+            )}
+            {pestana === 'guion' && textos.guion && (
+              <article className="lector-texto guion">
+                <Markdown remarkPlugins={[remarkGfm]}>{textos.guion}</Markdown>
+              </article>
             )}
           </>
         )}
-      </div>
-      {error && <p role="alert">{error}</p>}
-      {preguntando && clave && (
-        <Cuestionario
-          key={`${clave}-${preguntando.forzar}`}
-          titulo={`Material de ${clave}`}
-          preguntas={modoVista === 'video'
-            ? PREGUNTAS_MATERIAL.map((q) => (q.id === 'tipos' ? { ...q, porDefecto: ['apuntes', 'guion'] } : q))
-            : PREGUNTAS_MATERIAL}
-          boton={preguntando.forzar ? 'Rehacer el material' : 'Generar el material'}
-          alTerminar={(r) => generar(preguntando.forzar, r)}
-          alSaltar={() => setPreguntando(null)}
-          textoSaltar="Cancelar"
-        />
-      )}
-
-      {trabajo && (enCurso || trabajo.estado === 'fallido') && (
-        <div className="progreso" role="status">
-          <p>
-            {trabajo.estado === 'fallido'
-              ? `Falló: ${trabajo.error}`
-              : `${NODOS[trabajo.nodo ?? ''] ?? trabajo.nodo ?? 'En cola'}${trabajo.total > 1 ? ` · bloque ${trabajo.paso + 1} de ${trabajo.total}` : ''}`}
-          </p>
-          {enCurso && (
-            <>
-              <span className="barra">
-                <span style={{ width: `${trabajo.total ? ((trabajo.paso + 1) / trabajo.total) * 100 : 5}%` }} />
-              </span>
-              <button className="boton-mini" onClick={() => pedir(`/api/trabajos/${trabajo.id}/cancelar`, { method: 'POST' })}>
-                Cancelar
-              </button>
-            </>
-          )}
-        </div>
-      )}
-      {trabajo?.avisos.length ? (
-        <details>
-          <summary className="nota">{trabajo.avisos.length} avisos</summary>
-          <ul className="nota">
-            {trabajo.avisos.map((a, i) => (
-              <li key={i}>
-                {a.regla}: {a.detalle}
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-
-      {clave && datos && (
-        <>
-          <div className="fila">
-            {apuntes && (
-              <span className={`chip estado-${apuntes.estado}`}>
-                Apuntes: {apuntes.estado}
-                {apuntes.motivo ? ` · ${apuntes.motivo}` : ''}
-              </span>
-            )}
-            {apuntes?.ficheros.includes('pdf') && (
-              <a className="boton-mini" href={fichero(apuntes, 'pdf')} target="_blank" rel="noreferrer">
-                Apuntes en PDF
-              </a>
-            )}
-            {diapos?.ficheros.includes('html') && (
-              <a className="boton-mini" href={fichero(diapos, 'html')} target="_blank" rel="noreferrer">
-                Diapositivas
-              </a>
-            )}
-            {diapos?.ficheros.includes('diapositivas_pdf') && (
-              <a className="boton-mini" href={fichero(diapos, 'diapositivas_pdf')} target="_blank" rel="noreferrer">
-                Diapositivas en PDF
-              </a>
-            )}
-            {guion?.ficheros.includes('guion') && (
-              <a className="boton-mini" href={fichero(guion, 'guion')} target="_blank" rel="noreferrer">
-                Guion
-              </a>
-            )}
+        {datos && !apuntes && !enCurso && !preguntando && (
+          <div className="vacio-bloque">
+            <p>Esta lección aún no tiene material.</p>
+            <button className="boton boton-principal" onClick={() => setPreguntando({ forzar: false })}>
+              Generar el material
+            </button>
           </div>
-          {modoVista === 'fichas' && datos.preguntas.length > 0 && (
-            <section>
-              <h2>Fichas de repaso ({datos.preguntas.length})</h2>
-              <p className="nota">Intenta responder antes de mirar la respuesta fantasma.</p>
-              <ol className="fichas">
-                {datos.preguntas.map((p) => (
-                  <li key={p.id}>
-                    <p>
-                      <span className="chip">{p.tipo}</span> {p.enunciado}
-                    </p>
-                    {vistas.has(p.id) ? (
-                      <p className="fantasma">{p.fantasma}</p>
-                    ) : (
-                      <button className="boton-mini" onClick={() => setVistas(new Set([...vistas, p.id]))}>
-                        Ver la respuesta
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
-          {texto && (
-            <section className="apuntes">
-              <h2>{modoVista === 'video' ? 'Guion' : 'Apuntes'}</h2>
-              <Markdown remarkPlugins={[remarkGfm]}>
-                {texto
-                  .replace(/^---\n[\s\S]*?\n---\n/, '')
-                  .replace(/\{\.nb\}/g, '')
-                  .replace(/\[Definiciones: ([\s\S]*?)\]\{\.cita\}/, '> **Definiciones.** $1')
-                  .replace(/\n\s*::: fantasma\n[\s\S]*?:::\n/g, '\n')
-                  .replace(/^\[\[(\w+)\]\]$/gm, '**[$1]**')}
-              </Markdown>
-            </section>
-          )}
-          {!apuntes && !enCurso && <p className="vacio">Esta lección aún no tiene material.</p>}
-        </>
-      )}
+        )}
+        {guion && !textos.guion && pestana === 'guion' && <p className="nota">Cargando el guion…</p>}
+      </section>
     </div>
   )
 }
