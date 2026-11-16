@@ -99,6 +99,12 @@ async def lecciones_del_alumno() -> str:
 async def sistema_de_estudio(base: str, estado: dict) -> str:
     """El prompt de estudio con lo que el tutor debe saber del alumno en este turno."""
     partes = [base]
+    if estado.get("hoy"):
+        from datetime import date
+
+        d = date.fromisoformat(estado["hoy"])
+        dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        partes.append(f"Hoy es {dias[d.weekday()]} {d.isoformat()}.")
     lecciones = ""
     if estado.get("conversacion_id"):  # solo en conversaciones de verdad (las pruebas del grafo van sin base)
         try:

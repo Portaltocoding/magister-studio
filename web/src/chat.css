@@ -300,3 +300,35 @@ button.grupo-titulo:hover { color: var(--texto); }
 .tomate-ritmos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .tomate-ritmos .opcion { padding: 8px; align-items: center; text-align: center; }
 .tomate-ritmos small { font-size: 0.7rem; }
+
+
+/* ===== Preguntas con opciones y acciones del tutor (como en Claude Code) ===== */
+.pregunta-tarjeta, .agendar-tarjeta {
+  margin: 14px 0 6px; padding: 14px 16px; border-radius: var(--radio-grande, 14px); border: 1px solid var(--borde);
+  background: var(--fondo); text-align: left;
+}
+.pregunta-titulo { font-weight: 650; margin: 4px 0 10px; }
+.pregunta-opciones { display: flex; flex-direction: column; gap: 6px; }
+.pregunta-opcion {
+  display: flex; gap: 12px; align-items: flex-start; text-align: left; font: inherit; color: var(--texto); cursor: pointer;
+  padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--borde); background: transparent;
+  transition: border-color 250ms var(--suave-curva), background 250ms var(--suave-curva);
+}
+.pregunta-opcion:hover:not(:disabled) { border-color: var(--acento); }
+.pregunta-opcion:disabled { cursor: default; }
+.pregunta-opcion.marcada { border-color: var(--acento); background: var(--acento-suave); }
+.pregunta-marca { color: var(--suave); font-size: 1rem; line-height: 1.4; }
+.pregunta-texto { display: flex; flex-direction: column; gap: 2px; }
+.pregunta-texto em {
+  font-style: normal; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-left: 8px;
+  padding: 1px 7px; border-radius: 999px; background: var(--acento-suave); color: var(--suave); vertical-align: 2px;
+}
+.pregunta-texto small { color: var(--suave); font-size: 0.85rem; }
+.pregunta-otra { display: flex; gap: 8px; margin-top: 8px; }
+.pregunta-otra input { flex: 1; font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--borde); background: transparent; color: var(--texto); }
+.pregunta-tarjeta.respondida .pregunta-opcion:not(.marcada) { opacity: 0.5; }
+.agendar-cuando::first-letter { text-transform: uppercase; }
+.agendar-editar { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; }
+.agendar-editar input { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--borde); background: transparent; color: var(--texto); }
+.agendar-tarjeta.hecho { border-color: color-mix(in srgb, #3c9b6b 50%, var(--borde)); }
+.agendar-tarjeta.no { opacity: 0.6; }

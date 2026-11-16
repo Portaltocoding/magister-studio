@@ -5,6 +5,7 @@ import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { Diagrama, Opciones, TestRapido } from './Interactivo.tsx'
+import { AgendarTarjeta, PreguntaTarjeta } from './Preguntas.tsx'
 import Revelar from './Revelar.tsx'
 import type { CitaInfo } from '../api.ts'
 import { conMarcas, PanelCita } from '../Cita.tsx'
@@ -72,6 +73,9 @@ function CuerpoTutor({
           const texto = String(hijo.props.children ?? '')
           if (clase.includes('language-test')) return <TestRapido texto={texto} completo={completo} />
           if (clase.includes('language-svg')) return <Diagrama svg={texto} completo={completo} />
+          if (clase.includes('language-pregunta'))
+            return <PreguntaTarjeta texto={texto} completo={completo} alResponder={escribiendo ? undefined : alEnviar} />
+          if (clase.includes('language-agendar')) return <AgendarTarjeta texto={texto} completo={completo} />
           if (clase.includes('language-opciones')) return <Opciones texto={texto} activo={completo && !escribiendo} alElegir={alEnviar} />
         }
         return <pre>{children}</pre>
