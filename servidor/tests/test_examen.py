@@ -102,3 +102,15 @@ async def test_el_examen_se_corrige_en_una_llamada():
     assert hechas["p1"].nota == "bien" and version.startswith("corrector_examen@")
     # Un fallo sin decir qué falta pasa a parcial, como en el corrector de una en una.
     assert hechas["p2"].nota == "parcial"
+
+
+def test_los_diagramas_de_los_apuntes_pasan_limpios_al_pdf():
+    from magister.material.render import limpiar_svg, svg_en_linea
+
+    md = "Antes.\n\n```svg\n<svg viewBox=\"0 0 10 10\">\n  <script>alert(1)</script>\n  <rect onclick=\"x()\" width=\"5\" height=\"5\"/>\n" \
+         "  <image href=\"http://x/y.png\"/>\n  <path marker-end=\"url(#a)\"/>\n</svg>\n```\n\nDespués."
+    salida = svg_en_linea(md)
+    assert '<figure class="diagrama"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">' in salida
+    assert "script" not in salida and "onclick" not in salida and "image" not in salida
+    assert 'url(#a)' in salida and "\n" not in salida.split("<figure")[1].split("</figure>")[0]
+    assert limpiar_svg("no es un svg") is None

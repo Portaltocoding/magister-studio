@@ -4,6 +4,7 @@ import katex from 'katex'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
+import { Diagrama } from './Interactivo.tsx'
 import 'katex/dist/katex.min.css'
 
 // Lee el markdown del motor del libro (cajas `::: nombre`, etiquetas `{etq="..."}`, `[x]{.clase}`)
@@ -81,6 +82,13 @@ export const ancla = (t: string) =>
     .replace(/^-|-$/g, '')
 
 const componentes: Components = {
+  // Los diagramas ```svg de los apuntes, como imagen (no ejecuta nada).
+  pre: ({ children }) => {
+    const hijo = Children.toArray(children)[0]
+    if (isValidElement<{ className?: string; children?: ReactNode }>(hijo) && (hijo.props.className ?? '').includes('language-svg'))
+      return <Diagrama svg={String(hijo.props.children ?? '')} completo />
+    return <pre>{children}</pre>
+  },
   h2: ({ children }) => <h2 id={ancla(texto(children))}>{children}</h2>,
   h6: ({ children }) => <span className="lb-etq">{children}</span>,
   a: ({ children, href }) => (

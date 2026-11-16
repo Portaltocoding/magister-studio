@@ -73,3 +73,7 @@ ul.task-list { list-style: none; padding-left: 2px; }
 .fantasma p { margin: 0; line-height: 8mm; }
 .fantasma b, .fantasma strong, .fantasma code { color: inherit; background: none; }
 .fantasma .katex, .fantasma .katex * { color: #aaa497 !important; }
+
+/* Diagramas de los apuntes (SVG en línea) */
+figure.diagrama { margin: 14px auto; text-align: center; break-inside: avoid; }
+figure.diagrama svg { max-width: 100%; height: auto; max-height: 9cm; }

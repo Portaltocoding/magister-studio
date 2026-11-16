@@ -46,12 +46,39 @@ def _avisos(salida: str) -> list[dict]:
     return avisos
 
 
+_SVG = re.compile(r"```svg[ \t]*\n(.*?)\n```", re.S)
+
+
+def limpiar_svg(svg: str) -> str | None:
+    """Un SVG del modelo, sin nada que se ejecute ni cargue de fuera. None si no es un SVG."""
+    svg = svg.strip()
+    if not (svg.startswith("<svg") and svg.endswith("</svg>")):
+        return None
+    svg = re.sub(r"<(script|foreignObject|iframe|object|embed)\b.*?</\1\s*>", "", svg, flags=re.S | re.I)
+    svg = re.sub(r"<(script|foreignObject|iframe|object|embed|image)\b[^>]*/?>", "", svg, flags=re.I)
+    svg = re.sub(r"\son\w+\s*=\s*(\"[^\"]*\"|'[^']*')", "", svg, flags=re.I)
+    svg = re.sub(r"\s(xlink:)?href\s*=\s*(\"(?!#)[^\"]*\"|'(?!#)[^']*')", "", svg, flags=re.I)
+    if "xmlns=" not in svg:
+        svg = svg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"', 1)
+    # En una sola línea: así el motor lo trata como un bloque HTML y no lo parte.
+    return " ".join(svg.split())
+
+
+def svg_en_linea(markdown: str) -> str:
+    """Los diagramas ```svg de los apuntes, como figura dentro del PDF."""
+    def figura(m: re.Match) -> str:
+        limpio = limpiar_svg(m.group(1))
+        return f'\n<figure class="diagrama">{limpio}</figure>\n' if limpio else ""
+
+    return _SVG.sub(figura, markdown)
+
+
 async def pintar(markdown: str, plan_id: int, clave: str, nombre: str = "apuntes", estilo: str = "libro") -> Render:
     carpeta = carpeta_salidas(plan_id, clave)
     trabajo = carpeta / f".{nombre}"
     trabajo.mkdir(exist_ok=True)
     pdf = carpeta / f"{nombre}.pdf"
-    md = re.sub(r"^salida: .*$", f"salida: {pdf.as_posix()}", markdown, count=1, flags=re.M)
+    md = svg_en_linea(re.sub(r"^salida: .*$", f"salida: {pdf.as_posix()}", markdown, count=1, flags=re.M))
     (trabajo / "ficha.md").write_text(md, encoding="utf-8")
     (carpeta / f"{nombre}.md").write_text(md, encoding="utf-8")
     try:

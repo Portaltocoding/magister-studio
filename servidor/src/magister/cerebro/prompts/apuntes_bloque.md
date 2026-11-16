@@ -23,6 +23,7 @@ Formato para que se lea fácil (como el libro):
   La idea en una frase.
   :::
 - Tablas solo para comparar opciones; bloques de código con ``` y líneas cortas.
+- Un diagrama, como mucho uno por bloque, cuando explique mejor que un párrafo (flujos y pasos, capas, fuerzas, ejes, árboles, comparaciones): en un bloque de código `svg` con un SVG sencillo, `viewBox` de como mucho 640 x 360, fondo transparente, trazos de 1.5 en #333, rellenos suaves #e8e6e0, un realce #d08a00, texto sans-serif de 13 a 15 px en #222 y flechas con `marker`. Sin scripts, imágenes ni enlaces. Justo después, una frase con qué hay que mirar en él.
 - Fórmulas en LaTeX: `$...$` dentro de la frase y `$$...$$` en su propia línea para las importantes. Después de una fórmula aparte, di qué es cada símbolo.
 
 <leccion>

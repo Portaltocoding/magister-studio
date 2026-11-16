@@ -241,3 +241,7 @@ table:has(tr:nth-child(8)) { break-inside: auto; }
 
 /* Magister Studio: la etiqueta no se separa de su título. */
 h2 { break-inside: avoid; }
+
+/* Diagramas de los apuntes (SVG en línea) */
+figure.diagrama { margin: 14px auto; text-align: center; break-inside: avoid; }
+figure.diagrama svg { max-width: 100%; height: auto; max-height: 9cm; }
