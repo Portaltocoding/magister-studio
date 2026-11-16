@@ -177,3 +177,32 @@
 .apuestas details { margin: 6px 0; }
 .apuestas summary { cursor: pointer; }
 .apuestas details p { margin: 4px 0 4px 18px; }
+
+
+/* ===== Calentamiento con resumen, «más fácil», repaso del tema ===== */
+.calentamiento-resumen { margin: 0 0 16px; padding: 12px 16px 12px 34px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px; line-height: 1.55; }
+.calentamiento-resumen li + li { margin-top: 4px; }
+.calentamiento-dudas { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; font-size: 0.9rem; color: var(--suave); }
+.calentamiento-dudas textarea { font: inherit; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 8px 10px; resize: none; }
+.foco-facil { margin: 4px 0 10px; }
+.foco-facil-caja { background: color-mix(in srgb, var(--texto) 5%, transparent); border-left: 3px solid var(--texto); border-radius: 0 12px 12px 0; padding: 8px 14px; }
+.foco-facil-caja p { margin: 4px 0; }
+.volcado { max-width: 780px; margin: 0 auto; }
+.volcado h1 small { font-size: 0.5em; font-weight: 500; color: var(--suave); }
+.volcado-entrada textarea { width: 100%; box-sizing: border-box; font: inherit; line-height: 1.5; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 12px 14px; resize: vertical; min-height: 200px; }
+.volcado-siguiente { font-size: 1.05rem; }
+.volcado-apartados { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 6px; }
+.volcado-apartados li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; }
+.volcado-apartados li > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.volcado-apartados small { color: var(--suave); }
+.volcado-bien .chip { opacity: 0.6; }
+.volcado-falta { border-left: 3px solid var(--texto) !important; }
+.volcado-errores .tachado { text-decoration: line-through; opacity: 0.7; }
+.volcado-ordenado { margin: 10px 0; }
+.repaso-tema { margin: 10px 0 24px; padding: 16px 18px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); box-shadow: var(--sombra-suave); }
+.repaso-tema h2 { margin: 0 0 4px; text-transform: none; letter-spacing: 0; font-size: 1.1rem; color: var(--texto); }
+.repaso-tema-estilo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; }
+.repaso-tema-lista { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.repaso-tema-lista li { display: flex; align-items: center; gap: 10px; }
+.repaso-tema-titulo { flex: 1; display: flex; flex-direction: column; }
+.repaso-tema-titulo small { color: var(--suave); }

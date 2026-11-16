@@ -181,7 +181,22 @@ async def conceptos_flojos(n: int = 6) -> list[str]:
             "order by plan_id, concepto_id, momento desc) u join conceptos c on c.plan_id = u.plan_id and c.id = u.concepto_id "
             "join planes p on p.id = u.plan_id and p.estado = 'aceptado' where u.nota in ('fallo', 'parcial') "
             "order by u.momento desc limit :n"), {"n": n})).all()
-    return [f[0] for f in filas]
+    nombres = [f[0] for f in filas]
+    try:
+        from magister.material.estudio import apartados_flojos
+
+        for plan_id, leccion, claves in await apartados_flojos():
+            async with nueva_sesion() as s:
+                contrato = await s.scalar(text(
+                    "select contrato from materiales where plan_id = :p and leccion_clave = :c and tipo = 'apuntes' order by id desc limit 1"),
+                    {"p": plan_id, "c": leccion}) or {}
+                ids = [cid for b in contrato.get("bloques", []) if b["clave"] in claves for cid in b.get("conceptos", [])]
+                if ids:
+                    nombres += [r[0] for r in (await s.execute(text(
+                        "select nombre from conceptos where plan_id = :p and id = any(:i)"), {"p": plan_id, "i": ids})).all()]
+    except Exception:  # noqa: BLE001
+        pass
+    return list(dict.fromkeys(nombres))[: n + 4]
 
 
 async def apuntes_de(plan_id: int, clave: str, maximo: int = 14000) -> tuple[str, str] | None:

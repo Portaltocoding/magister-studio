@@ -12,7 +12,7 @@ import { escenas } from './PanelVideo.tsx'
 // - Charla: hablas de lo que quieras, con el modo de aprendizaje que elijas.
 // Habla frase a frase según le llega la respuesta, te escucha todo el rato y distingue tu voz de la suya.
 
-type Tipo = 'clase' | 'entrevista' | 'charla'
+type Tipo = 'clase' | 'oral' | 'entrevista' | 'charla'
 type Estado = 'conectando' | 'escuchando' | 'pensando' | 'hablando' | 'narrando'
 interface Turno {
   rol: 'tu' | 'tutor'
@@ -28,6 +28,18 @@ const SIGUE = /^(s[ií]|sigue|seguimos|sigamos|vale|venga|adelante|ok|okey|dale|
 const RELLENOS = ['A ver.', 'Vale.', 'Mmm.', 'Déjame pensar.']
 const MARCAS: Record<string, string> = { intuicion: 'la intuición', choque: 'el choque', nombre: 'el nombre', teoria: 'la teoría' }
 
+// Las reglas del examen oral (del prompt del vídeo, parte VIII), con el banco delante.
+function contextoOral(b: { panoramica: string[]; secciones: string[]; profundizacion: string[] }): string {
+  const lista = (t: string, xs: string[]) => `${t}:\n${xs.map((x, i) => `${i + 1}. ${x}`).join('\n')}`
+  return (
+    'Examen oral por llamada. Actúas como tutor universitario y examinador oral, basándote estricta y exclusivamente en los apuntes. ' +
+    'Haz las preguntas del banco una a una y en orden (primero el bloque 1, luego el 2 y después el 3); no leas la lista ni des las respuestas antes de tiempo. ' +
+    'Tras cada respuesta: evalúala de forma constructiva, señala omisiones o fallos conceptuales según los apuntes y pasa a la siguiente. ' +
+    'Si te pregunta una duda, resuélvela y luego sigue por donde ibas. Si es el primer turno, saluda en una frase y haz la primera pregunta.\n\n' +
+    [lista('Bloque 1, visión panorámica', b.panoramica), lista('Bloque 2, sección a sección', b.secciones), lista('Bloque 3, profundización y debate', b.profundizacion)].join('\n\n')
+  )
+}
+
 const reloj = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
 export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) {
@@ -35,7 +47,10 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
   const [plan, setPlan] = useState<VistaPlan | null>(null)
   const [preparadas, setPreparadas] = useState<Record<string, { apuntes?: number; guion?: number }>>({})
   const ruta = window.location.hash.replace(/^#\/?/, '').split('/')
-  const [tipo, setTipo] = useState<Tipo>(ruta[1] === 'entrevista' ? 'entrevista' : ruta[1] === 'charla' ? 'charla' : 'clase')
+  const [tipo, setTipo] = useState<Tipo>(ruta[1] === 'entrevista' ? 'entrevista' : ruta[1] === 'charla' ? 'charla' : ruta[1] === 'oral' ? 'oral' : 'clase')
+  // Examen oral: banco de preguntas en tres bloques (panorámica, sección a sección, profundización).
+  const [banco, setBanco] = useState<{ panoramica: string[]; secciones: string[]; profundizacion: string[] } | null>(null)
+  const bancoRef = useRef<typeof banco>(null)
   const [clave, setClave] = useState<string>(ruta[2] ?? '')
   const [modo, setModo] = useState<string>('')
   const [noCuenta, setNoCuenta] = useState(false)
@@ -173,10 +188,10 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       const d = datos.current
       const extra: ExtraMensaje = {
         llamada: true,
-        modo: d.tipo === 'entrevista' ? 'entrevista' : d.tipo === 'clase' ? 'normal' : d.modo || null,
+        modo: d.tipo === 'entrevista' ? 'entrevista' : d.tipo === 'clase' || d.tipo === 'oral' ? 'normal' : d.modo || null,
         plan_id: d.clave && plan ? plan.plan_id : null,
         leccion_clave: d.tipo !== 'charla' && d.clave ? d.clave : null,
-        contexto: contexto ?? null,
+        contexto: [contexto, d.tipo === 'oral' && bancoRef.current ? contextoOral(bancoRef.current) : null].filter(Boolean).join('\n\n') || null,
       }
       // Si tarda en arrancar, una palabra para que se note que te ha oído.
       let algo = false
@@ -303,7 +318,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     esperandoSeguir.current = false
     try {
       const titulo =
-        tipo === 'clase' ? `Llamada: clase de ${clave}` : tipo === 'entrevista' ? `Llamada: entrevista${clave ? ` de ${clave}` : ''}` : 'Llamada'
+        tipo === 'oral' ? `Llamada: examen oral de ${clave}` : tipo === 'clase' ? `Llamada: clase de ${clave}` : tipo === 'entrevista' ? `Llamada: entrevista${clave ? ` de ${clave}` : ''}` : 'Llamada'
       cid.current = (await crearConversacion(titulo)).id
       alCambiar?.()
     } catch (e) {
@@ -348,6 +363,18 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         ...lista,
       ]
       narrar()
+    } else if (tipo === 'oral') {
+      setEstado('pensando')
+      const p = preparadas[clave]
+      try {
+        const b = await pedir<{ panoramica: string[]; secciones: string[]; profundizacion: string[] }>(`/api/estudio/${p?.apuntes}/oral`)
+        bancoRef.current = b
+        setBanco(b)
+      } catch (e) {
+        setError(String((e as Error).message))
+        return
+      }
+      turno('Listo para empezar la discusión.', undefined, false)
     } else if (tipo === 'entrevista') {
       turno(
         'Empecemos la entrevista.',
@@ -440,6 +467,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           {(
             [
               ['clase', 'Clase', 'Te explica una lección en voz. Le cortas con tus dudas y sigue.'],
+              ['oral', 'Examen oral', 'Tutor socrático: visión general, sección a sección y debate a fondo.'],
               ['entrevista', 'Entrevista', 'Preguntas de entrevista técnica, nota en cada respuesta y al final.'],
               ['charla', 'Charla', 'Hablas de lo que quieras, con el modo que elijas.'],
             ] as const
@@ -495,7 +523,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
             <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} /> Esto no cuenta para el tutor
           </label>
         </div>
-        <button className="boton boton-principal llamada-llamar" onClick={llamar} disabled={tipo !== 'charla' && tipo === 'clase' && !clave}>
+        <button className="boton boton-principal llamada-llamar" onClick={llamar} disabled={(tipo === 'clase' || tipo === 'oral') && !clave}>
           Llamar
         </button>
         {tipo === 'clase' && !Object.keys(preparadas).length && <p className="nota">Para una clase, primero prepara alguna lección en Lecciones.</p>}
@@ -549,7 +577,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     <div className={`llamada en-${estado}`}>
       <div className="llamada-cabeza">
         <span className="llamada-titulo">
-          {tipo === 'clase' ? `Clase · ${clave}` : tipo === 'entrevista' ? `Entrevista${clave ? ` · ${clave}` : ''}` : 'Charla'}
+          {tipo === 'oral' ? `Examen oral · ${clave}` : tipo === 'clase' ? `Clase · ${clave}` : tipo === 'entrevista' ? `Entrevista${clave ? ` · ${clave}` : ''}` : 'Charla'}
         </span>
         <span className="llamada-reloj">{reloj(segundos)}</span>
       </div>
@@ -602,6 +630,29 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         </button>
       </div>
       {error && <p role="alert" className="nota">{error}</p>}
+      {banco && (
+        <details className="llamada-transcripcion">
+          <summary>Las preguntas del examen oral</summary>
+          {(
+            [
+              ['Visión panorámica', banco.panoramica],
+              ['Sección a sección', banco.secciones],
+              ['Profundización y debate', banco.profundizacion],
+            ] as const
+          ).map(([nombre, lista]) => (
+            <div key={nombre}>
+              <p>
+                <strong>{nombre}</strong>
+              </p>
+              <ol>
+                {lista.map((q) => (
+                  <li key={q}>{q}</li>
+                ))}
+              </ol>
+            </div>
+          ))}
+        </details>
+      )}
       {turnos.length > 0 && (
         <details className="llamada-transcripcion">
           <summary>Lo que lleváis dicho</summary>

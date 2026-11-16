@@ -21,6 +21,7 @@ from magister.api.rutas_tutor import rutas as rutas_tutor
 from magister.api.rutas_produccion import rutas as rutas_produccion
 from magister.api.rutas_research import rutas as rutas_research
 from magister.api.rutas_plan import rutas as rutas_plan
+from magister.api.rutas_estudio import rutas as rutas_estudio
 from magister.api.seguridad import Proteccion
 from magister.config import ajustes
 from magister.datos import conversaciones as dc
@@ -151,6 +152,7 @@ app.include_router(rutas_practica)
 app.include_router(rutas_tutor)
 app.include_router(rutas_produccion)
 app.include_router(rutas_agenda)
+app.include_router(rutas_estudio)
 app.include_router(rutas_examen)
 app.include_router(rutas_borrar)
 

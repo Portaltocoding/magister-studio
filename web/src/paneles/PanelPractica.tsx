@@ -3,6 +3,7 @@ import Markdown from 'react-markdown'
 import { enviarJson, flujo, pedir } from '../api.ts'
 import Vacio from '../componentes/Vacio.tsx'
 import MarcoFoco from '../componentes/MarcoFoco.tsx'
+import RepasoTema from '../componentes/RepasoTema.tsx'
 import type { IdModo } from '../modos.ts'
 import { barajar } from '../barajar.ts'
 
@@ -150,6 +151,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
   return (
     <div className="panel">
       <h1>Repaso</h1>
+      {!pregunta && <RepasoTema alPracticar={siguiente} alExaminar={() => irA('examen')} />}
       {cola && pregunta && (
         <p className="nota">
           {cola.length ? `${cola.length} conceptos para hoy · unos ${minutos} minutos` : 'Último de hoy.'}

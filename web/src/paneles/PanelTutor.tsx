@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { tituloSencillo, usarIndice } from '../componentes/indice.tsx'
+import Volcado from '../componentes/Volcado.tsx'
+import Pensando from '../componentes/Pensando.tsx'
 import Calentamiento, { ApuestasRevisadas, guardarCalentamiento, leerCalentamiento, type Apuestas, type DatosCalentamiento } from '../componentes/Calentamiento.tsx'
 import Markdown from 'react-markdown'
 import { flujo, listarPlanes, marcarSesion, pedir, rutaExamen, verPlan, type HitoExamen } from '../api.ts'
@@ -22,6 +24,7 @@ interface Hoy {
   repasos: number
   nuevos?: number
   dia?: { clave: string; titulo: string; horas: number; estado: string }[]
+  temas?: { clave: string; titulo: string; material_id: number }[]
   razon?: string
   // El examen del plan que ya toca y aún no has aprobado.
   examen?: HitoExamen | null
@@ -48,6 +51,7 @@ interface Formula {
 
 interface Leccion {
   material_id: number
+  plan_id?: number
   leccion_clave: string
   titulo: string
   tema: string
@@ -253,6 +257,21 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   const hayCalentamiento = !!leccion.calentamiento && (leccion.calentamiento.mapa.length > 0 || leccion.calentamiento.previas.length > 0)
   const [calentando, setCalentando] = useState(hayCalentamiento && !previo?.hecho && !inicial)
   const [apuestas, setApuestas] = useState<Apuestas>(previo?.apuestas ?? {})
+  // Cada 25 minutos: reexplicar lo que llevas antes de la pausa.
+  const [reexplicando, setReexplicando] = useState(false)
+  const [facil, setFacil] = useState<Record<string, string[] | 'cargando'>>({})
+  const pedirFacil = async (clave: string) => {
+    setFacil((f) => ({ ...f, [clave]: 'cargando' }))
+    try {
+      const r = await pedir<{ frases: string[] }>(`/api/estudio/${mid}/facil/${clave}`)
+      setFacil((f) => ({ ...f, [clave]: r.frases }))
+    } catch {
+      setFacil((f) => {
+        const { [clave]: _, ...resto } = f
+        return resto
+      })
+    }
+  }
 
   const b = bloques[i]
   const ultimo = i === bloques.length - 1
@@ -365,7 +384,12 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
         !cerrada && (
           <div className="foco-aviso" role="status">
             Llevas {Math.round(segundos / 60)} minutos concentrado. Una pausa corta ahora hace que lo siguiente entre mejor.
-            <button className="boton boton-principal" onClick={() => { setAvisoPausa(false); setDescanso(DESCANSO) }}>
+            {leccion.plan_id != null && (
+              <button className="boton boton-principal" onClick={() => { setAvisoPausa(false); setReexplicando(true) }} title="Explícate sin mirar lo que llevas; luego la pausa">
+                Reexplica lo que llevas
+              </button>
+            )}
+            <button className="boton" onClick={() => { setAvisoPausa(false); setDescanso(DESCANSO) }}>
               Pausa de 5 min
             </button>
             <button className="boton" onClick={() => setAvisoPausa(false)}>
@@ -427,8 +451,25 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
             Volver ya
           </button>
         </section>
+      ) : reexplicando && leccion.plan_id != null ? (
+        <Volcado
+          planId={leccion.plan_id}
+          clave={leccion.leccion_clave}
+          titulo={leccion.titulo}
+          alcance={bloques.slice(0, i + 1).map((x) => x.clave)}
+          alEstudiar={(k) => {
+            const n = bloques.findIndex((x) => x.clave === k)
+            if (n >= 0) setI(n)
+            setReexplicando(false)
+          }}
+          alCerrar={() => {
+            setReexplicando(false)
+            setDescanso(DESCANSO)
+          }}
+        />
       ) : calentando && leccion.calentamiento ? (
         <Calentamiento
+          mid={mid}
           datos={leccion.calentamiento}
           alTerminar={(a) => {
             setApuestas(a)
@@ -491,6 +532,22 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
             Idea {i + 1} de {bloques.length}
           </span>
           <h1>{b.titulo}</h1>
+          <div className="foco-facil">
+            {facil[b.clave] === 'cargando' ? (
+              <Pensando texto="Buscando una forma más sencilla…" />
+            ) : facil[b.clave] ? (
+              <div className="foco-facil-caja">
+                <span className="foco-etq">Más fácil, en tres frases</span>
+                {(facil[b.clave] as string[]).map((f) => (
+                  <p key={f}>{f}</p>
+                ))}
+              </div>
+            ) : (
+              <button className="boton-mini" onClick={() => pedirFacil(b.clave)} title="Si el texto se te atasca: tres frases sencillas (no cambia tus apuntes)">
+                Dímelo más fácil
+              </button>
+            )}
+          </div>
           <TextoLibro markdown={b.texto} className="foco-papel" />
           {b.pregunta && !comprobado[b.clave] && (
             <Comprobar key={b.clave} pregunta={b.pregunta} alAcabar={(n) => setComprobado((c) => ({ ...c, [b.clave]: n }))} />
@@ -509,7 +566,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
 function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | null; irA: (m: IdModo) => void }) {
   const dia = hoy.dia ?? []
   const indice = usarIndice(hoy.plan_id)
-  if (!dia.length && !hoy.examen) return null
+  if (!dia.length && !hoy.examen && !hoy.temas?.length) return null
   const horas = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',')
   const quedan = dia.filter((s) => s.estado !== 'hecha').reduce((a, s) => a + s.horas, 0) +
     (hoy.repasos ? (minutosRepaso ?? hoy.repasos * 2) / 60 : 0) + (hoy.examen && !hoy.examen.hecho ? hoy.examen.minutos / 60 : 0)
@@ -520,6 +577,15 @@ function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | 
         Tu día <small>{quedan > 0 ? `quedan unas ${horas(quedan)} h` : 'todo hecho'}</small>
       </h2>
       <ol>
+        {(hoy.temas ?? []).map((t) => (
+          <li key={`tema-${t.clave}`}>
+            <span className="tu-dia-num">{++n}</span>
+            <button className="enlace" onClick={() => irA('repaso')}>
+              Recordar entera <b className="tu-dia-clave">{t.clave}</b> {tituloSencillo(indice, t.clave, t.titulo)}
+            </button>
+            <small>repaso del tema</small>
+          </li>
+        ))}
         {hoy.repasos > 0 && (
           <li>
             <span className="tu-dia-num">{++n}</span>

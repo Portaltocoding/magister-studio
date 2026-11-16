@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { pedir } from '../api.ts'
+import Pensando from './Pensando.tsx'
 import { barajar } from '../barajar.ts'
 
 // Calentamiento (priming): unos minutos antes de estudiar una lección.
@@ -21,6 +23,15 @@ export interface DatosCalentamiento {
 
 export type Apuestas = Record<string, string>
 
+interface Priming {
+  resumen: string[]
+  apartados: Record<string, string>
+  preguntas: string[]
+}
+
+// Tus preguntas de antes de estudiar van con las apuestas, bajo esta clave.
+export const PREGUNTAS = '__preguntas'
+
 const CLAVE = (mid: number) => `magister-calentamiento-${mid}`
 
 export function leerCalentamiento(mid: number): { hecho: boolean; apuestas: Apuestas } | null {
@@ -40,9 +51,13 @@ export function guardarCalentamiento(mid: number, apuestas: Apuestas) {
   }
 }
 
-export default function Calentamiento({ datos, alTerminar }: { datos: DatosCalentamiento; alTerminar: (a: Apuestas) => void }) {
+export default function Calentamiento({ mid, datos, alTerminar }: { mid: number; datos: DatosCalentamiento; alTerminar: (a: Apuestas) => void }) {
   const [paso, setPaso] = useState<'mapa' | 'preguntas'>('mapa')
   const [apuestas, setApuestas] = useState<Apuestas>({})
+  const [priming, setPriming] = useState<Priming | null | undefined>(undefined)
+  useEffect(() => {
+    pedir<Priming>(`/api/estudio/${mid}/priming`).then(setPriming).catch(() => setPriming(null))
+  }, [mid])
   const hayPreguntas = datos.previas.length > 0
 
   if (paso === 'mapa')
@@ -51,14 +66,25 @@ export default function Calentamiento({ datos, alTerminar }: { datos: DatosCalen
         <span className="foco-etq">Calentamiento · 1 de {hayPreguntas ? 2 : 1}</span>
         <h1>El mapa de la lección</h1>
         <p className="calentamiento-guia">
-          Antes de entrar en detalle, mira el esqueleto: qué apartados hay y qué conceptos cuelgan de cada uno. No hace falta
-          entenderlo todo; solo saber dónde irá cada cosa. ¿Qué crees que conecta con qué?
+          Unos 5 minutos antes de entrar en detalle: lee el tema en cinco frases y mira el esqueleto. No hace falta entenderlo
+          todo; solo saber dónde irá cada cosa. Conéctalo con lo que ya sabes y apunta lo que te preguntes.
         </p>
+        {priming === undefined ? (
+          <Pensando texto="Preparando el tema en cinco frases…" />
+        ) : (
+          priming && (
+            <ol className="calentamiento-resumen">
+              {priming.resumen.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ol>
+          )
+        )}
         <ol className="calentamiento-mapa">
           {datos.mapa.map((b) => (
             <li key={b.clave}>
               <strong>{b.titulo}</strong>
-              {b.proposito && <small>{b.proposito}</small>}
+              {(priming?.apartados[b.clave] ?? b.proposito) && <small>{priming?.apartados[b.clave] ?? b.proposito}</small>}
               <div className="calentamiento-conceptos">
                 {b.conceptos.map((c) => (
                   <span key={c.id} className="chip" title={c.necesita.length ? `Se apoya en: ${c.necesita.join(', ')}` : undefined}>
@@ -70,8 +96,17 @@ export default function Calentamiento({ datos, alTerminar }: { datos: DatosCalen
             </li>
           ))}
         </ol>
+        <label className="calentamiento-dudas">
+          ¿Qué te preguntas antes de empezar? (opcional)
+          <textarea
+            rows={2}
+            value={apuestas[PREGUNTAS] ?? ''}
+            onChange={(e) => setApuestas((a) => ({ ...a, [PREGUNTAS]: e.target.value }))}
+            placeholder={priming?.preguntas?.join(' · ') ?? 'Lo que te intriga o no te cuadra'}
+          />
+        </label>
         <div className="botones">
-          <button className="boton boton-principal" onClick={() => (hayPreguntas ? setPaso('preguntas') : alTerminar({}))}>
+          <button className="boton boton-principal" onClick={() => (hayPreguntas ? setPaso('preguntas') : alTerminar(apuestas))}>
             {hayPreguntas ? 'Siguiente: tres preguntas a ojo' : 'Empezar la lección'}
           </button>
         </div>
@@ -129,11 +164,17 @@ export default function Calentamiento({ datos, alTerminar }: { datos: DatosCalen
 // Al cerrar: tus apuestas de antes frente a la respuesta.
 export function ApuestasRevisadas({ previas, apuestas }: { previas: Previa[]; apuestas: Apuestas }) {
   const con = previas.filter((q) => apuestas[q.pregunta_id])
-  if (!con.length) return null
+  const dudas = apuestas[PREGUNTAS]?.trim()
+  if (!con.length && !dudas) return null
   const acertadas = con.filter((q) => q.buena && apuestas[q.pregunta_id] === q.buena).length
   const tests = con.filter((q) => q.buena).length
   return (
     <div className="apuestas">
+      {dudas && (
+        <p>
+          <strong>Lo que te preguntabas antes:</strong> {dudas} <span className="nota">¿Resuelto? Si no, llévalo al chat o a una llamada.</span>
+        </p>
+      )}
       <p>
         <strong>Tus apuestas del calentamiento</strong>
         {tests > 0 && ` · antes de estudiar acertaste ${acertadas} de ${tests}`}

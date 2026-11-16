@@ -218,3 +218,13 @@ def test_el_indice_reparte_todas_las_lecciones():
                                 "titulos": [{"clave": "L1", "titulo": "Cómo viaja una petición"}]})
     assert _reglas(["L1"])(ix) == []
     assert _reglas(["L1", "L2"])(ix)  # falta L2: se pide otra vez
+
+
+
+@pytest.mark.anyio
+async def test_estilo_de_examen_y_repasos_de_tema(cliente):
+    r = await cliente.put("/api/planes/1/estilo-examen", json={"estilo": "oral"})
+    assert r.json()["estilo"] == "oral"
+    assert (await cliente.get("/api/planes/1/estilo-examen")).json()["estilo"] == "oral"
+    assert (await cliente.put("/api/planes/1/estilo-examen", json={"estilo": "otro"})).status_code == 422
+    assert isinstance((await cliente.get("/api/estudio/repasos-de-tema")).json(), list)
