@@ -17,6 +17,9 @@ export interface Pregunta {
   placeholder?: string
   // Una opción «Otro» que deja escribir (solo en tipo «una»).
   otro?: boolean
+  // Opciones y ayuda que dependen de lo ya respondido (las horas según la fecha y la profundidad).
+  opcionesSegun?: (r: Respuestas) => Opcion[]
+  ayudaSegun?: (r: Respuestas) => string | undefined
 }
 
 export type Respuestas = Record<string, string | string[]>
@@ -41,6 +44,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
   const p = preguntas[paso]
 
   const valor = (id: string) => r[id]
+  const opcionesDe = (q: Pregunta) => (q.opcionesSegun ? q.opcionesSegun(r) : q.opciones) ?? []
   const lista = (id: string) => (Array.isArray(r[id]) ? (r[id] as string[]) : [])
   const valida = (q: Pregunta) => {
     const v = r[q.id]
@@ -70,7 +74,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
     const v = r[q.id]
     if (v === undefined || v === '') return '·'
     if (v === '__otro') return otro[q.id]
-    const nombre = (x: string) => q.opciones?.find((o) => o.valor === x)?.etiqueta ?? x
+    const nombre = (x: string) => opcionesDe(q).find((o) => o.valor === x)?.etiqueta ?? x
     return Array.isArray(v) ? v.map(nombre).join(', ') : nombre(v)
   }
 
@@ -88,7 +92,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
       {!resumen && p && (
         <div className="cuestionario-pregunta" key={p.id}>
           <h2>{p.titulo}</h2>
-          {p.ayuda && <p className="nota">{p.ayuda}</p>}
+          {(p.ayudaSegun?.(r) ?? p.ayuda) && <p className="nota cuestionario-ayuda">{p.ayudaSegun?.(r) ?? p.ayuda}</p>}
           {p.tipo === 'texto' && (
             <textarea autoFocus className="critica" placeholder={p.placeholder} value={(valor(p.id) as string) ?? ''}
               onChange={(e) => setR({ ...r, [p.id]: e.target.value })} onKeyDown={enter} />
@@ -97,7 +101,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
             <div className="opciones">
               <input type="date" className="campo-fecha" value={(valor(p.id) as string) ?? ''}
                 onChange={(e) => setR({ ...r, [p.id]: e.target.value })} />
-              {p.opciones?.map((o) => (
+              {opcionesDe(p).map((o) => (
                 <button key={o.valor} className={`opcion ${valor(p.id) === o.valor ? 'elegida' : ''}`} onClick={() => elegir(p, o.valor)}>
                   {o.etiqueta}
                 </button>
@@ -106,7 +110,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
           )}
           {(p.tipo === 'una' || p.tipo === 'varias') && (
             <div className="opciones">
-              {p.opciones?.map((o) => {
+              {opcionesDe(p).map((o) => {
                 const elegida = p.tipo === 'una' ? valor(p.id) === o.valor : lista(p.id).includes(o.valor)
                 return (
                   <button key={o.valor} className={`opcion ${elegida ? 'elegida' : ''}`} aria-pressed={elegida}

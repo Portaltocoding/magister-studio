@@ -1,0 +1,44 @@
+/* ===== Etiquetas de nota legibles ===== */
+.chip.nota-fallo { background: #e8c1bc; color: #5c1f18; }
+.chip.nota-parcial { background: #ecd3a6; color: #4a3a0f; }
+.chip.nota-saltada { background: #d6d3cc; color: #3a3833; }
+
+/* ===== Móvil: la barra lateral se pliega y se abre con «Menú» ===== */
+.boton-menu { display: none; margin-right: auto; }
+.velo-menu { display: none; }
+@media (max-width: 820px) {
+  .marco { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sesion" "central"; }
+  .lateral {
+    position: fixed; top: 0; bottom: 0; left: 0; width: 270px; max-width: 85vw; z-index: 70;
+    transform: translateX(-102%); transition: transform 200ms ease; box-shadow: 8px 0 30px rgb(0 0 0 / 0.35);
+  }
+  .marco.menu-abierto .lateral { transform: none; }
+  .velo-menu { display: block; position: fixed; inset: 0; z-index: 65; background: rgb(0 0 0 / 0.4); }
+  .boton-menu { display: inline-flex; }
+  .sesion { justify-content: space-between; }
+  .central { padding: 18px 16px; }
+  .bloques { grid-template-columns: minmax(0, 1fr); }
+  .bloques-lista { position: static; max-height: none; }
+  .bloque-cabecera { flex-direction: column; gap: 10px; padding: 20px; }
+  .bloque-num { font-size: 3rem; align-self: flex-start; }
+  .lector { grid-template-columns: minmax(0, 1fr); }
+  .lector-indice { display: none; }
+  .lector-texto { padding: 26px 20px; }
+  .pg-hero { grid-template-columns: minmax(0, 1fr); padding: 20px; }
+  .pg-cifras { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pg-fila { grid-template-columns: auto minmax(0, 1fr) 18px; }
+  .pg-fila-horas { display: none; }
+  .pg-detalle { padding-left: 16px; }
+  .examen-nota { grid-template-columns: minmax(0, 1fr); }
+  .examen-nota strong { font-size: 3.4rem; }
+  .tutor-hoy, .vacio-guia, .examen-preparar { padding: 20px; }
+  .hitos-examen li { grid-template-columns: minmax(0, 1fr) auto; }
+  .hito-fecha { grid-column: 1 / -1; }
+}
+
+@media (max-width: 820px) {
+  /* Lecciones en el móvil: las claves en una fila que se desliza, y el contenido justo debajo. */
+  .bloques-lista ol { flex-direction: row; overflow-x: auto; padding-bottom: 6px; }
+  .bloques-lista li button { padding: 6px; }
+  .bloques-titulo { display: none; }
+}

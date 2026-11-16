@@ -214,7 +214,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                           <strong>{h.titulo}</strong>
                           <small>
                             {h.preguntas} preguntas · {h.minutos} min
-                            {h.hecho && h.nota != null ? ` · hecho: ${h.nota.toFixed(1).replace('.', ',')}` : ''}
+                            {h.nota != null ? ` · ${h.hecho ? 'aprobado con' : 'mejor nota'} ${h.nota.toFixed(1).replace('.', ',')}` : ''}
                           </small>
                         </span>
                         <button className="boton-mini" onClick={() => irARuta(rutaExamen(vista.plan_id, h))}>

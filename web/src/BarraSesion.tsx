@@ -10,7 +10,7 @@ interface Alerta {
   runbook: string
 }
 
-export default function BarraSesion() {
+export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
   const [estado, setEstado] = useState<Estado>('comprobando')
   const [alertas, setAlertas] = useState<Alerta[]>([])
 
@@ -34,6 +34,11 @@ export default function BarraSesion() {
 
   return (
     <header className="sesion">
+      {alMenu && (
+        <button type="button" className="boton-menu boton-mini" onClick={alMenu} aria-label="Abrir el menú">
+          ☰ Menú
+        </button>
+      )}
       {alertas.map((a) => (
         <span key={a.id} className="alerta" role="alert" title={`Qué hacer: ${a.runbook}`}>
           ⚠ {a.detalle}{' '}

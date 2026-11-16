@@ -245,7 +245,7 @@ export default function PanelCalendario() {
                           <strong>{h.titulo}</strong>{' '}
                           <span className="nota">
                             · {h.preguntas} preguntas, {h.minutos} min
-                            {h.hecho && h.nota != null ? ` · hecho: ${h.nota.toFixed(1).replace('.', ',')}` : ''}
+                            {h.nota != null ? ` · ${h.hecho ? 'aprobado con' : 'mejor nota'} ${h.nota.toFixed(1).replace('.', ',')}` : ''}
                           </span>
                         </span>
                         <button className="boton-mini" onClick={() => h.plan_id && (window.location.hash = rutaExamen(h.plan_id, h))}>

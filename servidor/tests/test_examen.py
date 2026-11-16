@@ -57,6 +57,9 @@ def test_hitos_cierran_la_semana_y_plan_corto_solo_final():
     assert [x["final"] for x in hitos(["L1", "L2"], fechas)] == [True]
     marcados = con_estado(h, [({"L1", "L2", "L3"}, 7.5)])
     assert marcados[0]["hecho"] and marcados[0]["nota"] == 7.5 and not marcados[1]["hecho"]
+    # Suspendido o en blanco: no cierra el hito, pero se ve la nota.
+    suspenso = con_estado(h, [({"L1", "L2"}, 0.0)])[0]
+    assert not suspenso["hecho"] and suspenso["nota"] == 0.0
 
 
 @pytest.mark.anyio

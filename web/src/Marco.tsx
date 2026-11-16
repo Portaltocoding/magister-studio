@@ -29,6 +29,9 @@ export default function Marco() {
   const [modo, setModo] = useState<IdModo>(inicial.modo)
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([])
   const [activa, setActiva] = useState<number | null>(inicial.conversacion)
+  // En el móvil la barra lateral se pliega y se abre con «Menú».
+  const [menu, setMenu] = useState(false)
+  useEffect(() => setMenu(false), [modo, activa])
   const [tipoNueva, setTipoNueva] = useState<'libre' | 'plan'>(() =>
     window.location.hash.startsWith('#/nuevo-plan') ? 'plan' : 'libre',
   )
@@ -55,7 +58,8 @@ export default function Marco() {
   const tipo: 'libre' | 'plan' = actual ? (actual.tipo === 'plan' ? 'plan' : 'libre') : tipoNueva
 
   return (
-    <div className="marco">
+    <div className={`marco ${menu ? 'menu-abierto' : ''}`}>
+      {menu && <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />}
       <BarraLateral
         modoActivo={modo}
         alElegir={(m) => {
@@ -74,7 +78,7 @@ export default function Marco() {
         }}
         alCambiar={recargar}
       />
-      <BarraSesion />
+      <BarraSesion alMenu={() => setMenu(!menu)} />
       <main className="central">
         <Central
           modo={modo}

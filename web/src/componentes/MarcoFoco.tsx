@@ -63,7 +63,8 @@ export default function MarcoFoco(p: Props) {
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const escribiendo = (e.target as HTMLElement).closest('textarea, input, select')
-      if (escribiendo) {
+      // Escribiendo, las teclas son del texto; con Alt pulsada, son del foco (Alt + → pasa de pregunta).
+      if (escribiendo && !e.altKey) {
         if (e.key === 'Escape') (escribiendo as HTMLElement).blur()
         return
       }

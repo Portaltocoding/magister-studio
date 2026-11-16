@@ -52,10 +52,17 @@ def hitos(orden: list[str], ultima_sesion: dict[str, date], cada: int = CADA) ->
     return salida
 
 
+APROBADO = 5.0
+
+
 def con_estado(lista: list[dict], hechos: list[tuple[set[str], float | None]]) -> list[dict]:
-    """Marca hecho el hito si hay un examen terminado que cubre todas sus lecciones; guarda la mejor nota."""
+    """Un hito está hecho cuando apruebas un examen que cubre todas sus lecciones; guarda la mejor nota.
+
+    Un examen suspendido (o entregado en blanco) no lo cierra: sigue pendiente, con la nota a la vista.
+    """
     salida = []
     for h in lista:
         notas = [n for lecciones, n in hechos if set(h["lecciones"]) <= lecciones and n is not None]
-        salida.append({**h, "hecho": bool(notas), "nota": max(notas) if notas else None})
+        mejor = max(notas) if notas else None
+        salida.append({**h, "hecho": mejor is not None and mejor >= APROBADO, "nota": mejor})
     return salida

@@ -233,7 +233,7 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
             <div>
               <h2>¿Cuántas preguntas?</h2>
               <div className="respuestas-rapidas">
-                {[5, 10, 15, 20].map((n) => (
+                {[...new Set([5, 10, 15, 20, cantidad])].sort((a, b) => a - b).map((n) => (
                   <button key={n} className={`opcion opcion-chip ${cantidad === n ? 'elegida' : ''}`} disabled={n > disponibles && n !== 5} onClick={() => setCantidad(n)}>
                     {n}
                   </button>
@@ -381,8 +381,13 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
   const teclas = useCallback(
     (e: KeyboardEvent) => {
       if (corrigiendo) return true
-      if (e.key === 'ArrowRight') setI((x) => Math.min(preguntas.length - 1, x + 1))
-      else if (e.key === 'ArrowLeft') setI((x) => Math.max(0, x - 1))
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        setI((x) => Math.min(preguntas.length - 1, x + 1))
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        setI((x) => Math.max(0, x - 1))
+      }
       else return false
       return true
     },
@@ -430,7 +435,7 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
               ← Anterior
             </button>
             <span className="foco-atajos">
-              {contestadas} de {preguntas.length} contestadas
+              {contestadas} de {preguntas.length} contestadas · Alt + ← → para moverte
             </span>
             {!evaluacion && (
               <button className="boton-mini" aria-pressed={r.marcada} onClick={() => poner({ marcada: !r.marcada })}>
