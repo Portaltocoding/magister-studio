@@ -512,3 +512,5 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .foco-barra .foco-boton, .foco-barra .boton-mini { padding: 6px 10px; font-size: 0.85rem; }
 .companera-boton .mascota.mascota-mini { width: 44px; height: 44px; }
 .foco-reloj { white-space: nowrap; }
+/* Con más herramientas, el título es lo que cede sitio: los pasos y el reloj no se pisan. */
+@media (min-width: 821px) { .foco-barra { grid-template-columns: minmax(0, 1fr) auto auto; } }

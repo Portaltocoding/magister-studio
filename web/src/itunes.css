@@ -176,3 +176,15 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 @keyframes pensar { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(5deg) translateY(-1px); } }
 .mascota-mini .mascota-figura { animation: none; }
 @media (prefers-reduced-motion: reduce) { .mascota-figura { animation: none !important; } }
+
+
+/* ===== Mascota: estilo plano de la primera (negra, ojos blancos alargados) ===== */
+.mascota { --m-cuerpo: #111; }
+.mascota .mascota-cuerpo { fill: var(--m-cuerpo); }
+.mascota .mascota-blanco { fill: #fff; }
+.mascota-ojos { transition: transform 120ms ease-out; }
+@media (prefers-color-scheme: dark) {
+  .mascota { --m-cuerpo: #111; }
+  .mascota .mascota-cuerpo { stroke: color-mix(in srgb, #fff 22%, transparent) !important; stroke-width: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .mascota-ojos { transition: none; } }

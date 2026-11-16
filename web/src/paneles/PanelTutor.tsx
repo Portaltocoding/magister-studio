@@ -287,6 +287,8 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   const [papel, setPapel] = useState<HTMLDivElement | null>(null)
   const [seleccion, setSeleccion] = useState<{ texto: string; x: number; y: number } | null>(null)
   const ideasDesdeReexplicar = useRef(0)
+  const indiceFoco = usarIndice(leccion.plan_id)
+  const tituloFoco = tituloSencillo(indiceFoco, leccion.leccion_clave, leccion.titulo)
 
   const b = bloques[i]
   const ultimo = i === bloques.length - 1
@@ -368,7 +370,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
 
   return (
     <MarcoFoco
-      titulo={leccion.titulo}
+      titulo={tituloFoco}
       placa={leccion.leccion_clave}
       leccion={leccion.leccion_clave}
       alSalir={alSalir}
@@ -534,7 +536,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
         <Volcado
           planId={leccion.plan_id}
           clave={leccion.leccion_clave}
-          titulo={leccion.titulo}
+          titulo={tituloFoco}
           alcance={bloques.slice(0, i + 1).map((x) => x.clave)}
           apoyo={mapa && mapa.nodos.length > 0 ? <MapaConceptos mapa={mapa} soloVer /> : undefined}
           alEstudiar={(k) => {
@@ -560,7 +562,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
       ) : cerrada ? (
         <section className="foco-cierre">
           <span className="foco-etq">Sesión hecha</span>
-          <h1>{leccion.titulo}</h1>
+          <h1>{tituloFoco}</h1>
           <div className="foco-cifras">
             <div>
               <strong>{reloj(segundos)}</strong>
