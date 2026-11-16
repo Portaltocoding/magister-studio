@@ -546,7 +546,9 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       </div>
       <div className="llamada-avatar">
         <span className="llamada-onda" aria-hidden />
-        <Mascota />
+        <Mascota
+          gesto={estado === 'pensando' ? 'pensando' : estado === 'escuchando' ? 'escuchando' : estado === 'hablando' || estado === 'narrando' ? 'hablando' : 'normal'}
+        />
       </div>
       <p className="llamada-estado" aria-live="polite">
         {textoEstado}

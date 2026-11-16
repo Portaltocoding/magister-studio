@@ -172,3 +172,46 @@ def test_ajuste_personal_con_escalones():
     assert w[2] > DEFAULT_PARAMETERS[2] and w[0] <= w[1] <= w[2] <= w[3]
     r = _calcular(muchos, None)
     assert r["hecho"] and r["perdida_despues"] < r["perdida_antes"] and r["etapa"] == "inicial"
+
+
+
+def test_la_red_aprende_lo_que_fsrs_no_ve():
+    """Un alumno inventado que de noche recuerda mucho peor (FSRS no mira la hora): la red lo aprende, gana a FSRS
+    en lo que no ha visto y pasa a mandar. Con pocos datos, ni se entrena."""
+    import random
+    from datetime import datetime, timedelta, timezone
+
+    from magister.aprender.programador import FSRS
+    from magister.aprender.red import calcular
+
+    rng = random.Random(7)
+    t0 = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
+    series = []
+    for i in range(70):
+        t = t0 + timedelta(hours=i)
+        serie = []
+        for k in range(5):
+            momento = t.replace(hour=rng.choice([9, 23]))
+            acierta = rng.random() < (0.95 if momento.hour == 9 else 0.3)
+            serie.append((momento, "bien" if acierta else "fallo", 0.75, 20000))
+            t += timedelta(days=2 + k * 2)
+        series.append(serie)
+    r = calcular(series, FSRS())
+    assert r["estado"] == "activa" and r["perdida_red"] < r["perdida_fsrs"], r
+    assert calcular(series[:5], FSRS())["estado"] == "sin_datos"
+
+
+def test_la_red_recien_creada_es_fsrs():
+    from datetime import datetime, timedelta, timezone
+
+    from magister.aprender.estado import EstadoConcepto
+    from magister.aprender.programador import FSRS
+    from magister.aprender.red import ProgramadorRed, _crear
+
+    t0 = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
+    e = EstadoConcepto("x", t0, [(t0, "bien")], [{"confianza": 0.75, "latencia_ms": 9000}])
+    f = FSRS()
+    pr = ProgramadorRed(f, _crear(), {"tasa": 0.7, "huella": "x"})
+    ahora = t0 + timedelta(days=4)
+    assert abs(pr.p_recordar(e, ahora) - f.p_recordar(e, ahora)) < 1e-3
+    assert pr.proxima(e) <= f.proxima(e)

@@ -156,3 +156,23 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 .afinar-mascotas .mascota { width: 40px; height: 40px; margin: 0; }
 .entrada-hilo > .boton, .entrada-hilo > button { align-self: flex-end; height: 44px; }
 .mascota .mascota-plumas { fill: none; stroke: color-mix(in srgb, var(--m-claro) 45%, var(--m-cuerpo)); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+
+/* ===== Mascota: volumen, gestos y vida ===== */
+.mascota .mascota-sombra { fill: color-mix(in srgb, var(--texto) 14%, transparent); }
+.mascota .mascota-oreja { fill: color-mix(in srgb, var(--m-claro) 22%, var(--m-cuerpo)); }
+.mascota .mascota-ala { fill: color-mix(in srgb, #000 22%, var(--m-cuerpo)); }
+.mascota .mascota-disco { fill: color-mix(in srgb, var(--m-claro) 14%, var(--m-cuerpo)); }
+.mascota .mascota-patas { fill: none; stroke: var(--m-medio); stroke-width: 2.6; stroke-linecap: round; }
+.mascota .mascota-mejilla { fill: color-mix(in srgb, var(--m-claro) 16%, var(--m-cuerpo)); }
+.mascota-figura { transform-box: view-box; transform-origin: 60px 112px; animation: respirar 4.5s ease-in-out infinite; }
+@keyframes respirar { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.025); } }
+.mascota-ojo, .mascota-ojo + .mascota-ojo { animation: parpadeo 5.5s infinite; animation-delay: 0s; }
+.gesto-escuchando .mascota-figura { animation: escuchar 2.8s ease-in-out infinite; }
+@keyframes escuchar { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(-4deg) scale(1.01); } }
+.gesto-hablando .mascota-figura { animation: hablar 0.9s ease-in-out infinite; }
+@keyframes hablar { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1.5px) scale(1.015, 1.03); } }
+.gesto-pensando .mascota-figura { animation: pensar 3.2s ease-in-out infinite; }
+@keyframes pensar { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(5deg) translateY(-1px); } }
+.mascota-mini .mascota-figura { animation: none; }
+@media (prefers-reduced-motion: reduce) { .mascota-figura { animation: none !important; } }

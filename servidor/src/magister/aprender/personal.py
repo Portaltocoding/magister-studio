@@ -43,17 +43,18 @@ async def cargar() -> None:
     _personal = v if v.get("activo") and v.get("parametros") else None
 
 
-async def series() -> list[list[tuple[datetime, str]]]:
-    """Por concepto, sus repasos espaciados (el primero de cada día), en orden."""
+async def series(con_extras: bool = False) -> list[list[tuple]]:
+    """Por concepto, sus repasos espaciados (el primero de cada día), en orden: (momento, nota) o, con extras,
+    (momento, nota, confianza, latencia_ms)."""
     async with nueva_sesion() as s:
         filas = (await s.execute(text(
-            "select plan_id, concepto_id, momento, nota_corrector, nota_usuario from intentos where tipo = 'espaciado' "
-            "order by plan_id, concepto_id, momento"))).all()
+            "select plan_id, concepto_id, momento, nota_corrector, nota_usuario, confianza, latencia_ms from intentos "
+            "where tipo = 'espaciado' order by plan_id, concepto_id, momento"))).all()
     por: dict[tuple, list] = {}
-    for plan_id, cid, momento, nc, nu in filas:
+    for plan_id, cid, momento, nc, nu, conf, lat in filas:
         lista = por.setdefault((plan_id, cid), [])
         if not lista or lista[-1][0].date() != momento.date():
-            lista.append((momento, nota_final(nc, nu)))
+            lista.append((momento, nota_final(nc, nu), conf, lat) if con_extras else (momento, nota_final(nc, nu)))
     return list(por.values())
 
 
@@ -171,4 +172,15 @@ async def estado() -> dict:
         "conceptos_con_repasos": len(datos), "conceptos_con_dos": con_dos, "repasos": repasos,
         "umbral_inicial": UMBRAL_INICIAL, "umbral_completo": UMBRAL_COMPLETO,
         "activo": {k: _personal.get(k) for k in ("etapa", "fecha", "perdida_antes", "perdida_despues", "conceptos")} if _personal else None,
+        "red": _red_meta(),
     }
+
+
+def _red_meta() -> dict | None:
+    from magister.aprender import red
+
+    m = red.meta()
+    if not m:
+        return {"estado": "sin_datos", "repasos": 0, "minimo": red.MIN_ENTRENAR + red.MIN_VALIDAR}
+    return {k: m.get(k) for k in ("estado", "repasos", "validacion", "perdida_fsrs", "perdida_red", "fecha", "faltan")} | {
+        "minimo": red.MIN_ENTRENAR + red.MIN_VALIDAR}

@@ -150,6 +150,12 @@ async def bucle() -> None:
                 r = await personal.ajustar()
                 if r.get("hecho"):
                     await anotar(f"Tu modelo de olvido se ha ajustado a tus repasos ({r['conceptos']} conceptos).")
+                from magister.aprender import red
+
+                antes = (red.meta() or {}).get("estado")
+                rr = await red.entrenar()
+                if rr.get("estado") == "activa" and antes != "activa":
+                    await anotar("La red neuronal de olvido ya predice tus aciertos mejor que FSRS: ahora decide ella.")
             except Exception:  # noqa: BLE001
                 registro.exception("ajuste personal")
         await asyncio.sleep(INTERVALO_S)

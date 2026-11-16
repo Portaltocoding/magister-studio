@@ -175,7 +175,10 @@ interface EstadoModelo {
   umbral_inicial: number
   umbral_completo: number
   activo: { etapa: string; fecha: string; perdida_antes: number; perdida_despues: number; conceptos: number } | null
+  red: { estado: 'sin_datos' | 'sombra' | 'activa'; repasos: number; minimo: number; perdida_fsrs?: number; perdida_red?: number; fecha?: string } | null
 }
+
+const coma = (n?: number) => (n == null ? '·' : String(n).replace('.', ','))
 
 // «Tu modelo»: cuándo olvidas tú, no la media. FSRS ajustado a tus repasos, por escalones y solo si mejora.
 function TuModelo() {
@@ -242,6 +245,29 @@ function TuModelo() {
           {haciendo ? 'Ajustando…' : 'Ajustar ahora'}
         </button>
       </p>
+      {e.red && (
+        <div className="tu-modelo-red">
+          <h3>Red neuronal</h3>
+          <p className="pg-explica">
+            Encima de FSRS, una red pequeña aprende de lo que FSRS no ve: tu seguridad al responder, lo que tardas, la hora, tu
+            racha y si te pasaste de seguro. Recién creada es igual que FSRS; se entrena cada día y solo decide cuando acierta más
+            que FSRS con tus repasos más recientes, que no ha visto.
+          </p>
+          <p>
+            <strong>
+              {e.red.estado === 'activa' ? 'Activa: decide ella' : e.red.estado === 'sombra' ? 'En sombra: entrenada, aún no gana a FSRS' : 'Esperando datos'}
+            </strong>
+            {e.red.estado === 'sin_datos'
+              ? ` · ${e.red.repasos} de ${e.red.minimo} repasos para empezar a entrenarse`
+              : ` · error en lo no visto: FSRS ${coma(e.red.perdida_fsrs)}, red ${coma(e.red.perdida_red)} (menos es mejor)`}
+          </p>
+          {e.red.estado === 'sin_datos' && (
+            <span className="barra">
+              <span style={{ width: `${Math.min(100, (e.red.repasos / e.red.minimo) * 100)}%` }} />
+            </span>
+          )}
+        </div>
+      )}
       {aviso && (
         <p className="nota" role="status">
           {aviso}

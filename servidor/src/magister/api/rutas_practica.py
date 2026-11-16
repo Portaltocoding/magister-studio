@@ -242,9 +242,11 @@ async def ver_modelo() -> dict:
 
 @rutas.post("/progreso/modelo/ajustar")
 async def ajustar_modelo() -> dict:
-    from magister.aprender import personal
+    from magister.aprender import personal, red
 
-    return {**await personal.ajustar(), "estado": await personal.estado()}
+    r = await personal.ajustar()
+    rr = await red.entrenar()
+    return {**r, "red": {k: v for k, v in rr.items() if not k.startswith("_")}, "estado": await personal.estado()}
 
 
 

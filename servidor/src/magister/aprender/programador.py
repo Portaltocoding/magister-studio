@@ -147,12 +147,12 @@ CARPETA_MODELOS = Path(__file__).resolve().parents[3] / "evals" / "olvido" / "mo
 def programador(nombre: str | None = None) -> Programador:
     nombre = nombre or ajustes.programador
     if nombre == "fsrs":
+        from magister.aprender import red
         from magister.aprender.personal import parametros_guardados
 
         personal = parametros_guardados()
-        if personal:
-            return FSRS(parametros=personal["parametros"], etiqueta=f"personal-{personal['etapa']}-{personal['huella']}")
-        return FSRS()
+        base = FSRS(parametros=personal["parametros"], etiqueta=f"personal-{personal['etapa']}-{personal['huella']}") if personal else FSRS()
+        return red.envolver(base)
     if nombre == "modelo":
         ruta = CARPETA_MODELOS / "actual.joblib"
         if ruta.exists():

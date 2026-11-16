@@ -62,6 +62,9 @@ async def ciclo_de_vida(_: FastAPI):
     from magister.aprender import personal
 
     await personal.cargar()
+    from magister.aprender import red as red_olvido
+
+    await red_olvido.cargar()
     vigia = asyncio.create_task(alertas.bucle())
     if ajustes.embeddings == "local":
         from magister.fuentes.embeber import embeber
