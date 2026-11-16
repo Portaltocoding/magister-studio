@@ -32,6 +32,33 @@ export default function Marco() {
   const [activa, setActiva] = useState<number | null>(inicial.conversacion)
   // En el móvil la barra lateral se pliega y se abre con «Menú».
   const [menu, setMenu] = useState(false)
+  const [plegada, setPlegada] = useState(() => {
+    try {
+      return localStorage.getItem('magister-lateral') === 'plegada'
+    } catch {
+      return false
+    }
+  })
+  const plegar = useCallback(() => {
+    setPlegada((x) => {
+      try {
+        localStorage.setItem('magister-lateral', x ? 'abierta' : 'plegada')
+      } catch {
+        /* sin almacenamiento */
+      }
+      return !x
+    })
+  }, [])
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        plegar()
+      }
+    }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [plegar])
   // El acento elegido vale para toda la app (Progreso, Tutor, foco), no solo para Lecciones.
   const [colores] = usarColores()
   useEffect(() => setMenu(false), [modo, activa])
@@ -61,7 +88,7 @@ export default function Marco() {
   const tipo: 'libre' | 'plan' = actual ? (actual.tipo === 'plan' ? 'plan' : 'libre') : tipoNueva
 
   return (
-    <div className={`marco ${menu ? 'menu-abierto' : ''}`} style={variables(acentoDe(colores, null))}>
+    <div className={`marco ${menu ? 'menu-abierto' : ''} ${plegada ? 'lateral-plegada' : ''}`} style={variables(acentoDe(colores, null))}>
       {menu && <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />}
       <BarraLateral
         modoActivo={modo}
@@ -81,7 +108,7 @@ export default function Marco() {
         }}
         alCambiar={recargar}
       />
-      <BarraSesion alMenu={() => setMenu(!menu)} />
+      <BarraSesion alMenu={() => setMenu(!menu)} alPlegar={plegar} plegada={plegada} />
       <main className="central">
         <Central
           modo={modo}

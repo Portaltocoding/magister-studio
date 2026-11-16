@@ -14,7 +14,7 @@ const RECORRIDO = 4 // cuánto se mueven como mucho, en unidades del dibujo (la 
 
 type Punto = { x: number; y: number }
 
-export default function Mascota() {
+export default function Mascota({ mini = false }: { mini?: boolean }) {
   const svg = useRef<SVGSVGElement>(null)
   const [mirada, setMirada] = useState<Punto>({ x: 0, y: 0 })
 
@@ -48,7 +48,7 @@ export default function Mascota() {
   }, [])
 
   return (
-    <svg ref={svg} className="mascota" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+    <svg ref={svg} className={mini ? 'mascota mascota-mini' : 'mascota'} viewBox="0 0 120 120" aria-hidden="true" focusable="false">
       <circle className="mascota-cuerpo" cx="60" cy="60" r="56" />
       <g className="mascota-ojos" style={{ transform: `translate(${mirada.x}px, ${mirada.y}px)` }}>
         {OJOS.map((ojo, i) => (

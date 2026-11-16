@@ -122,3 +122,17 @@ async def test_borrar_una_fuente(cliente):
     assert (await cliente.delete(f"/api/fuentes/{f['id']}")).status_code == 204
     assert all(x["id"] != f["id"] for x in (await cliente.get("/api/fuentes")).json())
     assert (await cliente.delete(f"/api/fuentes/{f['id']}")).status_code == 404
+
+
+@pytest.mark.anyio
+async def test_afinar_el_tutor(cliente):
+    from magister.flujo.comun import texto_preferencias
+
+    assert (await cliente.get("/api/preferencias")).json()["longitud"] == "normal"
+    r = await cliente.put("/api/preferencias", json={"longitud": "breve", "nivel": "experto", "estilo": "analogias",
+                                                     "diagramas": False, "tests": True, "opciones": True})
+    assert r.status_code == 200
+    p = (await cliente.get("/api/preferencias")).json()
+    texto = texto_preferencias(p)
+    assert "150 palabras" in texto and "avanzado" in texto and "analogía" in texto and "No dibujes" in texto
+    assert "test" not in texto

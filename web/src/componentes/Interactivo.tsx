@@ -77,15 +77,5 @@ export function Opciones({ texto, alElegir, activo }: { texto: string; alElegir?
   )
 }
 
-// Un diagrama SVG del tutor, como imagen: así no puede ejecutar nada ni cargar nada de fuera.
-export function Diagrama({ svg, completo }: { svg: string; completo: boolean }) {
-  const limpio = svg.trim()
-  if (!completo || !limpio.startsWith('<svg') || !limpio.endsWith('</svg>'))
-    return <div className="diagrama diagrama-esperando">Dibujando el diagrama…</div>
-  const conEspacio = limpio.includes('xmlns=') ? limpio : limpio.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
-  return (
-    <figure className="diagrama">
-      <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(conEspacio)}`} alt="Diagrama del tutor" />
-    </figure>
-  )
-}
+// El diagrama vivo (se dibuja trazo a trazo) está en Diagrama.tsx.
+export { default as Diagrama } from './Diagrama.tsx'

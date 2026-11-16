@@ -6,7 +6,10 @@ pendiente), los repasos vencidos y si la lección tiene material preparado.
 
 from datetime import date, datetime, timezone
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -98,3 +101,33 @@ async def servir(pregunta_id: str) -> dict:
         s.add(Servida(plan_id=p.plan_id, concepto_id=cid, pregunta_id=pregunta_id, momento=ahora, p_predicha=pr,
                       version_programador=prog.version))
     return {"pregunta_id": pregunta_id, "concepto_id": cid, "enunciado": p.enunciado, "p": round(pr, 3)}
+
+
+
+class PreferenciasTutor(BaseModel):
+    longitud: Literal["breve", "normal", "detallada"] = "normal"
+    nivel: Literal["cero", "normal", "experto"] = "normal"
+    estilo: Literal["directo", "analogias", "codigo"] = "directo"
+    diagramas: bool = True
+    tests: bool = True
+    opciones: bool = True
+
+
+@rutas.get("/preferencias")
+async def ver_preferencias() -> dict:
+    from magister.flujo.comun import preferencias_tutor
+
+    return await preferencias_tutor()
+
+
+@rutas.put("/preferencias")
+async def guardar_preferencias(cuerpo: PreferenciasTutor) -> dict:
+    """Lo que ajustas desde la mascota: el tutor lo tiene en cuenta desde el siguiente mensaje."""
+    from sqlalchemy.dialects.postgresql import insert
+
+    from magister.datos.produccion import Ajuste
+
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(insert(Ajuste).values(clave="tutor", valor=cuerpo.model_dump())
+                        .on_conflict_do_update(index_elements=[Ajuste.clave], set_={"valor": cuerpo.model_dump()}))
+    return cuerpo.model_dump()

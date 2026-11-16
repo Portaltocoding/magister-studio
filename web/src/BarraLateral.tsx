@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { borrarConversacion, type Conversacion } from './api.ts'
 import { GRUPOS, type IdModo } from './modos.ts'
 
@@ -10,6 +11,17 @@ interface Props {
   alCambiar: () => void
 }
 
+const CLAVE_PLEGADOS = 'magister-secciones-plegadas'
+
+function leerPlegados(): string[] {
+  try {
+    const t = localStorage.getItem(CLAVE_PLEGADOS)
+    return t ? (JSON.parse(t) as string[]) : GRUPOS.filter((g) => g.plegado).map((g) => g.nombre)
+  } catch {
+    return GRUPOS.filter((g) => g.plegado).map((g) => g.nombre)
+  }
+}
+
 export default function BarraLateral({
   modoActivo,
   alElegir,
@@ -18,6 +30,17 @@ export default function BarraLateral({
   alElegirConversacion,
   alCambiar,
 }: Props) {
+  const [plegados, setPlegados] = useState<string[]>(leerPlegados)
+  const alternar = (nombre: string) =>
+    setPlegados((x) => {
+      const nuevo = x.includes(nombre) ? x.filter((y) => y !== nombre) : [...x, nombre]
+      try {
+        localStorage.setItem(CLAVE_PLEGADOS, JSON.stringify(nuevo))
+      } catch {
+        /* sin almacenamiento: vale para esta sesión */
+      }
+      return nuevo
+    })
   return (
     <aside className="lateral">
       <div className="marca">Magister</div>
@@ -44,15 +67,25 @@ export default function BarraLateral({
               ))}
             </ul>
           )
-          return g.plegado ? (
-            <details key={g.nombre} className="grupo-modos" open={g.modos.some((m) => m.id === modoActivo)}>
-              <summary className="grupo-titulo">{g.nombre}</summary>
-              {lista}
-            </details>
-          ) : (
-            <div key={g.nombre || 'inicio'} className={`grupo-modos ${g.nombre ? '' : 'grupo-inicio'}`}>
-              {g.nombre && <h2 className="grupo-titulo">{g.nombre}</h2>}
-              {lista}
+          if (!g.nombre)
+            return (
+              <div key="inicio" className="grupo-modos grupo-inicio">
+                {lista}
+              </div>
+            )
+          // Una sección plegada se abre sola si estás en uno de sus modos.
+          const abierta = !plegados.includes(g.nombre) || g.modos.some((m) => m.id === modoActivo)
+          return (
+            <div key={g.nombre} className={`grupo-modos ${abierta ? 'abierto' : 'cerrado'}`}>
+              <button type="button" className="grupo-titulo" aria-expanded={abierta} onClick={() => alternar(g.nombre)}>
+                <span>{g.nombre}</span>
+                <span className="grupo-flecha" aria-hidden>
+                  ›
+                </span>
+              </button>
+              <div className="grupo-cuerpo">
+                <div>{lista}</div>
+              </div>
             </div>
           )
         })}

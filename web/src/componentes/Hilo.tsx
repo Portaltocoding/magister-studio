@@ -1,6 +1,6 @@
 import Pensando from './Pensando.tsx'
-import { Children, isValidElement, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import Markdown from 'react-markdown'
+import { Children, isValidElement, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import Markdown, { type Components } from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -46,6 +46,70 @@ const ESTADO_ADJUNTO: Record<Adjunto['estado'], string> = {
   indexando: 'leyéndolo…',
   listo: 'listo: el tutor ya lo usa',
   error: 'no se pudo leer',
+}
+
+// El texto del tutor. Los componentes de Markdown se fijan por burbuja (useMemo): si se crearan en cada
+// fotograma mientras el texto aparece, los diagramas y los tests se volverían a montar sin parar.
+function CuerpoTutor({
+  b,
+  escribiendo,
+  alEnviar,
+  alCita,
+}: {
+  b: Burbuja
+  escribiendo: boolean
+  alEnviar: (texto: string) => void
+  alCita: (c: { id: number; info: CitaInfo | undefined }) => void
+}) {
+  const completo = b.estado !== 'llegando'
+  const componentes = useMemo<Components>(
+    () => ({
+      // ```test, ```opciones y ```svg se convierten en botones y dibujos.
+      pre: ({ children }) => {
+        const hijo = Children.toArray(children)[0]
+        if (isValidElement<{ className?: string; children?: ReactNode }>(hijo)) {
+          const clase = hijo.props.className ?? ''
+          const texto = String(hijo.props.children ?? '')
+          if (clase.includes('language-test')) return <TestRapido texto={texto} completo={completo} />
+          if (clase.includes('language-svg')) return <Diagrama svg={texto} completo={completo} />
+          if (clase.includes('language-opciones')) return <Opciones texto={texto} activo={completo && !escribiendo} alElegir={alEnviar} />
+        }
+        return <pre>{children}</pre>
+      },
+      a: ({ href, children }) => {
+        const m = href?.match(/^#cita-(\d+)$/)
+        if (!m)
+          return (
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          )
+        const id = Number(m[1])
+        const info = b.citas?.find((c) => c.fragmento_id === id)
+        return (
+          <button
+            type="button"
+            className={info?.dudosa ? 'marca-cita cita-dudosa' : 'marca-cita'}
+            title={info?.dudosa ? 'Cita dudosa: compruébala' : 'Ver la fuente'}
+            onClick={() => alCita({ id, info })}
+          >
+            {id}
+            {info?.dudosa ? '?' : ''}
+          </button>
+        )
+      },
+    }),
+    [b.citas, completo, escribiendo, alEnviar, alCita],
+  )
+  return (
+    <Revelar texto={conMarcas(b.contenido)} animar={b.estado === 'llegando'}>
+      {(visible) => (
+        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={componentes}>
+          {visible}
+        </Markdown>
+      )}
+    </Revelar>
+  )
 }
 
 // El hilo de una conversación: lo usan Estudio libre, el diagnóstico y la sesión de tutor.
@@ -126,49 +190,7 @@ export default function Hilo({
             ) : b.estado === 'error' ? (
               <p role="alert">{b.contenido}</p>
             ) : b.rol === 'tutor' ? (
-              <Revelar texto={conMarcas(b.contenido)} animar={b.estado === 'llegando'}>
-              {(visible) => (
-              <Markdown
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  // ```test y ```opciones se convierten en botones.
-                  pre: ({ children }) => {
-                    const hijo = Children.toArray(children)[0]
-                    if (isValidElement<{ className?: string; children?: ReactNode }>(hijo)) {
-                      const clase = hijo.props.className ?? ''
-                      const texto = String(hijo.props.children ?? '')
-                      const completo = b.estado !== 'llegando'
-                      if (clase.includes('language-test')) return <TestRapido texto={texto} completo={completo} />
-                      if (clase.includes('language-svg')) return <Diagrama svg={texto} completo={completo} />
-                      if (clase.includes('language-opciones'))
-                        return <Opciones texto={texto} activo={completo && !escribiendo} alElegir={alEnviar} />
-                    }
-                    return <pre>{children}</pre>
-                  },
-                  a: ({ href, children }) => {
-                    const m = href?.match(/^#cita-(\d+)$/)
-                    if (!m) return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
-                    const id = Number(m[1])
-                    const info = b.citas?.find((c) => c.fragmento_id === id)
-                    return (
-                      <button
-                        type="button"
-                        className={info?.dudosa ? 'marca-cita cita-dudosa' : 'marca-cita'}
-                        title={info?.dudosa ? 'Cita dudosa: compruébala' : 'Ver la fuente'}
-                        onClick={() => setCita({ id, info })}
-                      >
-                        {id}
-                        {info?.dudosa ? '?' : ''}
-                      </button>
-                    )
-                  },
-                }}
-              >
-                {visible}
-              </Markdown>
-              )}
-              </Revelar>
+              <CuerpoTutor b={b} escribiendo={escribiendo} alEnviar={alEnviar} alCita={setCita} />
             ) : (
               <p className="propio">{b.contenido}</p>
             )}

@@ -105,6 +105,13 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
             lecciones = await lecciones_del_alumno()
         except Exception:  # noqa: BLE001  (sin base, el tutor sigue funcionando)
             lecciones = ""
+    if estado.get("conversacion_id"):
+        try:
+            preferencias = texto_preferencias(await preferencias_tutor())
+        except Exception:  # noqa: BLE001
+            preferencias = ""
+        if preferencias:
+            partes.append("Cómo quiere el alumno que le respondas (lo ha ajustado él; manda sobre lo anterior):\n" + preferencias)
     if lecciones:
         partes.append(
             "Lo que el alumno estudia en Magister:\n" + lecciones + "\n"
@@ -189,3 +196,36 @@ async def acciones_de_estudio(estado: dict, sin_fuentes: bool) -> None:
         acciones.append({"tipo": "ir", "etiqueta": "Hacer un plan de este tema", "ruta": "#/nuevo-plan"})
     if acciones:
         escribir(acciones=acciones[:3])
+
+
+# Lo que el alumno ajusta desde la mascota («Afina a tu tutor»).
+PREFERENCIAS_POR_DEFECTO = {"longitud": "normal", "nivel": "normal", "estilo": "directo",
+                            "diagramas": True, "tests": True, "opciones": True}
+
+
+async def preferencias_tutor() -> dict:
+    from magister.datos.produccion import Ajuste
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s:
+        fila = await s.get(Ajuste, "tutor")
+    return {**PREFERENCIAS_POR_DEFECTO, **(fila.valor if fila else {})}
+
+
+def texto_preferencias(p: dict) -> str:
+    lineas = {
+        "longitud": {"breve": "Prefiere respuestas breves: como mucho unas 150 palabras, salvo que pida más.",
+                     "detallada": "Prefiere respuestas completas y detalladas, con todos los pasos."},
+        "nivel": {"cero": "Explícale como a alguien que empieza: no des nada por sabido y define cada término.",
+                  "experto": "Tiene nivel avanzado: ve al grano y sáltate lo básico."},
+        "estilo": {"analogias": "Apoya cada idea en una analogía cotidiana antes de formalizarla.",
+                   "codigo": "Cuando el tema lo permita, explica con ejemplos de código cortos."},
+    }
+    salida = [lineas[k][p[k]] for k in lineas if p.get(k) in lineas[k]]
+    if not p.get("diagramas", True):
+        salida.append("No dibujes diagramas.")
+    if not p.get("tests", True):
+        salida.append("No pongas preguntas tipo test.")
+    if not p.get("opciones", True):
+        salida.append("No pongas el bloque de opciones para seguir.")
+    return "\n".join(f"- {x}" for x in salida)

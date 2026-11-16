@@ -102,3 +102,81 @@
 /* El × de borrar: discreto pero visible fuera de la barra lateral (allí sigue saliendo al pasar el ratón). */
 .tarjeta-fuente > .borrar, .tabla .borrar, .examen-historial .borrar { visibility: visible; opacity: 0.45; }
 .tarjeta-fuente > .borrar:hover, .tabla .borrar:hover, .examen-historial .borrar:hover, .borrar:focus-visible { opacity: 1; color: #c2453a; }
+
+/* ===== Diagramas vivos: sin caja, trazo a trazo ===== */
+.diagrama-vivo {
+  position: relative; margin: 18px 0; padding: 0; background: none; border: 0;
+  --dg-relleno: color-mix(in srgb, currentColor 8%, transparent);
+  --dg-realce: #e0a23c;
+}
+@media (prefers-color-scheme: light) { .diagrama-vivo { --dg-realce: #b9770e; } }
+.lector-texto .diagrama-vivo { --dg-realce: #b9770e; }
+.diagrama-lienzo svg { display: block; width: 100%; height: auto; max-height: 420px; overflow: visible; margin: 0 auto; }
+.diagrama-lienzo :is(path, line, polyline, polygon, rect, circle, ellipse) { stroke-linecap: round; stroke-linejoin: round; }
+.diagrama-lienzo text { font-family: inherit; }
+.diagrama-otra {
+  position: absolute; top: 0; right: 0; border: 0; background: none; color: var(--suave); cursor: pointer;
+  font-size: 1rem; opacity: 0; transition: opacity 150ms;
+}
+.diagrama-vivo:hover .diagrama-otra, .diagrama-otra:focus-visible { opacity: 0.8; }
+.diagrama-esperando { color: var(--suave); font-size: 0.9rem; padding: 18px 0; font-style: italic; }
+@keyframes dg-trazar { to { stroke-dashoffset: 0; } }
+@keyframes dg-rellenar { from { fill-opacity: 0; } }
+@keyframes dg-aparecer { from { opacity: 0; transform: translateY(3px); } }
+
+/* ===== La mascota de la barra y «Afina a tu tutor» ===== */
+.sesion { align-items: center; gap: 12px; }
+.afinar { position: relative; display: inline-flex; }
+.afinar-boton { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; display: inline-grid; place-items: center; transition: transform 150ms; }
+.afinar-boton:hover { transform: scale(1.08) rotate(-4deg); }
+.afinar-boton:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.mascota.mascota-mini { width: 30px; height: 30px; margin: 0; }
+.afinar-caja {
+  position: absolute; z-index: 150; top: calc(100% + 10px); right: 0; width: 340px; padding: 16px 18px; border-radius: 14px;
+  background: var(--tarjeta); border: 1px solid var(--borde); box-shadow: 0 16px 40px rgb(0 0 0 / 0.35); text-align: left;
+}
+.afinar-cabecera { display: flex; justify-content: space-between; align-items: center; }
+.afinar-cabecera small { opacity: 0; transition: opacity 200ms; color: #3c9b6b; }
+.afinar-cabecera small.visible { opacity: 1; }
+.afinar-caja .nota { margin: 2px 0 12px; }
+.afinar-grupo { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.afinar-grupo > span { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
+.afinar-segmentos { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--borde); border-radius: 9px; overflow: hidden; }
+.afinar-segmentos button { font: inherit; font-size: 0.85rem; padding: 6px 4px; border: 0; background: transparent; color: var(--texto); cursor: pointer; }
+.afinar-segmentos button + button { border-left: 1px solid var(--borde); }
+.afinar-segmentos button[aria-checked="true"] { background: var(--texto); color: var(--fondo); font-weight: 600; }
+.afinar-extras { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; font-size: 0.9rem; }
+.afinar-extras label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.afinar-pie { display: flex; gap: 8px; border-top: 1px solid var(--borde); padding-top: 10px; }
+.afinar-pie .colores-caja { right: auto; left: 0; }
+
+/* ===== Barra lateral plegable, con una animación muy suave ===== */
+:root { --suave-curva: cubic-bezier(.22, 1, .36, 1); }
+.marco { transition: grid-template-columns 420ms var(--suave-curva); }
+.marco.lateral-plegada { grid-template-columns: 0px 1fr; }
+.lateral { transition: opacity 320ms var(--suave-curva), transform 420ms var(--suave-curva); }
+.marco.lateral-plegada .lateral { opacity: 0; transform: translateX(-14px); pointer-events: none; overflow: hidden; padding-left: 0; padding-right: 0; border-right: 0; }
+.boton-plegar {
+  margin-right: auto; border: 0; background: none; color: var(--suave); cursor: pointer; padding: 4px; border-radius: 6px;
+  display: inline-grid; place-items: center; transition: color 200ms, background 200ms;
+}
+.boton-plegar:hover { color: var(--texto); background: var(--activo); }
+/* Secciones que se pliegan: la altura se anima con el truco de grid 0fr a 1fr. */
+.grupo-titulo { display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; background: none; cursor: pointer; font: inherit; }
+button.grupo-titulo { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--suave); padding: 2px 8px; }
+button.grupo-titulo:hover { color: var(--texto); }
+.grupo-flecha { font-size: 0.95rem; transition: transform 380ms var(--suave-curva); display: inline-block; }
+.grupo-modos.abierto .grupo-flecha { transform: rotate(90deg); }
+.grupo-cuerpo { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 420ms var(--suave-curva), opacity 320ms var(--suave-curva); }
+.grupo-cuerpo > div { overflow: hidden; min-height: 0; }
+.grupo-modos.cerrado .grupo-cuerpo { grid-template-rows: 0fr; opacity: 0; }
+.grupos-modos { gap: 8px; }
+@media (max-width: 820px) {
+  .boton-plegar { display: none; }
+  .marco.lateral-plegada { grid-template-columns: minmax(0, 1fr); }
+  .marco.lateral-plegada .lateral { opacity: 1; transform: translateX(-102%); pointer-events: auto; }
+  .marco.lateral-plegada.menu-abierto .lateral { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marco, .lateral, .grupo-cuerpo, .grupo-flecha { transition: none; }
+}
