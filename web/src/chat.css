@@ -54,3 +54,10 @@
 .horario-dia select, .horario-dia input { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); }
 .horario-dia.libre span { opacity: 0.55; }
 .horario-dia input:disabled { opacity: 0.4; }
+
+/* Test en el repaso y en las fichas */
+.repaso-test .test-opciones { margin: 12px 0; }
+.repaso-test .fila { align-items: center; }
+.ficha-opciones { margin: 10px 0 0; padding-left: 22px; list-style: upper-alpha; text-align: left; }
+.ficha-opciones li { margin: 4px 0; padding: 2px 6px; border-radius: 6px; }
+.ficha-opciones li.buena { background: color-mix(in srgb, #2f8a5b 18%, transparent); font-weight: 600; }

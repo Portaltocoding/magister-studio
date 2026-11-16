@@ -99,7 +99,7 @@ async def siguiente(ahora: datetime, concepto_id: str | None = None) -> dict | N
     inicio_dia = fin_del_dia(ahora) - timedelta(days=1)
     async with nueva_sesion() as s:
         preguntas = (await s.execute(
-            select(Pregunta.id, Pregunta.enunciado).join(PreguntaConcepto, PreguntaConcepto.pregunta_id == Pregunta.id)
+            select(Pregunta.id, Pregunta.enunciado, Pregunta.opciones).join(PreguntaConcepto, PreguntaConcepto.pregunta_id == Pregunta.id)
             .where(PreguntaConcepto.plan_id == f["plan_id"], PreguntaConcepto.concepto_id == f["concepto_id"],
                    Pregunta.estado == "activa", Pregunta.sonda.is_(False))
         )).all()
@@ -109,14 +109,15 @@ async def siguiente(ahora: datetime, concepto_id: str | None = None) -> dict | N
             "select pregunta_id from intentos where concepto_id = :c and momento >= :d and coalesce(nota_usuario, nota_corrector) = 'fallo'"
         ), {"c": f["concepto_id"], "d": inicio_dia})).all())
         candidatas = [p for p in preguntas if p[0] not in falladas_hoy] or list(preguntas)
-        pid, enunciado = min(candidatas, key=lambda p: (vistas.get(p[0], 0), p[0]))
+        pid, enunciado, opciones = min(candidatas, key=lambda p: (vistas.get(p[0], 0), p[0]))
         brazo = await s.scalar(select(ConceptoFila.brazo).where(ConceptoFila.plan_id == f["plan_id"], ConceptoFila.id == f["concepto_id"]))
         prog = programador(brazo) if brazo else programador()
         s.add(Servida(plan_id=f["plan_id"], concepto_id=f["concepto_id"], pregunta_id=pid, momento=ahora,
                       p_predicha=f["p"], version_programador=prog.version))
         await s.commit()
     return {"pregunta_id": pid, "concepto_id": f["concepto_id"], "plan_id": f["plan_id"], "nombre": f["nombre"],
-            "enunciado": enunciado, "p": f["p"], "quedan": len(pendientes)}
+            "enunciado": enunciado, "p": f["p"], "quedan": len(pendientes),
+            "opciones": [o["texto"] for o in opciones] if opciones else None}
 
 
 async def contexto_pregunta(pregunta_id: str) -> tuple[str, str, list[str]]:

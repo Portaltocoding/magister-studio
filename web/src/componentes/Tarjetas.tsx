@@ -8,6 +8,7 @@ export interface Ficha {
   enunciado: string
   fantasma: string
   donde: string | null
+  opciones?: { texto: string; buena: boolean }[] | null
 }
 
 const TIPOS: Record<string, string> = {
@@ -16,6 +17,7 @@ const TIPOS: Record<string, string> = {
   fallo: 'Encuentra el fallo',
   escenario: 'Escenario',
   hablada: 'En voz alta',
+  test: 'Tipo test',
 }
 
 type Resultado = 'sabia' | 'no'
@@ -188,6 +190,15 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
               <div className="ficha-enunciado">
                 <Markdown>{f.enunciado}</Markdown>
               </div>
+              {f.opciones && f.opciones.length > 0 && (
+                <ol className="ficha-opciones">
+                  {f.opciones.map((o) => (
+                    <li key={o.texto} className={girada && o.buena ? 'buena' : ''}>
+                      {o.texto}
+                    </li>
+                  ))}
+                </ol>
+              )}
               {girada ? (
                 <div className="ficha-respuesta">
                   <Markdown>{f.fantasma}</Markdown>

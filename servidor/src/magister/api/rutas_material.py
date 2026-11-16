@@ -61,6 +61,24 @@ async def pedir_material(plan_id: int, clave: str, cuerpo: PedirMaterial, s: Asy
     return {"trabajo_id": tid, "nuevo": nuevo}
 
 
+@rutas.post("/planes/{plan_id}/lecciones/{clave}/tests")
+async def crear_tests(plan_id: int, clave: str, n: int = 5, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    """Añade preguntas tipo test a una lección que ya tiene apuntes (una llamada al modelo); no toca las demás."""
+    from magister.datos.plan import ConceptoFila
+    from magister.material.preguntas import anadir_tests
+
+    apuntes = await s.scalar(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave,
+                                                    Material.tipo == "apuntes").order_by(Material.id.desc()).limit(1))
+    if apuntes is None:
+        raise HTTPException(404, "esta lección aún no tiene apuntes")
+    textos = (await s.scalars(select(BloqueMaterial.texto).where(BloqueMaterial.material_id == apuntes.id))).all()
+    conceptos = (await s.execute(select(ConceptoFila.id, ConceptoFila.nombre)
+                                 .where(ConceptoFila.plan_id == plan_id, ConceptoFila.leccion_clave == clave))).all()
+    await s.close()
+    ids = await anadir_tests(plan_id, clave, [(c, nombre) for c, nombre in conceptos], "\n\n".join(textos), max(2, min(8, n)))
+    return {"tests": ids}
+
+
 @rutas.get("/planes/{plan_id}/materiales")
 async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     """Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha."""
@@ -156,7 +174,8 @@ async def material_de_leccion(plan_id: int, clave: str, s: AsyncSession = Depend
                              {"p": plan_id, "c": clave})
     return {
         "materiales": {t: _material(m) for t, m in ultimo.items()},
-        "preguntas": [{"id": p.id, "tipo": p.tipo, "enunciado": p.enunciado, "fantasma": p.fantasma, "donde": p.donde} for p in preguntas],
+        "preguntas": [{"id": p.id, "tipo": p.tipo, "enunciado": p.enunciado, "fantasma": p.fantasma, "donde": p.donde,
+                       "opciones": p.opciones} for p in preguntas],
         "ultimo_trabajo": await cola.leer(trabajo) if trabajo else None,
     }
 

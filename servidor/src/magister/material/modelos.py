@@ -59,7 +59,12 @@ class Contrato(BaseModel):
     bloques: list[BloqueContrato] = Field(min_length=2, max_length=6)
 
 
-TipoPregunta = Literal["conceptual", "calculo", "fallo", "escenario", "hablada"]
+TipoPregunta = Literal["conceptual", "calculo", "fallo", "escenario", "hablada", "test"]
+
+
+class OpcionTest(BaseModel):
+    texto: str
+    buena: bool = False
 
 
 class PreguntaGen(BaseModel):
@@ -68,7 +73,12 @@ class PreguntaGen(BaseModel):
     enunciado: str
     fantasma: str = Field(description="Respuesta modelo de unas 60 palabras, con la sección de los apuntes entre paréntesis")
     donde: str = Field(description="Clave del bloque de los apuntes donde se explica (b1, b2...)")
+    opciones: list[OpcionTest] = Field(default_factory=list, description="Solo tipo test: 3 o 4, una sola buena")
 
 
 class ListaPreguntas(BaseModel):
     preguntas: list[PreguntaGen] = Field(min_length=3, max_length=14)
+
+
+class ListaTests(BaseModel):
+    preguntas: list[PreguntaGen] = Field(min_length=2, max_length=8)

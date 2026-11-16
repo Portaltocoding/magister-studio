@@ -5,6 +5,7 @@ Cuotas (respeta el número y el tipo que pide el alumno, abajo):
 - 2 de cálculo si la lección tiene números o fórmulas; si no, 2 de escenario.
 - 1 de «encuentra el fallo»: un razonamiento con un error típico que hay que señalar.
 - El resto, conceptuales o de escenario. Alguna puede ser «hablada» (explícalo en voz alta en un minuto).
+- 3 de tipo «test», para repasar rápido: `opciones` con 3 o 4 respuestas y una sola con `buena: true`; las demás, errores típicos plausibles, no relleno. En las tipo test la `fantasma` dice por qué la buena lo es y por qué falla la trampa más tentadora.
 
 Cada pregunta:
 - `conceptos`: ids de los conceptos que mide (de la lista).

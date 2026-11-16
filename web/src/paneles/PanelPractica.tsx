@@ -18,6 +18,16 @@ interface Servida {
   nombre: string
   enunciado: string
   quedan: number
+  // Solo las tipo test: se responden pulsando y se corrigen al momento, sin modelo.
+  opciones?: string[] | null
+}
+
+interface ResultadoTest {
+  elegida: string
+  acierto: boolean
+  buena: string
+  porque: string
+  proxima_fecha: string | null
 }
 
 type EventoCorreccion =
@@ -47,6 +57,20 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
   const [corrigiendo, setCorrigiendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const servidaEn = useRef(Date.now())
+  const [test, setTest] = useState<ResultadoTest | null>(null)
+
+  const responderTest = async (opcion: string) => {
+    if (!pregunta || test) return
+    try {
+      const r = await pedir<Omit<ResultadoTest, 'elegida'>>(
+        '/api/practica/test',
+        enviarJson({ pregunta_id: pregunta.pregunta_id, opcion, confianza, clave: nueva() }),
+      )
+      setTest({ ...r, elegida: opcion })
+    } catch (e) {
+      setError(String((e as Error).message))
+    }
+  }
 
   const cargar = useCallback(() => {
     pedir<EnCola[]>('/api/practica/cola').then(setCola)
@@ -55,6 +79,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
   useEffect(cargar, [cargar])
 
   const siguiente = async () => {
+    setTest(null)
     setNota(null)
     setExplicacion('')
     setFin(null)
@@ -142,6 +167,47 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
         <section className="practica">
           <p className="nota-linea">{pregunta.nombre}</p>
           <h2 className="enunciado">{pregunta.enunciado}</h2>
+          {pregunta.opciones && pregunta.opciones.length > 0 ? (
+            <div className="repaso-test">
+              <div className="fila" role="radiogroup" aria-label="¿Cómo de seguro estás? (opcional)">
+                <span className="nota">¿Seguro? (opcional)</span>
+                {CONFIANZAS.map(([v, t]) => (
+                  <button key={v} className="boton-mini" aria-pressed={confianza === v} disabled={!!test} onClick={() => setConfianza(v)}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <div className="test-opciones">
+                {pregunta.opciones.map((o, k) => (
+                  <button
+                    key={o}
+                    type="button"
+                    disabled={!!test}
+                    className={`test-opcion ${test && o === test.buena ? 'buena' : ''} ${test && o === test.elegida && !test.acierto ? 'mala' : ''}`}
+                    onClick={() => responderTest(o)}
+                  >
+                    <span className="test-letra">{String.fromCharCode(65 + k)}</span>
+                    <span>{o}</span>
+                  </button>
+                ))}
+              </div>
+              {test && (
+                <div className={`correccion nota-${test.acierto ? 'bien' : 'fallo'}`}>
+                  <p>
+                    <strong>{test.acierto ? '✓ Bien' : '✗ No'}</strong>
+                    {test.proxima_fecha ? ` · próximo repaso: ${new Date(test.proxima_fecha).toLocaleDateString('es-ES')}` : ''}
+                  </p>
+                  <Markdown>{test.porque}</Markdown>
+                  <div className="fila">
+                    <button className="boton boton-principal" onClick={siguiente}>
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
           <textarea
             className="critica"
             placeholder="Responde de memoria, con tus palabras"
@@ -221,6 +287,8 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
                 </div>
               )}
             </div>
+          )}
+          </>
           )}
           {error && <p role="alert">{error}</p>}
         </section>

@@ -190,3 +190,34 @@ async def calibracion(fuente: Literal["usuario", "modelo"] = "usuario") -> list[
 @rutas.get("/progreso/resumen")
 async def resumen() -> dict:
     return await progreso.resumen(ahora())
+
+
+class RespuestaTest(BaseModel):
+    pregunta_id: str
+    opcion: str = Field(max_length=2000)
+    confianza: Literal[0.25, 0.5, 0.75, 0.95] | None = None
+    clave: str = Field(min_length=8, max_length=80)
+
+
+@rutas.post("/practica/test")
+async def responder_test(cuerpo: RespuestaTest) -> dict:
+    """Una pregunta tipo test: se corrige al momento, sin modelo, y cuenta para el repaso (y la calibración si apostaste)."""
+    from magister.datos.material import Pregunta
+
+    async with nueva_sesion() as s:
+        p = await s.get(Pregunta, cuerpo.pregunta_id)
+        concepto = await s.scalar(select(PreguntaConcepto.concepto_id).where(PreguntaConcepto.pregunta_id == cuerpo.pregunta_id))
+    if p is None or not p.opciones or concepto is None:
+        raise HTTPException(404, "pregunta tipo test no encontrada")
+    buena = next((o["texto"] for o in p.opciones if o.get("buena")), "")
+    acierto = cuerpo.opcion.strip() == buena.strip()
+    previo = await _existente(cuerpo.clave)
+    if previo is None:
+        servida = await practica.ultima_servida(cuerpo.pregunta_id)
+        _, proxima = await registrar(
+            pregunta_id=p.id, concepto_id=concepto, momento=ahora(), tipo="espaciado", respuesta=cuerpo.opcion,
+            explicacion=p.fantasma, confianza=cuerpo.confianza, latencia_ms=None, nota="bien" if acierto else "fallo",
+            correccion={"origen": "test", "buena": buena}, version_corrector="test", clave=cuerpo.clave, servida=servida)
+    else:
+        proxima = None
+    return {"acierto": acierto, "buena": buena, "porque": p.fantasma, "proxima_fecha": proxima.isoformat() if proxima else None}
