@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Calentamiento, { ApuestasRevisadas, guardarCalentamiento, leerCalentamiento, type Apuestas, type DatosCalentamiento } from '../componentes/Calentamiento.tsx'
 import Markdown from 'react-markdown'
 import { flujo, listarPlanes, marcarSesion, pedir, rutaExamen, verPlan, type HitoExamen } from '../api.ts'
 import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
@@ -50,6 +51,7 @@ interface Leccion {
   titulo: string
   tema: string
   bloques: Bloque[]
+  calentamiento?: DatosCalentamiento
   definiciones: Definicion[]
   formulas: Formula[]
 }
@@ -245,6 +247,11 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   const [avisoPausa, setAvisoPausa] = useState(false)
   const [glosario, setGlosario] = useState(false)
   const [cerrada, setCerrada] = useState(false)
+  // Calentamiento (priming): antes de la primera idea, si no lo has hecho ya con esta lección y empiezas de cero.
+  const previo = leerCalentamiento(mid)
+  const hayCalentamiento = !!leccion.calentamiento && (leccion.calentamiento.mapa.length > 0 || leccion.calentamiento.previas.length > 0)
+  const [calentando, setCalentando] = useState(hayCalentamiento && !previo?.hecho && !inicial)
+  const [apuestas, setApuestas] = useState<Apuestas>(previo?.apuestas ?? {})
 
   const b = bloques[i]
   const ultimo = i === bloques.length - 1
@@ -368,7 +375,20 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
       }
       lateral={glosario && <Glosario leccion={leccion} alCerrar={() => setGlosario(false)} />}
       pie={
-        !cerrada &&
+        calentando ? (
+          <>
+            <span className="foco-atajos">Unos minutos para tener el mapa antes de los detalles.</span>
+            <button
+              className="boton-mini"
+              onClick={() => {
+                guardarCalentamiento(mid, {})
+                setCalentando(false)
+              }}
+            >
+              Saltar el calentamiento
+            </button>
+          </>
+        ) : !cerrada &&
         descanso == null && (
           <>
             <button className="boton" disabled={i === 0} onClick={() => ir(-1)}>
@@ -406,6 +426,15 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
             Volver ya
           </button>
         </section>
+      ) : calentando && leccion.calentamiento ? (
+        <Calentamiento
+          datos={leccion.calentamiento}
+          alTerminar={(a) => {
+            setApuestas(a)
+            guardarCalentamiento(mid, a)
+            setCalentando(false)
+          }}
+        />
       ) : cerrada ? (
         <section className="foco-cierre">
           <span className="foco-etq">Sesión hecha</span>
@@ -426,6 +455,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
               <span>comprobaciones bien</span>
             </div>
           </div>
+          {leccion.calentamiento && <ApuestasRevisadas previas={leccion.calentamiento.previas} apuestas={apuestas} />}
           {flojas.length > 0 ? (
             <>
               <p>Esto vuelve en tu repaso, antes que lo demás:</p>

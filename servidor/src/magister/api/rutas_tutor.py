@@ -88,7 +88,35 @@ async def leccion(material_id: int, s: AsyncSession = Depends(sesion_por_peticio
     contrato = m.contrato or {}
     return {"plan_id": m.plan_id, "leccion_clave": m.leccion_clave, "titulo": titulo, "tema": tema,
             "definiciones": contrato.get("definiciones", []), "formulas": contrato.get("formulas", []),
-            "bloques": [{"clave": c, "titulo": t, "texto": x, "pregunta": por_bloque.get(c)} for c, t, x in bloques]}
+            "bloques": [{"clave": c, "titulo": t, "texto": x, "pregunta": por_bloque.get(c)} for c, t, x in bloques],
+            "calentamiento": await _calentamiento(s, m, contrato, {v["pregunta_id"] for v in por_bloque.values()})}
+
+
+async def _calentamiento(s: AsyncSession, m: Material, contrato: dict, usadas: set[str]) -> dict:
+    """Priming: el mapa de la lección (apartados, conceptos y de qué depende cada uno) y tres preguntas para
+    contestar a ojo antes de estudiar (efecto pretest). Preferidas las tipo test que no son comprobaciones del foco."""
+    from magister.datos.plan import ConceptoFila
+
+    conceptos = {c.id: c for c in (await s.scalars(select(ConceptoFila).where(
+        ConceptoFila.plan_id == m.plan_id, ConceptoFila.leccion_clave == m.leccion_clave))).all()}
+    nombres = {c.id: c.nombre for c in conceptos.values()}
+    mapa = []
+    for b in contrato.get("bloques", []):
+        mapa.append({"clave": b["clave"], "titulo": b["titulo"], "proposito": b.get("proposito", ""),
+                     "conceptos": [{"id": cid, "nombre": nombres.get(cid, cid),
+                                    "necesita": [nombres.get(d, d) for d in (conceptos[cid].depende_de if cid in conceptos else [])]}
+                                   for cid in b.get("conceptos", [])]})
+    filas = (await s.execute(select(Pregunta.id, Pregunta.tipo, Pregunta.enunciado, Pregunta.opciones, Pregunta.fantasma).where(
+        Pregunta.plan_id == m.plan_id, Pregunta.leccion_clave == m.leccion_clave, Pregunta.estado == "activa",
+        Pregunta.sonda.is_(False)).order_by(Pregunta.id))).all()
+    libres = [f for f in filas if f[0] not in usadas]
+    elegidas = ([f for f in libres if f[3]] + [f for f in libres if not f[3]])[:3]
+    previas = [{"pregunta_id": pid, "enunciado": enunciado,
+                "opciones": [o["texto"] for o in opciones] if opciones else None,
+                "buena": next((o["texto"] for o in opciones if o.get("buena")), None) if opciones else None,
+                "respuesta": fantasma}
+               for pid, _tipo, enunciado, opciones, fantasma in elegidas]
+    return {"mapa": mapa, "previas": previas}
 
 
 @rutas.post("/tutor/servir/{pregunta_id}")

@@ -333,8 +333,17 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           for (const f of lista2) lista.push({ marca: `la parte «${titulo}»`, texto: f })
         }
       }
+      // Priming: antes de los detalles, el mapa de la lección dicho en una frase.
+      let mapa: string[] = []
+      if (p?.apuntes) {
+        const a = await pedir<{ contrato?: { bloques?: { titulo: string }[] } }>(`/api/materiales/${p.apuntes}`).catch(() => null)
+        mapa = (a?.contrato?.bloques ?? []).map((b) => b.titulo)
+      }
       narracion.current.lista = [
         { marca: 'el principio', texto: `Hola. Vamos con ${clave}: ${leccion?.titulo ?? ''}.` },
+        ...(mapa.length > 1
+          ? [{ marca: 'el mapa', texto: `Primero, el mapa: veremos ${mapa.slice(0, -1).join(', ')} y ${mapa[mapa.length - 1]}. Ve pensando cómo se conectan.` }]
+          : []),
         { marca: 'el principio', texto: 'Si te surge una duda, interrúmpeme cuando quieras, hablando sin más.' },
         ...lista,
       ]
