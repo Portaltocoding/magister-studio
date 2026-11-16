@@ -114,3 +114,11 @@ def test_los_diagramas_de_los_apuntes_pasan_limpios_al_pdf():
     assert "script" not in salida and "onclick" not in salida and "image" not in salida
     assert 'url(#a)' in salida and "\n" not in salida.split("<figure")[1].split("</figure>")[0]
     assert limpiar_svg("no es un svg") is None
+
+
+@pytest.mark.anyio
+async def test_borrar_una_fuente(cliente):
+    f = (await cliente.post("/api/fuentes", json={"nombre": "Para borrar", "tipo": "pdf", "confianza": 3})).json()
+    assert (await cliente.delete(f"/api/fuentes/{f['id']}")).status_code == 204
+    assert all(x["id"] != f["id"] for x in (await cliente.get("/api/fuentes")).json())
+    assert (await cliente.delete(f"/api/fuentes/{f['id']}")).status_code == 404

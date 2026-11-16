@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Vacio from '../componentes/Vacio.tsx'
 import {
+  pedir,
   crearFuente,
   decidirPropuesta,
   estadoIndice,
@@ -133,12 +134,27 @@ export default function PanelFuentes() {
       )}
       <div className="tarjetas tarjetas-fuentes">
         {fuentes.map((f) => (
-          <button key={f.id} className="tarjeta" aria-pressed={f.id === activa} onClick={() => setActiva(f.id)}>
-            <strong>{f.nombre}</strong>
-            <span className="nota">
-              {f.tipo} · confianza {f.confianza}
-            </span>
-          </button>
+          <div key={f.id} className="tarjeta-fuente">
+            <button className="tarjeta" aria-pressed={f.id === activa} onClick={() => setActiva(f.id)}>
+              <strong>{f.nombre}</strong>
+              <span className="nota">
+                {f.tipo} · confianza {f.confianza}
+              </span>
+            </button>
+            <button
+              className="borrar"
+              aria-label={`Borrar la fuente ${f.nombre}`}
+              title="Borrar la fuente y sus documentos"
+              onClick={async () => {
+                if (!confirm(`¿Borrar la fuente «${f.nombre}» con todos sus documentos? El tutor dejará de citarla. No se puede deshacer.`)) return
+                await pedir(`/api/fuentes/${f.id}`, { method: 'DELETE' })
+                if (activa === f.id) setActiva(null)
+                recargar()
+              }}
+            >
+              ×
+            </button>
+          </div>
         ))}
         <form
           className="tarjeta"
@@ -237,6 +253,7 @@ export default function PanelFuentes() {
                   <th>Documento</th>
                   <th>Estado</th>
                   <th>Fragmentos</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -249,6 +266,20 @@ export default function PanelFuentes() {
                       {d.version?.duplicado_de ? ` · duplicado de ${d.version.duplicado_de}` : ''}
                     </td>
                     <td>{d.fragmentos}</td>
+                    <td>
+                      <button
+                        className="borrar"
+                        aria-label={`Borrar ${d.titulo}`}
+                        onClick={async () => {
+                          if (activa == null || !confirm(`¿Borrar «${d.titulo}»? El tutor dejará de citarlo.`)) return
+                          await pedir(`/api/fuentes/${activa}/documentos/${d.id}`, { method: 'DELETE' })
+                          cargarDocs()
+                          recargar()
+                        }}
+                      >
+                        ×
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

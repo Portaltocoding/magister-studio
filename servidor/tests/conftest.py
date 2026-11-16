@@ -25,6 +25,9 @@ def sin_modelos_locales(monkeypatch, tmp_path) -> None:
     # Embeddings por hash y crudo en una carpeta temporal: las pruebas no cargan modelos.
     monkeypatch.setattr(ajustes, "embeddings", "falso")
     monkeypatch.setattr(ajustes, "crudo", str(tmp_path / "crudo"))
+    # Las salidas (PDF, diapositivas, guiones) también en una carpeta temporal: los ids de la base de pruebas
+    # coinciden con los de la real, y borrar «el plan 1» de prueba no puede tocar tus ficheros.
+    monkeypatch.setattr(ajustes, "salidas", str(tmp_path / "salidas"))
 
 
 @pytest.fixture(autouse=True)

@@ -247,6 +247,25 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     }
   }
 
+  const borrar = async (tipo: 'diapositivas' | 'guion' | 'todo') => {
+    if (!plan || !clave) return
+    const que = {
+      diapositivas: 'las diapositivas de esta lección',
+      guion: 'el guion de esta lección',
+      todo: 'todo el material de esta lección (apuntes, fichas, diapositivas y guion). Tus repasos se quedan',
+    }[tipo]
+    if (!confirm(`¿Borrar ${que}? No se puede deshacer.`)) return
+    try {
+      await pedir(`/api/planes/${plan.plan_id}/lecciones/${clave}/material?tipo=${tipo}`, { method: 'DELETE' })
+      setAviso(tipo === 'todo' ? 'Material borrado: la lección queda sin preparar.' : 'Borrado.')
+      if (tipo !== 'todo') setPestana('apuntes')
+      cargar()
+      cargarEstados()
+    } catch (e) {
+      setError(String((e as Error).message))
+    }
+  }
+
   const cambiarEstilo = async (nuevo: string) => {
     if (!datos?.materiales.apuntes) return
     setAviso('Volviendo a pintar el PDF…')
@@ -351,6 +370,11 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                     Rehacer el material
                   </button>
                 )}
+                {apuntes && (
+                  <button className="boton peligro" disabled={!!enCurso} onClick={() => borrar('todo')}>
+                    Borrar el material
+                  </button>
+                )}
                 {apuntes?.ficheros.includes('pdf') && (
                   <a className="boton" href={fichero(apuntes, 'pdf')} target="_blank" rel="noreferrer">
                     Apuntes en PDF
@@ -445,10 +469,24 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
             {pestana === 'diapositivas' && diapos?.ficheros.includes('html') && (
               <div className="visor-diapositivas">
                 <iframe title="Diapositivas" src={fichero(diapos, 'html')} />
-                <p className="nota">Pulsa dentro y usa las flechas para pasar. F abre en pantalla completa.</p>
+                <p className="nota">
+                  Pulsa dentro y usa las flechas para pasar. F abre en pantalla completa.{' '}
+                  <button className="boton-mini peligro" onClick={() => borrar('diapositivas')}>
+                    Borrar las diapositivas
+                  </button>
+                </p>
               </div>
             )}
-            {pestana === 'guion' && textos.guion && <TextoLibro markdown={textos.guion} className="guion" />}
+            {pestana === 'guion' && textos.guion && (
+              <>
+                <TextoLibro markdown={textos.guion} className="guion" />
+                <p className="nota">
+                  <button className="boton-mini peligro" onClick={() => borrar('guion')}>
+                    Borrar el guion
+                  </button>
+                </p>
+              </>
+            )}
             {pestana === 'diapositivas' && !diapos && !enCurso && (
               <Vacio
                 etiqueta="Sin diapositivas"

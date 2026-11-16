@@ -68,6 +68,15 @@ async def test_v02_de_la_peticion_al_calendario(cliente) -> None:
     mal = await cliente.put(f"/api/temas/{tema_id}/plan/horario", json={**horario, "horas_por_dia": [0] * 7})
     assert mal.status_code == 422
 
+    # Borrar el plan se lleva lecciones, calendario y lo demás; la conversación se queda.
+    r = await cliente.delete(f"/api/temas/{tema_id}/plan")
+    assert r.status_code == 200 and r.json()["planes"] >= 1
+    assert (await cliente.get("/api/planes")).json() == []
+    assert (await cliente.get(f"/api/temas/{tema_id}/plan")).status_code == 404
+    assert (await cliente.delete(f"/api/temas/{tema_id}/plan")).status_code == 404
+    assert len((await cliente.get("/api/conversaciones")).json()) == 1
+    assert (await cliente.delete("/api/examenes/999")).status_code == 404
+
 
 async def test_mensaje_con_plan_pendiente_es_un_cambio(cliente) -> None:
     from magister.cerebro.estructura import eco

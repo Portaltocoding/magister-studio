@@ -54,6 +54,27 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
 
   useEffect(cargar, [cargar])
 
+  const borrarPlan = async () => {
+    if (tema == null || !vista) return
+    const nombre = planes?.find((x) => x.tema_id === tema)?.tema ?? 'este plan'
+    const ok = confirm(
+      `¿Borrar el plan «${nombre}»?\n\nSe borran sus ${vista.lecciones.length} lecciones, el calendario, los apuntes, las fichas, ` +
+        'tus repasos de esos conceptos y sus exámenes. Las conversaciones se quedan. No se puede deshacer.',
+    )
+    if (!ok) return
+    try {
+      await pedir(`/api/temas/${tema}/plan`, { method: 'DELETE' })
+      setVista(null)
+      setTema(null)
+      const ps = await listarPlanes()
+      setPlanes(ps)
+      if (ps.length) setTema(ps[0].tema_id)
+      setAviso(`Plan «${nombre}» borrado.`)
+    } catch (e) {
+      setAviso(String((e as Error).message))
+    }
+  }
+
   const atrasado = async () => {
     if (tema == null) return
     try {
@@ -149,6 +170,9 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
             fin previsto {fechaCorta(vista.fin)}{' '}
             <button className="boton-mini" onClick={() => setHorario(!horario)}>
               Mi horario
+            </button>{' '}
+            <button className="boton-mini peligro" onClick={borrarPlan}>
+              Borrar el plan
             </button>{' '}
             <button className="boton-mini" onClick={atrasado}>
               Me he atrasado

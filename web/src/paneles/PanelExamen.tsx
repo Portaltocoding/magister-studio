@@ -286,6 +286,18 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
                     {h.segundos ? ` · ${reloj(h.segundos)}` : ''}
                   </small>
                 </button>
+                <button
+                  className="borrar"
+                  aria-label="Quitar del historial"
+                  title="Quitar del historial (lo que respondiste sigue contando para tu repaso)"
+                  onClick={async () => {
+                    if (!confirm('¿Quitar este examen del historial? Lo que respondiste sigue contando para tu repaso.')) return
+                    await pedir(`/api/examenes/${h.id}`, { method: 'DELETE' })
+                    setHistorial((x) => x.filter((y) => y.id !== h.id))
+                  }}
+                >
+                  ×
+                </button>
               </li>
             ))}
           </ol>
