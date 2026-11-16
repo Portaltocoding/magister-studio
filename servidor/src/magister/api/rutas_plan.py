@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from magister.datos import plan as dp
@@ -46,6 +46,32 @@ async def recalcular(tema_id: int, cuerpo: Recalcular, s: AsyncSession = Depends
         raise HTTPException(404, "este tema no tiene plan aceptado")
     if isinstance(r, str):
         raise HTTPException(409, r)
+    return r
+
+
+class Horario(BaseModel):
+    # De lunes a domingo.
+    horas_por_dia: list[float] = Field(min_length=7, max_length=7)
+    inicio_por_dia: list[str | None] = Field(min_length=7, max_length=7)
+
+
+@rutas.put("/temas/{tema_id}/plan/horario")
+async def cambiar_horario(tema_id: int, cuerpo: Horario, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    """Cambia cuántas horas y a qué hora estudias cada día, y recoloca lo pendiente desde hoy."""
+    from datetime import date
+
+    if any(h < 0 or h > 12 for h in cuerpo.horas_por_dia) or sum(cuerpo.horas_por_dia) <= 0:
+        raise HTTPException(422, "Pon entre 0 y 12 horas por día, y al menos un día con horas.")
+    fila = await dp.plan_aceptado(s, tema_id)
+    if fila is None:
+        raise HTTPException(404, "este tema no tiene plan aceptado")
+    fila.perfil = {**(fila.perfil or {}), "horas_por_dia": cuerpo.horas_por_dia, "inicio_por_dia": cuerpo.inicio_por_dia}
+    await s.flush()
+    r = await planes.recalcular(s, tema_id, date.today())
+    if isinstance(r, str):
+        await s.rollback()
+        raise HTTPException(409, r)
+    await s.commit()
     return r
 
 

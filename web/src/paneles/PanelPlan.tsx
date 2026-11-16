@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Horario from '../componentes/Horario.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import {
   enviarJson,
@@ -32,6 +33,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   const [tema, setTema] = useState<number | null>(temaInicial ?? null)
   const [vista, setVista] = useState<VistaPlan | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [horario, setHorario] = useState(false)
   const [reajuste, setReajuste] = useState<{ cambios: string[]; avisos: string[]; texto: string; sesiones: unknown[] | null } | null>(null)
 
   useEffect(() => {
@@ -145,6 +147,9 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
           <p className="nota">
             Versión {vista.version} · {vista.horas_hechas} de {vista.total_horas} h hechas ({pct(vista.progreso)}) ·
             fin previsto {fechaCorta(vista.fin)}{' '}
+            <button className="boton-mini" onClick={() => setHorario(!horario)}>
+              Mi horario
+            </button>{' '}
             <button className="boton-mini" onClick={atrasado}>
               Me he atrasado
             </button>{' '}
@@ -161,6 +166,18 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               Reajustar con mis repasos
             </button>
           </p>
+          {horario && tema != null && (
+            <Horario
+              temaId={tema}
+              perfil={vista.perfil}
+              alCerrar={() => setHorario(false)}
+              alGuardar={(v) => {
+                setVista(v)
+                setHorario(false)
+                setAviso(`Horario guardado. Ahora acabas el ${fechaCorta(v.fin)}.`)
+              }}
+            />
+          )}
           <div className="dos-columnas">
             <section>
               <h2>Lecciones</h2>

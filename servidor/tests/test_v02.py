@@ -59,6 +59,15 @@ async def test_v02_de_la_peticion_al_calendario(cliente) -> None:
     planes = (await cliente.get("/api/planes")).json()
     assert planes[0]["tema"] == "bases de datos"
 
+    # Cambiar el horario recoloca lo pendiente con las horas y la hora de inicio nuevas.
+    horario = {"horas_por_dia": [2, 2, 2, 2, 2, 0, 0], "inicio_por_dia": ["09:00"] * 5 + [None, None]}
+    r = await cliente.put(f"/api/temas/{tema_id}/plan/horario", json=horario)
+    assert r.status_code == 200, r.text
+    pendientes = [x for s in r.json()["semanas"] for d in s["dias"] for x in d["sesiones"] if x["estado"] == "pendiente"]
+    assert pendientes and all(x["inicio"] >= "09:00" and x["horas"] <= 2 for x in pendientes)
+    mal = await cliente.put(f"/api/temas/{tema_id}/plan/horario", json={**horario, "horas_por_dia": [0] * 7})
+    assert mal.status_code == 422
+
 
 async def test_mensaje_con_plan_pendiente_es_un_cambio(cliente) -> None:
     from magister.cerebro.estructura import eco

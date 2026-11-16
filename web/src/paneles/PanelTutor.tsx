@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
-import { flujo, listarPlanes, marcarSesion, pedir, verPlan } from '../api.ts'
+import { flujo, listarPlanes, marcarSesion, pedir, rutaExamen, verPlan, type HitoExamen } from '../api.ts'
 import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
@@ -19,6 +19,8 @@ interface Hoy {
   material_id?: number | null
   repasos: number
   razon?: string
+  // El examen del plan que ya toca y aún no has aprobado.
+  examen?: HitoExamen | null
 }
 
 interface Bloque {
@@ -469,6 +471,28 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   )
 }
 
+// Si hoy (o antes) tocaba un examen del plan y no lo has aprobado, el tutor te lo propone.
+function TarjetaExamen({ examen }: { examen: HitoExamen }) {
+  const atrasado = examen.fecha < new Date().toISOString().slice(0, 10)
+  return (
+    <section className="tutor-examen">
+      <div>
+        <span className="vacio-etq">{atrasado ? 'Examen pendiente' : 'Hoy toca examen'}</span>
+        <strong>{examen.titulo}</strong>
+        <small>
+          {examen.preguntas} preguntas · {examen.minutos} min
+          {examen.nota != null ? ` · tu mejor nota: ${examen.nota.toFixed(1).replace('.', ',')} (se aprueba con 5)` : ''}
+        </small>
+      </div>
+      {examen.plan_id && (
+        <button className="boton boton-principal" onClick={() => irARuta(rutaExamen(examen.plan_id!, examen))}>
+          Hacer el examen
+        </button>
+      )}
+    </section>
+  )
+}
+
 // Modo Tutor: la tarjeta «Hoy», otras lecciones para estudiar en foco y, al empezar, el modo foco.
 export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
   const [hoy, setHoy] = useState<Hoy | null>(null)
@@ -552,6 +576,7 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
   return (
     <div className="tutor-inicio">
       <Mascota />
+      {hoy.examen && <TarjetaExamen examen={hoy.examen} />}
       {hoy.titulo && hoy.estado !== 'solo_repaso' ? (
         <section className="tutor-hoy">
           <span className="vacio-etq">Hoy · {hoy.razon}</span>

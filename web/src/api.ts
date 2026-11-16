@@ -234,6 +234,7 @@ export interface VistaPlan {
   fin: string | null
   hoy: string
   examenes: HitoExamen[]
+  perfil?: { horas_por_dia?: number[] | null; inicio_por_dia?: (string | null)[] | null }
 }
 
 export interface ResumenPlan {
