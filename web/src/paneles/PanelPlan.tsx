@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { BotonLibro, guardarIndice, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
 import Horario from '../componentes/Horario.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import {
@@ -40,6 +41,10 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   const [vista, setVista] = useState<VistaPlan | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [horario, setHorario] = useState(false)
+  const indiceGuardado = usarIndice(vista?.plan_id)
+  const [indiceNuevo, setIndiceNuevo] = useState<IndicePlan | null>(null)
+  const [haciendoIndice, setHaciendoIndice] = useState(false)
+  const indice = indiceNuevo ?? indiceGuardado
   // Qué material tiene ya cada lección (lo mismo que dice Lecciones).
   const [material, setMaterial] = useState<Record<string, { tipos: Record<string, string> }>>({})
   useEffect(() => {
@@ -213,14 +218,53 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               }}
             />
           )}
+          <section className="indice-plan">
+            <h2>De qué va</h2>
+            {indice ? (
+              <div className="indice-temas">
+                {indice.temas.map((t) => (
+                  <div key={t.nombre} className="indice-tema">
+                    <strong>{t.nombre}</strong>
+                    <small>{t.lecciones.map((c) => tituloSencillo(indice, c, c)).join(' · ')}</small>
+                    <ul>
+                      {t.trata.map((x) => (
+                        <li key={x}>{x}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="nota">
+                Un índice con pocos temas de nombre sencillo y de qué trata cada uno.{' '}
+                <button
+                  className="boton-mini"
+                  disabled={haciendoIndice}
+                  onClick={async () => {
+                    setHaciendoIndice(true)
+                    try {
+                      const ix = await pedir<IndicePlan>(`/api/planes/${vista.plan_id}/indice`, { method: 'POST' })
+                      guardarIndice(vista.plan_id, ix)
+                      setIndiceNuevo(ix)
+                    } finally {
+                      setHaciendoIndice(false)
+                    }
+                  }}
+                >
+                  {haciendoIndice ? 'Haciéndolo…' : 'Hacer el índice'}
+                </button>
+              </p>
+            )}
+            <BotonLibro planId={vista.plan_id} />
+          </section>
           <div className="dos-columnas">
             <section>
               <h2>Lecciones</h2>
               <ol className="lecciones">
                 {vista.lecciones.map((l) => (
                   <li key={l.clave} className={`leccion-${l.estado}`}>
-                    <strong>
-                      {l.clave} · {l.titulo}
+                    <strong title={l.titulo}>
+                      {l.clave} · {tituloSencillo(indice, l.clave, l.titulo)}
                     </strong>{' '}
                     <span className="nota-linea">
                       {num(l.horas_hechas)}/{num(l.horas)} h · {ESTADO_LECCION[l.estado] ?? l.estado}

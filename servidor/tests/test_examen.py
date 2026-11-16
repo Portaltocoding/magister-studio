@@ -208,3 +208,13 @@ def test_el_nivel_llega_al_material():
 async def test_rehacer_bloque_rechaza_lo_que_no_existe(cliente):
     r = await cliente.post("/api/materiales/999999/bloques/b1/rehacer", json={"como": "sencillo"})
     assert r.status_code == 400
+
+
+
+def test_el_indice_reparte_todas_las_lecciones():
+    from magister.material.libro import Indice, _reglas
+
+    ix = Indice.model_validate({"temas": [{"nombre": "Conexiones", "lecciones": ["L1"], "trata": ["cómo viaja una petición"]}],
+                                "titulos": [{"clave": "L1", "titulo": "Cómo viaja una petición"}]})
+    assert _reglas(["L1"])(ix) == []
+    assert _reglas(["L1", "L2"])(ix)  # falta L2: se pide otra vez

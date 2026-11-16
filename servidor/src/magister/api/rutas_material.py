@@ -137,6 +137,57 @@ async def rehacer(mid: int, clave: str, cuerpo: Rehacer) -> dict:
     return {"texto": texto}
 
 
+@rutas.get("/planes/{plan_id}/indice")
+async def ver_indice(plan_id: int) -> dict | None:
+    """El índice sencillo del plan, si ya está hecho (no gasta modelo)."""
+    from magister.material.libro import _leer
+
+    return await _leer(f"indice_plan_{plan_id}")
+
+
+@rutas.post("/planes/{plan_id}/indice")
+async def hacer_indice(plan_id: int, rehacer: bool = False) -> dict:
+    """Temas con nombre llano, de qué trata cada uno y un título sencillo por lección (una llamada al modelo)."""
+    from magister.material.libro import indice
+
+    try:
+        return await indice(plan_id, rehacer)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@rutas.get("/planes/{plan_id}/libro")
+async def ver_libro(plan_id: int) -> dict | None:
+    from magister.material.libro import estado_libro
+
+    return await estado_libro(plan_id)
+
+
+@rutas.post("/planes/{plan_id}/libro", status_code=202)
+async def hacer_libro(plan_id: int) -> dict:
+    """Junta los apuntes preparados en un libro (PDF). Va en segundo plano: consulta GET para saber cuándo está."""
+    from magister.material.libro import estado_libro, lanzar_libro
+
+    e = await estado_libro(plan_id)
+    if not (e and e.get("estado") == "haciendo"):
+        lanzar_libro(plan_id)
+    return {"estado": "haciendo"}
+
+
+@rutas.get("/planes/{plan_id}/libro/pdf")
+async def libro_pdf(plan_id: int):
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+
+    from magister.material.libro import estado_libro
+
+    e = await estado_libro(plan_id)
+    if not e or not e.get("pdf") or not Path(e["pdf"]).exists():
+        raise HTTPException(404, "el libro aún no está hecho")
+    return FileResponse(e["pdf"], media_type="application/pdf", filename="libro.pdf")
+
+
 @rutas.get("/planes/{plan_id}/materiales")
 async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     """Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha."""

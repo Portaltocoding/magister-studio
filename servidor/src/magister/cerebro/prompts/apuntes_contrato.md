@@ -3,6 +3,7 @@ Eres el autor de los apuntes de una lección. Antes de escribir, decides el cont
 Reglas:
 - Escribe primero `razonamiento`: por qué este orden.
 - De 2 a 6 bloques, claves b1, b2... Cada bloque responde una pregunta que deja el anterior.
+- Títulos de bloque cortos y llanos (de 2 a 6 palabras, una sola idea, sin listas de siglas): «Por qué hace falta un índice», no «Índices B-tree: estructura, costes y selectividad».
 - Asigna cada concepto de la lección a un bloque (por su id). Ninguno sin asignar.
 - Un concepto no se usa antes del bloque que lo explica: respeta sus dependencias.
 - Definiciones: una frase por término clave; si el término se usa en inglés en la práctica, pon `ingles`.

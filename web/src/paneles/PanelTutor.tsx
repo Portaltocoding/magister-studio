@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import Calentamiento, { ApuestasRevisadas, guardarCalentamiento, leerCalentamiento, type Apuestas, type DatosCalentamiento } from '../componentes/Calentamiento.tsx'
 import Markdown from 'react-markdown'
 import { flujo, listarPlanes, marcarSesion, pedir, rutaExamen, verPlan, type HitoExamen } from '../api.ts'
@@ -507,6 +508,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
 // «Tu día»: lo que toca, en orden (repasar, las lecciones, el examen al final) y cuánto queda.
 function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | null; irA: (m: IdModo) => void }) {
   const dia = hoy.dia ?? []
+  const indice = usarIndice(hoy.plan_id)
   if (!dia.length && !hoy.examen) return null
   const horas = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',')
   const quedan = dia.filter((s) => s.estado !== 'hecha').reduce((a, s) => a + s.horas, 0) +
@@ -531,7 +533,7 @@ function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | 
           <li key={s.clave} className={s.estado === 'hecha' ? 'hecho' : ''}>
             <span className="tu-dia-num">{s.estado === 'hecha' ? '✓' : ++n}</span>
             <span>
-              <b className="tu-dia-clave">{s.clave}</b> {s.titulo}
+              <b className="tu-dia-clave">{s.clave}</b> {tituloSencillo(indice, s.clave, s.titulo)}
             </span>
             <small>{horas(s.horas)} h</small>
           </li>
@@ -578,6 +580,7 @@ const saludo = () => {
 // Modo Tutor: la tarjeta «Hoy», otras lecciones para estudiar en foco y, al empezar, el modo foco.
 export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
   const [hoy, setHoy] = useState<Hoy | null>(null)
+  const indiceHoy = usarIndice(hoy?.plan_id)
   const [leccion, setLeccion] = useState<Leccion | null>(null)
   const [otras, setOtras] = useState<Opcion[]>([])
   const [avance, setAvance] = useState<Avance | null>(null)
@@ -721,7 +724,7 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
         <section className="tutor-hoy">
           <span className="vacio-etq">Hoy · {hoy.razon}</span>
           <h1>
-            <span className="bloques-clave">{hoy.leccion_clave}</span> {hoy.titulo}
+            <span className="bloques-clave">{hoy.leccion_clave}</span> {tituloSencillo(indiceHoy, hoy.leccion_clave ?? '', hoy.titulo)}
           </h1>
           <p className="nota">
             {hoy.tema} · {String(hoy.horas).replace('.', ',')} h previstas

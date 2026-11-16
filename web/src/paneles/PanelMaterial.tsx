@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { BotonLibro, tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import {
   enviarJson,
   leerSSE,
@@ -118,6 +119,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   const [preguntando, setPreguntando] = useState<null | { forzar: boolean }>(null)
   const control = useRef<AbortController | null>(null)
   const [colores] = usarColores()
+  const indice = usarIndice(plan?.plan_id)
   const raiz = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -348,22 +350,30 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         ) : (
           <p className="bloques-plan">{temaNombre}</p>
         )}
-        <ol>
-          {plan?.lecciones.map((l) => {
-            const e = estadoLeccion(estados[l.clave])
-            return (
-              <li key={l.clave}>
-                <button className={l.clave === clave ? 'activa' : ''} onClick={() => setClave(l.clave)}>
-                  <span className="bloques-clave">{l.clave}</span>
-                  <span className="bloques-titulo">
-                    {l.titulo}
-                    <small className={`estado-leccion ${e.clase}`}>{e.texto}</small>
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ol>
+        {(indice?.temas ?? [{ nombre: '', lecciones: plan?.lecciones.map((l) => l.clave) ?? [], trata: [] }]).map((t) => (
+          <div key={t.nombre || 'todas'} className="bloques-tema">
+            {t.nombre && <p className="bloques-tema-nombre">{t.nombre}</p>}
+            <ol>
+              {plan?.lecciones
+                .filter((l) => t.lecciones.includes(l.clave))
+                .map((l) => {
+                  const e = estadoLeccion(estados[l.clave])
+                  return (
+                    <li key={l.clave}>
+                      <button className={l.clave === clave ? 'activa' : ''} onClick={() => setClave(l.clave)} title={l.titulo}>
+                        <span className="bloques-clave">{l.clave}</span>
+                        <span className="bloques-titulo">
+                          {tituloSencillo(indice, l.clave, l.titulo)}
+                          <small className={`estado-leccion ${e.clase}`}>{e.texto}</small>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+            </ol>
+          </div>
+        ))}
+        {plan && <BotonLibro planId={plan.plan_id} />}
       </aside>
 
       <section className="bloque-vista">
@@ -374,7 +384,8 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               <span className="lb-etq">
                 {leccion.clave} · {temaNombre}
               </span>
-              <h1>{leccion.titulo}</h1>
+              <h1>{tituloSencillo(indice, leccion.clave, leccion.titulo)}</h1>
+              {indice?.titulos[leccion.clave] && <p className="bloque-titulo-largo">{leccion.titulo}</p>}
               {leccion.objetivos.length > 0 && (
                 <p className="bloque-objetivos">Con qué saldrás: {leccion.objetivos.join('; ')}</p>
               )}
