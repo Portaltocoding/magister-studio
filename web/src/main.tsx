@@ -6,6 +6,7 @@ import './vistas.css'
 import './examen.css'
 import './chat.css'
 import './movil.css'
+import './viz.css'
 import Marco from './Marco.tsx'
 
 createRoot(document.getElementById('root')!).render(

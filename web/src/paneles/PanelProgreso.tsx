@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
+import { usarAviso } from '../componentes/Aviso.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
 
@@ -70,31 +71,99 @@ function material(e: EstadoMaterial | undefined): string {
   return 'sin material'
 }
 
-// Una barra por estado, proporcional al número de conceptos.
-function BarraDominio({ conceptos }: { conceptos: Concepto[] }) {
-  if (!conceptos.length) return <span className="pg-dominio vacia" />
+type Sobre = ReturnType<typeof usarAviso>['sobre']
+
+// Barra segmentada fina: de más a menos sabido; «sin practicar» es la pista neutra.
+function BarraDominio({ conceptos, sobre }: { conceptos: Concepto[]; sobre: Sobre }) {
+  if (!conceptos.length) return <span className="pg-dominio" />
   return (
-    <span className="pg-dominio" role="img" aria-label={ESTADOS.map((e) => `${conceptos.filter((c) => c.estado === e.id).length} ${e.nombre}`).join(', ')}>
+    <span className="pg-dominio" role="group" aria-label="Dominio de los conceptos">
       {ESTADOS.map((e) => {
         const n = conceptos.filter((c) => c.estado === e.id).length
-        return n ? <span key={e.id} className={`pg-${e.id}`} style={{ flexGrow: n }} title={`${n} ${e.nombre.toLowerCase()}`} /> : null
+        return n ? (
+          <span
+            key={e.id}
+            className={`pg-seg pg-${e.id}`}
+            style={{ flexGrow: n }}
+            {...sobre({ valor: plural(n, 'concepto', 'conceptos'), etiqueta: e.nombre.toLowerCase() })}
+          />
+        ) : null
       })}
     </span>
   )
 }
 
-function Fiabilidad({ titulo, tramos }: { titulo: string; tramos: Tramo[] }) {
+const ANCHO = 240
+const ALTO = 210
+const M = { izq: 40, der: 10, arr: 10, aba: 38 }
+const px = (v: number) => M.izq + v * (ANCHO - M.izq - M.der)
+const py = (v: number) => ALTO - M.aba - v * (ALTO - M.arr - M.aba)
+
+function Fiabilidad({ titulo, tramos, sobre }: { titulo: string; tramos: Tramo[]; sobre: Sobre }) {
   return (
     <figure className="fiabilidad">
       <figcaption>{titulo}</figcaption>
-      <svg viewBox="0 0 100 100" role="img" aria-label={titulo}>
-        <line x1="0" y1="100" x2="100" y2="0" className="diagonal" />
+      <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} role="group" aria-label={titulo}>
+        {[0, 0.5, 1].map((t) => (
+          <g key={t}>
+            <line className="viz-rejilla" x1={px(0)} x2={px(1)} y1={py(t)} y2={py(t)} />
+            <text className="viz-tick" x={px(0) - 6} y={py(t) + 4} textAnchor="end">
+              {pct(t)}
+            </text>
+            <text className="viz-tick" x={px(t)} y={py(0) + 16} textAnchor="middle">
+              {pct(t)}
+            </text>
+          </g>
+        ))}
+        <line className="viz-referencia" x1={px(0)} y1={py(0)} x2={px(1)} y2={py(1)} />
+        <text className="viz-nota-ref" x={px(0.56)} y={py(0.56) - 8} transform={`rotate(-41 ${px(0.56)} ${py(0.56) - 8})`}>
+          calibración perfecta
+        </text>
+        <text className="viz-eje" x={(px(0) + px(1)) / 2} y={ALTO - 4} textAnchor="middle">
+          Lo seguro que estabas
+        </text>
+        <text className="viz-eje" transform={`translate(11 ${(py(0) + py(1)) / 2}) rotate(-90)`} textAnchor="middle">
+          Lo que acertaste
+        </text>
         {tramos.map((t, i) => (
-          <circle key={i} cx={t.predicho * 100} cy={100 - t.observado * 100} r={Math.min(6, 2 + Math.sqrt(t.n))} />
+          <g
+            key={i}
+            {...sobre({ valor: `acertaste ${pct(t.observado)}`, etiqueta: `cuando decías ${pct(t.predicho)} · ${plural(t.n, 'respuesta', 'respuestas')}` })}
+          >
+            <circle className="viz-punto" cx={px(t.predicho)} cy={py(t.observado)} r={Math.min(7, 4 + Math.sqrt(t.n) / 2)} />
+            <circle className="viz-zona" cx={px(t.predicho)} cy={py(t.observado)} r={12} />
+          </g>
         ))}
       </svg>
-      <small className="nota">{tramos.map((t) => `creías ${pct(t.predicho)}, acertaste ${pct(t.observado)} (${t.n})`).join(' · ')}</small>
     </figure>
+  )
+}
+
+function TablaCalibracion({ tuya, modelo }: { tuya: Tramo[]; modelo: Tramo[] }) {
+  return (
+    <details className="viz-tabla">
+      <summary>Ver como tabla</summary>
+      <table>
+        <thead>
+          <tr>
+            <th>Quién</th>
+            <th>Seguridad</th>
+            <th>Aciertos</th>
+            <th>Respuestas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[...tuya.map((t) => ['Tú', t] as const), ...modelo.map((t) => ['Tutor', t] as const)].map(([q, t], i) => (
+            <tr key={i}>
+              <td>{q}</td>
+              <td>{pct(t.predicho)}</td>
+              <td>{pct(t.observado)}</td>
+              <td>{t.n}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   )
 }
 
@@ -112,6 +181,7 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
   const [hoy, setHoy] = useState<Hoy | null>(null)
   const [abierta, setAbierta] = useState<string | null>(null)
   const [elegido, setElegido] = useState<Concepto | null>(null)
+  const { sobre, nodo: aviso } = usarAviso()
 
   const elegirPlan = (p: ResumenPlan) => {
     setNombre(p.tema)
@@ -198,8 +268,8 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
                   key={l.clave}
                   className={`pg-tramo ${l.estado}`}
                   style={{ flexGrow: l.horas }}
-                  title={`${l.clave} · ${l.titulo}: ${horas(l.horas_hechas)} de ${horas(l.horas)}`}
                   onClick={() => setAbierta(l.clave)}
+                  {...sobre({ valor: `${horas(l.horas_hechas)} de ${horas(l.horas)}`, etiqueta: `${l.clave} · ${l.titulo}` })}
                 >
                   <span className="pg-tramo-relleno" style={{ width: `${Math.min(1, l.horas_hechas / (l.horas || 1)) * 100}%` }} />
                   <small>{l.clave}</small>
@@ -297,7 +367,7 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
                     </small>
                   </span>
                   <span className="pg-fila-dominio">
-                    <BarraDominio conceptos={suyos} />
+                    <BarraDominio conceptos={suyos} sobre={sobre} />
                     <small>
                       {dom} de {suyos.length} dominados
                     </small>
@@ -351,19 +421,49 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
             </p>
           ) : (
             <>
-              <div className="pg-barras" role="img" aria-label="Repasos previstos por día">
+              <div className="viz-columnas" role="group" aria-label="Repasos previstos por día">
+                {carga.map((c) => {
+                  const destacar = c.repasos > 0 && (c.fecha === hoyIso || c.repasos === maxCarga)
+                  return (
+                    <div
+                      key={c.fecha}
+                      className={`viz-columna ${c.fecha === hoyIso ? 'hoy' : ''}`}
+                      {...sobre({ valor: plural(c.repasos, 'repaso', 'repasos'), etiqueta: `${fechaCorta(c.fecha)} · unos ${Math.round(c.minutos)} min` })}
+                    >
+                      <span className="viz-valor">{destacar ? c.repasos : ''}</span>
+                      {c.repasos > 0 && <span className="viz-barra" style={{ height: `${(c.repasos / maxCarga) * 100}%` }} />}
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="viz-dias" aria-hidden>
                 {carga.map((c) => (
-                  <div
-                    key={c.fecha}
-                    className={`pg-barra-dia ${c.fecha === hoyIso ? 'hoy' : ''}`}
-                    title={`${fechaCorta(c.fecha)}: ${plural(c.repasos, 'repaso', 'repasos')}, ${c.minutos} min`}
-                  >
-                    {c.repasos > 0 && <b>{c.repasos}</b>}
-                    <span style={{ height: `${(c.repasos / maxCarga) * 100}%` }} />
-                    <small>{c.fecha === hoyIso ? 'hoy' : new Date(c.fecha + 'T12:00:00').getDate()}</small>
-                  </div>
+                  <small key={c.fecha} className={c.fecha === hoyIso ? 'hoy' : ''}>
+                    {c.fecha === hoyIso ? 'hoy' : new Date(c.fecha + 'T12:00:00').getDate()}
+                  </small>
                 ))}
               </div>
+              <details className="viz-tabla">
+                <summary>Ver como tabla</summary>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Día</th>
+                      <th>Repasos</th>
+                      <th>Minutos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {carga.map((c) => (
+                      <tr key={c.fecha}>
+                        <td>{fechaCorta(c.fecha)}</td>
+                        <td>{c.repasos}</td>
+                        <td>{Math.round(c.minutos)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
               <p className="nota">
                 {plural(totalCarga, 'repaso', 'repasos')} en 14 días · unos {Math.round(carga.reduce((a, c) => a + c.minutos, 0))} min
               </p>
@@ -388,13 +488,15 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
             <>
               <p className="pg-explica">Cada punto compara lo seguro que estabas con lo que acertaste. Sobre la diagonal, bien calibrado.</p>
               <div className="dos-columnas">
-                <Fiabilidad titulo="Tu seguridad" tramos={tuya} />
-                <Fiabilidad titulo="La apuesta del tutor" tramos={modelo} />
+                <Fiabilidad titulo="Tu seguridad" tramos={tuya} sobre={sobre} />
+                <Fiabilidad titulo="La apuesta del tutor" tramos={modelo} sobre={sobre} />
               </div>
+              <TablaCalibracion tuya={tuya} modelo={modelo} />
             </>
           )}
         </section>
       </div>
+      {aviso}
     </div>
   )
 }

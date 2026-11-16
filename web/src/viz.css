@@ -1,0 +1,97 @@
+/* ===== Gráficos de Progreso (método dataviz: forma, color validado, marcas finas, aviso y tabla) ===== */
+/* Rampa ordinal de dominio (un solo azul) y serie única, validadas con validate_palette.js
+   contra la tarjeta (#ffffff claro, #262523 oscuro). En oscuro la rampa se invierte: lo flojo, cerca del fondo. */
+.progreso-panel {
+  --viz-ord-1: #86b6ef; /* flojo */
+  --viz-ord-2: #3987e5; /* aprendiendo */
+  --viz-ord-3: #184f95; /* dominado */
+  --viz-pista: #e4e2de; /* sin practicar: pista neutra */
+  --viz-serie: #2a78d6;
+  --viz-rejilla: #e4e2de;
+  --viz-superficie: var(--fondo);
+}
+@media (prefers-color-scheme: dark) {
+  .progreso-panel {
+    --viz-ord-1: #1c5cab;
+    --viz-ord-2: #3987e5;
+    --viz-ord-3: #86b6ef;
+    --viz-pista: #3a3936;
+    --viz-serie: #3987e5;
+    --viz-rejilla: #33322e;
+  }
+}
+
+/* Leyenda y puntos de concepto: el mismo color que su segmento. */
+.progreso-panel .pg-dominado { background: var(--viz-ord-3); }
+.progreso-panel .pg-aprendiendo { background: var(--viz-ord-2); }
+.progreso-panel .pg-flojo { background: var(--viz-ord-1); }
+.progreso-panel .pg-nuevo { background: var(--viz-pista); }
+
+/* Barra segmentada fina: 8 px, extremos redondos, 2 px de hueco del color de la tarjeta, sin texto. */
+.progreso-panel .pg-dominio {
+  display: flex; gap: 2px; height: 8px; border-radius: 999px; overflow: hidden; background: none;
+}
+.progreso-panel .pg-dominio:empty { background: var(--viz-pista); }
+.pg-seg { min-width: 4px; outline: none; transition: filter 120ms; }
+.pg-seg:hover, .pg-seg:focus-visible { filter: brightness(1.18); }
+
+/* Franja del plan: barra alta como mucho de 28 px; el relleno es el avance de cada lección. */
+.pg-tramo { height: 28px; border-radius: 4px; }
+.pg-tramo-relleno, .pg-tramo.empezada .pg-tramo-relleno { background: var(--t-acento, #f2c200); }
+.pg-tramo.hecha small, .pg-tramo.empezada small { color: #141414; }
+
+/* Repasos de 14 días: una serie, columnas de 24 px como mucho, punta redondeada y base recta. */
+.viz-columnas {
+  position: relative; display: flex; align-items: flex-end; gap: 2px; height: 120px; padding-top: 18px;
+  border-bottom: 1px solid var(--viz-rejilla);
+}
+.viz-columna {
+  flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+  outline: none; border-radius: 4px;
+}
+.viz-columna:focus-visible { box-shadow: 0 0 0 2px var(--acento); }
+.viz-barra { width: min(24px, 70%); min-height: 2px; background: var(--viz-serie); border-radius: 4px 4px 0 0; transition: filter 120ms; }
+.viz-columna:hover .viz-barra, .viz-columna:focus-visible .viz-barra { filter: brightness(1.2); }
+.viz-valor { font-size: 0.75rem; font-weight: 650; color: var(--texto); min-height: 1.1em; line-height: 1.1; }
+.viz-dias { display: flex; gap: 2px; margin-top: 4px; }
+.viz-dias small { flex: 1; text-align: center; font-size: 0.7rem; color: var(--suave); font-variant-numeric: tabular-nums; }
+.viz-dias small.hoy { color: var(--texto); font-weight: 700; }
+.pg-seccion .viz-dias + .viz-tabla { margin-top: 10px; }
+
+/* Calibración: ejes, rejilla en línea fina y continua, diagonal de referencia, puntos con anillo. */
+.progreso-panel .fiabilidad { margin: 0; }
+.progreso-panel .fiabilidad figcaption { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+.progreso-panel .fiabilidad svg { width: 100%; max-width: 300px; height: auto; border: 0; background: none; overflow: visible; }
+.viz-rejilla { stroke: var(--viz-rejilla); stroke-width: 1; }
+.viz-referencia { stroke: var(--suave); stroke-width: 1; }
+.viz-tick { font-size: 10px; fill: var(--suave); font-variant-numeric: tabular-nums; }
+.viz-eje { font-size: 11px; fill: var(--suave); }
+.viz-nota-ref { font-size: 9.5px; fill: var(--suave); }
+.progreso-panel .fiabilidad .viz-punto { fill: var(--viz-serie); stroke: var(--viz-superficie); stroke-width: 2; opacity: 1; }
+.progreso-panel .fiabilidad .viz-zona { fill: transparent; opacity: 1; }
+.progreso-panel .fiabilidad g[tabindex] { outline: none; cursor: default; }
+.progreso-panel .fiabilidad g[tabindex]:hover .viz-punto,
+.progreso-panel .fiabilidad g[tabindex]:focus-visible .viz-punto { stroke: var(--texto); }
+
+/* El aviso: el valor delante, la etiqueta detrás. */
+.viz-aviso {
+  position: fixed; z-index: 200; transform: translate(-50%, calc(-100% - 12px)); pointer-events: none;
+  display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 8px;
+  background: var(--tarjeta); border: 1px solid var(--borde); box-shadow: var(--sombra); white-space: nowrap;
+}
+.viz-aviso strong { font-size: 0.95rem; color: var(--texto); }
+.viz-aviso span { font-size: 0.78rem; color: var(--suave); }
+
+/* La tabla de cada gráfico: el mismo dato sin depender del color ni del ratón. */
+.viz-tabla { margin-top: 10px; font-size: 0.85rem; }
+.viz-tabla summary { cursor: pointer; color: var(--suave); }
+.viz-tabla table { margin-top: 8px; border-collapse: collapse; }
+.viz-tabla th, .viz-tabla td { padding: 3px 14px 3px 0; text-align: left; font-variant-numeric: tabular-nums; }
+.viz-tabla th { font-weight: 600; color: var(--suave); border-bottom: 1px solid var(--viz-rejilla); }
+
+/* Repasos y calibración, cada uno a ancho completo: los dos gráficos de calibración caben lado a lado. */
+.progreso-panel .pg-dos { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.progreso-panel .pg-dos .dos-columnas { grid-template-columns: repeat(2, minmax(0, 320px)); gap: 40px; }
+.progreso-panel .viz-columnas { max-width: 760px; }
+.progreso-panel .viz-dias { max-width: 760px; }
+.viz-eje { font-size: 11.5px; }
