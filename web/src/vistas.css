@@ -514,3 +514,12 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .foco-reloj { white-space: nowrap; }
 /* Con más herramientas, el título es lo que cede sitio: los pasos y el reloj no se pisan. */
 @media (min-width: 821px) { .foco-barra { grid-template-columns: minmax(0, 1fr) auto auto; } }
+
+/* Título de lección editable */
+.titulo-editable { display: inline; }
+.titulo-lapiz { font: inherit; font-size: 0.6em; vertical-align: middle; margin-left: 6px; background: none; border: 0; color: inherit; opacity: 0; cursor: pointer; }
+.titulo-editable:hover .titulo-lapiz, .titulo-lapiz:focus-visible { opacity: 0.6; }
+.titulo-lapiz:hover { opacity: 1 !important; }
+@media (hover: none) { .titulo-lapiz { opacity: 0.5; } }
+.titulo-editar { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.titulo-editar input { font: inherit; font-size: 0.95em; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 8px; padding: 2px 8px; min-width: 16ch; }

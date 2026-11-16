@@ -153,3 +153,19 @@ async def montar_libro(plan_id: int) -> dict:
 
 def lanzar_libro(plan_id: int) -> None:
     asyncio.create_task(montar_libro(plan_id))
+
+
+
+async def cambiar_titulo(plan_id: int, clave: str, titulo: str | None) -> dict:
+    """Tu título para una lección; None vuelve al original."""
+    ix = await _leer(f"indice_plan_{plan_id}")
+    if not ix:
+        raise ValueError("el plan aún no tiene índice")
+    titulos = dict(ix.get("titulos") or {})
+    if titulo and titulo.strip():
+        titulos[clave] = titulo.strip()[:80]
+    else:
+        titulos.pop(clave, None)
+    ix = {**ix, "titulos": titulos}
+    await _guardar(f"indice_plan_{plan_id}", ix)
+    return ix

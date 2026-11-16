@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BotonLibro, tituloSencillo, usarIndice } from '../componentes/indice.tsx'
+import { BotonLibro, TituloEditable, tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import {
   enviarJson,
   leerSSE,
@@ -384,7 +384,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               <span className="lb-etq">
                 {leccion.clave} · {temaNombre}
               </span>
-              <h1>{tituloSencillo(indice, leccion.clave, leccion.titulo)}</h1>
+              <h1>{plan ? <TituloEditable planId={plan.plan_id} clave={leccion.clave} largo={leccion.titulo} indice={indice} /> : leccion.titulo}</h1>
               {indice?.titulos[leccion.clave] && <p className="bloque-titulo-largo">{leccion.titulo}</p>}
               {leccion.objetivos.length > 0 && (
                 <p className="bloque-objetivos">Con qué saldrás: {leccion.objetivos.join('; ')}</p>

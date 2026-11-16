@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { pedir } from '../api.ts'
+import { enviarJson, pedir } from '../api.ts'
 
 // El índice sencillo del plan: temas con nombre llano y un título corto por lección.
 // Se pide una vez por plan y se comparte entre pantallas.
@@ -26,11 +26,60 @@ export function usarIndice(planId: number | null | undefined): IndicePlan | null
       })
       .catch(() => undefined)
   }, [planId])
+  // Un cambio en una pantalla (un título que editas) se ve en todas.
+  useEffect(() => {
+    const al = (e: Event) => {
+      const d = (e as CustomEvent<{ planId: number; ix: IndicePlan }>).detail
+      if (d.planId === planId) setIx(d.ix)
+    }
+    window.addEventListener('magister-indice', al)
+    return () => window.removeEventListener('magister-indice', al)
+  }, [planId])
   return ix
 }
 
 export function guardarIndice(planId: number, ix: IndicePlan) {
   cache.set(planId, ix)
+  window.dispatchEvent(new CustomEvent('magister-indice', { detail: { planId, ix } }))
+}
+
+// El título de una lección, con un lápiz para cambiarlo a tu gusto o volver al original.
+export function TituloEditable({ planId, clave, largo, indice }: { planId: number; clave: string; largo: string; indice: IndicePlan | null }) {
+  const [editando, setEditando] = useState(false)
+  const actual = tituloSencillo(indice, clave, largo)
+  const guardar = async (titulo: string | null) => {
+    const ix = await pedir<IndicePlan>(`/api/planes/${planId}/indice/titulo`, enviarJson({ clave, titulo }, 'PUT'))
+    guardarIndice(planId, ix)
+    setEditando(false)
+  }
+  if (editando)
+    return (
+      <form
+        className="titulo-editar"
+        onSubmit={(e) => {
+          e.preventDefault()
+          guardar(new FormData(e.currentTarget).get('t')?.toString() ?? null)
+        }}
+      >
+        <input name="t" defaultValue={actual} autoFocus aria-label="Título de la lección" onKeyDown={(e) => e.key === 'Escape' && setEditando(false)} />
+        <button className="boton-mini">Guardar</button>
+        {indice?.titulos[clave] && (
+          <button type="button" className="boton-mini" onClick={() => guardar(null)} title={largo}>
+            El original
+          </button>
+        )}
+      </form>
+    )
+  return (
+    <span className="titulo-editable">
+      {actual}
+      {indice && (
+        <button type="button" className="titulo-lapiz" onClick={() => setEditando(true)} aria-label="Cambiar el título" title="Cambiar el título">
+          ✎
+        </button>
+      )}
+    </span>
+  )
 }
 
 // El título que se enseña: el sencillo si lo hay; el largo queda como detalle.

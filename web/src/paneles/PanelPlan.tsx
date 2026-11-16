@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BotonLibro, guardarIndice, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
+import { BotonLibro, guardarIndice, TituloEditable, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
 import Horario from '../componentes/Horario.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import {
@@ -264,7 +264,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                 {vista.lecciones.map((l) => (
                   <li key={l.clave} className={`leccion-${l.estado}`}>
                     <strong title={l.titulo}>
-                      {l.clave} · {tituloSencillo(indice, l.clave, l.titulo)}
+                      {l.clave} · <TituloEditable planId={vista.plan_id} clave={l.clave} largo={l.titulo} indice={indice} />
                     </strong>{' '}
                     <span className="nota-linea">
                       {num(l.horas_hechas)}/{num(l.horas)} h · {ESTADO_LECCION[l.estado] ?? l.estado}

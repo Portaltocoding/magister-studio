@@ -156,6 +156,22 @@ async def hacer_indice(plan_id: int, rehacer: bool = False) -> dict:
         raise HTTPException(400, str(e)) from e
 
 
+class TituloPropio(BaseModel):
+    clave: str = Field(max_length=20)
+    titulo: str | None = Field(None, max_length=80)
+
+
+@rutas.put("/planes/{plan_id}/indice/titulo")
+async def poner_titulo(plan_id: int, cuerpo: TituloPropio) -> dict:
+    """Cambia el título que se enseña de una lección; vacío vuelve al original."""
+    from magister.material.libro import cambiar_titulo
+
+    try:
+        return await cambiar_titulo(plan_id, cuerpo.clave, cuerpo.titulo)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
 @rutas.get("/planes/{plan_id}/libro")
 async def ver_libro(plan_id: int) -> dict | None:
     from magister.material.libro import estado_libro
