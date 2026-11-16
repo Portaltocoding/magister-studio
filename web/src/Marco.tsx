@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { listarConversaciones, type Conversacion } from './api.ts'
 import BarraLateral from './BarraLateral.tsx'
 import BarraSesion from './BarraSesion.tsx'
+import Riel, { usarHoy } from './Riel.tsx'
 import { acentoDe, usarColores, variables } from './componentes/colores.ts'
 import Central from './Central.tsx'
 import { MODOS, type IdModo } from './modos.ts'
@@ -30,35 +31,20 @@ export default function Marco() {
   const [modo, setModo] = useState<IdModo>(inicial.modo)
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([])
   const [activa, setActiva] = useState<number | null>(inicial.conversacion)
-  // En el móvil la barra lateral se pliega y se abre con «Menú».
+  // La barra lateral va siempre plegada (queda la tira de iconos) y se abre por encima del contenido;
+  // se vuelve a plegar al elegir algo, al pulsar fuera o con Esc. Ctrl+B la abre y la cierra.
   const [menu, setMenu] = useState(false)
-  const [plegada, setPlegada] = useState(() => {
-    try {
-      return localStorage.getItem('magister-lateral') === 'plegada'
-    } catch {
-      return false
-    }
-  })
-  const plegar = useCallback(() => {
-    setPlegada((x) => {
-      try {
-        localStorage.setItem('magister-lateral', x ? 'abierta' : 'plegada')
-      } catch {
-        /* sin almacenamiento */
-      }
-      return !x
-    })
-  }, [])
+  const hoy = usarHoy()
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault()
-        plegar()
-      }
+        setMenu((x) => !x)
+      } else if (e.key === 'Escape') setMenu(false)
     }
     window.addEventListener('keydown', tecla)
     return () => window.removeEventListener('keydown', tecla)
-  }, [plegar])
+  }, [])
   // El acento elegido vale para toda la app (Progreso, Tutor, foco), no solo para Lecciones.
   const [colores] = usarColores()
   useEffect(() => setMenu(false), [modo, activa])
@@ -88,9 +74,11 @@ export default function Marco() {
   const tipo: 'libre' | 'plan' = actual ? (actual.tipo === 'plan' ? 'plan' : 'libre') : tipoNueva
 
   return (
-    <div className={`marco ${menu ? 'menu-abierto' : ''} ${plegada ? 'lateral-plegada' : ''}`} style={variables(acentoDe(colores, null))}>
-      {menu && <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />}
+    <div className={`marco ${menu ? 'menu-abierto' : ''}`} style={variables(acentoDe(colores, null))}>
+      <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />
+      <Riel modo={modo} hoy={hoy} alAbrir={() => setMenu(true)} alIr={(m) => setModo(m)} />
       <BarraLateral
+        alCerrar={() => setMenu(false)}
         modoActivo={modo}
         alElegir={(m) => {
           if (m === 'libre') {
@@ -108,7 +96,7 @@ export default function Marco() {
         }}
         alCambiar={recargar}
       />
-      <BarraSesion alMenu={() => setMenu(!menu)} alPlegar={plegar} plegada={plegada} />
+      <BarraSesion alMenu={() => setMenu(!menu)} />
       <main className="central">
         <Central
           modo={modo}

@@ -9,6 +9,7 @@ interface Props {
   activa: number | null
   alElegirConversacion: (id: number | null) => void
   alCambiar: () => void
+  alCerrar?: () => void
 }
 
 const CLAVE_PLEGADOS = 'magister-secciones-plegadas'
@@ -29,6 +30,7 @@ export default function BarraLateral({
   activa,
   alElegirConversacion,
   alCambiar,
+  alCerrar,
 }: Props) {
   const [plegados, setPlegados] = useState<string[]>(leerPlegados)
   const alternar = (nombre: string) =>
@@ -43,7 +45,17 @@ export default function BarraLateral({
     })
   return (
     <aside className="lateral">
-      <div className="marca">Magister</div>
+      <div className="marca">
+        <span>Magister</span>
+        {alCerrar && (
+          <button type="button" className="boton-plegar" onClick={alCerrar} aria-label="Plegar la barra lateral" title="Plegar (Ctrl+B o Esc)">
+            <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden>
+              <rect x="2.5" y="3.5" width="15" height="13" rx="3" fill="none" stroke="currentColor" strokeWidth="1.4" />
+              <line x1="7.5" y1="3.5" x2="7.5" y2="16.5" stroke="currentColor" strokeWidth="1.4" />
+            </svg>
+          </button>
+        )}
+      </div>
 
       <nav aria-label="Modos" className="grupos-modos">
         {GRUPOS.map((g) => {
