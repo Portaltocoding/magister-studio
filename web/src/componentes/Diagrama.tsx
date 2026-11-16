@@ -44,6 +44,10 @@ function limpiar(svg: string): string | null {
         if (!ATRIBUTOS.has(nombre) || /^\s*javascript:/i.test(a.value)) hijo.removeAttribute(nombre)
         else if (nombre === 'fill' || nombre === 'stroke') hijo.setAttribute(nombre, recolorear(a.value) ?? a.value)
       }
+      if (hijo.nodeName === 'text' || hijo.nodeName === 'tspan') {
+        const f = hijo.getAttribute('fill')
+        hijo.setAttribute('fill', f === 'var(--dg-realce)' ? f : 'currentColor')
+      }
       recorrer(hijo)
     }
   }

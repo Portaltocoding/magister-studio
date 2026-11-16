@@ -7,6 +7,7 @@ import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoc
 import Pensando from '../componentes/Pensando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
+import { barajar } from '../barajar.ts'
 
 type Modo = 'examen' | 'evaluacion'
 type Nota = 'fallo' | 'parcial' | 'bien' | 'perfecta'
@@ -515,7 +516,7 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
           </div>
           {p.opciones && p.opciones.length > 0 ? (
             <div className="examen-test">
-              {p.opciones.map((o, k) => (
+              {barajar(p.opciones, p.pregunta_id).map((o, k) => (
                 <button
                   key={o}
                   type="button"

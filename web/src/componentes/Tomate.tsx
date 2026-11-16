@@ -26,8 +26,13 @@ export default function Tomate() {
   useEffect(() => {
     if (!abierto) return
     const fuera = (e: MouseEvent) => caja.current && !caja.current.contains(e.target as Node) && setAbierto(false)
+    const tecla = (e: KeyboardEvent) => e.key === 'Escape' && setAbierto(false)
     document.addEventListener('mousedown', fuera)
-    return () => document.removeEventListener('mousedown', fuera)
+    document.addEventListener('keydown', tecla)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      document.removeEventListener('keydown', tecla)
+    }
   }, [abierto])
 
   const fase = pomo.p.fase

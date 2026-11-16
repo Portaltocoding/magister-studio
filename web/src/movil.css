@@ -42,3 +42,16 @@
   .bloques-lista li button { padding: 6px; }
   .bloques-titulo { display: none; }
 }
+
+
+/* ===== Revisión: barra superior sobria y que no se rompa en el móvil ===== */
+.sesion .alerta { color: var(--suave); font-size: 0.82rem; }
+.sesion .alerta .boton-mini { font-size: 0.75rem; }
+@media (max-width: 820px) {
+  .sesion { flex-wrap: nowrap; gap: 8px; }
+  .sesion .alerta { display: none; }
+  .boton-buscar { flex: 0 0 auto; min-width: 36px; padding: 0 10px; }
+  .boton-buscar kbd, .boton-buscar .buscar-texto { display: none; }
+  .boton-buscar::before { content: "⌕"; font-size: 1.1rem; }
+  .estado-texto { display: none; }
+}

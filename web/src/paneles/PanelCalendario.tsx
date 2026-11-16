@@ -191,7 +191,7 @@ export default function PanelCalendario() {
                         {h.titulo}
                       </span>
                     ))}
-                  {verPlan && carga[f] && <span className="fondo-plan fondo-repaso">{carga[f].repasos} repasos</span>}
+                  {verPlan && carga[f] && <span className="fondo-plan fondo-repaso">{carga[f].repasos} {carga[f].repasos === 1 ? 'repaso' : 'repasos'}</span>}
                 </span>
               </button>
             )

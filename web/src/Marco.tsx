@@ -56,6 +56,10 @@ export default function Marco() {
   }, [])
   const hoy = usarHoy()
   useEffect(() => {
+    const nombre = MODOS.find((m) => m.id === modo)?.nombre
+    document.title = nombre ? `${nombre} · Magister` : 'Magister'
+  }, [modo])
+  useEffect(() => {
     if (!hoy || !('Notification' in window) || Notification.permission !== 'granted' || !avisosActivos()) return
     const fecha = new Date().toISOString().slice(0, 10)
     const clave = `magister-avisado-${fecha}`
@@ -124,6 +128,7 @@ export default function Marco() {
         alCerrar={() => setMenu(false)}
         fija={fija}
         alFijar={fijar}
+        oculta={!menu && !fija}
         modoActivo={modo}
         alElegir={(m) => {
           if (m === 'libre') {

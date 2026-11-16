@@ -11,6 +11,11 @@ class HuecoSinRellenar(Exception):
     pass
 
 
+
+def _ingles_util(d: dict) -> bool:
+    """El término en inglés solo si aporta: nada de «QUIC (QUIC)»."""
+    return bool(d.get('ingles')) and d['ingles'].strip().lower() != d['termino'].strip().lower()
+
 def montar(plantilla: str, valores: dict[str, str]) -> str:
     faltan = sorted({m.group(1) for m in HUECO.finditer(plantilla)} - valores.keys())
     if faltan:
@@ -30,7 +35,7 @@ def _repaso(repaso: list[dict]) -> str:
 def _montar_ficha(titulo: str, pie: str, salida: str, definiciones: list[dict], bloques: list[tuple[str, str]],
                   repaso: list[dict]) -> str:
     defs = "\n".join(
-        f"- **{d['termino']}**{f' ({d['ingles']})' if d.get('ingles') else ''}: {d['definicion'].rstrip('.')}." for d in definiciones
+        f"- **{d['termino']}**{f' ({d['ingles']})' if _ingles_util(d) else ''}: {d['definicion'].rstrip('.')}." for d in definiciones
     )
     cuerpo = "\n\n".join(f"## {t} {{.nb}}\n\n{texto.strip()}" for t, texto in bloques)
     plantilla = (CARPETA / "apuntes_ficha.md").read_text(encoding="utf-8")
@@ -51,7 +56,7 @@ def montar_apuntes(titulo: str, pie: str, salida: str, definiciones: list[dict],
     if estilo == "ficha":
         return _montar_ficha(titulo, pie, salida, definiciones, bloques, repaso)
     defs = "\n".join(
-        f"::: marco\n**{d['termino']}**{f' · *{d['ingles']}*' if d.get('ingles') else ''}\n\n{d['definicion'].rstrip('.')}.\n:::"
+        f"::: marco\n**{d['termino']}**{f' · *{d['ingles']}*' if _ingles_util(d) else ''}\n\n{d['definicion'].rstrip('.')}.\n:::"
         for d in definiciones
     )
     total = len(bloques)

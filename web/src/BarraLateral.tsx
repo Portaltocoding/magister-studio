@@ -11,6 +11,8 @@ interface Props {
   alCambiar: () => void
   alCerrar?: () => void
   fija?: boolean
+  // Plegada y fuera de pantalla: ni Tab ni lector de pantalla entran en ella.
+  oculta?: boolean
   alFijar?: (si: boolean) => void
 }
 
@@ -34,6 +36,7 @@ export default function BarraLateral({
   alCambiar,
   alCerrar,
   fija = false,
+  oculta = false,
   alFijar,
 }: Props) {
   const [plegados, setPlegados] = useState<string[]>(leerPlegados)
@@ -48,7 +51,7 @@ export default function BarraLateral({
       return nuevo
     })
   return (
-    <aside className="lateral">
+    <aside className="lateral" inert={oculta}>
       <div className="marca">
         <span className="marca-nombre">Magister</span>
         {alFijar && (

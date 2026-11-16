@@ -3,6 +3,7 @@ import Markdown from 'react-markdown'
 import { enviarJson, flujo, pedir } from '../api.ts'
 import Vacio from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
+import { barajar } from '../barajar.ts'
 
 interface EnCola {
   concepto_id: string
@@ -178,7 +179,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
                 ))}
               </div>
               <div className="test-opciones">
-                {pregunta.opciones.map((o, k) => (
+                {barajar(pregunta.opciones, pregunta.pregunta_id).map((o, k) => (
                   <button
                     key={o}
                     type="button"

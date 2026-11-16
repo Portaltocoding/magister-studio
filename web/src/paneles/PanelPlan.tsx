@@ -15,6 +15,9 @@ import {
   type VistaPlan,
 } from '../api.ts'
 
+// Números a la española: coma decimal.
+const num = (n: number | null | undefined) => (n == null ? '0' : String(n).replace('.', ','))
+
 interface Props {
   alNuevoPlan: () => void
   temaInicial?: number | null
@@ -123,7 +126,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
           >
             <strong>{p.tema}</strong>
             <span className="nota">
-              {p.lecciones} lecciones · {p.total_horas} h · acaba {fechaCorta(p.fin)}
+              {p.lecciones} lecciones · {num(p.total_horas)} h · acaba {fechaCorta(p.fin)}
             </span>
             <span className="barra" aria-label={`Progreso ${pct(p.progreso)}`}>
               <span style={{ width: pct(p.progreso) }} />
@@ -166,7 +169,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       {vista && (
         <>
           <p className="nota">
-            Versión {vista.version} · {vista.horas_hechas} de {vista.total_horas} h hechas ({pct(vista.progreso)}) ·
+            Versión {vista.version} · {num(vista.horas_hechas)} de {num(vista.total_horas)} h hechas ({pct(vista.progreso)}) ·
             fin previsto {fechaCorta(vista.fin)}{' '}
             <button className="boton-mini" onClick={() => setHorario(!horario)}>
               Mi horario
@@ -212,7 +215,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                       {l.clave} · {l.titulo}
                     </strong>{' '}
                     <span className="nota-linea">
-                      {l.horas_hechas}/{l.horas} h · {l.estado}
+                      {num(l.horas_hechas)}/{num(l.horas)} h · {l.estado}
                       {l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''} ·{' '}
                       {l.sin_material ? 'sin material' : `${l.fuentes} fragmentos de tus fuentes`}
                     </span>{' '}
@@ -276,7 +279,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                       <ul>
                         {d.sesiones.map((x) => (
                           <li key={x.id} className={`sesion-${x.estado}`}>
-                            {x.inicio ?? ''} {x.clave} {x.titulo} · {x.horas} h
+                            {x.inicio ?? ''} {x.clave} {x.titulo} · {num(x.horas)} h
                             <select
                               aria-label={`Estado de ${x.clave} el ${d.fecha}`}
                               value={x.estado}

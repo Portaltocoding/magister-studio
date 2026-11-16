@@ -100,7 +100,10 @@ function estadoLeccion(e: EstadoLeccion | undefined): { clase: string; texto: st
 
 // Fichas y Vídeo: cada lección como un bloque de aprendizaje (apuntes, fichas, diapositivas y guion).
 export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 'video' }) {
-  const [planes, setPlanes] = useState<ResumenPlan[]>([])
+  // null mientras carga: así un fallo o una espera no se confunden con «no tienes plan».
+  const [planes, setPlanes] = useState<ResumenPlan[] | null>(null)
+  const [fallo, setFallo] = useState(false)
+  const [intento, setIntento] = useState(0)
   const [plan, setPlan] = useState<VistaPlan | null>(null)
   const [estados, setEstados] = useState<Record<string, EstadoLeccion>>({})
   const [clave, setClave] = useState<string | null>(null)
@@ -120,18 +123,22 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   useEffect(() => {
     const [, temaRuta, claveRuta, pestanaRuta] = window.location.hash.replace(/^#\/?/, '').split('/')
     if (['apuntes', 'fichas', 'diapositivas', 'guion'].includes(pestanaRuta)) setPestana(pestanaRuta as Pestana)
-    listarPlanes().then((ps) => {
-      setPlanes(ps)
-      const elegido = ps.find((p) => p.tema_id === Number(temaRuta)) ?? ps[0]
-      if (elegido)
-        verPlan(elegido.tema_id).then((v) => {
-          setPlan(v)
-          const valida = claveRuta && v.lecciones.some((l) => l.clave === claveRuta)
-          setClave(valida ? claveRuta : (v.lecciones[0]?.clave ?? null))
-        })
-      if (temaRuta) window.history.replaceState(null, '', `#/${modoVista === 'video' ? 'video' : 'fichas'}`)
-    })
-  }, [modoVista])
+    setFallo(false)
+    listarPlanes()
+      .then((ps) => {
+        setPlanes(ps)
+        const elegido = ps.find((p) => p.tema_id === Number(temaRuta)) ?? ps[0]
+        if (elegido)
+          Promise.all([verPlan(elegido.tema_id), pedir<{ leccion_clave?: string }>('/api/hoy').catch(() => null)]).then(([v, hoy]) => {
+            setPlan(v)
+            // Sin lección en la URL, abre la que toca hoy (no siempre la primera).
+            const existe = (c?: string | null) => !!c && v.lecciones.some((l) => l.clave === c)
+            setClave(existe(claveRuta) ? claveRuta : existe(hoy?.leccion_clave) ? hoy!.leccion_clave! : (v.lecciones[0]?.clave ?? null))
+          })
+        if (temaRuta) window.history.replaceState(null, '', `#/${modoVista === 'video' ? 'video' : 'fichas'}`)
+      })
+      .catch(() => setFallo(true))
+  }, [modoVista, intento])
 
   // Un enlace a otra lección (#/fichas/1/L4) con el panel ya abierto: se cambia de lección sin recargar.
   useEffect(() => {
@@ -285,7 +292,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   const diapos = datos?.materiales.diapositivas
   const guion = datos?.materiales.guion
   const leccion = plan?.lecciones.find((l) => l.clave === clave)
-  const temaNombre = planes.find((p) => p.plan_id === plan?.plan_id)?.tema ?? ''
+  const temaNombre = (planes ?? []).find((p) => p.plan_id === plan?.plan_id)?.tema ?? ''
   const pestanas: { id: Pestana; nombre: string; hay: boolean }[] = [
     { id: 'apuntes', nombre: 'Apuntes', hay: !!textos.apuntes },
     { id: 'fichas', nombre: `Fichas${datos?.preguntas.length ? ` (${datos.preguntas.length})` : ''}`, hay: !!datos?.preguntas.length },
@@ -293,10 +300,22 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     { id: 'guion', nombre: 'Guion', hay: !!textos.guion },
   ]
 
+  if (planes === null)
+    return fallo ? (
+      <div className="panel">
+        <h1>Lecciones</h1>
+        <p role="alert" className="nota">No he podido cargar tus lecciones. Comprueba que Magister sigue en marcha.</p>
+        <button className="boton" onClick={() => setIntento((x) => x + 1)}>
+          Reintentar
+        </button>
+      </div>
+    ) : (
+      <Pensando texto="Cargando tus lecciones…" />
+    )
   if (!planes.length)
     return (
       <div className="panel">
-        <h1>{modoVista === 'video' ? 'Vídeo' : 'Fichas'}</h1>
+        <h1>{modoVista === 'video' ? 'Vídeo' : 'Lecciones'}</h1>
         <Vacio
           etiqueta="Sin plan todavía"
           titulo="Aquí estará cada lección de tu plan"

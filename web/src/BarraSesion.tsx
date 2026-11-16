@@ -53,9 +53,11 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
         </span>
       ))}
       <button type="button" className="boton-buscar" onClick={() => window.dispatchEvent(new Event('magister-paleta'))} title="Ir a o hacer (Ctrl+K)">
-        Buscar <kbd>Ctrl K</kbd>
+        <span className="buscar-texto">Buscar</span> <kbd>Ctrl K</kbd>
       </button>
-      <span className={estado === 'conectado' ? 'estado estado-si' : 'estado estado-no'}>{estado}</span>
+      <span className={estado === 'conectado' ? 'estado estado-si' : 'estado estado-no'} title={estado}>
+        <span className="estado-texto">{estado}</span>
+      </span>
       <Tomate />
       <Afinar />
     </header>

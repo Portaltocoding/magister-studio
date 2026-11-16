@@ -75,7 +75,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
   useEffect(() => {
     if (todas) return
     const tecla = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest('input, textarea, select')) return
+      if ((e.target as HTMLElement).closest('input, textarea, select, button, a, summary, [role=tab]')) return
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault()
         setGirada((g) => !g)

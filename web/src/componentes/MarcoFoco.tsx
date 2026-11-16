@@ -68,6 +68,7 @@ export default function MarcoFoco(p: Props) {
         if (e.key === 'Escape') (escribiendo as HTMLElement).blur()
         return
       }
+      if (e.ctrlKey || e.metaKey) return
       if (teclas?.(e)) return
       if (e.key === 'Escape' && !document.fullscreenElement) salir()
       else if (e.key === 'l') setLupa((x) => !x)

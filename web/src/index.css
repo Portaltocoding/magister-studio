@@ -495,3 +495,11 @@ body { overflow: hidden; }
 .fondo-plan:hover { opacity: 0.95; outline: 1px solid var(--acento); }
 .item-plan { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .item-plan label { flex: 1; min-width: 0; }
+
+
+/* ===== Revisión: contraste y movimiento ===== */
+.celda-hoy .celda-numero { color: var(--fondo); }
+:root { accent-color: var(--texto); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
