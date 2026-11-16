@@ -131,15 +131,6 @@ export function mensajePlan(r: Respuestas): string {
 // Antes de generar el material de una lección.
 export const PREGUNTAS_MATERIAL: Pregunta[] = [
   {
-    id: 'tipos', titulo: '¿Qué te preparo?', tipo: 'varias', porDefecto: ['apuntes', 'preguntas', 'diapositivas'],
-    opciones: [
-      { valor: 'apuntes', etiqueta: 'Apuntes en PDF', desc: 'Siempre: lo demás sale de aquí' },
-      { valor: 'preguntas', etiqueta: 'Fichas de repaso', desc: 'Con respuesta fantasma' },
-      { valor: 'diapositivas', etiqueta: 'Diapositivas' },
-      { valor: 'guion', etiqueta: 'Guion de vídeo' },
-    ],
-  },
-  {
     id: 'profundidad', titulo: '¿Con qué profundidad?', tipo: 'una',
     opciones: [
       { valor: 'intro', etiqueta: 'Introducción', desc: 'Lo esencial, rápido' },

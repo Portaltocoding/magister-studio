@@ -27,6 +27,13 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], 
 
     await progreso("entrada", 0, 1)
     entrada = await entrada_de_leccion(plan_id, clave)
+    # Diapositivas y guion se piden aparte, con un botón: salen de los apuntes que ya tienes, sin rehacerlos.
+    if not {"apuntes", "preguntas"} & set(tipos):
+        previos = await almacen.ultimos_apuntes(plan_id, clave)
+        if previos is None or not previos.texto:
+            raise ValueError("Primero prepara la lección: las diapositivas y el guion salen de sus apuntes.")
+        entrada.preferencias = preferencias or {}
+        return await _extras(trabajo_id, plan_id, clave, tipos, entrada, previos.texto, progreso, parar)
     await enriquecer(plan_id, clave, entrada.titulo, entrada.objetivos)
     entrada = await entrada_de_leccion(plan_id, clave)
     entrada.preferencias = preferencias or {}
@@ -68,14 +75,19 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], 
     if any(a["gravedad"] == "veto" for a in r.avisos):
         cambios.update(estado="bloqueado", motivo="el PDF tiene la raya larga")
     await almacen.actualizar(mid, **cambios)
+    return materiales + await _extras(trabajo_id, plan_id, clave, tipos, entrada, m.texto or "", progreso, parar)
 
+
+async def _extras(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], entrada, texto_apuntes: str, progreso, parar) -> list[int]:
+    """Diapositivas y guion a partir del texto de los apuntes."""
+    materiales: list[int] = []
     if "diapositivas" in tipos:
         if await parar():
             raise Cancelado()
         await progreso("diapositivas", 0, 1)
         did = await almacen.nuevo_material(plan_id, clave, "diapositivas", trabajo_id)
         materiales.append(did)
-        p = await generar_diapositivas(m.texto or "")
+        p = await generar_diapositivas(texto_apuntes)
         marp = montar_marp(p, entrada.titulo, clave, entrada.tema)
         hallazgos = auditar_diapositivas(marp) + lint.revisar(marp, "diapositivas")
         rutas_d = await pintar_marp(marp, plan_id, clave)
@@ -89,7 +101,7 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], 
         await progreso("guion", 0, 1)
         gid = await almacen.nuevo_material(plan_id, clave, "guion", trabajo_id)
         materiales.append(gid)
-        texto = await generar_guion(entrada, m.texto or "", ajustes.duracion_guion_min)
+        texto = await generar_guion(entrada, texto_apuntes, ajustes.duracion_guion_min)
         hallazgos = auditar_guion(texto, ajustes.duracion_guion_min) + lint.revisar(texto, "guion")
         ruta = almacen.carpeta_salidas(plan_id, clave) / "guion.md"
         ruta.write_text(texto, encoding="utf-8")

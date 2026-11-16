@@ -39,7 +39,8 @@ class Preferencias(BaseModel):
 
 
 class PedirMaterial(BaseModel):
-    tipos: list[Literal["apuntes", "preguntas", "diapositivas", "guion"]] = ["apuntes", "preguntas", "diapositivas", "guion"]
+    # Preparar una lección: apuntes y fichas. Diapositivas y guion se piden aparte, con su botón.
+    tipos: list[Literal["apuntes", "preguntas", "diapositivas", "guion"]] = Field(default_factory=lambda: ["apuntes", "preguntas"], min_length=1)
     forzar: bool = False
     preferencias: Preferencias = Preferencias()
 

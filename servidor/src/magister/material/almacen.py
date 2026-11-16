@@ -127,3 +127,11 @@ async def actualizar(material_id: int, **valores) -> None:
 async def material(material_id: int) -> Material | None:
     async with nueva_sesion() as s:
         return await s.get(Material, material_id)
+
+
+async def ultimos_apuntes(plan_id: int, clave: str) -> Material | None:
+    """Los apuntes más recientes que no estén a medias: de ellos salen las diapositivas y el guion que pidas aparte."""
+    async with nueva_sesion() as s:
+        return await s.scalar(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave,
+                                                     Material.tipo == "apuntes", Material.estado != "generando")
+                              .order_by(Material.id.desc()).limit(1))

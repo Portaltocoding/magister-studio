@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
+import Pensando from '../componentes/Pensando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 
 // Vídeo: entender una lección antes de estudiarla. El guion se narra por escenas con la voz del equipo,
@@ -228,16 +229,40 @@ export default function PanelVideo() {
   const [plan, setPlan] = useState<VistaPlan | null>(null)
   const [estados, setEstados] = useState<Estados>({})
   const [clave, setClave] = useState<string | null>(null)
+  const [haciendo, setHaciendo] = useState<string | null>(null)
+
+  const cargarEstados = useCallback((planId: number) => pedir<Estados>(`/api/planes/${planId}/materiales`).then(setEstados), [])
 
   useEffect(() => {
     listarPlanes().then((ps) => {
       setPlanes(ps)
       if (ps[0]) {
         verPlan(ps[0].tema_id).then(setPlan)
-        pedir<Estados>(`/api/planes/${ps[0].plan_id}/materiales`).then(setEstados)
+        cargarEstados(ps[0].plan_id)
       }
     })
-  }, [])
+  }, [cargarEstados])
+
+  // Mientras se hace un vídeo, se mira cada pocos segundos si ya está.
+  useEffect(() => {
+    if (!haciendo || !plan) return
+    const t = setInterval(async () => {
+      const e = await pedir<Estados & Record<string, { en_marcha?: boolean }>>(`/api/planes/${plan.plan_id}/materiales`)
+      setEstados(e)
+      if (e[haciendo]?.ids?.guion && !e[haciendo]?.en_marcha) {
+        setClave(haciendo)
+        setHaciendo(null)
+      }
+    }, 5000)
+    return () => clearInterval(t)
+  }, [haciendo, plan])
+
+  const hacerVideo = async (c: string) => {
+    if (!plan) return
+    const tipos = estados[c]?.ids?.diapositivas ? ['guion'] : ['guion', 'diapositivas']
+    await pedir(`/api/planes/${plan.plan_id}/lecciones/${c}/material`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ forzar: true, tipos }) })
+    setHaciendo(c)
+  }
 
   if (planes == null) return <p className="vacio">Cargando…</p>
   if (!plan)
@@ -266,9 +291,14 @@ export default function PanelVideo() {
       ) : (
         <Vacio
           etiqueta="Sin vídeos todavía"
-          titulo="Prepara el guion de una lección"
-          texto="Al preparar una lección, marca «Guion de vídeo». Aquí se verá narrado, con subtítulos y sus diapositivas."
+          titulo="Aún no tienes vídeos"
+          texto="Elige abajo una lección preparada y pulsa «Hacer el vídeo»: se escribe su guion por escenas y se ve aquí narrado, con subtítulos y sus diapositivas."
         />
+      )}
+      {haciendo && (
+        <p className="nota video-haciendo">
+          <Pensando texto={`Haciendo el vídeo de ${haciendo}: guion por escenas${estados[haciendo]?.ids?.diapositivas ? '' : ' y diapositivas'}. Tarda un par de minutos; puedes seguir con otra cosa.`} />
+        </p>
       )}
       <section className="pg-seccion">
         <h2>Biblioteca</h2>
@@ -282,15 +312,21 @@ export default function PanelVideo() {
               </button>
             </li>
           ))}
-          {sinVideo.map((l) => (
-            <li key={l.clave} className="sin-video">
-              <button onClick={() => irARuta(`#/fichas/${plan.tema_id}/${l.clave}`)}>
-                <span className="bloques-clave">{l.clave}</span>
-                <span>{l.titulo}</span>
-                <small>Preparar guion →</small>
-              </button>
-            </li>
-          ))}
+          {sinVideo.map((l) => {
+            const preparada = !!estados[l.clave]?.ids?.apuntes
+            return (
+              <li key={l.clave} className="sin-video">
+                <button
+                  disabled={haciendo != null}
+                  onClick={() => (preparada ? hacerVideo(l.clave) : irARuta(`#/fichas/${plan.tema_id}/${l.clave}`))}
+                >
+                  <span className="bloques-clave">{l.clave}</span>
+                  <span>{l.titulo}</span>
+                  <small>{haciendo === l.clave ? 'Haciéndolo…' : preparada ? 'Hacer el vídeo' : 'Preparar la lección →'}</small>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       </section>
     </div>

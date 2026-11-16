@@ -19,7 +19,7 @@ import Pensando from '../componentes/Pensando.tsx'
 
 // Lo que sale si no eliges nada: lo de casi siempre.
 const RECOMENDADO: Respuestas = {
-  tipos: ['apuntes', 'preguntas', 'diapositivas'],
+  tipos: ['apuntes', 'preguntas'],
   profundidad: 'estandar',
   preguntas: 'mezcla',
   cantidad: 'normal',
@@ -28,12 +28,7 @@ const RECOMENDADO: Respuestas = {
 const AVANCE = [
   { titulo: 'Apuntes', texto: 'Para leer aquí como un libro o bajar en PDF' },
   { titulo: 'Fichas', texto: 'Preguntas de memoria, de una en una' },
-  { titulo: 'Diapositivas', texto: 'Unas doce, para repasar de un vistazo' },
   { titulo: 'Repaso', texto: 'Sus conceptos entran en tu repaso diario' },
-]
-const AVANCE_VIDEO = [
-  { titulo: 'Apuntes', texto: 'La base de la que sale todo' },
-  { titulo: 'Guion', texto: 'Para grabarlo en vídeo, por partes' },
 ]
 
 interface MaterialInfo {
@@ -138,6 +133,19 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     })
   }, [modoVista])
 
+  // Un enlace a otra lección (#/fichas/1/L4) con el panel ya abierto: se cambia de lección sin recargar.
+  useEffect(() => {
+    const alCambiar = () => {
+      const [modoRuta, , claveRuta, pestanaRuta] = window.location.hash.replace(/^#\/?/, '').split('/')
+      if (modoRuta !== 'fichas' || !claveRuta) return
+      setClave(claveRuta)
+      if (['apuntes', 'fichas', 'diapositivas', 'guion'].includes(pestanaRuta)) setPestana(pestanaRuta as Pestana)
+      window.history.replaceState(null, '', '#/fichas')
+    }
+    window.addEventListener('hashchange', alCambiar)
+    return () => window.removeEventListener('hashchange', alCambiar)
+  }, [])
+
   const cargarEstados = useCallback(() => {
     if (plan) pedir<Record<string, EstadoLeccion>>(`/api/planes/${plan.plan_id}/materiales`).then(setEstados)
   }, [plan])
@@ -202,7 +210,8 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     if (!plan || !clave) return
     setError(null)
     setPreguntando(null)
-    const tipos = Array.from(new Set(['apuntes', ...((r.tipos as string[]) ?? [])]))
+    // Preparar = apuntes y fichas; diapositivas y guion se piden aparte, con su botón.
+    const tipos = Array.from(new Set(['apuntes', ...((r.tipos as string[]) ?? ['preguntas'])]))
     const preferencias = {
       profundidad: r.profundidad,
       preguntas: r.preguntas,
@@ -214,6 +223,22 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
       const res = await pedir<{ trabajo_id: number }>(
         `/api/planes/${plan.plan_id}/lecciones/${clave}/material`,
         enviarJson({ forzar, tipos, preferencias }),
+      )
+      seguir(res.trabajo_id)
+      cargarEstados()
+    } catch (e) {
+      setError(String((e as Error).message))
+    }
+  }
+
+  // Diapositivas y guion, a mano: salen de los apuntes que ya tienes.
+  const pedirExtra = async (tipo: 'diapositivas' | 'guion') => {
+    if (!plan || !clave) return
+    setError(null)
+    try {
+      const res = await pedir<{ trabajo_id: number }>(
+        `/api/planes/${plan.plan_id}/lecciones/${clave}/material`,
+        enviarJson({ forzar: true, tipos: [tipo], preferencias: { estilo } }),
       )
       seguir(res.trabajo_id)
       cargarEstados()
@@ -407,7 +432,6 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                   role="tab"
                   aria-selected={pestana === p.id}
                   className={pestana === p.id ? 'activa' : ''}
-                  disabled={!p.hay}
                   onClick={() => setPestana(p.id)}
                 >
                   {p.nombre}
@@ -425,6 +449,22 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               </div>
             )}
             {pestana === 'guion' && textos.guion && <TextoLibro markdown={textos.guion} className="guion" />}
+            {pestana === 'diapositivas' && !diapos && !enCurso && (
+              <Vacio
+                etiqueta="Sin diapositivas"
+                titulo="Las diapositivas se hacen cuando las pides"
+                texto="Unas doce, con los colores del libro, a partir de los apuntes de esta lección. Tarda un par de minutos."
+                acciones={[{ texto: 'Hacer las diapositivas', principal: true, alPulsar: () => pedirExtra('diapositivas') }]}
+              />
+            )}
+            {pestana === 'guion' && !guion && !enCurso && (
+              <Vacio
+                etiqueta="Sin guion"
+                titulo="El guion del vídeo se escribe cuando lo pides"
+                texto="Por escenas, para verlo narrado en Vídeo. Sale de los apuntes de esta lección y tarda un par de minutos."
+                acciones={[{ texto: 'Escribir el guion', principal: true, alPulsar: () => pedirExtra('guion') }]}
+              />
+            )}
           </>
         )}
         {datos && !apuntes && !enCurso && !preguntando && (
@@ -433,12 +473,12 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
             titulo="Prepárala y tendrás todo esto"
             texto="El tutor escribe la lección bloque a bloque con tus fuentes, revisa el tono y comprueba que no falte nada. Tarda unos minutos y puedes seguir usando la app mientras tanto."
             acciones={[
-              { texto: 'Prepararla con lo recomendado', principal: true, alPulsar: () => generar(false, modoVista === 'video' ? { ...RECOMENDADO, tipos: ['apuntes', 'guion'] } : RECOMENDADO) },
+              { texto: 'Prepararla con lo recomendado', principal: true, alPulsar: () => generar(false, RECOMENDADO) },
               { texto: 'Elegir yo las opciones', alPulsar: () => setPreguntando({ forzar: false }) },
             ]}
           >
             <ul className="vacio-avance">
-              {(modoVista === 'video' ? AVANCE_VIDEO : AVANCE).map((a) => (
+              {AVANCE.map((a) => (
                 <li key={a.titulo}>
                   <strong>{a.titulo}</strong>
                   <span>{a.texto}</span>
