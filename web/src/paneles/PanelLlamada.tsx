@@ -3,6 +3,7 @@ import { crearConversacion, enviar, listarPlanes, pedir, verPlan, type ExtraMens
 import { esEco, frases, Locutor, Oido, paraLeer } from '../componentes/voz.ts'
 import { todosLosModos, usarPreferencias } from '../componentes/preferencias.ts'
 import Mascota from '../Mascota.tsx'
+import ControlVoz from '../componentes/ControlVoz.tsx'
 import { escenas } from './PanelVideo.tsx'
 
 // La llamada: hablas con tu tutor como por teléfono, sin pulsar nada.
@@ -54,7 +55,6 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
   const [clave, setClave] = useState<string>(ruta[2] ?? '')
   const [modo, setModo] = useState<string>('')
   const [noCuenta, setNoCuenta] = useState(false)
-  const [velocidad, setVelocidad] = useState(1.05)
 
   const [fase, setFase] = useState<'preparar' | 'llamada' | 'colgada'>('preparar')
   const [estado, setEstadoVista] = useState<Estado>('conectando')
@@ -111,9 +111,6 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     return () => window.clearInterval(t)
   }, [fase])
 
-  useEffect(() => {
-    locutor.current.velocidad = velocidad
-  }, [velocidad])
 
   // Al salir de la pantalla, se cuelga.
   useEffect(
@@ -329,7 +326,6 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     configurarOido()
     if (!mudo) oido.current.empezar()
     const l = locutor.current
-    l.velocidad = velocidad
     if (tipo === 'clase') {
       const p = preparadas[clave]
       const lista: Frase[] = []
@@ -509,16 +505,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           </label>
         )}
         <div className="llamada-ajustes">
-          <label>
-            Velocidad de la voz{' '}
-            <select value={velocidad} onChange={(e) => setVelocidad(Number(e.target.value))}>
-              {[0.95, 1, 1.05, 1.15, 1.3].map((v) => (
-                <option key={v} value={v}>
-                  {String(v).replace('.', ',')}×
-                </option>
-              ))}
-            </select>
-          </label>
+          <ControlVoz />
           <label>
             <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} /> Esto no cuenta para el tutor
           </label>
@@ -607,6 +594,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           <button className="boton">Enviar</button>
         </form>
       )}
+      <ControlVoz compacto />
       <div className="llamada-botones">
         <button className={`llamada-boton ${mudo ? 'activo' : ''}`} onClick={alternarMudo} aria-pressed={mudo} title={mudo ? 'Activar el micro' : 'Silenciar el micro'}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>

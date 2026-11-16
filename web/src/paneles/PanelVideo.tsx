@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { enviarJson, listarPlanes, pedir, verPlan, type VistaPlan } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
+import ControlVoz, { usarAjustesVoz } from '../componentes/ControlVoz.tsx'
+import { vozElegida } from '../componentes/voz.ts'
 
 // Vídeo: entender una lección (o un concepto) antes de estudiarla. El guion se narra por escenas con la voz
 // del equipo, con subtítulos y las diapositivas a la par. Cada vídeo lo pides tú: qué, con qué estilo y cuánto dura.
@@ -34,7 +36,6 @@ const NOMBRE_ESTILO = Object.fromEntries(ESTILOS.map((e) => [e.id, e.nombre]))
 
 const MARCAS: Record<string, string> = { intuicion: 'Intuición', choque: 'Choque', nombre: 'Nombre', teoria: 'Teoría' }
 const nombreMarca = (m: string) => MARCAS[m] ?? m.charAt(0).toUpperCase() + m.slice(1)
-const VELOCIDADES = [0.9, 1, 1.15, 1.3]
 
 export function escenas(guion: string): Escena[] {
   const salida: Escena[] = []
@@ -62,7 +63,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
   const [e, setE] = useState(0)
   const [f, setF] = useState(0)
   const [voz, setVoz] = useState<EstadoVoz>('parado')
-  const [velocidad, setVelocidad] = useState(1)
+  const [{ velocidad, voz: nombreVoz }] = usarAjustesVoz()
   const [laVoz, setLaVoz] = useState<SpeechSynthesisVoice | null>(null)
   const marco = useRef<HTMLIFrameElement | null>(null)
   const turno = useRef(0)
@@ -116,7 +117,8 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
       }
       const u = new SpeechSynthesisUtterance(frase)
       u.lang = 'es-ES'
-      if (laVoz) u.voice = laVoz
+      const elegida = vozElegida() ?? laVoz
+      if (elegida) u.voice = elegida
       u.rate = velocidad
       u.onend = () => {
         if (mio !== turno.current) return
@@ -134,8 +136,16 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
       }
       sintesis.speak(u)
     },
-    [lista, laVoz, velocidad],
+    [lista, laVoz, velocidad, nombreVoz],
   )
+
+  // Si cambias la velocidad o la voz mientras suena, la frase de ahora se repite ya con lo nuevo.
+  const sonando = useRef(false)
+  sonando.current = voz === 'sonando'
+  useEffect(() => {
+    if (sonando.current) decir(e, f)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [velocidad, nombreVoz])
 
   // Pausa de verdad: se detiene a mitad de frase y sigue desde ahí.
   const tocar = () => {
@@ -232,16 +242,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
         <span className="barra video-barra">
           <span style={{ width: `${total ? (hechas / total) * 100 : 0}%` }} />
         </span>
-        <label className="nota">
-          Velocidad{' '}
-          <select value={velocidad} onChange={(x) => setVelocidad(Number(x.target.value))}>
-            {VELOCIDADES.map((v) => (
-              <option key={v} value={v}>
-                {String(v).replace('.', ',')}×
-              </option>
-            ))}
-          </select>
-        </label>
+        <ControlVoz compacto />
       </div>
       {!laVoz && <p className="nota">No encuentro una voz en español instalada en tu equipo: se usará la que tenga el navegador.</p>}
       <div className="video-info">

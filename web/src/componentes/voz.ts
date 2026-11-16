@@ -36,6 +36,42 @@ export function paraLeer(t: string): string {
     .trim()
 }
 
+// Velocidad y voz, compartidas por la llamada, Hablar y el vídeo, y recordadas en el navegador.
+// Con las voces de Windows, Chrome redondea la velocidad a pasos enteros: por eso los pasos son grandes (1,05× no se nota).
+export const VELOCIDADES = [0.8, 1, 1.25, 1.5, 1.75, 2]
+export interface AjustesVoz {
+  velocidad: number
+  voz: string | null // nombre de la voz; null = la local en español
+}
+const CLAVE_VOZ = 'magister-voz'
+export function leerAjustesVoz(): AjustesVoz {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_VOZ) ?? '{}')
+    return { velocidad: VELOCIDADES.includes(v.velocidad) ? v.velocidad : 1, voz: typeof v.voz === 'string' ? v.voz : null }
+  } catch {
+    return { velocidad: 1, voz: null }
+  }
+}
+export function guardarAjustesVoz(a: AjustesVoz) {
+  try {
+    localStorage.setItem(CLAVE_VOZ, JSON.stringify(a))
+  } catch {
+    /* sin almacenamiento */
+  }
+  window.dispatchEvent(new CustomEvent('magister-voz', { detail: a }))
+}
+export function vocesEspanol(): SpeechSynthesisVoice[] {
+  return (window.speechSynthesis?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().startsWith('es'))
+}
+export function vozElegida(): SpeechSynthesisVoice | null {
+  const nombre = leerAjustesVoz().voz
+  return (nombre && vocesEspanol().find((v) => v.name === nombre)) || vozLocal()
+}
+
+// Los locutores que están hablando: si cambias la velocidad o la voz, repiten la frase que suena con lo nuevo.
+const hablando = new Set<Locutor>()
+window.addEventListener('magister-voz', () => hablando.forEach((l) => l.repetirActual()))
+
 export const frases = (t: string) => t.split(/(?<=[.!?…:;])\s+(?=\S)/).map((x) => x.trim()).filter(Boolean)
 
 const palabras = (t: string) =>
@@ -62,8 +98,6 @@ export class Locutor {
   private cerrado = false
   private enviadas = 0
   private fin: (() => void) | null = null
-  voz: SpeechSynthesisVoice | null = vozLocal()
-  velocidad = 1.05
   // Lo último que ha dicho (para reconocer el eco) y la frase que suena (para el subtítulo).
   reciente = ''
   actual = ''
@@ -104,7 +138,15 @@ export class Locutor {
     })
   }
 
+  // Vuelve a decir la frase que suena (con la velocidad y la voz de ahora).
+  repetirActual() {
+    if (!this.hablando || !this.actual) return
+    this.cola.unshift(this.actual)
+    window.speechSynthesis?.cancel() // su onend/onerror lanza la siguiente: la misma, otra vez
+  }
+
   parar() {
+    hablando.delete(this)
     this.cola = []
     this.hablando = false
     window.speechSynthesis?.cancel()
@@ -127,19 +169,25 @@ export class Locutor {
   private siguiente() {
     const frase = this.cola.shift()
     if (frase == null) {
+      hablando.delete(this)
       this.hablando = false
       this.actual = ''
       if (this.cerrado) this.acabar()
       return
     }
     this.hablando = true
+    hablando.add(this)
+    const repetida = frase === this.actual
     this.actual = frase
-    this.reciente = (this.reciente + ' ' + frase).slice(-600)
-    this.alFrase?.(frase)
+    if (!repetida) {
+      this.reciente = (this.reciente + ' ' + frase).slice(-600)
+      this.alFrase?.(frase)
+    }
     const u = new SpeechSynthesisUtterance(frase)
     u.lang = 'es-ES'
-    if (this.voz) u.voice = this.voz
-    u.rate = this.velocidad
+    const voz = vozElegida()
+    if (voz) u.voice = voz
+    u.rate = leerAjustesVoz().velocidad
     u.onend = () => this.hablando && this.siguiente()
     u.onerror = () => this.hablando && this.siguiente()
     window.speechSynthesis.speak(u)

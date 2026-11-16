@@ -77,7 +77,7 @@ async def poner_estilo(plan_id: int, cuerpo: Estilo) -> dict:
 class Parrafo(BaseModel):
     clave: str = Field(max_length=10)
     parrafo: str = Field(min_length=3, max_length=4000)
-    accion: Literal["facil", "ejemplo", "porque", "clave", "pregunta"]
+    accion: Literal["facil", "ejemplo", "porque", "clave", "codigo", "pregunta", "comprobar"]
     pregunta: str | None = Field(None, max_length=500)
 
 

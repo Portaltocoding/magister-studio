@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Colores from './Colores.tsx'
 import { acentoDe, usarColores, variables } from './colores.ts'
 
@@ -11,6 +11,8 @@ interface Props {
   pasos?: ReactNode
   reloj?: ReactNode
   herramientas?: ReactNode
+  // Lo que va dentro de «Ajustes ▾» además de lupa, colores y pantalla completa (por ejemplo, el ritmo).
+  ajustes?: ReactNode
   aviso?: ReactNode
   pie?: ReactNode
   lateral?: ReactNode
@@ -43,6 +45,14 @@ export default function MarcoFoco(p: Props) {
   const [lupa, setLupa] = usarLupa()
   const [pantalla, setPantalla] = useState(!!document.fullscreenElement)
   const [ajuste] = usarColores()
+  const [menu, setMenu] = useState(false)
+  const caja = useRef<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    if (!menu) return
+    const fuera = (e: MouseEvent) => caja.current && !caja.current.contains(e.target as Node) && setMenu(false)
+    document.addEventListener('mousedown', fuera)
+    return () => document.removeEventListener('mousedown', fuera)
+  }, [menu])
   const { alSalir, teclas } = p
 
   const salir = useCallback(() => {
@@ -98,14 +108,25 @@ export default function MarcoFoco(p: Props) {
         <div className="foco-centro">{p.pasos}</div>
         <div className="foco-herramientas">
           {p.reloj}
-          <button className="foco-boton" aria-pressed={lupa} onClick={() => setLupa(!lupa)} title="Acercar el párrafo bajo el ratón (L)">
-            Lupa
-          </button>
           {p.herramientas}
-          <Colores leccion={p.leccion} clase="foco-boton" />
-          <button className="foco-boton" onClick={pantallaCompleta} title="Pantalla completa">
-            {pantalla ? 'Ventana' : 'Pantalla completa'}
-          </button>
+          {/* Lo de estudiar, a la vista; lo de ajustar la pantalla, en un menú. */}
+          <span className="foco-ajustes" ref={caja}>
+            <button className="foco-boton" aria-expanded={menu} onClick={() => setMenu(!menu)} title="Lupa, colores, ritmo y pantalla completa">
+              Ajustes ▾
+            </button>
+            {menu && (
+              <span className="foco-ajustes-caja">
+                <button className="foco-boton" aria-pressed={lupa} onClick={() => setLupa(!lupa)} title="Acercar el párrafo bajo el ratón (L)">
+                  {lupa ? '✓ ' : ''}Lupa
+                </button>
+                <Colores leccion={p.leccion} clase="foco-boton" />
+                <button className="foco-boton" onClick={pantallaCompleta}>
+                  {pantalla ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                </button>
+                {p.ajustes}
+              </span>
+            )}
+          </span>
           <button className="foco-boton foco-salir" onClick={salir} title="Salir (Esc)">
             Salir
           </button>

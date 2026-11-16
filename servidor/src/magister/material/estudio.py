@@ -265,6 +265,7 @@ PEDIDOS = {
     "ejemplo": "Un ejemplo concreto y cotidiano de lo que dice el párrafo.",
     "porque": "¿Por qué es así? La razón de fondo de lo que afirma el párrafo.",
     "clave": "Las 2 o 3 palabras clave del párrafo y cómo se conectan, en una frase.",
+    "codigo": "Explícame este código línea a línea, en frases cortas: qué hace cada parte y para qué.",
 }
 
 
@@ -278,20 +279,23 @@ async def ayuda_parrafo(mid: int, clave_bloque: str, parrafo: str, accion: str, 
     b = next((x for x in bloques if x.clave == clave_bloque), None)
     if b is None:
         raise ValueError("ese apartado no existe")
-    if accion == "pregunta" and not (pregunta or "").strip():
+    if accion in ("pregunta", "comprobar") and not (pregunta or "").strip():
         raise ValueError("falta la pregunta")
     huella = hashlib.sha256(f"{accion}|{parrafo}".encode()).hexdigest()[:16]
     clave = f"parrafo_{mid}_{huella}"
-    if accion != "pregunta":
+    if accion not in ("pregunta", "comprobar"):
         hecho = await _leer(clave)
         if hecho and hecho.get("version") == _version(m):
             return hecho["texto"]
     titulos = {x["clave"]: x["titulo"] for x in (m.contrato or {}).get("bloques", [])}
-    pedido = PEDIDOS.get(accion) or f"Su pregunta sobre el párrafo: {pregunta}"
+    pedido = PEDIDOS.get(accion) or (
+        f"Ha explicado con sus palabras lo que acaba de leer: «{pregunta}». Dile si lo ha entendido (sé concreto) y, si le "
+        "falta algo esencial o se equivoca, qué en una frase. Si está bien, díselo y añade un matiz que lo enriquezca."
+        if accion == "comprobar" else f"Su pregunta sobre el párrafo: {pregunta}")
     sistema = cargar("parrafo").rellenar(pedido=pedido, alumno=await alumno(m.plan_id), titulo=titulos.get(b.clave, b.titulo),
                                          apartado=b.texto[:8000], parrafo=parrafo[:3000])
     texto = "".join([t async for t in generar(sistema, [Turno("usuario", pregunta or pedido)])]).strip()
-    if accion != "pregunta":
+    if accion not in ("pregunta", "comprobar"):
         await _guardar(clave, {"texto": texto, "version": _version(m)})
     return texto
 

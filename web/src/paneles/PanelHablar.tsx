@@ -3,6 +3,7 @@ import { crearConversacion, enviar } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Mascota from '../Mascota.tsx'
 import { Locutor } from '../componentes/voz.ts'
+import ControlVoz from '../componentes/ControlVoz.tsx'
 
 // Hablar: estudias de palabra. Dices tu pregunta, el tutor contesta para el oído y te lo lee; luego vuelve a escucharte.
 // La respuesta se lee con una voz instalada en tu equipo. El dictado usa el reconocimiento de voz del navegador.
@@ -53,7 +54,6 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
   const [parcial, setParcial] = useState('')
   const [escrito, setEscrito] = useState('')
   const [seguido, setSeguido] = useState(true)
-  const [velocidad, setVelocidad] = useState(1.05)
   const [error, setError] = useState<string | null>(null)
   const cid = useRef<number | null>(null)
   const rec = useRef<Reconocimiento | null>(null)
@@ -124,7 +124,6 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
       // Empieza a hablar con la primera frase, sin esperar a la respuesta entera.
       const l = locutor.current
       l.nueva()
-      l.velocidad = velocidad
       l.alFrase = () => setEstado('hablando')
       for await (const ev of enviar(cid.current, texto, control.current.signal, true, true)) {
         if (ev.tipo === 'delta') {
@@ -196,16 +195,7 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
         <label>
           <input type="checkbox" checked={seguido} onChange={(e) => setSeguido(e.target.checked)} /> Volver a escuchar al acabar
         </label>
-        <label>
-          Velocidad{' '}
-          <select value={velocidad} onChange={(e) => setVelocidad(Number(e.target.value))}>
-            {[0.9, 1, 1.05, 1.15, 1.3].map((v) => (
-              <option key={v} value={v}>
-                {String(v).replace('.', ',')}×
-              </option>
-            ))}
-          </select>
-        </label>
+        <ControlVoz />
       </div>
       {error && <p role="alert">{error}</p>}
       <p className="nota hablar-aviso">

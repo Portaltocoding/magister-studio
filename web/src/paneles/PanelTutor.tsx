@@ -281,7 +281,6 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   // Cada 25 minutos: reexplicar lo que llevas antes de la pausa.
   const [reexplicando, setReexplicando] = useState(false)
   const [ritmo, setRitmo] = useState<Ritmo>(leerRitmo)
-  const [verRitmo, setVerRitmo] = useState(false)
   const [verMapa, setVerMapa] = useState(false)
   const { mapa, cambiar: cambiarMapa, anadir: anadirAlMapa } = usarMapa(mid)
   const [papel, setPapel] = useState<HTMLDivElement | null>(null)
@@ -411,35 +410,6 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
               Reexplicar
             </button>
           )}
-          <span className="foco-ritmo">
-            <button className="foco-boton" aria-expanded={verRitmo} onClick={() => setVerRitmo(!verRitmo)} title="Cada cuánto paras y cuándo reexplicas">
-              Ritmo
-            </button>
-            {verRitmo && (
-              <span className="foco-ritmo-caja">
-                <label>
-                  Pausa
-                  <select value={ritmo.pausa} onChange={(e) => { const r = { ...ritmo, pausa: Number(e.target.value) }; setRitmo(r); guardarRitmo(r) }}>
-                    {[15, 25, 40, 50].map((m) => (
-                      <option key={m} value={m}>
-                        cada {m} min
-                      </option>
-                    ))}
-                    <option value={0}>sin aviso</option>
-                  </select>
-                </label>
-                <label>
-                  Reexplicar
-                  <select value={ritmo.reexplicar} onChange={(e) => { const r = { ...ritmo, reexplicar: e.target.value as Ritmo['reexplicar'] }; setRitmo(r); guardarRitmo(r) }}>
-                    <option value="pausa">en cada pausa</option>
-                    <option value="idea">al acabar cada idea</option>
-                    <option value="dos">cada dos ideas</option>
-                    <option value="pedir">solo cuando yo quiera</option>
-                  </select>
-                </label>
-              </span>
-            )}
-          </span>
         </>
       }
       aviso={
@@ -461,6 +431,30 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
             </button>
           </div>
         )
+      }
+      ajustes={
+        <span className="foco-ritmo-ajustes">
+          <label>
+            Pausa
+            <select value={ritmo.pausa} onChange={(e) => { const r = { ...ritmo, pausa: Number(e.target.value) }; setRitmo(r); guardarRitmo(r) }}>
+              {[15, 25, 40, 50].map((m) => (
+                <option key={m} value={m}>
+                  cada {m} min
+                </option>
+              ))}
+              <option value={0}>sin aviso</option>
+            </select>
+          </label>
+          <label>
+            Reexplicar
+            <select value={ritmo.reexplicar} onChange={(e) => { const r = { ...ritmo, reexplicar: e.target.value as Ritmo['reexplicar'] }; setRitmo(r); guardarRitmo(r) }}>
+              <option value="pausa">en cada pausa</option>
+              <option value="idea">al acabar cada idea</option>
+              <option value="dos">cada dos ideas</option>
+              <option value="pedir">solo cuando yo quiera</option>
+            </select>
+          </label>
+        </span>
       }
       lateral={
         glosario ? (
@@ -644,7 +638,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
                 + Al mapa
               </button>
             )}
-            <Companera key={b.clave} mid={mid} claveBloque={b.clave} papel={papel} alPalabras={(ps) => anadirAlMapa(ps)} />
+            <Companera key={b.clave} mid={mid} claveBloque={b.clave} papel={papel} alPalabras={(ps) => anadirAlMapa(ps)} enMapa={mapa?.nodos.map((n) => n.texto) ?? []} />
           </div>
           {b.pregunta && !comprobado[b.clave] && (
             <Comprobar key={b.clave} pregunta={b.pregunta} alAcabar={(n) => setComprobado((c) => ({ ...c, [b.clave]: n }))} />
