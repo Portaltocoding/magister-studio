@@ -77,8 +77,9 @@ async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por
     for clave, tipo, estado, mid in filas:
         d = salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})
         d["tipos"][tipo] = estado
+        d.setdefault("ids", {})[tipo] = mid  # para abrir cada material (foco, vídeo)
         if tipo == "apuntes":
-            d["apuntes_id"] = mid  # para abrir la lección en modo foco
+            d["apuntes_id"] = mid
     for clave in set(fichas) | en_marcha:
         salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})
     for clave, d in salida.items():

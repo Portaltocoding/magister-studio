@@ -1,0 +1,40 @@
+/* ===== Vídeo: diapositivas, voz y subtítulos por escenas ===== */
+.video-panel { max-width: 1180px; }
+.video { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 22px; align-items: start; margin-top: 12px; }
+.video-pantalla { position: relative; aspect-ratio: 16 / 9; background: #141414; border-radius: 14px; overflow: hidden; grid-column: 1; }
+.video-pantalla iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.video-escena { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 8%; color: #fff; }
+.video-escena p { font-size: clamp(1.2rem, 2.4vw, 2rem); font-weight: 700; line-height: 1.3; margin: 10px 0 0; }
+.video-subtitulo {
+  position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 86%; text-align: center;
+  background: rgb(0 0 0 / 0.78); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: clamp(0.9rem, 1.5vw, 1.15rem); line-height: 1.4;
+}
+.video-subtitulo:empty { display: none; }
+.video-controles { grid-column: 1; display: flex; align-items: center; gap: 10px; }
+.video-tocar { min-width: 120px; }
+.video-barra { flex: 1; }
+.video-controles select { font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); }
+.video-info { grid-column: 2; grid-row: 1 / span 3; }
+.video-info h2 { display: flex; gap: 10px; align-items: center; font-size: 1.15rem; margin: 0 0 4px; text-transform: none; letter-spacing: 0; color: var(--texto); }
+.video-capitulos { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 4px; max-height: 420px; overflow-y: auto; }
+.video-capitulos button {
+  width: 100%; display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; color: var(--texto); cursor: pointer;
+  padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; background: transparent;
+}
+.video-capitulos button span { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
+.video-capitulos button small { font-size: 0.85rem; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.video-capitulos button:hover { background: var(--tarjeta); }
+.video-capitulos button.actual { border-color: var(--acento); background: var(--tarjeta); }
+.video-biblioteca { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.video-biblioteca button {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font: inherit; color: var(--texto);
+  background: var(--tarjeta); border: 1px solid var(--borde); cursor: pointer; text-align: left;
+}
+.video-biblioteca button > span:nth-child(2) { flex: 1; line-height: 1.3; }
+.video-biblioteca button small { opacity: 0.7; white-space: nowrap; }
+.video-biblioteca button.actual { border-color: var(--acento); }
+.video-biblioteca .sin-video button { opacity: 0.6; }
+@media (max-width: 900px) {
+  .video { grid-template-columns: minmax(0, 1fr); }
+  .video-info { grid-column: 1; grid-row: auto; }
+}

@@ -12,6 +12,7 @@ import PanelTutor from './paneles/PanelTutor.tsx'
 import PanelFuentes from './paneles/PanelFuentes.tsx'
 import PanelPlan from './paneles/PanelPlan.tsx'
 import PanelExamen from './paneles/PanelExamen.tsx'
+import PanelVideo from './paneles/PanelVideo.tsx'
 
 interface Props {
   modo: IdModo
@@ -57,7 +58,7 @@ export default function Central({
     case 'fichas':
       return <PanelMaterial key="fichas" vista="fichas" />
     case 'video':
-      return <PanelMaterial key="video" vista="video" />
+      return <PanelVideo />
     case 'repaso':
       return <PanelPractica irA={irA} />
     case 'examen':
