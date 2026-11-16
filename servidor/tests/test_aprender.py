@@ -94,6 +94,12 @@ async def preparar_preguntas() -> int:
                        fantasma="La columna que identifica cada fila sin repetirse ni ser nula.", donde="b1", estado="activa"))
         await s.flush()
         s.add(PreguntaConcepto(pregunta_id="p1", plan_id=plan_id, concepto_id="clave-primaria"))
+        # La lección ya se estudió: sus conceptos entran en el repaso.
+        from datetime import date
+
+        from magister.datos.plan import SesionFila
+
+        s.add(SesionFila(plan_id=plan_id, leccion_clave="L1", fecha=date(2026, 1, 5), horas=1.0, estado="hecha"))
     return plan_id
 
 

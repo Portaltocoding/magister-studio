@@ -359,3 +359,26 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .afinar-recuerda .borrar { visibility: visible; opacity: 0.5; }
 .afinar-anadir { display: flex; gap: 6px; margin-top: 6px; }
 .afinar-anadir input { flex: 1; font: inherit; font-size: 0.85rem; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; padding: 4px 8px; }
+
+
+/* ===== Hoy: «Tu día» ===== */
+.tu-dia { margin: 14px 0; padding: 16px 20px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); box-shadow: var(--sombra-suave); }
+.tu-dia h2 { margin: 0 0 10px; display: flex; align-items: baseline; gap: 10px; text-transform: none; letter-spacing: 0; font-size: 1.1rem; color: var(--texto); }
+.tu-dia h2 small { font-weight: 400; color: var(--suave); font-size: 0.85rem; }
+.tu-dia ol { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.tu-dia li { display: flex; align-items: center; gap: 10px; }
+.tu-dia li > span:nth-child(2), .tu-dia li > .enlace { flex: 1; }
+.tu-dia li small { color: var(--suave); font-variant-numeric: tabular-nums; }
+.tu-dia li.hecho { opacity: 0.55; }
+.tu-dia li.hecho > span:nth-child(2) { text-decoration: line-through; }
+.tu-dia-num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700; background: color-mix(in srgb, var(--texto) 10%, transparent); flex: 0 0 auto; }
+.tu-dia .enlace { font: inherit; color: var(--texto); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--borde); text-underline-offset: 3px; }
+
+
+/* ===== Repaso en modo foco ===== */
+.foco-contador { font-variant-numeric: tabular-nums; font-weight: 700; }
+.repaso-envio { align-items: center; gap: 10px; flex-wrap: wrap; }
+.repaso-envio > .boton-principal { margin-left: auto; }
+.repaso-no-se { margin-top: 10px; }
+
+.tu-dia-clave { font-weight: 700; margin-right: 6px; font-variant-numeric: tabular-nums; }

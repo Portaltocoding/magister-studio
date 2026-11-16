@@ -47,8 +47,13 @@ async def hoy(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     await s.close()
     repasos = await practica.cola(datetime.now(timezone.utc))
     examen = await examen_pendiente(date.today())
+    async with nueva_sesion() as s3:
+        dia = [{"clave": c, "titulo": t, "horas": h, "estado": e} for c, t, h, e in (await s3.execute(text(
+            "select s.leccion_clave, l.titulo, s.horas, s.estado from sesiones s join planes p on p.id = s.plan_id and p.estado = 'aceptado' "
+            "join lecciones l on l.plan_id = s.plan_id and l.clave = s.leccion_clave where s.fecha = :hoy order by s.inicio nulls last, s.id"),
+            {"hoy": date.today()})).all()]
     if fila is None:
-        return {"estado": "sin_plan" if not repasos and not examen else "solo_repaso", "repasos": len(repasos), "examen": examen}
+        return {"estado": "sin_plan" if not repasos and not examen else "solo_repaso", "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia}
     sid, plan_id, clave, titulo, fecha, horas, tema, tema_id, inicio = fila
     async with nueva_sesion() as s2:
         material = await s2.scalar(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave,
@@ -58,7 +63,7 @@ async def hoy(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
         estado = "sin_preparar"
     return {"estado": estado, "sesion_id": sid, "plan_id": plan_id, "tema_id": tema_id, "tema": tema, "leccion_clave": clave,
             "titulo": titulo, "fecha": fecha.isoformat(), "inicio": inicio.strftime("%H:%M") if inicio else None, "horas": horas, "material_id": material.id if material else None,
-            "repasos": len(repasos), "examen": examen,
+            "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia,
             "razon": ("Toca hoy según tu calendario." if fecha == date.today() else
                       "Vas con retraso: es la primera sesión pendiente." if fecha < date.today() else
                       f"Lo siguiente de tu calendario es el {fecha:%d-%m}.")}

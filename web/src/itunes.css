@@ -79,3 +79,41 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 .hoy-cifra .barra { margin: 6px 0 2px; }
 .tutor-inicio > .mascota { display: none; }
 @media (max-width: 820px) { .hoy-resumen { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== Sobrio: grises en lugar de colores sueltos (revisión de diseño) ===== */
+/* Calendario: el tipo se distingue por la intensidad del filete, no por el color de fondo. */
+:root { --tipo-examen: var(--texto); --tipo-deber: color-mix(in srgb, var(--texto) 62%, transparent); --tipo-clase: color-mix(in srgb, var(--texto) 38%, transparent); --tipo-nota: color-mix(in srgb, var(--texto) 20%, transparent); }
+.pastilla { background: color-mix(in srgb, var(--texto) 9%, transparent); color: var(--texto); border-left: 3px solid var(--tipo-deber); border-radius: 4px; }
+.pastilla-deber { background: color-mix(in srgb, var(--texto) 9%, transparent); border-left-color: var(--tipo-deber); }
+.pastilla-examen { background: color-mix(in srgb, var(--texto) 14%, transparent); border-left-color: var(--tipo-examen); font-weight: 650; }
+.pastilla-clase { background: color-mix(in srgb, var(--texto) 9%, transparent); border-left-color: var(--tipo-clase); }
+.pastilla-nota { background: color-mix(in srgb, var(--texto) 6%, transparent); border-left: 3px dashed var(--tipo-nota); }
+/* Progreso: de gris claro (flojo) a casi negro (dominado); en oscuro, al revés. */
+:root { --viz-ord-1: #cfccc5; --viz-ord-2: #8d8a83; --viz-ord-3: #34322e; --viz-serie: #4a4843; }
+@media (prefers-color-scheme: dark) {
+  :root { --viz-ord-1: #4e4c47; --viz-ord-2: #9a968f; --viz-ord-3: #ece9e3; --viz-serie: #cfccc5; }
+}
+/* Verde de «ver la respuesta» con contraste suficiente sobre el papel. */
+.lb-fantasma summary, .fichas-lista summary { color: #1f6e3a; }
+/* Cabecera de lección: el botón principal se ve como principal, no como apagado. */
+.bloque-cabecera .boton-principal { background: #f2f0eb; color: #141414; border-color: #f2f0eb; }
+.bloque-cabecera .peligro { border-color: transparent; background: transparent; color: #e0786d; }
+@media (prefers-color-scheme: light) {
+  .bloque-cabecera { background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); box-shadow: var(--sombra-suave); }
+  .bloque-cabecera h1 { color: var(--texto); }
+  .bloque-num { color: var(--suave); opacity: 0.55; }
+  .bloque-datos .lb-etq { color: var(--suave); }
+  .bloque-objetivos { background: color-mix(in srgb, var(--texto) 5%, transparent); color: var(--texto); border-left-color: var(--borde); }
+  .bloque-cabecera .boton:not(.boton-principal) { color: var(--texto); border-color: var(--borde); }
+  .bloque-cabecera .boton-principal { background: var(--texto); color: var(--fondo); border-color: var(--texto); }
+  .bloque-cabecera .peligro { color: #b5524a; }
+  .estilo-pdf { color: var(--suave); }
+  .estilo-pdf select { background: var(--fondo); color: var(--texto); border-color: var(--borde); }
+}
+/* Roadmap: cada lección, una tarjeta. */
+.lecciones { list-style: none; padding-left: 0; }
+.lecciones > li { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); padding: 14px 18px; box-shadow: var(--sombra-suave); margin-bottom: 10px; }
+.lecciones .nota-linea a { color: inherit; }
+.leccion-hecha > strong a, .roadmap a.hecha { color: var(--suave); }
+/* Controles nativos en gris, no en azul. */
+:root { accent-color: var(--texto); }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
 import { usarAviso } from '../componentes/Aviso.tsx'
+import Pensando from '../componentes/Pensando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
 
@@ -56,7 +57,7 @@ const ESTADOS: { id: EstadoConcepto; nombre: string; desc: string }[] = [
 ]
 const NOMBRE_ESTADO = Object.fromEntries(ESTADOS.map((e) => [e.id, e.nombre])) as Record<EstadoConcepto, string>
 
-const LECCION: Record<string, string> = { hecha: 'Hecha', empezada: 'En curso', pendiente: 'Pendiente' }
+const LECCION: Record<string, string> = { hecha: 'Estudiada', empezada: 'Empezada', pendiente: 'Pendiente' }
 
 const pct = (x: number) => `${Math.round(x * 100)} %`
 const horas = (h: number) => `${Number.isInteger(h) ? h : h.toFixed(1).replace('.', ',')} h`
@@ -189,22 +190,53 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
     pedir<Record<string, EstadoMaterial>>(`/api/planes/${p.plan_id}/materiales`).then(setMateriales)
   }
 
+  const [fallo, setFallo] = useState(false)
+  const [intento, setIntento] = useState(0)
+
+  // Todo llega junto y se pinta de una vez: así la pantalla no da saltos mientras carga.
   useEffect(() => {
-    listarPlanes().then((ps) => {
-      setPlanes(ps)
-      if (ps[0]) elegirPlan(ps[0])
-    })
-    pedir<Resumen>('/api/progreso/resumen').then(setResumen)
-    pedir<Concepto[]>('/api/progreso/conceptos').then(setConceptos)
-    pedir<typeof carga>('/api/progreso/carga?dias=14').then(setCarga)
-    pedir<Tramo[]>('/api/progreso/calibracion?fuente=usuario').then(setTuya)
-    pedir<Tramo[]>('/api/progreso/calibracion?fuente=modelo').then(setModelo)
-    pedir<Hoy>('/api/hoy').then(setHoy)
-  }, [])
+    setFallo(false)
+    Promise.all([
+      listarPlanes(),
+      pedir<Resumen>('/api/progreso/resumen'),
+      pedir<Concepto[]>('/api/progreso/conceptos'),
+      pedir<typeof carga>('/api/progreso/carga?dias=14'),
+      pedir<Tramo[]>('/api/progreso/calibracion?fuente=usuario'),
+      pedir<Tramo[]>('/api/progreso/calibracion?fuente=modelo'),
+      pedir<Hoy>('/api/hoy'),
+    ])
+      .then(async ([ps, r, c, cg, tu, mo, h]) => {
+        if (ps[0]) {
+          const [v, m] = await Promise.all([verPlan(ps[0].tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${ps[0].plan_id}/materiales`)])
+          setNombre(ps[0].tema)
+          setPlan(v)
+          setMateriales(m)
+        }
+        setResumen(r)
+        setConceptos(c)
+        setCarga(cg)
+        setTuya(tu)
+        setModelo(mo)
+        setHoy(h)
+        setPlanes(ps)
+      })
+      .catch(() => setFallo(true))
+  }, [intento])
 
   const delPlan = useMemo(() => conceptos.filter((c) => !plan || c.plan_id === plan.plan_id), [conceptos, plan])
 
-  if (planes == null) return <p className="vacio">Cargando…</p>
+  if (planes == null)
+    return fallo ? (
+      <div className="panel">
+        <h1>Progreso</h1>
+        <p role="alert" className="nota">No he podido cargar tu progreso. Comprueba que Magister sigue en marcha.</p>
+        <button className="boton" onClick={() => setIntento((x) => x + 1)}>
+          Reintentar
+        </button>
+      </div>
+    ) : (
+      <Pensando texto="Cargando tu progreso…" />
+    )
 
   if (!planes.length)
     return (

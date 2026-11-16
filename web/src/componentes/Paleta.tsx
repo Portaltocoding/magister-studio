@@ -18,12 +18,16 @@ const plano = (t: string) =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
 
+let cacheLecciones: { clave: string; titulo: string; tema_id: number; tema: string }[] | null = null
+
 export default function Paleta({ conversaciones, alPlegar }: { conversaciones: Conversacion[]; alPlegar: () => void }) {
   const [abierta, setAbierta] = useState(false)
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
   const [lecciones, setLecciones] = useState<{ clave: string; titulo: string; tema_id: number; tema: string }[]>([])
   const caja = useRef<HTMLInputElement | null>(null)
+  // Dónde estaba el foco al abrir: al cerrar vuelve ahí.
+  const antes = useRef<HTMLElement | null>(null)
   const pomo = usarPomodoro()
 
   useEffect(() => {
@@ -43,16 +47,23 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
   }, [])
 
   useEffect(() => {
-    if (!abierta) return
+    if (!abierta) {
+      antes.current?.focus?.()
+      return
+    }
+    antes.current = document.activeElement as HTMLElement | null
     setQ('')
     setI(0)
     window.setTimeout(() => caja.current?.focus(), 30)
+    // Las lecciones se cargan una vez (y todas a la vez), no en cada apertura.
+    if (cacheLecciones) {
+      setLecciones(cacheLecciones)
+      return
+    }
     listarPlanes().then(async (ps) => {
-      const todas = []
-      for (const p of ps) {
-        const v = await verPlan(p.tema_id)
-        todas.push(...v.lecciones.map((l) => ({ clave: l.clave, titulo: l.titulo, tema_id: p.tema_id, tema: p.tema })))
-      }
+      const vistas = await Promise.all(ps.map((p) => verPlan(p.tema_id)))
+      const todas = vistas.flatMap((v, k) => v.lecciones.map((l) => ({ clave: l.clave, titulo: l.titulo, tema_id: ps[k].tema_id, tema: ps[k].tema })))
+      cacheLecciones = todas
       setLecciones(todas)
     })
   }, [abierta])
@@ -95,7 +106,24 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
 
   return (
     <div className="paleta-velo" onMouseDown={() => setAbierta(false)}>
-      <div className="paleta" role="dialog" aria-label="Ir a o hacer" onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="paleta"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ir a o hacer"
+        onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          // Esc cierra desde cualquier sitio de la paleta; Tab no se escapa a lo de detrás.
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            e.stopPropagation()
+            setAbierta(false)
+          } else if (e.key === 'Tab') {
+            e.preventDefault()
+            caja.current?.focus()
+          }
+        }}
+      >
         <input
           ref={caja}
           value={q}
@@ -111,7 +139,6 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
               e.preventDefault()
               setI((x) => Math.max(0, x - 1))
             } else if (e.key === 'Enter') elegir(filtradas[i])
-            else if (e.key === 'Escape') setAbierta(false)
           }}
           placeholder="Ir a una pantalla, una lección, una conversación… o hacer algo"
           aria-label="Buscar"

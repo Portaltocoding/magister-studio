@@ -18,6 +18,8 @@ interface Hoy {
   horas?: number
   material_id?: number | null
   repasos: number
+  nuevos?: number
+  dia?: { clave: string; titulo: string; horas: number; estado: string }[]
   razon?: string
   // El examen del plan que ya toca y aún no has aprobado.
   examen?: HitoExamen | null
@@ -472,7 +474,51 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
 }
 
 // Si hoy (o antes) tocaba un examen del plan y no lo has aprobado, el tutor te lo propone.
-function TarjetaExamen({ examen }: { examen: HitoExamen }) {
+// «Tu día»: lo que toca, en orden (repasar, las lecciones, el examen al final) y cuánto queda.
+function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | null; irA: (m: IdModo) => void }) {
+  const dia = hoy.dia ?? []
+  if (!dia.length && !hoy.examen) return null
+  const horas = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',')
+  const quedan = dia.filter((s) => s.estado !== 'hecha').reduce((a, s) => a + s.horas, 0) +
+    (hoy.repasos ? (minutosRepaso ?? hoy.repasos * 2) / 60 : 0) + (hoy.examen && !hoy.examen.hecho ? hoy.examen.minutos / 60 : 0)
+  let n = 0
+  return (
+    <section className="tu-dia">
+      <h2>
+        Tu día <small>{quedan > 0 ? `quedan unas ${horas(quedan)} h` : 'todo hecho'}</small>
+      </h2>
+      <ol>
+        {hoy.repasos > 0 && (
+          <li>
+            <span className="tu-dia-num">{++n}</span>
+            <button className="enlace" onClick={() => irA('repaso')}>
+              Repasar {hoy.repasos} {hoy.repasos === 1 ? 'concepto' : 'conceptos'}
+            </button>
+            <small>unos {minutosRepaso ?? '·'} min</small>
+          </li>
+        )}
+        {dia.map((s) => (
+          <li key={s.clave} className={s.estado === 'hecha' ? 'hecho' : ''}>
+            <span className="tu-dia-num">{s.estado === 'hecha' ? '✓' : ++n}</span>
+            <span>
+              <b className="tu-dia-clave">{s.clave}</b> {s.titulo}
+            </span>
+            <small>{horas(s.horas)} h</small>
+          </li>
+        ))}
+        {hoy.examen && (
+          <li className={hoy.examen.hecho ? 'hecho' : ''}>
+            <span className="tu-dia-num">{hoy.examen.hecho ? '✓' : ++n}</span>
+            <span>{hoy.examen.titulo}</span>
+            <small>{hoy.examen.minutos} min</small>
+          </li>
+        )}
+      </ol>
+    </section>
+  )
+}
+
+function TarjetaExamen({ examen, despues }: { examen: HitoExamen; despues?: string[] }) {
   const atrasado = examen.fecha < new Date().toISOString().slice(0, 10)
   return (
     <section className="tutor-examen">
@@ -481,6 +527,7 @@ function TarjetaExamen({ examen }: { examen: HitoExamen }) {
         <strong>{examen.titulo}</strong>
         <small>
           {examen.preguntas} preguntas · {examen.minutos} min
+          {despues?.length ? ` · mejor al acabar ${despues.join(' y ')}` : ''}
           {examen.nota != null ? ` · tu mejor nota: ${examen.nota.toFixed(1).replace('.', ',')} (se aprueba con 5)` : ''}
         </small>
       </div>
@@ -593,6 +640,10 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
 
   const otrasSinHoy = otras.filter((o) => o.material_id !== hoy.material_id)
   const seguir = avance && hoy.material_id ? `Seguir por la idea ${avance.i + 1}` : null
+  // Si el examen cubre lecciones que aún tienes pendientes hoy, va después de ellas.
+  const examenDespues = hoy.examen
+    ? (hoy.dia ?? []).filter((s) => s.estado !== 'hecha' && hoy.examen!.lecciones?.includes(s.clave)).map((s) => s.clave)
+    : []
 
   return (
     <div className="tutor-inicio">
@@ -608,7 +659,11 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
         <button className="hoy-cifra" onClick={() => irA('repaso')} disabled={!hoy.repasos}>
           <strong>{hoy.repasos}</strong>
           <span>{hoy.repasos === 1 ? 'repaso' : 'repasos'}</span>
-          <small>{hoy.repasos ? `unos ${minutosRepaso ?? '·'} min · Repasar →` : 'nada pendiente'}</small>
+          <small>
+            {hoy.repasos
+              ? `${hoy.nuevos ? `${hoy.nuevos} ${hoy.nuevos === 1 ? 'concepto nuevo' : 'conceptos nuevos'} · ` : ''}unos ${minutosRepaso ?? '·'} min · Repasar →`
+              : 'nada pendiente'}
+          </small>
         </button>
         {semana && (
           <div className="hoy-cifra">
@@ -630,7 +685,8 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
           <small>{hoy.examen ? `${hoy.examen.titulo} →` : 'Hacer uno cuando quieras →'}</small>
         </button>
       </div>
-      {hoy.examen && <TarjetaExamen examen={hoy.examen} />}
+      <TuDia hoy={hoy} minutosRepaso={minutosRepaso} irA={irA} />
+      {hoy.examen && !examenDespues.length && <TarjetaExamen examen={hoy.examen} />}
       {hoy.titulo && hoy.estado !== 'solo_repaso' ? (
         <section className="tutor-hoy">
           <span className="vacio-etq">Hoy · {hoy.razon}</span>
@@ -689,6 +745,7 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
           acciones={hoy.repasos ? [{ texto: 'Repasar', principal: true, alPulsar: () => irA('repaso') }] : []}
         />
       )}
+      {hoy.examen && examenDespues.length > 0 && <TarjetaExamen examen={hoy.examen} despues={examenDespues} />}
       {otrasSinHoy.length > 0 && (
         <section className="tutor-otras">
           <h2>O estudia otra lección en modo foco</h2>

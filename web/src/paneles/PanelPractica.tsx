@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { enviarJson, flujo, pedir } from '../api.ts'
 import Vacio from '../componentes/Vacio.tsx'
+import MarcoFoco from '../componentes/MarcoFoco.tsx'
 import type { IdModo } from '../modos.ts'
 import { barajar } from '../barajar.ts'
 
@@ -59,6 +60,8 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
   const [error, setError] = useState<string | null>(null)
   const servidaEn = useRef(Date.now())
   const [test, setTest] = useState<ResultadoTest | null>(null)
+  // La tanda de hoy: cuántas había al empezar y cuántas llevas.
+  const [tanda, setTanda] = useState<{ total: number; hechas: number } | null>(null)
 
   const responderTest = async (opcion: string) => {
     if (!pregunta || test) return
@@ -79,7 +82,14 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
 
   useEffect(cargar, [cargar])
 
+  const salir = () => {
+    setPregunta(null)
+    setTanda(null)
+    cargar()
+  }
+
   const siguiente = async () => {
+    setTanda((t) => (t ? { ...t, hechas: t.hechas + (pregunta ? 1 : 0) } : { total: cola?.length ?? 1, hechas: 0 }))
     setTest(null)
     setNota(null)
     setExplicacion('')
@@ -93,8 +103,14 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
     cargar()
   }
 
-  const enviar = async (tipo: 'espaciado' | 'reintento' = 'espaciado') => {
-    if (!pregunta || confianza == null || !respuesta.trim()) return
+  const enviar = async (tipo: 'espaciado' | 'reintento' = 'espaciado', forzado?: { respuesta: string; confianza: number }) => {
+    const respuesta_ = forzado?.respuesta ?? respuesta
+    const confianza_ = forzado?.confianza ?? confianza
+    if (!pregunta || confianza_ == null || !respuesta_.trim()) return
+    if (forzado) {
+      setRespuesta(forzado.respuesta)
+      setConfianza(forzado.confianza)
+    }
     setCorrigiendo(true)
     setExplicacion('')
     try {
@@ -103,8 +119,8 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
         {
           pregunta_id: pregunta.pregunta_id,
           concepto_id: pregunta.concepto_id,
-          respuesta,
-          confianza,
+          respuesta: respuesta_,
+          confianza: confianza_,
           clave: nueva(),
           tipo,
           latencia_ms: Date.now() - servidaEn.current,
@@ -165,8 +181,22 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
         </Vacio>
       )}
       {pregunta && (
+        <MarcoFoco
+          titulo={pregunta.nombre}
+          placa="RE"
+          alSalir={() => {
+            if (!corrigiendo) salir()
+          }}
+          pasos={
+            tanda && (
+              <span className="foco-contador" aria-live="polite">
+                {Math.min(tanda.hechas + 1, tanda.total)} de {tanda.total}
+              </span>
+            )
+          }
+          pie={<span className="nota">Esc para salir: lo que has respondido ya cuenta.</span>}
+        >
         <section className="practica">
-          <p className="nota-linea">{pregunta.nombre}</p>
           <h2 className="enunciado">{pregunta.enunciado}</h2>
           {pregunta.opciones && pregunta.opciones.length > 0 ? (
             <div className="repaso-test">
@@ -219,20 +249,32 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
           />
           {!nota && (
             <>
-              <div className="fila" role="radiogroup" aria-label="¿Cómo de seguro estás?">
-                {CONFIANZAS.map(([v, t]) => (
-                  <button key={v} className="boton" aria-pressed={confianza === v} onClick={() => setConfianza(v)}>
-                    {t}
-                  </button>
-                ))}
+              <div className="fila repaso-envio">
+                <span className="nota">¿Seguro?</span>
+                <div className="fila" role="radiogroup" aria-label="¿Cómo de seguro estás?">
+                  {CONFIANZAS.map(([v, t]) => (
+                    <button key={v} className="boton-mini" aria-pressed={confianza === v} onClick={() => setConfianza(v)}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="boton boton-principal"
+                  disabled={corrigiendo || confianza == null || !respuesta.trim()}
+                  onClick={() => enviar()}
+                >
+                  {corrigiendo ? 'Corrigiendo…' : 'Enviar'}
+                </button>
               </div>
-              <button
-                className="boton boton-principal"
-                disabled={corrigiendo || confianza == null || !respuesta.trim()}
-                onClick={() => enviar()}
-              >
-                {corrigiendo ? 'Corrigiendo…' : 'Enviar'}
-              </button>
+              {!corrigiendo && (
+                <button
+                  className="boton-mini repaso-no-se"
+                  title="Cuenta como fallo y te enseña la respuesta"
+                  onClick={() => enviar('espaciado', { respuesta: 'No lo sé.', confianza: 0.25 })}
+                >
+                  No lo sé, enséñame la respuesta
+                </button>
+              )}
             </>
           )}
           {nota && (
@@ -293,6 +335,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
           )}
           {error && <p role="alert">{error}</p>}
         </section>
+        </MarcoFoco>
       )}
     </div>
   )

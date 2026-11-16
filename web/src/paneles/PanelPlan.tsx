@@ -15,6 +15,9 @@ import {
   type VistaPlan,
 } from '../api.ts'
 
+// Lo mismo que en Progreso: «estudiada» es que hiciste sus sesiones; dominarla es otra cosa (eso lo dice Progreso).
+const ESTADO_LECCION: Record<string, string> = { hecha: 'estudiada', en_curso: 'empezada', pendiente: 'pendiente' }
+
 // Números a la española: coma decimal.
 const num = (n: number | null | undefined) => (n == null ? '0' : String(n).replace('.', ','))
 
@@ -37,6 +40,11 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   const [vista, setVista] = useState<VistaPlan | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [horario, setHorario] = useState(false)
+  // Qué material tiene ya cada lección (lo mismo que dice Lecciones).
+  const [material, setMaterial] = useState<Record<string, { tipos: Record<string, string> }>>({})
+  useEffect(() => {
+    if (vista) pedir<Record<string, { tipos: Record<string, string> }>>(`/api/planes/${vista.plan_id}/materiales`).then(setMaterial).catch(() => undefined)
+  }, [vista])
   const [reajuste, setReajuste] = useState<{ cambios: string[]; avisos: string[]; texto: string; sesiones: unknown[] | null } | null>(null)
 
   useEffect(() => {
@@ -215,9 +223,15 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                       {l.clave} · {l.titulo}
                     </strong>{' '}
                     <span className="nota-linea">
-                      {num(l.horas_hechas)}/{num(l.horas)} h · {l.estado}
+                      {num(l.horas_hechas)}/{num(l.horas)} h · {ESTADO_LECCION[l.estado] ?? l.estado}
                       {l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''} ·{' '}
-                      {l.sin_material ? 'sin material' : `${l.fuentes} fragmentos de tus fuentes`}
+                      {['listo', 'revisar'].includes(material[l.clave]?.tipos?.apuntes ?? '') ? (
+                        <a href={`#/fichas/${vista.tema_id}/${l.clave}`}>apuntes listos</a>
+                      ) : (
+                        'sin preparar'
+                      )}
+                      {' · '}
+                      {l.sin_material ? 'sin fuentes tuyas' : `${l.fuentes} fragmentos de tus fuentes`}
                     </span>{' '}
                     {l.sin_material && (
                       <button

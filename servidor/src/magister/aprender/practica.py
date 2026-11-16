@@ -62,6 +62,15 @@ async def minutos_por_repaso() -> float:
     return round(statistics.median(lat) / 60000 + 0.5, 1) if len(lat) >= 5 else MINUTOS_POR_DEFECTO
 
 
+async def lecciones_empezadas() -> set[tuple[int, str]]:
+    """(plan, lección) con alguna sesión hecha."""
+    from magister.datos.plan import SesionFila
+
+    async with nueva_sesion() as s:
+        filas = (await s.execute(select(SesionFila.plan_id, SesionFila.leccion_clave).where(SesionFila.estado == "hecha").distinct())).all()
+    return {(a, b) for a, b in filas}
+
+
 def _prog(c: ConceptoPractica):
     return programador(c.brazo) if c.brazo else programador()
 
@@ -72,8 +81,14 @@ async def cola(ahora: datetime, nuevos_max: int | None = None) -> list[dict]:
     fin = fin_del_dia(ahora)
     minutos = await minutos_por_repaso()
     vencidos, nuevos = [], []
+    # Un concepto nuevo entra en el repaso solo si ya empezaste su lección (una sesión hecha o algo practicado):
+    # no tiene sentido repasar lo que aún no has estudiado.
+    empezadas = await lecciones_empezadas()
+    empezadas |= {(c.plan_id, c.leccion_clave) for c in conceptos if estados[c.concepto_id].repasos}
     for c in conceptos:
         e = estados[c.concepto_id]
+        if not e.repasos and (c.plan_id, c.leccion_clave) not in empezadas:
+            continue
         p = _prog(c)
         prox = p.proxima(e)
         fila = {"concepto_id": c.concepto_id, "plan_id": c.plan_id, "nombre": c.nombre, "leccion_clave": c.leccion_clave,
