@@ -131,7 +131,9 @@ async def enviar_mensaje(
     cid: int, cuerpo: MensajeEntrada, p: Preparado = Depends(preparar_mensaje)
 ) -> AsyncIterator[ServerSentEvent]:
     fase_inicial = "diagnostico" if p.tipo == "plan" else "estudio"
-    eventos = ejecutar.mensaje(cid, cuerpo.contenido, p.turnos, hoy(), fase_inicial, voz=cuerpo.voz)
+    eventos = ejecutar.mensaje(cid, cuerpo.contenido, p.turnos, hoy(), fase_inicial, voz=cuerpo.voz,
+                                extra={"llamada": cuerpo.llamada, "modo": cuerpo.modo, "plan_id_leccion": cuerpo.plan_id,
+                                       "leccion_clave": cuerpo.leccion_clave, "contexto": cuerpo.contexto})
     async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid}):
         yield evento
 

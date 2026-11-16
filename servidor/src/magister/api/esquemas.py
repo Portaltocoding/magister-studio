@@ -41,6 +41,15 @@ class MensajeEntrada(BaseModel):
     cuenta: bool = True
     # Modo Hablar: la respuesta se va a escuchar.
     voz: bool = False
+    # Llamada: conversación de voz por turnos (respuestas cortas, sin bloques que se pulsan).
+    llamada: bool = False
+    # Modo de aprendizaje solo para este mensaje (manda sobre el elegido en la mascota); «normal» lo quita.
+    modo: str | None = Field(None, max_length=60)
+    # Lección de la que se habla: sus apuntes van al tutor como contexto.
+    plan_id: int | None = None
+    leccion_clave: str | None = Field(None, max_length=20)
+    # Dónde está la llamada (por ejemplo, la parte de la clase en la que le interrumpes). No se guarda en el hilo.
+    contexto: str | None = Field(None, max_length=3000)
 
 
 class MensajeSalida(Salida):

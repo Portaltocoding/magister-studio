@@ -113,7 +113,10 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
             lecciones = ""
     if estado.get("conversacion_id"):
         try:
-            preferencias = texto_preferencias(await preferencias_tutor())
+            p = await preferencias_tutor()
+            if estado.get("modo"):
+                p = {**p, "modo": None if estado["modo"] == "normal" else estado["modo"]}
+            preferencias = texto_preferencias(p)
         except Exception:  # noqa: BLE001
             preferencias = ""
         if preferencias:
@@ -123,9 +126,71 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
             "Lo que el alumno estudia en Magister:\n" + lecciones + "\n"
             "Si lo que pregunta está en una de esas lecciones, nómbrala («lo tienes en L2») para que la abra en Lecciones o en "
             "el modo foco; si ya la hizo, conecta con lo que vio allí. No repitas la lista.")
+    if estado.get("conversacion_id"):
+        try:
+            flojos = await conceptos_flojos()
+        except Exception:  # noqa: BLE001
+            flojos = []
+        if flojos:
+            partes.append("Conceptos que el alumno tiene flojos ahora mismo (falló o casi olvidó): " + ", ".join(flojos) + ". "
+                          "Si encaja con lo que pregunta, conéctalo con uno de ellos o hazle una pregunta rápida sobre él; "
+                          "no los enumeres ni lo fuerces.")
+    if estado.get("leccion_clave") and estado.get("plan_id_leccion"):
+        try:
+            apuntes = await apuntes_de(estado["plan_id_leccion"], estado["leccion_clave"])
+        except Exception:  # noqa: BLE001
+            apuntes = None
+        if apuntes:
+            titulo, texto = apuntes
+            partes.append(f"Estáis trabajando la lección {estado['leccion_clave']} «{titulo}». Apóyate en sus apuntes (son lo "
+                          "que el alumno estudia) y usa sus mismos ejemplos y cifras:\n<apuntes>\n" + texto + "\n</apuntes>")
     if estado.get("voz"):
         partes.append(VOZ)
+    if estado.get("llamada"):
+        partes.append(LLAMADA)
+    if estado.get("contexto"):
+        partes.append("Dónde está la llamada ahora:\n" + str(estado["contexto"]))
     return "\n\n".join(partes)
+
+
+LLAMADA = """Estás en una llamada de voz con el alumno, por turnos, como una tutoría por teléfono:
+- Habla como en una conversación: de 2 a 5 frases cortas por turno, una sola idea, y termina pasándole la palabra (una pregunta o «¿seguimos?»).
+- Nada de bloques de código, tablas, listas, diagramas ni bloques que se pulsan (test, opciones, pregunta, agendar, recordar, modo): todo se oye.
+- Si lo que dice está cortado o no tiene sentido (el dictado se equivoca), di lo que has entendido y pregúntale si es eso.
+- Si te interrumpe con una duda, contesta a la duda directamente y después pregunta si sigues por donde ibas."""
+
+
+async def conceptos_flojos(n: int = 6) -> list[str]:
+    """Los conceptos con un fallo o un parcial en sus últimos intentos (de los planes aceptados)."""
+    from sqlalchemy import text
+
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s:
+        filas = (await s.execute(text(
+            "select c.nombre from (select distinct on (plan_id, concepto_id) plan_id, concepto_id, "
+            "coalesce(nota_usuario, nota_corrector) as nota, momento from intentos "
+            "order by plan_id, concepto_id, momento desc) u join conceptos c on c.plan_id = u.plan_id and c.id = u.concepto_id "
+            "join planes p on p.id = u.plan_id and p.estado = 'aceptado' where u.nota in ('fallo', 'parcial') "
+            "order by u.momento desc limit :n"), {"n": n})).all()
+    return [f[0] for f in filas]
+
+
+async def apuntes_de(plan_id: int, clave: str, maximo: int = 14000) -> tuple[str, str] | None:
+    """Título y apuntes (sin el repaso) de una lección, recortados para el prompt."""
+    from sqlalchemy import text
+
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s:
+        fila = (await s.execute(text(
+            "select l.titulo, m.texto from lecciones l left join lateral (select texto from materiales where plan_id = l.plan_id "
+            "and leccion_clave = l.clave and tipo = 'apuntes' and estado in ('listo', 'revisar') order by id desc limit 1) m on true "
+            "where l.plan_id = :p and l.clave = :c"), {"p": plan_id, "c": clave})).first()
+    if fila is None or not fila[1]:
+        return None
+    texto = fila[1].split("\n# Repaso")[0]
+    return fila[0], texto[:maximo]
 
 
 # Cuántos turnos se reenvían al modelo en Estudio libre: lo reciente basta para seguir el hilo y ahorra tokens.
@@ -273,3 +338,14 @@ def texto_preferencias(p: dict) -> str:
         salida.append(f"Modo de aprendizaje activo «{modo['nombre']}» ({modo.get('para', '')}). Sus reglas mandan sobre la forma "
                       "de las respuestas: " + " ".join(modo.get("reglas") or []))
     return "\n".join(f"- {x}" for x in salida)
+
+
+
+async def para_explicar() -> str:
+    """Las preferencias que valen fuera del chat (correcciones, material): nivel, estilo e instrucciones; sin el modo,
+    que es para conversar, ni lo de test, opciones y diagramas, que son del chat."""
+    try:
+        p = await preferencias_tutor()
+    except Exception:  # noqa: BLE001
+        return ""
+    return texto_preferencias({**p, "modo": None, "longitud": "normal", "diagramas": True, "tests": True, "opciones": True})

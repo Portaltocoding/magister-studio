@@ -55,14 +55,17 @@ async def _correr(entrada: dict | Command, cid: int) -> AsyncIterator[dict]:
 
 
 async def mensaje(
-    cid: int, texto: str, turnos: list[dict], hoy: date, fase_inicial: str, voz: bool = False
+    cid: int, texto: str, turnos: list[dict], hoy: date, fase_inicial: str, voz: bool = False, extra: dict | None = None
 ) -> AsyncIterator[dict]:
     """Un mensaje del alumno. Si había un plan propuesto, el mensaje cuenta como «cambiar»."""
     if await pendiente_de_decision(cid):
         async for ev in decision(cid, {"accion": "cambiar", "texto": texto}, hoy, turnos):
             yield ev
         return
-    entrada: dict = {"conversacion_id": cid, "mensaje": texto, "turnos": turnos, "hoy": hoy.isoformat(), "voz": voz}
+    entrada: dict = {"conversacion_id": cid, "mensaje": texto, "turnos": turnos, "hoy": hoy.isoformat(), "voz": voz,
+                     # Siempre se escriben todas: así un mensaje no hereda la llamada o el modo del anterior.
+                     "llamada": False, "modo": None, "plan_id_leccion": None, "leccion_clave": None, "contexto": None,
+                     **{k: v for k, v in (extra or {}).items()}}
     if await fase_actual(cid) is None:
         entrada["fase"] = fase_inicial
     async for ev in _correr(entrada, cid):

@@ -141,6 +141,14 @@ export default function Hilo({
 
   const pegado = useRef(true)
 
+  // La caja crece sola con lo que escribes, hasta un límite; a partir de ahí, se desplaza por dentro.
+  useEffect(() => {
+    const c = caja.current
+    if (!c) return
+    c.style.height = 'auto'
+    c.style.height = `${Math.min(c.scrollHeight, 220)}px`
+  }, [borrador])
+
   // Otras partes (el selector de modo) pueden dejarte un texto empezado en el cuadro.
   useEffect(() => {
     const al = (e: Event) => {
@@ -266,8 +274,10 @@ export default function Hilo({
           </ul>
         )}
         {alAdjuntar && (
-          <label className="boton adjuntar" title="Adjuntar PDF, Markdown, HTML o texto (también puedes arrastrarlos aquí)">
-            📎
+          <label className="adjuntar" title="Adjuntar PDF, Markdown, HTML o texto (también puedes arrastrarlos aquí)" aria-label="Adjuntar un fichero">
+            <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden>
+              <path d="M10 4.5v11M4.5 10h11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
             <input
               type="file"
               hidden
@@ -282,7 +292,7 @@ export default function Hilo({
         )}
         <textarea
           ref={caja}
-          rows={2}
+          rows={1}
           value={borrador}
           onChange={(e) => setBorrador(e.target.value)}
           onKeyDown={alTeclear}

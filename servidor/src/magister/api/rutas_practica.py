@@ -91,7 +91,12 @@ async def intentar(cuerpo: IntentoEntrada) -> AsyncIterator[ServerSentEvent]:
     partes: list[str] = []
     try:
         if c.nota != "perfecta":
-            async for trozo in generar(molde + f"\n\nRespuesta de referencia: {referencia}", [Turno("usuario", "Explícaselo.")]):
+            from magister.flujo.comun import para_explicar
+
+            ajustes_alumno = await para_explicar()
+            sistema_explicar = molde + f"\n\nRespuesta de referencia: {referencia}" + (
+                f"\n\nCómo quiere el alumno que le expliques (lo ha ajustado él):\n{ajustes_alumno}" if ajustes_alumno else "")
+            async for trozo in generar(sistema_explicar, [Turno("usuario", "Explícaselo.")]):
                 trozo = _limpiar(trozo)
                 partes.append(trozo)
                 yield ServerSentEvent(data={"t": trozo}, event="delta")

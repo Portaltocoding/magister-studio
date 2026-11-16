@@ -18,6 +18,23 @@ from magister.trabajos import cola
 TIPOS = ("apuntes", "preguntas", "diapositivas", "guion")
 
 
+async def _del_tutor() -> dict:
+    """Lo ajustado en la mascota que también vale para el material: instrucciones y nivel."""
+    from magister.datos.produccion import Ajuste
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s:
+        fila = await s.get(Ajuste, "tutor")
+    v = (fila.valor if fila else {}) or {}
+    salida: dict = {}
+    if v.get("instrucciones"):
+        salida["instrucciones"] = list(v["instrucciones"])
+    nivel = {"cero": "nada", "experto": "avanzado"}.get(v.get("nivel", ""))
+    if nivel:
+        salida["nivel_tutor"] = nivel
+    return salida
+
+
 async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], preferencias: dict | None = None) -> list[int]:
     async def progreso(nodo: str, paso: int, total: int) -> None:
         await cola.fase(trabajo_id, nodo, paso, total)
@@ -36,7 +53,7 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], 
         return await _extras(trabajo_id, plan_id, clave, tipos, entrada, previos.texto, progreso, parar)
     await enriquecer(plan_id, clave, entrada.titulo, entrada.objetivos)
     entrada = await entrada_de_leccion(plan_id, clave)
-    entrada.preferencias = preferencias or {}
+    entrada.preferencias = {**(preferencias or {}), **await _del_tutor()}
     materiales: list[int] = []
 
     mid = await almacen.nuevo_material(plan_id, clave, "apuntes", trabajo_id)

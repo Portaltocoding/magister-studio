@@ -117,3 +117,42 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 .leccion-hecha > strong a, .roadmap a.hecha { color: var(--suave); }
 /* Controles nativos en gris, no en azul. */
 :root { accent-color: var(--texto); }
+
+/* Cuadro del chat: sin tirador, crece solo hasta 220 px; el adjuntar es un «+» sencillo. */
+.entrada-hilo textarea { resize: none; min-height: 44px; max-height: 220px; overflow-y: auto; line-height: 1.45; }
+.entrada-hilo .adjuntar {
+  display: inline-grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; align-self: flex-end; border-radius: 50%;
+  color: var(--suave); cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.entrada-hilo .adjuntar:hover { color: var(--texto); background: color-mix(in srgb, var(--texto) 8%, transparent); }
+.entrada-hilo .adjuntar:focus-within { outline: 2px solid var(--texto); outline-offset: 2px; }
+
+/* ===== Mascota: búho, birrete o gota de tinta ===== */
+.mascota { --m-cuerpo: #1f1e1c; --m-claro: #f4f2ed; --m-medio: #8d8a83; --m-pupila: #161514; overflow: visible; }
+@media (prefers-color-scheme: dark) {
+  .mascota { --m-cuerpo: #4a4743; --m-claro: #f4f2ed; --m-medio: #a8a49c; --m-pupila: #161514; }
+}
+.mascota .mascota-cuerpo { fill: var(--m-cuerpo); stroke: none; }
+.mascota .mascota-tripa { fill: color-mix(in srgb, var(--m-claro) 16%, var(--m-cuerpo)); }
+.mascota .mascota-cara { fill: var(--m-claro); stroke: var(--m-cuerpo); stroke-width: 3; }
+.mascota-birrete .mascota-blanco { fill: var(--m-claro); stroke: var(--m-cuerpo); stroke-width: 2; }
+.mascota .mascota-blanco { fill: var(--m-claro); }
+.mascota .mascota-pupila { fill: var(--m-pupila); transition: cx 120ms ease-out, cy 120ms ease-out; }
+.mascota .mascota-brillo { fill: #fff; opacity: 0.9; transition: cx 120ms ease-out, cy 120ms ease-out; }
+.mascota .mascota-pico { fill: var(--m-medio); }
+.mascota .mascota-boca, .mascota .mascota-borla { fill: none; stroke: var(--m-cuerpo); stroke-width: 2.6; stroke-linecap: round; }
+.mascota .mascota-borla-punta { fill: var(--m-medio); }
+.mascota .mascota-reflejo { fill: none; stroke: color-mix(in srgb, var(--m-claro) 35%, transparent); stroke-width: 4; stroke-linecap: round; }
+.mascota-cuerpo { stroke: none !important; }
+/* Parpadeo de vez en cuando */
+.mascota-ojo { animation: parpadeo 6s infinite; transform-box: view-box; }
+.mascota-ojo + .mascota-ojo { animation-delay: 0.02s; }
+@keyframes parpadeo { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@media (prefers-reduced-motion: reduce) { .mascota-ojo { animation: none; } .mascota .mascota-pupila, .mascota .mascota-brillo { transition: none; } }
+/* Elegir mascota en «Afina a tu tutor» */
+.afinar-mascotas { display: flex; gap: 8px; }
+.afinar-mascotas button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 8px; font: inherit; font-size: 0.75rem; color: var(--texto); background: transparent; border: 1px solid transparent; border-radius: 12px; cursor: pointer; }
+.afinar-mascotas button[aria-checked='true'] { border-color: var(--texto); background: color-mix(in srgb, var(--texto) 6%, transparent); }
+.afinar-mascotas .mascota { width: 40px; height: 40px; margin: 0; }
+.entrada-hilo > .boton, .entrada-hilo > button { align-self: flex-end; height: 44px; }
+.mascota .mascota-plumas { fill: none; stroke: color-mix(in srgb, var(--m-claro) 45%, var(--m-cuerpo)); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from './preferencias.ts'
-import Mascota from '../Mascota.tsx'
+import Mascota, { elegirForma, FORMAS, usarForma } from '../Mascota.tsx'
 import Colores from './Colores.tsx'
 
 // La mascota de la barra de arriba: siempre a la vista; al pulsarla, «Afina a tu tutor».
@@ -31,6 +31,7 @@ export const avisosActivos = () => {
 export default function Afinar() {
   const [abierto, setAbierto] = useState(false)
   const p = usarPreferencias()
+  const forma = usarForma()
   const [nueva, setNueva] = useState('')
   const [guardado, setGuardado] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
@@ -105,6 +106,17 @@ export default function Afinar() {
                     {x.texto}
                   </label>
                 ))}
+              </div>
+              <div className="afinar-grupo">
+                <span>Mascota</span>
+                <div className="afinar-mascotas" role="radiogroup" aria-label="Mascota">
+                  {FORMAS.map((f) => (
+                    <button key={f.id} type="button" role="radio" aria-checked={forma === f.id} onClick={() => elegirForma(f.id)}>
+                      <Mascota forma={f.id} mini />
+                      {f.nombre}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="afinar-grupo">
                 <span>Modo de aprendizaje</span>

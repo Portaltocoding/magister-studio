@@ -26,8 +26,11 @@ NIVEL = {
 def texto(preferencias: dict | None) -> str:
     p = preferencias or {}
     lineas = [PROFUNDIDAD.get(p.get("profundidad", "estandar"), PROFUNDIDAD["estandar"])]
-    if p.get("nivel") in NIVEL:
-        lineas.append(NIVEL[p["nivel"]])
+    nivel = p.get("nivel_tutor") or p.get("nivel")
+    if nivel in NIVEL:
+        lineas.append(NIVEL[nivel])
+    for x in p.get("instrucciones") or []:
+        lineas.append(f"El alumno pide: {x}")
     if p.get("enfoque"):
         lineas.append(f"Enfoque que pide el alumno: {p['enfoque']}")
     return "\n".join(f"- {x}" for x in lineas)

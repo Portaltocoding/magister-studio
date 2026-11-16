@@ -15,6 +15,11 @@ class Estado(TypedDict, total=False):
     hoy: str  # AAAA-MM-DD, lo pone quien invoca
     mensaje: str  # último mensaje del alumno
     voz: bool  # el alumno habla y escucha (modo Hablar): respuestas para el oído
+    llamada: bool  # llamada de voz por turnos
+    modo: str | None  # modo de aprendizaje solo para este mensaje
+    plan_id_leccion: int | None  # lección de la que se habla
+    leccion_clave: str | None
+    contexto: str | None  # dónde está la llamada
     turnos: list[Turno]  # historial completo de la conversación (lo pasa la API)
     perfil: dict
     plan: dict | None

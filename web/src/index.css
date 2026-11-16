@@ -110,7 +110,7 @@ h2 {
 
 .mascota { display: block; width: 120px; height: 120px; margin: 0 auto 8px; }
 .mascota-cuerpo { fill: #111; }
-.mascota-ojos { transition: transform 120ms ease-out; }
+
 @media (prefers-reduced-motion: reduce) {
   .mascota-ojos { transition: none; }
 }
