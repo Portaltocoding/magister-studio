@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
   enviarJson,
   leerSSE,
@@ -12,8 +10,28 @@ import {
 } from '../api.ts'
 import Cuestionario, { type Respuestas } from '../componentes/Cuestionario.tsx'
 import { PREGUNTAS_MATERIAL } from '../componentes/cuestionarios.ts'
-import LectorLibro from '../componentes/LectorLibro.tsx'
+import LectorLibro, { TextoLibro } from '../componentes/LectorLibro.tsx'
 import Tarjetas, { type Ficha } from '../componentes/Tarjetas.tsx'
+import Vacio, { irARuta } from '../componentes/Vacio.tsx'
+
+// Lo que sale si no eliges nada: lo de casi siempre.
+const RECOMENDADO: Respuestas = {
+  tipos: ['apuntes', 'preguntas', 'diapositivas'],
+  profundidad: 'estandar',
+  preguntas: 'mezcla',
+  cantidad: 'normal',
+}
+
+const AVANCE = [
+  { titulo: 'Apuntes', texto: 'Para leer aquí como un libro o bajar en PDF' },
+  { titulo: 'Fichas', texto: 'Preguntas de memoria, de una en una' },
+  { titulo: 'Diapositivas', texto: 'Unas doce, para repasar de un vistazo' },
+  { titulo: 'Repaso', texto: 'Sus conceptos entran en tu repaso diario' },
+]
+const AVANCE_VIDEO = [
+  { titulo: 'Apuntes', texto: 'La base de la que sale todo' },
+  { titulo: 'Guion', texto: 'Para grabarlo en vídeo, por partes' },
+]
 
 interface MaterialInfo {
   id: number
@@ -185,7 +203,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
       profundidad: r.profundidad,
       preguntas: r.preguntas,
       cantidad: r.cantidad,
-      estilo: r.estilo ?? 'libro',
+      estilo: r.estilo ?? estilo,
       enfoque: (r.enfoque as string | undefined)?.trim() || null,
     }
     try {
@@ -231,7 +249,12 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     return (
       <div className="panel">
         <h1>{modoVista === 'video' ? 'Vídeo' : 'Fichas'}</h1>
-        <p className="vacio">Primero acepta un plan en Roadmap.</p>
+        <Vacio
+          etiqueta="Sin plan todavía"
+          titulo="Aquí estará cada lección de tu plan"
+          texto="Cada lección es un bloque: apuntes que se leen como un libro, fichas para repasar de memoria, diapositivas y guion de vídeo. Primero hace falta un plan que diga qué lecciones hay."
+          acciones={[{ texto: 'Crear un plan', principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
+        />
       </div>
     )
 
@@ -289,13 +312,11 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 <p className="bloque-objetivos">Con qué saldrás: {leccion.objetivos.join('; ')}</p>
               )}
               <div className="bloque-acciones">
-                <button
-                  className="boton boton-principal"
-                  disabled={!!enCurso}
-                  onClick={() => setPreguntando({ forzar: !!apuntes })}
-                >
-                  {apuntes ? 'Rehacer el material' : 'Generar el material'}
-                </button>
+                {apuntes && (
+                  <button className="boton" disabled={!!enCurso} onClick={() => setPreguntando({ forzar: true })}>
+                    Rehacer el material
+                  </button>
+                )}
                 {apuntes?.ficheros.includes('pdf') && (
                   <a className="boton" href={fichero(apuntes, 'pdf')} target="_blank" rel="noreferrer">
                     Apuntes en PDF
@@ -391,20 +412,28 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 <p className="nota">Pulsa dentro y usa las flechas para pasar. F abre en pantalla completa.</p>
               </div>
             )}
-            {pestana === 'guion' && textos.guion && (
-              <article className="lector-texto guion">
-                <Markdown remarkPlugins={[remarkGfm]}>{textos.guion}</Markdown>
-              </article>
-            )}
+            {pestana === 'guion' && textos.guion && <TextoLibro markdown={textos.guion} className="guion" />}
           </>
         )}
         {datos && !apuntes && !enCurso && !preguntando && (
-          <div className="vacio-bloque">
-            <p>Esta lección aún no tiene material.</p>
-            <button className="boton boton-principal" onClick={() => setPreguntando({ forzar: false })}>
-              Generar el material
-            </button>
-          </div>
+          <Vacio
+            etiqueta="Lección sin preparar"
+            titulo="Prepárala y tendrás todo esto"
+            texto="El tutor escribe la lección bloque a bloque con tus fuentes, revisa el tono y comprueba que no falte nada. Tarda unos minutos y puedes seguir usando la app mientras tanto."
+            acciones={[
+              { texto: 'Prepararla con lo recomendado', principal: true, alPulsar: () => generar(false, modoVista === 'video' ? { ...RECOMENDADO, tipos: ['apuntes', 'guion'] } : RECOMENDADO) },
+              { texto: 'Elegir yo las opciones', alPulsar: () => setPreguntando({ forzar: false }) },
+            ]}
+          >
+            <ul className="vacio-avance">
+              {(modoVista === 'video' ? AVANCE_VIDEO : AVANCE).map((a) => (
+                <li key={a.titulo}>
+                  <strong>{a.titulo}</strong>
+                  <span>{a.texto}</span>
+                </li>
+              ))}
+            </ul>
+          </Vacio>
         )}
         {guion && !textos.guion && pestana === 'guion' && <p className="nota">Cargando el guion…</p>}
       </section>

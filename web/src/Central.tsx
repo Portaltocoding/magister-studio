@@ -1,3 +1,4 @@
+import Vacio from './componentes/Vacio.tsx'
 import EstudioLibre from './EstudioLibre.tsx'
 import type { IdModo } from './modos.ts'
 import PanelCalendario from './paneles/PanelCalendario.tsx'
@@ -56,9 +57,9 @@ export default function Central({
     case 'video':
       return <PanelMaterial key="video" vista="video" />
     case 'repaso':
-      return <PanelPractica />
+      return <PanelPractica irA={irA} />
     case 'progreso':
-      return <PanelProgreso />
+      return <PanelProgreso irA={irA} />
     case 'triaje':
       return <PanelTriaje />
     case 'etiquetar':
@@ -71,5 +72,9 @@ export default function Central({
 }
 
 function Pendiente({ texto }: { texto: string }) {
-  return <p className="vacio">Próximamente: {texto}</p>
+  return (
+    <div className="panel">
+      <Vacio etiqueta="Próximamente" titulo="Esta parte aún no está hecha" texto={texto} />
+    </div>
+  )
 }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { enviarJson, flujo, pedir } from '../api.ts'
+import Vacio from '../componentes/Vacio.tsx'
+import type { IdModo } from '../modos.ts'
 
 interface EnCola {
   concepto_id: string
@@ -34,7 +36,7 @@ const NOTAS = ['fallo', 'parcial', 'bien', 'perfecta']
 const nueva = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
 
 // Repaso: lo que toca hoy, una pregunta cada vez, respondida de memoria y corregida en flujo.
-export default function PanelPractica({ concepto }: { concepto?: string }) {
+export default function PanelPractica({ concepto, irA }: { concepto?: string; irA: (m: IdModo) => void }) {
   const [cola, setCola] = useState<EnCola[] | null>(null)
   const [pregunta, setPregunta] = useState<Servida | null>(null)
   const [respuesta, setRespuesta] = useState('')
@@ -99,19 +101,42 @@ export default function PanelPractica({ concepto }: { concepto?: string }) {
   return (
     <div className="panel">
       <h1>Repaso</h1>
-      {cola && (
+      {cola && pregunta && (
         <p className="nota">
-          {cola.length ? `${cola.length} conceptos para hoy · unos ${minutos} minutos` : 'Nada que repasar hoy.'}
-          {cola.some((c) => c.nuevo) ? ` · ${cola.filter((c) => c.nuevo).length} nuevos` : ''}
+          {cola.length ? `${cola.length} conceptos para hoy · unos ${minutos} minutos` : 'Último de hoy.'}
         </p>
       )}
-      {cola && cola.length === 0 && (
-        <p className="vacio">Genera el material de una lección en Fichas y sus conceptos entrarán en el repaso.</p>
+      {cola && cola.length === 0 && !pregunta && (
+        <Vacio
+          etiqueta="Hoy, nada pendiente"
+          titulo="No te toca repasar nada"
+          texto="Los conceptos entran aquí cuando generas el material de una lección, y vuelven justo antes de que los olvides. Cuantas más lecciones prepares, más tendrás."
+          acciones={[
+            { texto: 'Preparar una lección', principal: true, alPulsar: () => irA('fichas') },
+            { texto: 'Ver mi progreso', alPulsar: () => irA('progreso') },
+          ]}
+        />
       )}
       {!pregunta && cola && cola.length > 0 && (
-        <button className="boton boton-principal" onClick={siguiente}>
-          Empezar
-        </button>
+        <Vacio
+          etiqueta={`Hoy · unos ${minutos} minutos`}
+          titulo={`${cola.length} ${cola.length === 1 ? 'concepto te espera' : 'conceptos te esperan'}`}
+          texto="Una pregunta cada vez. Sin mirar los apuntes: recordar cuesta, y por eso fija."
+          pasos={[
+            { titulo: 'Responde de memoria', texto: 'Con tus palabras, aunque sea a medias.' },
+            { titulo: 'Di lo seguro que estás', texto: 'Así sabrás si aciertas tanto como crees.' },
+            { titulo: 'El tutor corrige', texto: 'Y te lo vuelve a preguntar justo antes de que lo olvides.' },
+          ]}
+          acciones={[{ texto: 'Empezar', principal: true, alPulsar: siguiente }]}
+        >
+          <div className="vacio-chips">
+            {cola.map((c) => (
+              <span key={c.concepto_id} className={`chip ${c.nuevo ? 'chip-nuevo' : ''}`} title={c.nuevo ? 'Primera vez' : `Lo recuerdas al ${Math.round(c.p * 100)} %`}>
+                {c.nombre}
+              </span>
+            ))}
+          </div>
+        </Vacio>
       )}
       {pregunta && (
         <section className="practica">

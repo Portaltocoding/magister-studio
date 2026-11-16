@@ -86,13 +86,6 @@ export const PREGUNTAS_MATERIAL: Pregunta[] = [
     ],
   },
   {
-    id: 'estilo', titulo: '¿Con qué estilo?', tipo: 'una',
-    opciones: [
-      { valor: 'libro', etiqueta: 'Libro', desc: 'Portada, teoría en amarillo, repaso en verde' },
-      { valor: 'ficha', etiqueta: 'Ficha general', desc: 'Sobria y densa, para imprimir y escribir' },
-    ],
-  },
-  {
     id: 'enfoque', titulo: '¿Algún enfoque? (opcional)', tipo: 'texto', opcional: true,
     placeholder: 'Por ejemplo: con ejemplos en TypeScript, pensando en entrevistas, sin matemáticas...',
   },

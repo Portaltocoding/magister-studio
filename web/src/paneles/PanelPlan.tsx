@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Vacio from '../componentes/Vacio.tsx'
 import {
   enviarJson,
   hoyIso,
@@ -66,10 +67,17 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
     return (
       <div className="panel">
         <h1>Roadmap</h1>
-        <p className="vacio">Aún no tienes ningún plan. Cuéntale al tutor qué quieres aprender y te propone uno.</p>
-        <button className="boton boton-principal" onClick={alNuevoPlan}>
-          Nuevo plan
-        </button>
+        <Vacio
+          etiqueta="Sin plan todavía"
+          titulo="Tu camino, lección a lección"
+          texto="Un plan convierte «quiero aprender X» en lecciones ordenadas, con horas y fechas en tu calendario. Lo puedes cambiar cuando quieras."
+          pasos={[
+            { titulo: 'Cuatro preguntas', texto: 'Qué, para qué, qué sabes ya y cuánto tiempo tienes.' },
+            { titulo: 'El tutor propone', texto: 'Lecciones, objetivos y calendario. Lo aceptas o lo cambias.' },
+            { titulo: 'A estudiar', texto: 'Cada día, el tutor te dice qué toca.' },
+          ]}
+          acciones={[{ texto: 'Crear mi plan', principal: true, alPulsar: alNuevoPlan }]}
+        />
       </div>
     )
 

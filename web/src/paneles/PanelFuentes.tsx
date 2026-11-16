@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Vacio from '../componentes/Vacio.tsx'
 import {
   crearFuente,
   decidirPropuesta,
@@ -118,7 +119,19 @@ export default function PanelFuentes() {
         </section>
       )}
 
-      <div className="tarjetas">
+      {fuentes.length === 0 && (
+        <Vacio
+          etiqueta="Sin fuentes todavía"
+          titulo="Dale al tutor tus propios materiales"
+          texto="Una fuente es un sitio de donde sale lo que estudias: tus apuntes, un libro en PDF, una web. El tutor las lee, responde con ellas y cita de dónde sale cada cosa. Sin fuentes también funciona, pero con las tuyas se ciñe a tu temario."
+          pasos={[
+            { titulo: 'Crea una fuente', texto: 'Ponle nombre abajo: «Apuntes de clase», «Libro de BD»...' },
+            { titulo: 'Sube ficheros o URLs', texto: 'PDF, Markdown, HTML o texto. Se indexan solos en segundos.' },
+            { titulo: 'Pregunta', texto: 'En Estudio libre o en el tutor verás las citas a tus documentos.' },
+          ]}
+        />
+      )}
+      <div className="tarjetas tarjetas-fuentes">
         {fuentes.map((f) => (
           <button key={f.id} className="tarjeta" aria-pressed={f.id === activa} onClick={() => setActiva(f.id)}>
             <strong>{f.nombre}</strong>
@@ -147,21 +160,21 @@ export default function PanelFuentes() {
               value={nueva.tipo}
               onChange={(e) => setNueva({ ...nueva, tipo: e.target.value as Fuente['tipo'] })}
             >
-              <option value="pdf">pdf</option>
-              <option value="libro">libro</option>
-              <option value="vault">vault</option>
-              <option value="web">web</option>
+              <option value="pdf">PDF o ficheros</option>
+              <option value="libro">Libro</option>
+              <option value="vault">Notas (Obsidian)</option>
+              <option value="web">Web</option>
             </select>
             <select
               aria-label="Confianza"
               value={nueva.confianza}
               onChange={(e) => setNueva({ ...nueva, confianza: Number(e.target.value) })}
             >
-              <option value={3}>3 · tuyo</option>
-              <option value={2}>2 · libro</option>
-              <option value={1}>1 · web</option>
+              <option value={3}>Fiabilidad máxima (mío)</option>
+              <option value={2}>Fiabilidad media (libro)</option>
+              <option value={1}>Fiabilidad baja (web)</option>
             </select>
-            <button className="boton-mini">Crear</button>
+            <button className="boton-mini">Crear fuente</button>
           </span>
         </form>
       </div>

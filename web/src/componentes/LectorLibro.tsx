@@ -34,9 +34,22 @@ function arbol(md: string): Nodo {
   return raiz
 }
 
+// Las marcas del guion ([[intuicion]], [[choque]]...) se leen como etiquetas.
+const MARCAS: Record<string, string> = {
+  intuicion: 'Intuición',
+  choque: 'Choque',
+  nombre: 'Nombre',
+  teoria: 'Teoría',
+  ejemplo: 'Ejemplo',
+  cierre: 'Cierre',
+  practica: 'Práctica',
+}
+const marca = (m: string) => MARCAS[m] ?? m.charAt(0).toUpperCase() + m.slice(1)
+
 // Las etiquetas del motor pasan a Markdown normal: la etiqueta de un título va como h6 encima.
 function limpiar(t: string): string {
   return t
+    .replace(/^\[\[([a-z_]+)\]\]\s*/gm, (_, m: string) => `###### ${marca(m)}\n\n`)
     .replace(/^(#{1,4}) (.+?)\s*\{([^}]*)\}\s*$/gm, (_, h: string, titulo: string, attrs: string) => {
       const etq = attrs.match(/etq="([^"]*)"/)
       return `${etq ? `###### ${etq[1]}\n\n` : ''}${h} ${titulo}`
@@ -104,6 +117,16 @@ export function secciones(md: string): Seccion[] {
     titulo: m[1],
     etq: m[2]?.match(/etq="([^"]*)"/)?.[1] ?? null,
   }))
+}
+
+// El mismo papel y las mismas cajas, sin índice: para el guion y el modo foco.
+export function TextoLibro({ markdown, className = '' }: { markdown: string; className?: string }) {
+  const nodos = useMemo(() => arbol(markdown.replace(/^---\n[\s\S]*?\n---\n/, '')), [markdown])
+  return (
+    <article className={`lector-texto ${className}`}>
+      <Pintar nodo={nodos} />
+    </article>
+  )
 }
 
 interface Props {
