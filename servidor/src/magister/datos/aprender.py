@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, Float, ForeignKeyConstraint, Index, Integer, String, Text
+from sqlalchemy import BigInteger, CheckConstraint, Float, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -58,3 +58,24 @@ class Servida(Base):
     momento: Mapped[datetime] = mapped_column(Fecha)
     p_predicha: Mapped[float | None] = mapped_column(Float)
     version_programador: Mapped[str] = mapped_column(String(120))
+
+
+class Examen(Base):
+    """Un examen o una evaluación: las preguntas que salieron, lo que respondiste y la nota."""
+
+    __tablename__ = "examenes"
+    __table_args__ = (
+        CheckConstraint("modo in ('examen', 'evaluacion')", name="ck_examenes_modo"),
+        Index("ix_examenes_plan_creado", "plan_id", "creado"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    plan_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("planes.id", ondelete="CASCADE"))
+    modo: Mapped[str] = mapped_column(String(12))
+    lecciones: Mapped[list[str]] = mapped_column(JSONB)
+    preguntas: Mapped[list[dict]] = mapped_column(JSONB)
+    minutos: Mapped[int | None] = mapped_column(Integer)
+    creado: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
+    terminado: Mapped[datetime | None] = mapped_column(Fecha)
+    segundos: Mapped[int | None] = mapped_column(Integer)
+    nota: Mapped[float | None] = mapped_column(Float)

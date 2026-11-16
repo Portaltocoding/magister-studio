@@ -1,5 +1,5 @@
 import { borrarConversacion, type Conversacion } from './api.ts'
-import { MODOS, type IdModo } from './modos.ts'
+import { GRUPOS, type IdModo } from './modos.ts'
 
 interface Props {
   modoActivo: IdModo
@@ -22,24 +22,40 @@ export default function BarraLateral({
     <aside className="lateral">
       <div className="marca">Magister</div>
 
-      <nav aria-label="Modos">
-        <ul className="modos">
-          {MODOS.map((m) => (
-            <li key={m.id}>
-              {/* Un botón desactivado no se puede pulsar ni enfocar con el teclado. */}
-              <button
-                type="button"
-                className="modo"
-                disabled={!m.encendido}
-                aria-current={m.id === modoActivo ? 'page' : undefined}
-                onClick={() => alElegir(m.id)}
-              >
-                <span>{m.nombre}</span>
-                {!m.encendido && <span className="pronto">próximamente</span>}
-              </button>
-            </li>
-          ))}
-        </ul>
+      <nav aria-label="Modos" className="grupos-modos">
+        {GRUPOS.map((g) => {
+          const lista = (
+            <ul className="modos">
+              {g.modos.map((m) => (
+                <li key={m.id}>
+                  {/* Un botón desactivado no se puede pulsar ni enfocar con el teclado. */}
+                  <button
+                    type="button"
+                    className="modo"
+                    disabled={!m.encendido}
+                    title={m.ayuda}
+                    aria-current={m.id === modoActivo ? 'page' : undefined}
+                    onClick={() => alElegir(m.id)}
+                  >
+                    <span>{m.nombre}</span>
+                    {!m.encendido && <span className="pronto">pronto</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
+          return g.plegado ? (
+            <details key={g.nombre} className="grupo-modos" open={g.modos.some((m) => m.id === modoActivo)}>
+              <summary className="grupo-titulo">{g.nombre}</summary>
+              {lista}
+            </details>
+          ) : (
+            <div key={g.nombre || 'inicio'} className={`grupo-modos ${g.nombre ? '' : 'grupo-inicio'}`}>
+              {g.nombre && <h2 className="grupo-titulo">{g.nombre}</h2>}
+              {lista}
+            </div>
+          )
+        })}
       </nav>
 
       <section className="conversaciones">

@@ -1,3 +1,4 @@
+import { usarAdjuntos } from './componentes/usarAdjuntos.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   crearConversacion,
@@ -54,6 +55,8 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     alGuardado,
   )
   const [pendiente, setPendiente] = useState<string | null>(null)
+  const { adjuntos, subir, quitar } = usarAdjuntos()
+  const conAdjuntos = { alAdjuntar: subir, adjuntos, alQuitarAdjunto: quitar }
   // La que acabamos de crear aquí: no se recarga desde la API, o borraría la respuesta que está llegando.
   const recienCreada = useRef<number | null>(null)
 
@@ -120,11 +123,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           ))}
         </div>
       )}
-      {fase && (
-        <p className="fase" role="status">
-          {fase}…
-        </p>
-      )}
+
       {propuesta && (
         <PropuestaPlan
           propuesta={propuesta}
@@ -185,6 +184,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           alParar={parar}
           placeholder={tipo === 'plan' ? 'Quiero preparar...' : 'Escribe un tema o una pregunta'}
           pie={pie}
+          {...conAdjuntos}
         />
       </div>
     )
@@ -193,7 +193,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   return (
     <div className="vista-hilo">
       {error && <p role="alert">{error}</p>}
-      <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} />
+      <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} fase={fase} {...conAdjuntos} />
     </div>
   )
 }

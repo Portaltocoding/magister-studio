@@ -11,7 +11,8 @@ function leerRuta(): { modo: IdModo; conversacion: number | null } {
   const partes = window.location.hash.replace(/^#\/?/, '').split('/')
   if (partes[0] === 'conversacion' && Number(partes[1])) return { modo: 'libre', conversacion: Number(partes[1]) }
   const modo = MODOS.find((m) => m.id === partes[0] && m.encendido)?.id
-  return { modo: modo ?? 'libre', conversacion: null }
+  // Sin ruta se abre «Hoy»: el tutor con lo que toca.
+  return { modo: modo ?? (partes[0] ? 'libre' : 'tutor'), conversacion: null }
 }
 
 function escribirRuta(modo: IdModo, conversacion: number | null) {

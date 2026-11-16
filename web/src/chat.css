@@ -1,0 +1,34 @@
+/* ===== Preguntas tipo test y opciones dentro del chat ===== */
+.test-rapido {
+  margin: 14px 0 6px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--borde);
+  background: var(--fondo); text-align: left;
+}
+.test-etq { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--suave); }
+.test-enunciado { font-weight: 600; margin: 4px 0 10px; }
+.test-enunciado p { margin: 0; }
+.test-opciones { display: flex; flex-direction: column; gap: 6px; }
+.test-opcion {
+  display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; color: var(--texto); cursor: pointer;
+  padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--borde); background: transparent;
+  transition: border-color 120ms, background 120ms;
+}
+.test-opcion p { margin: 0; }
+.test-opcion:hover:not(:disabled) { border-color: var(--acento); }
+.test-opcion:disabled { cursor: default; }
+.test-letra {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.78rem; font-weight: 800;
+  border: 1.5px solid var(--borde);
+}
+.test-opcion.buena { border-color: #2f8a5b; background: color-mix(in srgb, #2f8a5b 14%, transparent); }
+.test-opcion.buena .test-letra { background: #2f8a5b; border-color: #2f8a5b; color: #fff; }
+.test-opcion.mala { border-color: #c2453a; background: color-mix(in srgb, #c2453a 12%, transparent); }
+.test-opcion.mala .test-letra { background: #c2453a; border-color: #c2453a; color: #fff; }
+.test-resultado { margin: 10px 0 0; font-size: 0.92rem; }
+.test-resultado.bien strong { color: #3c9b6b; }
+.test-resultado.mal strong { color: #d0574b; }
+.opciones-chat { margin: 12px 0 4px; }
+
+/* Diagramas del tutor: sobre papel claro, como en el libro */
+.diagrama { margin: 14px 0; padding: 14px; border-radius: 12px; background: #fbf9f4; border: 1px solid var(--borde); text-align: center; }
+.diagrama img { max-width: 100%; height: auto; max-height: 380px; }
+.diagrama-esperando { color: #8a867e; font-size: 0.9rem; padding: 28px; }

@@ -202,6 +202,25 @@ export interface LeccionVista extends LeccionPlan {
   sin_material: boolean
 }
 
+// Un examen del plan: sale del calendario (un parcial cada pocas lecciones y un final).
+export interface HitoExamen {
+  id: string
+  titulo: string
+  fecha: string
+  lecciones: string[]
+  final: boolean
+  preguntas: number
+  minutos: number
+  hecho: boolean
+  nota: number | null
+  tema?: string
+  tema_id?: number
+  plan_id?: number
+}
+
+// La ruta que abre Examen con ese examen ya preparado.
+export const rutaExamen = (planId: number, h: HitoExamen) => `#/examen/${planId}/${h.lecciones.join(',')}/${h.preguntas}/${h.minutos}`
+
 export interface VistaPlan {
   plan_id: number
   tema_id: number
@@ -214,6 +233,7 @@ export interface VistaPlan {
   semanas: { lunes: string; dias: { fecha: string; hoy: boolean; sesiones: SesionVista[] }[] }[]
   fin: string | null
   hoy: string
+  examenes: HitoExamen[]
 }
 
 export interface ResumenPlan {
@@ -238,7 +258,7 @@ export const verCalendario = (desde?: string, hasta?: string) => {
   const q = new URLSearchParams()
   if (desde) q.set('desde', desde)
   if (hasta) q.set('hasta', hasta)
-  return pedir<{ fecha: string; sesiones: SesionVista[] }[]>(`/api/calendario?${q}`)
+  return pedir<{ fecha: string; sesiones: SesionVista[]; examenes?: HitoExamen[] }[]>(`/api/calendario?${q}`)
 }
 
 export const hoyIso = () => {

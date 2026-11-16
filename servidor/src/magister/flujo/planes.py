@@ -10,6 +10,21 @@ from magister.datos import repositorio_fuentes as rf
 from magister.flujo.nodos.calendarizar import reglas_calendario
 from magister.plan.calendario import NoCabe, a_hora, calendarizar
 from magister.plan.esquemas import Concepto, Leccion, Perfil, Plan
+from magister.plan.examenes import con_estado, hitos
+
+
+async def examenes_del_plan(s: AsyncSession, plan_id: int, lecs: list, ses: list) -> list[dict]:
+    """Los exámenes que tocan según el calendario, marcados si ya hiciste uno que los cubre."""
+    from sqlalchemy import select
+
+    from magister.datos.aprender import Examen
+
+    ultima: dict = {}
+    for x in ses:
+        ultima[x.leccion_clave] = max(ultima.get(x.leccion_clave, x.fecha), x.fecha)
+    hechos = [(set(e.lecciones or []), e.nota) for e in (await s.scalars(
+        select(Examen).where(Examen.plan_id == plan_id, Examen.terminado.is_not(None)))).all()]
+    return con_estado(hitos([lec.clave for lec in lecs], ultima), hechos)
 
 
 async def _plan_pydantic(s: AsyncSession, plan_id: int) -> Plan:
@@ -116,6 +131,7 @@ async def vista_por_id(s: AsyncSession, plan_id: int, hoy: date) -> dict | None:
         ],
         "fin": ses[-1].fecha.isoformat() if ses else None,
         "hoy": hoy.isoformat(),
+        "examenes": await examenes_del_plan(s, fila.id, lecs, ses),
     }
 
 
@@ -164,9 +180,16 @@ async def resumen_planes(s: AsyncSession, hoy: date) -> list[dict]:
 async def calendario(s: AsyncSession, desde: date, hasta: date) -> list[dict]:
     """Las sesiones de todos los planes aceptados entre dos fechas, por día."""
     dias: dict[date, list] = defaultdict(list)
+    examenes: dict[date, list] = defaultdict(list)
     for fila, nombre in await dp.planes_aceptados(s):
-        titulos = {lec.clave: lec.titulo for lec in await dp.lecciones(s, fila.id)}
-        for x in await dp.sesiones(s, fila.id):
+        lecs = await dp.lecciones(s, fila.id)
+        titulos = {lec.clave: lec.titulo for lec in lecs}
+        todas = await dp.sesiones(s, fila.id)
+        for h in await examenes_del_plan(s, fila.id, lecs, todas):
+            f = date.fromisoformat(h["fecha"])
+            if desde <= f <= hasta:
+                examenes[f].append({**h, "tema": nombre, "tema_id": fila.tema_id, "plan_id": fila.id})
+        for x in todas:
             if desde <= x.fecha <= hasta:
                 dias[x.fecha].append(
                     {
@@ -181,7 +204,8 @@ async def calendario(s: AsyncSession, desde: date, hasta: date) -> list[dict]:
                         "estado": x.estado,
                     }
                 )
-    return [{"fecha": d.isoformat(), "sesiones": v} for d, v in sorted(dias.items())]
+    return [{"fecha": d.isoformat(), "sesiones": dias.get(d, []), "examenes": examenes.get(d, [])}
+            for d in sorted(set(dias) | set(examenes))]
 
 
 async def proponer_reajuste(s: AsyncSession, tema_id: int, ahora) -> dict | None:

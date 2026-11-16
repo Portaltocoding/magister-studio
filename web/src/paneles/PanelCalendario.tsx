@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { enviarJson, hoyIso, marcarSesion, pedir, verCalendario, type SesionVista } from '../api.ts'
+import { enviarJson, hoyIso, marcarSesion, pedir, rutaExamen, verCalendario, type HitoExamen, type SesionVista } from '../api.ts'
 
 type Tipo = 'deber' | 'examen' | 'clase' | 'nota'
 
@@ -48,6 +48,7 @@ export default function PanelCalendario() {
   const [mes, setMes] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [eventos, setEventos] = useState<Evento[]>([])
   const [sesiones, setSesiones] = useState<Record<string, SesionVista[]>>({})
+  const [examenes, setExamenes] = useState<Record<string, HitoExamen[]>>({})
   const [carga, setCarga] = useState<Record<string, Carga>>({})
   const [pendientes, setPendientes] = useState<Evento[]>([])
   const [dia, setDia] = useState<string | null>(null)
@@ -62,7 +63,10 @@ export default function PanelCalendario() {
     const hasta = iso(celdas[41])
     pedir<Evento[]>(`/api/eventos?desde=${desde}&hasta=${hasta}`).then(setEventos)
     pedir<Evento[]>('/api/eventos/pendientes').then(setPendientes)
-    verCalendario(desde, hasta).then((dias) => setSesiones(Object.fromEntries(dias.map((d) => [d.fecha, d.sesiones]))))
+    verCalendario(desde, hasta).then((dias) => {
+      setSesiones(Object.fromEntries(dias.map((d) => [d.fecha, d.sesiones])))
+      setExamenes(Object.fromEntries(dias.map((d) => [d.fecha, d.examenes ?? []])))
+    })
     pedir<Carga[]>('/api/progreso/carga?dias=42')
       .then((c) => setCarga(Object.fromEntries(c.filter((x) => x.repasos > 0).map((x) => [x.fecha, x]))))
       .catch(() => setCarga({}))
@@ -173,6 +177,20 @@ export default function PanelCalendario() {
                         {x.clave} {x.titulo}
                       </span>
                     ))}
+                  {verPlan &&
+                    (examenes[f] ?? []).map((h) => (
+                      <span
+                        key={`e${h.id}`}
+                        className={`fondo-plan fondo-examen ${h.hecho ? 'pastilla-hecha' : ''}`}
+                        title={`${h.titulo} · ${h.preguntas} preguntas, ${h.minutos} min. Pulsa para hacerlo`}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          if (h.plan_id) window.location.hash = rutaExamen(h.plan_id, h)
+                        }}
+                      >
+                        {h.titulo}
+                      </span>
+                    ))}
                   {verPlan && carga[f] && <span className="fondo-plan fondo-repaso">{carga[f].repasos} repasos</span>}
                 </span>
               </button>
@@ -217,6 +235,27 @@ export default function PanelCalendario() {
                   </li>
                 ))}
               </ul>
+              {verPlan && (examenes[dia] ?? []).length > 0 && (
+                <>
+                  <h3>Exámenes</h3>
+                  <ul className="lista-dia">
+                    {(examenes[dia] ?? []).map((h) => (
+                      <li key={h.id} className="item-plan">
+                        <span>
+                          <strong>{h.titulo}</strong>{' '}
+                          <span className="nota">
+                            · {h.preguntas} preguntas, {h.minutos} min
+                            {h.hecho && h.nota != null ? ` · hecho: ${h.nota.toFixed(1).replace('.', ',')}` : ''}
+                          </span>
+                        </span>
+                        <button className="boton-mini" onClick={() => h.plan_id && (window.location.hash = rutaExamen(h.plan_id, h))}>
+                          {h.hecho ? 'Repetir →' : 'Hacerlo →'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
               {verPlan && (sesiones[dia] ?? []).length > 0 && (
                 <>
                   <h3>Del plan</h3>

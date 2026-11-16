@@ -39,6 +39,12 @@ class Definicion(BaseModel):
     definicion: str = Field(description="Una frase")
 
 
+class Formula(BaseModel):
+    nombre: str = Field(description="Cómo se llama: «Ley de Ohm», «Derivada de un producto»")
+    latex: str = Field(description=r"La fórmula en LaTeX, sin $: V = I \cdot R")
+    significado: str = Field(description="Una frase: qué es cada símbolo y cuándo se usa")
+
+
 class BloqueContrato(BaseModel):
     clave: str = Field(description="b1, b2...")
     titulo: str
@@ -49,6 +55,7 @@ class BloqueContrato(BaseModel):
 class Contrato(BaseModel):
     razonamiento: str = Field(description="Primero: por qué este orden de bloques")
     definiciones: list[Definicion]
+    formulas: list[Formula] = Field(default_factory=list, description="Solo si la lección tiene fórmulas; si no, lista vacía")
     bloques: list[BloqueContrato] = Field(min_length=2, max_length=6)
 
 

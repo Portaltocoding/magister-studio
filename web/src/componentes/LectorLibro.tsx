@@ -1,6 +1,10 @@
 import { Children, isValidElement, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Markdown, { type Components } from 'react-markdown'
+import katex from 'katex'
+import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import 'katex/dist/katex.min.css'
 
 // Lee el markdown del motor del libro (cajas `::: nombre`, etiquetas `{etq="..."}`, `[x]{.clase}`)
 // y lo pinta en pantalla con la misma maqueta: portada negra, teoría amarilla, práctica verde.
@@ -89,7 +93,7 @@ const componentes: Components = {
 function Pintar({ nodo }: { nodo: Nodo | string }) {
   if (typeof nodo === 'string')
     return (
-      <Markdown remarkPlugins={[remarkGfm]} components={componentes}>
+      <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={componentes}>
         {limpiar(nodo)}
       </Markdown>
     )
@@ -178,4 +182,16 @@ export default function LectorLibro({ markdown, raiz }: Props) {
       </article>
     </div>
   )
+}
+
+// Una fórmula suelta (glosario, fichas). KaTeX escapa el texto; si el LaTeX está mal, se ve tal cual.
+export function Tex({ latex, bloque = false }: { latex: string; bloque?: boolean }) {
+  const html = useMemo(() => {
+    try {
+      return katex.renderToString(latex, { displayMode: bloque, throwOnError: false, trust: false })
+    } catch {
+      return null
+    }
+  }, [latex, bloque])
+  return html ? <span className="tex" dangerouslySetInnerHTML={{ __html: html }} /> : <code>{latex}</code>
 }

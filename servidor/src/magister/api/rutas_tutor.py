@@ -14,6 +14,7 @@ from magister.aprender import practica
 from magister.datos.aprender import Servida
 from magister.datos.material import Material, Pregunta, PreguntaConcepto
 from magister.datos.sesion import nueva_sesion, sesion_por_peticion
+from magister.material import almacen
 
 rutas = APIRouter(prefix="/api")
 
@@ -59,7 +60,10 @@ async def leccion(material_id: int, s: AsyncSession = Depends(sesion_por_peticio
     por_bloque: dict[str, dict] = {}
     for pid, donde, enunciado, cid in preguntas:
         por_bloque.setdefault(donde or "", {"pregunta_id": pid, "enunciado": enunciado, "concepto_id": cid})
-    return {"plan_id": m.plan_id, "leccion_clave": m.leccion_clave, "definiciones": (m.contrato or {}).get("definiciones", []),
+    titulo, tema, _ = await almacen.datos_leccion(m.plan_id, m.leccion_clave)
+    contrato = m.contrato or {}
+    return {"plan_id": m.plan_id, "leccion_clave": m.leccion_clave, "titulo": titulo, "tema": tema,
+            "definiciones": contrato.get("definiciones", []), "formulas": contrato.get("formulas", []),
             "bloques": [{"clave": c, "titulo": t, "texto": x, "pregunta": por_bloque.get(c)} for c, t, x in bloques]}
 
 

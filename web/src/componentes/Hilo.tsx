@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import Pensando from './Pensando.tsx'
+import { Children, isValidElement, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import Markdown from 'react-markdown'
+import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import { Diagrama, Opciones, TestRapido } from './Interactivo.tsx'
+import Revelar from './Revelar.tsx'
 import type { CitaInfo } from '../api.ts'
 import { conMarcas, PanelCita } from '../Cita.tsx'
 import Valorar from './Valorar.tsx'
+import { ACEPTA, type Adjunto } from './usarAdjuntos.ts'
 
 export interface Burbuja {
   clave: string
@@ -24,10 +30,36 @@ interface Props {
   placeholder?: string
   pie?: ReactNode
   deshabilitado?: boolean
+  // Adjuntar ficheros: si se pasa, sale el clip y se puede arrastrar sobre la caja.
+  alAdjuntar?: (ficheros: File[]) => void
+  adjuntos?: Adjunto[]
+  alQuitarAdjunto?: (nombre: string) => void
+  // Lo que está haciendo el tutor («Buscando en tus fuentes»): va dentro de la burbuja que espera.
+  fase?: string | null
+}
+
+const ESTADO_ADJUNTO: Record<Adjunto['estado'], string> = {
+  subiendo: 'subiendo…',
+  indexando: 'leyéndolo…',
+  listo: 'listo: el tutor ya lo usa',
+  error: 'no se pudo leer',
 }
 
 // El hilo de una conversación: lo usan Estudio libre, el diagnóstico y la sesión de tutor.
-export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeholder, pie, deshabilitado }: Props) {
+export default function Hilo({
+  burbujas,
+  escribiendo,
+  alEnviar,
+  alParar,
+  placeholder,
+  pie,
+  deshabilitado,
+  alAdjuntar,
+  adjuntos,
+  alQuitarAdjunto,
+  fase,
+}: Props) {
+  const [encima, setEncima] = useState(false)
   const [borrador, setBorrador] = useState('')
   const caja = useRef<HTMLTextAreaElement>(null)
   const final = useRef<HTMLDivElement>(null)
@@ -45,8 +77,24 @@ export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeho
     return () => zona.removeEventListener('scroll', alDesplazar)
   }, [])
 
+  // Sigue al texto mientras crece (también cuando aparece a ritmo de lectura) hasta el fondo de verdad,
+  // por debajo de la caja de escribir. Si subes para releer, deja de seguir hasta que vuelvas abajo.
   useEffect(() => {
-    if (pegado.current) final.current?.scrollIntoView({ block: 'end' })
+    const zona = final.current?.closest('.central')
+    const lista = final.current?.closest('.hilo')
+    if (!zona || !lista) return
+    const seguir = () => {
+      if (pegado.current) zona.scrollTo({ top: zona.scrollHeight })
+    }
+    const obs = new ResizeObserver(seguir)
+    obs.observe(lista)
+    return () => obs.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const ultima = burbujas[burbujas.length - 1]
+    // Al enviar tú un mensaje, siempre abajo.
+    if (ultima?.rol === 'usuario') pegado.current = true
   }, [burbujas])
 
   const mandar = () => {
@@ -70,15 +118,30 @@ export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeho
         {burbujas.map((b) => (
           <div key={b.clave} className={`burbuja burbuja-${b.rol} burbuja-${b.estado}`}>
             {b.rol === 'tutor' && b.estado === 'llegando' && !b.contenido ? (
-              <span className="puntos" aria-label="El tutor está escribiendo">
-                …
-              </span>
+              <Pensando texto={fase ? `${fase}…` : 'Pensando…'} />
             ) : b.estado === 'error' ? (
               <p role="alert">{b.contenido}</p>
             ) : b.rol === 'tutor' ? (
+              <Revelar texto={conMarcas(b.contenido)} animar={b.estado === 'llegando'}>
+              {(visible) => (
               <Markdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
+                  // ```test y ```opciones se convierten en botones.
+                  pre: ({ children }) => {
+                    const hijo = Children.toArray(children)[0]
+                    if (isValidElement<{ className?: string; children?: ReactNode }>(hijo)) {
+                      const clase = hijo.props.className ?? ''
+                      const texto = String(hijo.props.children ?? '')
+                      const completo = b.estado !== 'llegando'
+                      if (clase.includes('language-test')) return <TestRapido texto={texto} completo={completo} />
+                      if (clase.includes('language-svg')) return <Diagrama svg={texto} completo={completo} />
+                      if (clase.includes('language-opciones'))
+                        return <Opciones texto={texto} activo={completo && !escribiendo} alElegir={alEnviar} />
+                    }
+                    return <pre>{children}</pre>
+                  },
                   a: ({ href, children }) => {
                     const m = href?.match(/^#cita-(\d+)$/)
                     if (!m) return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
@@ -98,8 +161,10 @@ export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeho
                   },
                 }}
               >
-                {conMarcas(b.contenido)}
+                {visible}
               </Markdown>
+              )}
+              </Revelar>
             ) : (
               <p className="propio">{b.contenido}</p>
             )}
@@ -119,12 +184,57 @@ export default function Hilo({ burbujas, escribiendo, alEnviar, alParar, placeho
       {cita && <PanelCita id={cita.id} info={cita.info} alCerrar={() => setCita(null)} />}
       {pie}
       <form
-        className="entrada entrada-hilo"
+        className={`entrada entrada-hilo ${encima ? 'soltar' : ''}`}
+        onDragOver={(e) => {
+          if (!alAdjuntar) return
+          e.preventDefault()
+          setEncima(true)
+        }}
+        onDragLeave={() => setEncima(false)}
+        onDrop={(e) => {
+          if (!alAdjuntar) return
+          e.preventDefault()
+          setEncima(false)
+          alAdjuntar(Array.from(e.dataTransfer.files))
+        }}
         onSubmit={(e) => {
           e.preventDefault()
           mandar()
         }}
       >
+        {adjuntos && adjuntos.length > 0 && (
+          <ul className="adjuntos">
+            {adjuntos.map((a) => (
+              <li key={a.nombre} className={`adjunto ${a.estado}`} title={a.detalle ?? ''}>
+                <span className="adjunto-icono" aria-hidden>
+                  {a.estado === 'listo' ? '✓' : a.estado === 'error' ? '!' : '…'}
+                </span>
+                <span className="adjunto-nombre">{a.nombre}</span>
+                <small>{ESTADO_ADJUNTO[a.estado]}</small>
+                {alQuitarAdjunto && (
+                  <button type="button" aria-label={`Quitar ${a.nombre}`} onClick={() => alQuitarAdjunto(a.nombre)}>
+                    ×
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {alAdjuntar && (
+          <label className="boton adjuntar" title="Adjuntar PDF, Markdown, HTML o texto (también puedes arrastrarlos aquí)">
+            📎
+            <input
+              type="file"
+              hidden
+              multiple
+              accept={ACEPTA}
+              onChange={(e) => {
+                alAdjuntar(Array.from(e.target.files ?? []))
+                e.target.value = ''
+              }}
+            />
+          </label>
+        )}
         <textarea
           ref={caja}
           rows={2}

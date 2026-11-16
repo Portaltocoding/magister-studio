@@ -13,6 +13,9 @@ import { PREGUNTAS_MATERIAL } from '../componentes/cuestionarios.ts'
 import LectorLibro, { TextoLibro } from '../componentes/LectorLibro.tsx'
 import Tarjetas, { type Ficha } from '../componentes/Tarjetas.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
+import Colores from '../componentes/Colores.tsx'
+import { acentoDe, usarColores, variables } from '../componentes/colores.ts'
+import Pensando from '../componentes/Pensando.tsx'
 
 // Lo que sale si no eliges nada: lo de casi siempre.
 const RECOMENDADO: Respuestas = {
@@ -116,6 +119,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   const [aviso, setAviso] = useState<string | null>(null)
   const [preguntando, setPreguntando] = useState<null | { forzar: boolean }>(null)
   const control = useRef<AbortController | null>(null)
+  const [colores] = usarColores()
   const raiz = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -259,7 +263,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     )
 
   return (
-    <div className="bloques" ref={raiz}>
+    <div className="bloques" ref={raiz} style={variables(acentoDe(colores, clave))}>
       <aside className="bloques-lista" aria-label="Lecciones">
         {planes.length > 1 ? (
           <select
@@ -313,6 +317,11 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               )}
               <div className="bloque-acciones">
                 {apuntes && (
+                  <button className="boton boton-principal" onClick={() => irARuta(`#/tutor/foco/${apuntes.id}`)}>
+                    Estudiar en modo foco
+                  </button>
+                )}
+                {apuntes && (
                   <button className="boton" disabled={!!enCurso} onClick={() => setPreguntando({ forzar: true })}>
                     Rehacer el material
                   </button>
@@ -327,6 +336,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                     Diapositivas en PDF
                   </a>
                 )}
+                <Colores leccion={clave} />
                 {apuntes && (
                   <label className="estilo-pdf">
                     Estilo del PDF
@@ -368,11 +378,13 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
 
         {trabajo && (enCurso || trabajo.estado === 'fallido') && (
           <div className="progreso" role="status">
-            <p>
-              {trabajo.estado === 'fallido'
-                ? `Falló: ${trabajo.error}`
-                : `${NODOS[trabajo.nodo ?? ''] ?? trabajo.nodo ?? 'En cola'}${trabajo.total > 1 ? ` · bloque ${trabajo.paso + 1} de ${trabajo.total}` : ''}`}
-            </p>
+            {trabajo.estado === 'fallido' ? (
+              <p>Falló: {trabajo.error}</p>
+            ) : (
+              <Pensando
+                texto={`${NODOS[trabajo.nodo ?? ''] ?? trabajo.nodo ?? 'En cola'}${trabajo.total > 1 ? ` · bloque ${trabajo.paso + 1} de ${trabajo.total}` : ''}`}
+              />
+            )}
             {enCurso && (
               <>
                 <span className="barra">

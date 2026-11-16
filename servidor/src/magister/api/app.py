@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from magister.api.rutas_agenda import rutas as rutas_agenda
+from magister.api.rutas_examen import rutas as rutas_examen
 from magister.api.rutas_conversaciones import rutas as rutas_conversaciones
 from magister.api.rutas_fuentes import rutas as rutas_fuentes
 from magister.api.rutas_material import rutas as rutas_material
@@ -84,6 +86,9 @@ app = FastAPI(title="Magister", version=VERSION_CONTRATO, lifespan=ciclo_de_vida
 app.add_middleware(Proteccion)
 
 
+DIAPOSITIVAS_HTML = re.compile(r"/api/materiales/\d+/fichero/html")
+
+
 @app.middleware("http")
 async def poner_sobre(request: Request, call_next):
     id_peticion = request.headers.get("X-Request-Id") or uuid.uuid4().hex
@@ -91,8 +96,14 @@ async def poner_sobre(request: Request, call_next):
 
     traza_actual.set(id_peticion)
     respuesta = await call_next(request)
-    respuesta.headers["Content-Security-Policy"] = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
-                                                     "frame-ancestors 'none'")
+    if DIAPOSITIVAS_HTML.fullmatch(request.url.path):
+        # Las diapositivas de Marp se ven dentro de la app (iframe) y pasan con su script en línea.
+        respuesta.headers["Content-Security-Policy"] = (
+            "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; "
+            "script-src 'self' 'unsafe-inline'; frame-ancestors 'self'")
+    else:
+        respuesta.headers["Content-Security-Policy"] = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+                                                         "frame-ancestors 'none'")
     respuesta.headers["X-Content-Type-Options"] = "nosniff"
     respuesta.headers["X-Magister-Version"] = VERSION_CONTRATO
     respuesta.headers["X-Request-Id"] = id_peticion
@@ -128,6 +139,7 @@ app.include_router(rutas_practica)
 app.include_router(rutas_tutor)
 app.include_router(rutas_produccion)
 app.include_router(rutas_agenda)
+app.include_router(rutas_examen)
 
 # La API sirve también la página (web/dist) si está construida: un solo puerto, http://localhost:8000.
 _dist = __import__("pathlib").Path(__file__).resolve().parents[4] / "web" / "dist"

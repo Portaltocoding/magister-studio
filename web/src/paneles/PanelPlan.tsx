@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import Vacio from '../componentes/Vacio.tsx'
+import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import {
   enviarJson,
   hoyIso,
   pedir,
+  rutaExamen,
   lanzarResearch,
   listarPlanes,
   marcarSesion,
@@ -202,6 +203,28 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               </ol>
             </section>
             <section>
+              {vista.examenes?.length > 0 && (
+                <>
+                  <h2>Exámenes</h2>
+                  <ul className="hitos-examen">
+                    {vista.examenes.map((h) => (
+                      <li key={h.id} className={`${h.hecho ? 'hecho' : ''} ${h.final ? 'final' : ''}`}>
+                        <span className="hito-fecha">{fechaCorta(h.fecha)}</span>
+                        <span className="hito-titulo">
+                          <strong>{h.titulo}</strong>
+                          <small>
+                            {h.preguntas} preguntas · {h.minutos} min
+                            {h.hecho && h.nota != null ? ` · hecho: ${h.nota.toFixed(1).replace('.', ',')}` : ''}
+                          </small>
+                        </span>
+                        <button className="boton-mini" onClick={() => irARuta(rutaExamen(vista.plan_id, h))}>
+                          {h.hecho ? 'Repetir' : 'Hacerlo'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
               <h2>Calendario</h2>
               {vista.semanas.map((s) => (
                 <div key={s.lunes} className="semana">

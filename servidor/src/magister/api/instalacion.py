@@ -27,9 +27,13 @@ async def sincronizar_prompts() -> None:
     tiene versión activa. Lo activo en la base manda (así se vuelve atrás sin tocar ficheros)."""
     async with nueva_sesion() as s, s.begin():
         for p in prompts.ficheros():
-            await s.execute(insert(PromptVersion).values(nombre=p.nombre, version=p.version, contenido=p.texto)
-                            .on_conflict_do_nothing())
-            await s.execute(insert(PromptActivo).values(nombre=p.nombre, version=p.version).on_conflict_do_nothing())
+            nueva = (await s.execute(insert(PromptVersion).values(nombre=p.nombre, version=p.version, contenido=p.texto)
+                                     .on_conflict_do_nothing().returning(PromptVersion.version))).first()
+            activo = insert(PromptActivo).values(nombre=p.nombre, version=p.version)
+            # Un fichero editado (versión que la base no había visto) pasa a mandar: editar el prompt es querer usarlo.
+            # Si vuelves atrás a mano, se respeta mientras no cambies el fichero.
+            await s.execute(activo.on_conflict_do_update(index_elements=[PromptActivo.nombre], set_={"version": p.version})
+                            if nueva else activo.on_conflict_do_nothing())
         activos = (await s.execute(select(PromptActivo.nombre, PromptVersion.contenido, PromptVersion.version)
                                    .join(PromptVersion, (PromptVersion.nombre == PromptActivo.nombre)
                                          & (PromptVersion.version == PromptActivo.version)))).all()

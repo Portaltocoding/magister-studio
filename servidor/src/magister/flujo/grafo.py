@@ -48,7 +48,7 @@ async def a_diagnostico(estado: Estado) -> dict:
 
 
 async def a_estudio(estado: Estado) -> dict:
-    decir("Vale, dejamos el plan. Seguimos con lo que quieras.")
+    decir("Vale, sin plan. Vamos con ello.\n\n")
     return {"fase": "estudio"}
 
 
@@ -77,12 +77,14 @@ def construir_grafo(
     g.add_node("a_diagnostico", a_diagnostico)
     g.add_node("a_estudio", a_estudio)
     g.add_edge("a_diagnostico", "extraer")
-    finales = ["preguntar", "negociar", "explicar_fallo", "guardar", "a_estudio"]
+    # Al dejar el plan se sigue por estudio: responde a lo que pedías antes, con lo hablado como contexto.
+    finales = ["preguntar", "negociar", "explicar_fallo", "guardar"]
     if buscador is None:
         g.add_node("conversar", conversar)
         g.add_conditional_edges(START, enrutar_entrada, {"extraer": "extraer", "estudio": "conversar",
                                                          "a_diagnostico": "a_diagnostico", "a_estudio": "a_estudio"})
         finales.append("conversar")
+        g.add_edge("a_estudio", "conversar")
     else:
         g.add_node("reescribir", reescribir)
         g.add_node("aclarar", aclarar)
@@ -93,6 +95,7 @@ def construir_grafo(
         g.add_conditional_edges("reescribir", tras_reescribir, ["aclarar", "recuperar"])
         g.add_edge("recuperar", "responder")
         finales += ["aclarar", "responder"]
+        g.add_edge("a_estudio", "reescribir")
     g.add_conditional_edges("extraer", tras_extraer, ["preguntar", "planificar"])
     g.add_conditional_edges("planificar", tras_salida, ["calendarizar", "negociar", "explicar_fallo"])
     g.add_conditional_edges("calendarizar", tras_salida, ["proponer", "negociar"])

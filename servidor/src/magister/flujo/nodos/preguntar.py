@@ -18,9 +18,13 @@ async def preguntar(estado: Estado) -> dict:
     await hablar(sistema, [Turno("usuario", "Escribe tu siguiente turno para el alumno.")])
     faltan = huecos(perfil)
     if faltan and faltan[0] in OPCIONES:
-        escribir(opciones={"campo": faltan[0], "opciones": [{"valor": v, "etiqueta": e} for e, v in OPCIONES[faltan[0]]]})
+        # Siempre con salida: si no querías un plan, un clic y vuelve a explicar.
+        lista = [*OPCIONES[faltan[0]], SALIDA]
+        escribir(opciones={"campo": faltan[0], "opciones": [{"valor": v, "etiqueta": e} for e, v in lista]})
     return {}
 
+
+SALIDA = ("No quiero un plan: explícamelo", "No quiero un plan, explícamelo ya")
 
 # Respuestas rápidas por hueco (etiqueta, texto que se envía). El tema no tiene: se escribe.
 OPCIONES = {

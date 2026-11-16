@@ -65,7 +65,7 @@ async def pedir_material(plan_id: int, clave: str, cuerpo: PedirMaterial, s: Asy
 async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     """Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha."""
     filas = (await s.execute(text(
-        "select distinct on (leccion_clave, tipo) leccion_clave, tipo, estado from materiales "
+        "select distinct on (leccion_clave, tipo) leccion_clave, tipo, estado, id from materiales "
         "where plan_id = :p order by leccion_clave, tipo, id desc"), {"p": plan_id})).all()
     fichas = dict((await s.execute(text(
         "select leccion_clave, count(*) from preguntas where plan_id = :p and estado = 'activa' and not sonda "
@@ -74,8 +74,11 @@ async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por
         "select leccion_clave from trabajos where plan_id = :p and tipo = 'material' and estado in ('pendiente', 'en_curso')"),
         {"p": plan_id})).all())
     salida: dict[str, dict] = {}
-    for clave, tipo, estado in filas:
-        salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})["tipos"][tipo] = estado
+    for clave, tipo, estado, mid in filas:
+        d = salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})
+        d["tipos"][tipo] = estado
+        if tipo == "apuntes":
+            d["apuntes_id"] = mid  # para abrir la lección en modo foco
     for clave in set(fichas) | en_marcha:
         salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})
     for clave, d in salida.items():

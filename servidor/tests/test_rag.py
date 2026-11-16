@@ -85,9 +85,13 @@ def test_intencion_de_plan() -> None:
     for si in ("y podemos hacer un plan con ello un research organizarlo en el calendario y demás?", "hazme un roadmap",
                "quiero un plan de estudio para esto", "organízalo en el calendario", "un plan para 3 meses"):
         assert pide_plan(si), si
-    for no in ("¿qué es un plan de ejecución en Postgres?", "explícame el calendario juliano", "hola"):
+    for no in ("¿qué es un plan de ejecución en Postgres?", "explícame el calendario juliano", "hola",
+               "quiero que me expliques fisica de fluidos en plan rapido bernoulli y demas",
+               "quiero entender el plan de pensiones", "explícame esto en plan sencillo"):
         assert not pide_plan(no), no
+    assert pide_plan("explícamelo y luego hazme un plan de estudio")
     assert deja_plan("déjalo, mejor otra cosa") and not deja_plan("sigue")
+    assert deja_plan("No quiero un plan, explícamelo ya")
 
 
 async def test_estudio_pasa_al_plan_y_vuelve() -> None:
@@ -112,8 +116,11 @@ async def test_estudio_pasa_al_plan_y_vuelve() -> None:
     g2 = construir_grafo(InMemorySaver(), BuscadorFalso())
     eco.encolar(Perfil, [{"tema": "x"}])
     await correr(g2, estudio("hazme un plan", None), "q")
-    nodos, texto, _ = await correr(g2, {"mensaje": "déjalo", "turnos": [], "hoy": "2026-11-09"}, "q")
-    assert texto.startswith("Vale, dejamos el plan")
+    previos = [{"rol": "usuario", "contenido": "explícame los índices"}, {"rol": "tutor", "contenido": "¿Para qué lo quieres?"},
+               {"rol": "usuario", "contenido": "déjalo"}]
+    nodos, texto, _ = await correr(g2, {"mensaje": "déjalo", "turnos": previos, "hoy": "2026-11-09"}, "q")
+    # Deja el plan y sigue con la explicación en el mismo turno.
+    assert texto.startswith("Vale, sin plan") and "responder" in nodos
     nodos, _, _ = await correr(g2, {"mensaje": "qué es un índice", "turnos": [{"rol": "usuario", "contenido": "qué es un índice"}],
                                     "hoy": "2026-11-09"}, "q")
     assert nodos == ["recuperar", "responder"]
@@ -131,7 +138,9 @@ async def test_el_diagnostico_ofrece_opciones() -> None:
                                        stream_mode=["custom", "updates"]):
         if modo == "custom" and "opciones" in datos:
             vistas.append(datos["opciones"])
-    assert vistas and vistas[0]["campo"] == "objetivo" and len(vistas[0]["opciones"]) == 4
+    assert vistas and vistas[0]["campo"] == "objetivo" and len(vistas[0]["opciones"]) == 5
+    # La última siempre es la salida: no quiero un plan.
+    assert vistas[0]["opciones"][-1]["valor"].startswith("No quiero un plan")
 
 
 def test_las_preferencias_llegan_a_los_prompts() -> None:

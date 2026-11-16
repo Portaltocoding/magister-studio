@@ -23,6 +23,7 @@ Formato para que se lea fácil (como el libro):
   La idea en una frase.
   :::
 - Tablas solo para comparar opciones; bloques de código con ``` y líneas cortas.
+- Fórmulas en LaTeX: `$...$` dentro de la frase y `$$...$$` en su propia línea para las importantes. Después de una fórmula aparte, di qué es cada símbolo.
 
 <leccion>
 Lección: {titulo}
