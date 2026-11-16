@@ -15,6 +15,7 @@ import PanelExamen from './paneles/PanelExamen.tsx'
 import PanelVideo from './paneles/PanelVideo.tsx'
 import PanelHablar from './paneles/PanelHablar.tsx'
 import PanelAutomatizar from './paneles/PanelAutomatizar.tsx'
+import PanelLlamada from './paneles/PanelLlamada.tsx'
 
 interface Props {
   modo: IdModo
@@ -88,6 +89,8 @@ export default function Central({
       )
     case 'construccion':
       return <Pendiente texto="El método de este libro aplicado a otro tema." />
+    case 'llamada':
+      return <PanelLlamada alCambiar={alCambiarConversaciones} />
     case 'automatizar':
       return <PanelAutomatizar />
     case 'hablar':

@@ -82,3 +82,22 @@ async def test_error_del_modelo_es_evento_y_fila(cliente, monkeypatch) -> None:
     assert ev[-1] == ("error", {"detalle": "modelo inexistente"})
     m = (await cliente.get(f"/api/conversaciones/{cid}/mensajes")).json()
     assert m[-1]["estado"] == "error"
+
+
+async def test_la_llamada_llega_al_cerebro(cliente, monkeypatch) -> None:
+    """Llamada, modo, contexto: llegan al prompt de ese mensaje y no se heredan en el siguiente."""
+    from magister.flujo import comun as rc
+
+    sistemas = []
+
+    async def falso(sistema, historial):
+        sistemas.append(sistema)
+        yield "vale"
+
+    monkeypatch.setattr(rc, "generar", falso)
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "Prueba"})).json()["id"]
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={
+        "contenido": "Empecemos", "voz": True, "llamada": True, "modo": "entrevista", "contexto": "Entrevista sobre la lección L2."})
+    assert "llamada de voz" in sistemas[-1] and "Entrevista sobre la lección L2." in sistemas[-1] and "Entrevista técnica" in sistemas[-1]
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "otra cosa"})
+    assert "llamada de voz" not in sistemas[-1] and "Entrevista sobre" not in sistemas[-1]

@@ -724,6 +724,9 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
                     Empezar de cero
                   </button>
                 )}
+                <button className="boton" onClick={() => irARuta(`#/llamada/clase/${hoy.leccion_clave}`)} title="Te la explica en voz y le interrumpes con tus dudas">
+                  Explícamela por llamada
+                </button>
                 {hoy.repasos > 0 && (
                   <button className="boton" onClick={() => irA('repaso')}>
                     Antes, {hoy.repasos} repasos

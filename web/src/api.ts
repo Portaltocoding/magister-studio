@@ -173,8 +173,17 @@ export const crearConversacion = (titulo: string, tema_id: number | null = null,
 export const borrarConversacion = (id: number) => pedir<void>(`/api/conversaciones/${id}`, { method: 'DELETE' })
 export const listarMensajes = (cid: number) => pedir<Mensaje[]>(`/api/conversaciones/${cid}/mensajes`)
 
-export function enviar(cid: number, contenido: string, signal: AbortSignal, cuenta = true, voz = false) {
-  return flujo<EventoTutor>(`/api/conversaciones/${cid}/mensajes`, { contenido, cuenta, voz }, signal)
+// Lo que puede acompañar a un mensaje: llamada de voz, modo solo para este mensaje, lección de la que se habla y contexto.
+export interface ExtraMensaje {
+  llamada?: boolean
+  modo?: string | null
+  plan_id?: number | null
+  leccion_clave?: string | null
+  contexto?: string | null
+}
+
+export function enviar(cid: number, contenido: string, signal: AbortSignal, cuenta = true, voz = false, extra: ExtraMensaje = {}) {
+  return flujo<EventoTutor>(`/api/conversaciones/${cid}/mensajes`, { contenido, cuenta, voz, ...extra }, signal)
 }
 
 // v0.2: el plan

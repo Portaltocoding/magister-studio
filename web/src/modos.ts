@@ -19,6 +19,7 @@ export type IdModo =
   | 'hablar'
   | 'animaciones'
   | 'automatizar'
+  | 'llamada'
 
 export interface Modo {
   id: IdModo
@@ -53,6 +54,7 @@ export const GRUPOS: Grupo[] = [
     nombre: 'Estudiar',
     modos: [
       { id: 'fichas', nombre: 'Lecciones', encendido: true, ayuda: 'Apuntes, fichas, diapositivas y guion de cada lección' },
+      { id: 'llamada', nombre: 'Llamada', encendido: true, ayuda: 'Habla con tu tutor como por teléfono: clase, entrevista o charla' },
       { id: 'hablar', nombre: 'Hablar', encendido: true, ayuda: 'Pregunta en voz alta y escucha la respuesta' },
       { id: 'video', nombre: 'Vídeo', encendido: true, ayuda: 'Entender un tema antes de estudiarlo' },
     ],
