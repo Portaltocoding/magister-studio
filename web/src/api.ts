@@ -54,6 +54,7 @@ export type EventoTutor =
   | ({ tipo: 'plan' } & Propuesta)
   | { tipo: 'guardado'; plan_id: number; tema_id: number }
   | { tipo: 'opciones'; campo: string; opciones: { valor: string; etiqueta: string }[] }
+  | { tipo: 'acciones'; acciones: { tipo: 'ir' | 'buscar'; etiqueta: string; ruta?: string; consulta?: string }[] }
 
 export interface ConceptoPlan {
   id: string
@@ -172,8 +173,8 @@ export const crearConversacion = (titulo: string, tema_id: number | null = null,
 export const borrarConversacion = (id: number) => pedir<void>(`/api/conversaciones/${id}`, { method: 'DELETE' })
 export const listarMensajes = (cid: number) => pedir<Mensaje[]>(`/api/conversaciones/${cid}/mensajes`)
 
-export function enviar(cid: number, contenido: string, signal: AbortSignal, cuenta = true) {
-  return flujo<EventoTutor>(`/api/conversaciones/${cid}/mensajes`, { contenido, cuenta }, signal)
+export function enviar(cid: number, contenido: string, signal: AbortSignal, cuenta = true, voz = false) {
+  return flujo<EventoTutor>(`/api/conversaciones/${cid}/mensajes`, { contenido, cuenta, voz }, signal)
 }
 
 // v0.2: el plan

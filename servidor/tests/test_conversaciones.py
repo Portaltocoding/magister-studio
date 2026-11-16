@@ -33,7 +33,8 @@ async def test_mensaje_en_flujo_con_eco_y_guardado(cliente) -> None:
     ev = eventos_sse(r.text)
     nombres = [e for e, _ in ev]
     assert nombres[0] == "inicio" and nombres[-1] == "fin"
-    assert set(nombres[1:-1]) == {"delta"}
+    # Entre inicio y fin: el texto y, al final, los botones del arnés (acciones).
+    assert set(nombres[1:-1]) <= {"delta", "acciones"} and "delta" in nombres
     assert ev[0][1] == {"conversacion_id": cid}
     assert "".join(d["t"] for e, d in ev if e == "delta") == "Eco: hola tutor "
     fin = ev[-1][1]

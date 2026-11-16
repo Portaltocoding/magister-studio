@@ -14,7 +14,7 @@ from magister.cerebro.estructura import ErrorEstructura, estructurar
 from magister.cerebro.modelo import Turno
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
-from magister.flujo.comun import decir, escribir, fase, hablar, turnos_recientes
+from magister.flujo.comun import acciones_de_estudio, decir, escribir, fase, hablar, historial_reciente, sistema_de_estudio, turnos_recientes
 from magister.flujo.estado import Estado
 
 K = 5
@@ -96,16 +96,18 @@ def _bloque(recuperados: list[dict]) -> str:
 
 async def responder(estado: Estado) -> dict:
     fase("responder")
-    historial = [Turno(t["rol"], t["contenido"]) for t in estado.get("turnos", [])]  # type: ignore[arg-type]
+    historial = historial_reciente(estado)
     recuperados = estado.get("recuperados", [])
     if not recuperados:
-        decir("_No lo encuentro en tus fuentes; te respondo con lo que sé en general._\n\n")
-        sistema = cargar("conversar").texto
+        # Sin fuentes: la pantalla lo marca con una etiqueta discreta (sin_fuentes), no con una frase delante.
+        sistema = await sistema_de_estudio(cargar("conversar").texto, estado)
         await hablar(sistema, historial)
         escribir(citas=[], busqueda_id=estado.get("busqueda_id"), sin_fuentes=True)
+        await acciones_de_estudio(estado, sin_fuentes=True)
         return {"citas": []}
-    sistema = cargar("responder").texto + "\n\n<fragmentos>\n" + _bloque(recuperados) + "\n</fragmentos>"
+    sistema = await sistema_de_estudio(cargar("responder").texto, estado) + "\n\n<fragmentos>\n" + _bloque(recuperados) + "\n</fragmentos>"
     texto = await hablar(sistema, historial)
     citas = [c.a_dict() for c in comprobar(texto, {x["id"]: x["texto"] for x in recuperados})]
     escribir(citas=citas, busqueda_id=estado.get("busqueda_id"), sin_fuentes=False)
+    await acciones_de_estudio(estado, sin_fuentes=False)
     return {"citas": citas}

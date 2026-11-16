@@ -80,6 +80,9 @@ export function usarConversacion(
             case 'opciones':
               setOpciones(ev.opciones)
               break
+            case 'acciones':
+              actualizarUltima((b) => ({ ...b, acciones: ev.acciones }))
+              break
             case 'guardado':
               alGuardado?.(ev.plan_id, ev.tema_id)
               break
@@ -91,6 +94,7 @@ export function usarConversacion(
                 tiempos: { primero: ev.ms_primer_token, total: ev.ms_total },
                 citas: ev.citas,
                 traza: ev.traza_id ?? undefined,
+                sinFuentes: ev.sin_fuentes ?? undefined,
               }))
               break
             case 'error':

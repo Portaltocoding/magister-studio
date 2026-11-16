@@ -39,6 +39,8 @@ class MensajeEntrada(BaseModel):
     contenido: str = Field(min_length=1, max_length=20_000)
     # «Esto no cuenta para el tutor» (docs/tutor.md, sección 2).
     cuenta: bool = True
+    # Modo Hablar: la respuesta se va a escuchar.
+    voz: bool = False
 
 
 class MensajeSalida(Salida):

@@ -52,6 +52,7 @@ export const GRUPOS: Grupo[] = [
     nombre: 'Estudiar',
     modos: [
       { id: 'fichas', nombre: 'Lecciones', encendido: true, ayuda: 'Apuntes, fichas, diapositivas y guion de cada lección' },
+      { id: 'hablar', nombre: 'Hablar', encendido: true, ayuda: 'Pregunta en voz alta y escucha la respuesta' },
       { id: 'video', nombre: 'Vídeo', encendido: true, ayuda: 'Entender un tema antes de estudiarlo' },
     ],
   },
@@ -69,7 +70,6 @@ export const GRUPOS: Grupo[] = [
       { id: 'temas', nombre: 'Temas y fuentes', encendido: true, ayuda: 'Tus PDF, libros y webs' },
       { id: 'proyectos', nombre: 'Proyectos', encendido: false, ayuda: 'El camino que sale de lo que construyes' },
       { id: 'construccion', nombre: 'Construcción', encendido: false, ayuda: 'Un libro a tu medida, por bloques' },
-      { id: 'hablar', nombre: 'Hablar', encendido: false, ayuda: 'Estudiar por voz' },
     ],
   },
   {

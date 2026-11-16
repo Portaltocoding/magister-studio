@@ -75,3 +75,24 @@ async def decidir(pid: int, cuerpo: Decision) -> dict:
             )
         )
     return {"id": pid, "estado": "aprobada" if cuerpo.accion == "aprobar" else "rechazada", "version_id": version_id}
+
+
+class ResearchLibre(BaseModel):
+    consulta: str = Field(min_length=3, max_length=300)
+
+
+@rutas.post("/research/libre")
+async def research_libre(cuerpo: ResearchLibre) -> dict:
+    """Busca y puntúa páginas sobre un tema de Estudio libre. Devuelve las mejores; añadirlas a tus fuentes es aparte."""
+    from magister.research.fijo import research_fijo
+    from magister.research.herramientas import Herramientas
+
+    encontradas: list[dict] = []
+
+    async def guardar(url: str, titulo: str, motivo: str) -> bool:
+        encontradas.append({"url": url, "titulo": titulo, "motivo": motivo})
+        return True
+
+    h = Herramientas(tareas.web_por_defecto, 0, "libre", None, guardar_propuesta=guardar)
+    r = await research_fijo({"tema": "Estudio libre", "titulo": cuerpo.consulta, "objetivos": []}, h, max_urls=8, max_propuestas=4)
+    return {"propuestas": encontradas, "motivo_fin": r.get("motivo_fin")}

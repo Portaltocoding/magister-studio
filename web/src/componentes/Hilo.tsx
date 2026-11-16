@@ -9,6 +9,7 @@ import Revelar from './Revelar.tsx'
 import type { CitaInfo } from '../api.ts'
 import { conMarcas, PanelCita } from '../Cita.tsx'
 import Valorar from './Valorar.tsx'
+import Acciones, { type AccionArnes } from './Acciones.tsx'
 import { ACEPTA, type Adjunto } from './usarAdjuntos.ts'
 
 export interface Burbuja {
@@ -20,6 +21,8 @@ export interface Burbuja {
   citas?: CitaInfo[]
   traza?: string
   voto?: boolean | null
+  sinFuentes?: boolean
+  acciones?: AccionArnes[]
 }
 
 interface Props {
@@ -115,8 +118,9 @@ export default function Hilo({
   return (
     <div className="hilo">
       <div className="mensajes" aria-live="polite" aria-busy={escribiendo}>
-        {burbujas.map((b) => (
-          <div key={b.clave} className={`burbuja burbuja-${b.rol} burbuja-${b.estado}`}>
+        {/* Clave por posición: al acabar, la burbuja cambia de id y no debe volver a montarse (cortaría el texto que aparece). */}
+        {burbujas.map((b, i) => (
+          <div key={i} className={`burbuja burbuja-${b.rol} burbuja-${b.estado}`}>
             {b.rol === 'tutor' && b.estado === 'llegando' && !b.contenido ? (
               <Pensando texto={fase ? `${fase}…` : 'Pensando…'} />
             ) : b.estado === 'error' ? (
@@ -169,6 +173,12 @@ export default function Hilo({
               <p className="propio">{b.contenido}</p>
             )}
             {b.estado === 'interrumpido' && <small className="nota">Interrumpido</small>}
+            {b.acciones && b.acciones.length > 0 && b.estado === 'completo' && <Acciones acciones={b.acciones} />}
+            {b.sinFuentes && (
+              <small className="sin-fuentes" title="No había nada en tus fuentes sobre esto: es una respuesta general del tutor.">
+                Sin tus fuentes · respuesta general
+              </small>
+            )}
             {b.tiempos && (
               <small className="nota">
                 primer trozo {b.tiempos.primero ?? '·'} ms · total {b.tiempos.total} ms

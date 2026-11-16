@@ -38,7 +38,8 @@ async def test_rama_de_estudio_recupera_y_responde() -> None:
 
 async def test_sin_fuentes_lo_dice() -> None:
     nodos, texto, extra = await correr(construir_grafo(InMemorySaver(), BuscadorFalso(vacio=True)), estudio("qué es TCP"))
-    assert texto.startswith("_No lo encuentro en tus fuentes")
+    # El aviso ya no va como texto delante: la pantalla lo marca con una etiqueta.
+    assert not texto.startswith("_No lo encuentro") and texto.startswith("Eco:")
     assert extra["sin_fuentes"] is True
 
 

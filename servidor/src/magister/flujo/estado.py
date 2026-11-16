@@ -14,6 +14,7 @@ class Estado(TypedDict, total=False):
     fase: str  # diagnostico | estudio
     hoy: str  # AAAA-MM-DD, lo pone quien invoca
     mensaje: str  # último mensaje del alumno
+    voz: bool  # el alumno habla y escucha (modo Hablar): respuestas para el oído
     turnos: list[Turno]  # historial completo de la conversación (lo pasa la API)
     perfil: dict
     plan: dict | None

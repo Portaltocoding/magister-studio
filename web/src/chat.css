@@ -61,3 +61,31 @@
 .ficha-opciones { margin: 10px 0 0; padding-left: 22px; list-style: upper-alpha; text-align: left; }
 .ficha-opciones li { margin: 4px 0; padding: 2px 6px; border-radius: 6px; }
 .ficha-opciones li.buena { background: color-mix(in srgb, #2f8a5b 18%, transparent); font-weight: 600; }
+
+.sin-fuentes { display: inline-block; margin: 8px 8px 0 0; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--borde); color: var(--suave); }
+
+/* ===== Hablar ===== */
+.hablar { max-width: 720px; margin: 4vh auto 0; text-align: center; }
+.hablar .mascota { width: 84px; height: 84px; }
+.hablar-micro { width: 116px; height: 116px; border-radius: 50%; border: 0; margin: 22px auto 10px; display: grid; place-items: center; font-size: 2.6rem; cursor: pointer; background: var(--acento); color: #fff; box-shadow: var(--sombra); transition: transform 120ms; }
+.hablar-micro:hover { transform: scale(1.04); }
+.hablar-micro.escuchando { background: #c2453a; animation: latir 1.2s infinite; }
+.hablar-micro.pensando, .hablar-micro.hablando { background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); font-size: 2rem; }
+.hablar-estado { min-height: 2.2em; color: var(--suave); }
+.hablar-respuesta { text-align: left; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px; padding: 16px 20px; line-height: 1.65; margin: 14px 0; }
+.hablar-escribir { display: flex; gap: 8px; margin: 14px 0; }
+.hablar-escribir input { flex: 1; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); }
+.hablar-ajustes { display: flex; gap: 18px; justify-content: center; font-size: 0.88rem; color: var(--suave); }
+.hablar-ajustes select { font: inherit; }
+.hablar-aviso { margin-top: 16px; font-size: 0.8rem; }
+.hablar-transcripcion { text-align: left; margin-top: 14px; }
+.hablar-transcripcion p { margin: 8px 0; line-height: 1.55; }
+
+/* Botones del arnés y documentos buscados */
+.acciones-arnes { margin-top: 10px; }
+.accion-arnes { border-style: dashed; }
+.docs-buscados ul { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.docs-buscados li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--borde); }
+.docs-buscados li a { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docs-buscados li small { grid-column: 1; opacity: 0.7; }
+.docs-buscados li button { grid-column: 2; grid-row: 1 / span 2; }

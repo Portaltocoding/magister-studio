@@ -27,10 +27,12 @@ prompts:
   conceptos: extraer
   planificar: planificar
   corrector: corregir
+  corrector_examen: corregir
   apuntes_contrato: generar
   apuntes_bloque: generar
   apuntes_refinar: generar
   preguntas: generar
+  preguntas_test: generar
   diapositivas: generar
   guion: generar
   juez_tono: juez
