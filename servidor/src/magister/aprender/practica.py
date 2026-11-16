@@ -98,9 +98,59 @@ async def cola(ahora: datetime, nuevos_max: int | None = None) -> list[dict]:
             nuevos.append(fila)
         elif prox is not None and prox <= fin:
             vencidos.append(fila)
-    vencidos.sort(key=lambda f: f["p"])
+    # Orden (engram docs/13 §2.2): con tiempo limitado, primero lo que aún se salva barato (p alta, cerca del umbral);
+    # lo casi olvidado (p < 0,10) al final, como «a reaprender»: esperar no le quita casi nada más. A igualdad,
+    # antes lo que bloquea a otros conceptos tuyos (idea de learn-anything: los requisitos primero).
+    bloquea = await _cuantos_bloquea()
+    vencidos.sort(key=lambda f: (f["p"] < CASI_OLVIDADO, -f["p"] - 0.02 * bloquea.get((f["plan_id"], f["concepto_id"]), 0)))
+    for f in vencidos:
+        f["reaprender"] = f["p"] < CASI_OLVIDADO
     nuevos.sort(key=lambda f: (f["plan_id"], f["leccion_clave"]))
-    return vencidos + nuevos[: ajustes.nuevos_dia if nuevos_max is None else nuevos_max]
+    # Reaprendizaje en la misma sesión (Rawson y Dunlosky): lo que fallas hoy vuelve al final de la tanda, con otra
+    # pregunta, hasta acertarlo una vez (como mucho 3 intentos al día). Esos reintentos no cuentan para el programador.
+    otra_vez = await _a_repetir_hoy(ahora)
+    ya = {(f["plan_id"], f["concepto_id"]) for f in vencidos}
+    por_id = {(c.plan_id, c.concepto_id): c for c in conceptos}
+    repetir = []
+    for clave in otra_vez:
+        c = por_id.get(clave)
+        if c is None:
+            continue
+        if clave in ya:
+            vencidos = [f for f in vencidos if (f["plan_id"], f["concepto_id"]) != clave]
+        e = estados[c.concepto_id]
+        repetir.append({"concepto_id": c.concepto_id, "plan_id": c.plan_id, "nombre": c.nombre, "leccion_clave": c.leccion_clave,
+                        "p": round(_prog(c).p_recordar(e, ahora), 3), "minutos": minutos, "proxima": None, "nuevo": False,
+                        "otra_vez": True})
+    return vencidos + nuevos[: ajustes.nuevos_dia if nuevos_max is None else nuevos_max] + repetir
+
+
+CASI_OLVIDADO = 0.10
+INTENTOS_AL_DIA = 3
+
+
+async def _cuantos_bloquea() -> dict[tuple[int, str], int]:
+    """Cuántos conceptos dependen de cada uno."""
+    async with nueva_sesion() as s:
+        filas = (await s.execute(text(
+            "select plan_id, unnest(depende_de) as base, count(*) from conceptos group by 1, 2"))).all()
+    return {(p, b): n for p, b, n in filas}
+
+
+async def _a_repetir_hoy(ahora: datetime) -> list[tuple[int, str]]:
+    """Conceptos cuyo primer intento de hoy fue un fallo, sin acierto después y con menos de 3 intentos hoy."""
+    inicio = fin_del_dia(ahora) - timedelta(days=1)
+    async with nueva_sesion() as s:
+        filas = (await s.execute(text(
+            "select plan_id, concepto_id, coalesce(nota_usuario, nota_corrector) from intentos "
+            "where momento >= :d order by plan_id, concepto_id, momento"), {"d": inicio})).all()
+    por: dict[tuple[int, str], list[str]] = {}
+    for plan_id, cid, nota in filas:
+        por.setdefault((plan_id, cid), []).append(nota)
+    from magister.aprender.estado import es_acierto
+
+    return [k for k, notas in por.items()
+            if not es_acierto(notas[0]) and not any(es_acierto(n) for n in notas) and len(notas) < INTENTOS_AL_DIA]
 
 
 async def siguiente(ahora: datetime, concepto_id: str | None = None) -> dict | None:
@@ -131,7 +181,7 @@ async def siguiente(ahora: datetime, concepto_id: str | None = None) -> dict | N
                       p_predicha=f["p"], version_programador=prog.version))
         await s.commit()
     return {"pregunta_id": pid, "concepto_id": f["concepto_id"], "plan_id": f["plan_id"], "nombre": f["nombre"],
-            "enunciado": enunciado, "p": f["p"], "quedan": len(pendientes),
+            "enunciado": enunciado, "p": f["p"], "quedan": len(pendientes), "otra_vez": bool(f.get("otra_vez")),
             "opciones": [o["texto"] for o in opciones] if opciones else None}
 
 

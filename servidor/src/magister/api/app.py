@@ -59,6 +59,9 @@ async def ciclo_de_vida(_: FastAPI):
     comprobar_al_arrancar()
     observar.instalar()
     await preparar_instalacion()
+    from magister.aprender import personal
+
+    await personal.cargar()
     vigia = asyncio.create_task(alertas.bucle())
     if ajustes.embeddings == "local":
         from magister.fuentes.embeber import embeber

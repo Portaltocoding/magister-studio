@@ -128,3 +128,47 @@ async def test_practica_de_punta_a_punta(cliente) -> None:
     assert cp["aciertos"] == 1 and cp["repasos"][0]["nota"] == "bien"
     assert (await cliente.get("/api/progreso/resumen")).json()["intentos"] == 1
     _ = columnas
+
+
+
+def test_solo_el_primer_intento_del_dia_es_un_repaso():
+    from datetime import datetime, timezone
+
+    from magister.aprender.estado import estado_de
+
+    d = lambda h, dia=1: datetime(2026, 11, dia, h, tzinfo=timezone.utc)  # noqa: E731
+    e = estado_de("x", d(23, 5), [(d(9), "fallo", None, "espaciado"), (d(10), "bien", None, "espaciado"),
+                                   (d(9, 3), "bien", None, "espaciado"), (d(11, 3), "fallo", None, "reintento")])
+    assert [n for _, n in e.repasos] == ["fallo", "bien"]
+
+
+def test_lo_recien_aprendido_vuelve_pronto():
+    from datetime import datetime, timedelta, timezone
+
+    from magister.aprender.estado import EstadoConcepto
+    from magister.aprender.programador import FSRS
+
+    t0 = datetime(2026, 11, 1, 9, tzinfo=timezone.utc)
+    f = FSRS()
+    uno = EstadoConcepto("x", t0, [(t0, "perfecta")])
+    assert f.proxima(uno) <= t0 + timedelta(days=3)
+    dos = EstadoConcepto("x", t0, [(t0, "perfecta"), (t0 + timedelta(days=3), "perfecta")])
+    assert f.proxima(dos) <= t0 + timedelta(days=12)
+
+
+def test_ajuste_personal_con_escalones():
+    from datetime import datetime, timedelta, timezone
+
+    from magister.aprender.personal import _ajustar_iniciales, _calcular
+
+    t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    pocos = [[(t0, "bien"), (t0 + timedelta(days=3), "bien")]] * 3
+    assert _calcular(pocos, None)["hecho"] is False
+    # Alguien que recuerda mucho mejor de lo que espera FSRS: la estabilidad inicial de «bien» sube y es monótona.
+    muchos = [[(t0, "bien"), (t0 + timedelta(days=20), "bien"), (t0 + timedelta(days=60), "bien")] for _ in range(12)]
+    w = _ajustar_iniciales(muchos)
+    from fsrs.scheduler import DEFAULT_PARAMETERS
+
+    assert w[2] > DEFAULT_PARAMETERS[2] and w[0] <= w[1] <= w[2] <= w[3]
+    r = _calcular(muchos, None)
+    assert r["hecho"] and r["perdida_despues"] < r["perdida_antes"] and r["etapa"] == "inicial"

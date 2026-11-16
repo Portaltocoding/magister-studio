@@ -52,7 +52,14 @@ class EstadoConcepto:
 
 def estado_de(concepto_id: str, momento: datetime, intentos: list[tuple[datetime, str, str | None, str]]) -> EstadoConcepto:
     """Función pura: `intentos` son (momento, nota_corrector, nota_usuario, tipo)."""
-    repasos = sorted((m, nota_final(nc, nu)) for m, nc, nu, tipo in intentos if tipo == "espaciado" and m < momento)
+    todos = sorted((m, nota_final(nc, nu)) for m, nc, nu, tipo in intentos if tipo == "espaciado" and m < momento)
+    # Solo el primer intento de cada día es un repaso: repetir el mismo día no dice nada del olvido y sesgaría el
+    # modelo (FSRS hace lo mismo: filtra los repasos con 0 días de separación).
+    repasos, dias = [], set()
+    for m, n in todos:
+        if m.date() not in dias:
+            dias.add(m.date())
+            repasos.append((m, n))
     return EstadoConcepto(concepto_id, momento, repasos)
 
 

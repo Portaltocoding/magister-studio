@@ -84,6 +84,9 @@ async def intentar(cuerpo: IntentoEntrada) -> AsyncIterator[ServerSentEvent]:
         return
     yield ServerSentEvent(data={"nota": c.nota, "ideas_ausentes": c.ideas_ausentes,
                                 "errores": [e.model_dump() for e in c.errores]}, event="nota")
+    aviso = await _aviso_confianza(cuerpo.confianza, c.nota)
+    if aviso:
+        yield ServerSentEvent(data={"texto": aviso}, event="aviso")
     molde = andamiajes.molde(c.tipo_error).format(
         pregunta=enunciado, respuesta=cuerpo.respuesta, ideas_ausentes="; ".join(c.ideas_ausentes) or "nada",
         errores="; ".join(f"{e.afirmacion} ({e.por_que})" for e in c.errores) or "ninguno",
@@ -226,3 +229,36 @@ async def responder_test(cuerpo: RespuestaTest) -> dict:
     else:
         proxima = None
     return {"acierto": acierto, "buena": buena, "porque": p.fantasma, "proxima_fecha": proxima.isoformat() if proxima else None}
+
+
+
+@rutas.get("/progreso/modelo")
+async def ver_modelo() -> dict:
+    """En qué escalón está tu modelo de olvido y con cuántos datos."""
+    from magister.aprender import personal
+
+    return await personal.estado()
+
+
+@rutas.post("/progreso/modelo/ajustar")
+async def ajustar_modelo() -> dict:
+    from magister.aprender import personal
+
+    return {**await personal.ajustar(), "estado": await personal.estado()}
+
+
+
+async def _aviso_confianza(confianza: float | None, nota: str) -> str | None:
+    """Solo si apostaste alto, fallaste y te pasa a menudo en tus últimos 30 días (al menos 2 de cada 5)."""
+    if confianza is None or confianza < 0.75 or nota not in ("fallo", "parcial"):
+        return None
+    from sqlalchemy import text as sql
+
+    async with nueva_sesion() as s:
+        altos, mal = (await s.execute(sql(
+            "select count(*), count(*) filter (where coalesce(nota_usuario, nota_corrector) in ('fallo', 'parcial')) "
+            "from intentos where confianza >= 0.75 and momento > now() - interval '30 days'"))).one()
+    if altos < 3 or mal / altos < 0.4:
+        return None
+    return (f"Ojo con la seguridad: este mes, de {altos} veces que dijiste estar seguro, {mal} no lo tenías del todo. "
+            "Antes de responder, prueba a decirte qué parte no tienes clara.")

@@ -20,6 +20,8 @@ interface Servida {
   nombre: string
   enunciado: string
   quedan: number
+  // Lo fallaste hoy: vuelve con otra pregunta hasta acertarlo una vez (no cuenta para el programador).
+  otra_vez?: boolean
   // Solo las tipo test: se responden pulsando y se corrigen al momento, sin modelo.
   opciones?: string[] | null
 }
@@ -37,6 +39,7 @@ type EventoCorreccion =
   | { tipo: 'delta'; t: string }
   | { tipo: 'fin'; intento_id: string; proxima_fecha: string | null }
   | { tipo: 'error'; detalle: string }
+  | { tipo: 'aviso'; texto: string }
 
 const CONFIANZAS: [number, string][] = [
   [0.25, 'No lo sé'],
@@ -58,6 +61,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
   const [fin, setFin] = useState<{ intento_id: string; proxima_fecha: string | null } | null>(null)
   const [corrigiendo, setCorrigiendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [avisoConfianza, setAvisoConfianza] = useState<string | null>(null)
   const servidaEn = useRef(Date.now())
   const [test, setTest] = useState<ResultadoTest | null>(null)
   // La tanda de hoy: cuántas había al empezar y cuántas llevas.
@@ -97,6 +101,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
     setRespuesta('')
     setConfianza(null)
     setError(null)
+    setAvisoConfianza(null)
     const p = await pedir<Servida | null>(`/api/practica/siguiente${concepto ? `?concepto_id=${concepto}` : ''}`)
     setPregunta(p)
     servidaEn.current = Date.now()
@@ -107,6 +112,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
     const respuesta_ = forzado?.respuesta ?? respuesta
     const confianza_ = forzado?.confianza ?? confianza
     if (!pregunta || confianza_ == null || !respuesta_.trim()) return
+    if (pregunta.otra_vez) tipo = 'reintento'
     if (forzado) {
       setRespuesta(forzado.respuesta)
       setConfianza(forzado.confianza)
@@ -130,6 +136,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
         else if (ev.tipo === 'delta') setExplicacion((x) => x + ev.t)
         else if (ev.tipo === 'fin') setFin(ev)
         else if (ev.tipo === 'error') setError(ev.detalle)
+        else if (ev.tipo === 'aviso') setAvisoConfianza(ev.texto)
       }
     } catch (e) {
       setError(String(e))
@@ -197,6 +204,9 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
           pie={<span className="nota">Esc para salir: lo que has respondido ya cuenta.</span>}
         >
         <section className="practica">
+          {pregunta.otra_vez && (
+            <p className="repaso-otra-vez">Otra vez, con otra pregunta: hoy lo fallaste. Acertarlo una vez basta.</p>
+          )}
           <h2 className="enunciado">{pregunta.enunciado}</h2>
           {pregunta.opciones && pregunta.opciones.length > 0 ? (
             <div className="repaso-test">
@@ -283,6 +293,7 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
                 <strong>Nota: {nota.nota}</strong>
                 {nota.ideas_ausentes.length > 0 && <> · Faltaba: {nota.ideas_ausentes.join('; ')}</>}
               </p>
+              {avisoConfianza && <p className="repaso-aviso-confianza">{avisoConfianza}</p>}
               {nota.errores.map((e, i) => (
                 <p key={i} className="aviso-dudosa">
                   «{e.afirmacion}»: {e.por_que}

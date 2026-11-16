@@ -134,9 +134,22 @@ async def una_vuelta(ahora: datetime | None = None) -> str | None:
 
 
 async def bucle() -> None:
+    ultimo_ajuste = None
     while True:
         try:
             await una_vuelta()
         except Exception:  # noqa: BLE001
             registro.exception("automatizaciones")
+        # Tu modelo de olvido se reajusta solo una vez al día, de madrugada si el equipo está encendido o al arrancar.
+        hoy = date.today()
+        if ultimo_ajuste != hoy:
+            ultimo_ajuste = hoy
+            try:
+                from magister.aprender import personal
+
+                r = await personal.ajustar()
+                if r.get("hecho"):
+                    await anotar(f"Tu modelo de olvido se ha ajustado a tus repasos ({r['conceptos']} conceptos).")
+            except Exception:  # noqa: BLE001
+                registro.exception("ajuste personal")
         await asyncio.sleep(INTERVALO_S)

@@ -134,7 +134,15 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
         if flojos:
             partes.append("Conceptos que el alumno tiene flojos ahora mismo (falló o casi olvidó): " + ", ".join(flojos) + ". "
                           "Si encaja con lo que pregunta, conéctalo con uno de ellos o hazle una pregunta rápida sobre él; "
-                          "no los enumeres ni lo fuerces.")
+                          "no los enumeres ni lo fuerces. Si pregunta por uno de ellos, más andamiaje: un ejemplo resuelto antes de pedirle nada.")
+        try:
+            dominados = await conceptos_dominados()
+        except Exception:  # noqa: BLE001
+            dominados = []
+        if dominados:
+            partes.append("Conceptos que ya domina (acertó sus dos últimos repasos): " + ", ".join(dominados) + ". "
+                          "Si salen, no los expliques desde lo básico: ve a matices, casos límite y decisiones (con quien ya sabe, "
+                          "la ayuda de más estorba).")
     if estado.get("leccion_clave") and estado.get("plan_id_leccion"):
         try:
             apuntes = await apuntes_de(estado["plan_id_leccion"], estado["leccion_clave"])
@@ -296,6 +304,13 @@ MODOS_DE_SERIE = [
      "reglas": ["No des nada por sabido: cada término técnico, con una frase llana y un ejemplo cotidiano antes de usarlo.",
                 "Un solo paso por respuesta, corto, y comprueba con una pregunta sencilla antes de seguir.",
                 "Si un concepto necesita otro previo, explica antes el previo en dos o tres frases."]},
+    {"id": "practica", "nombre": "Práctica con código", "para": "Ejercicios con código de partida y pruebas, como en TDD.",
+     "reglas": ["Propón un ejercicio cada vez: contexto en una frase, qué implementar, código de partida con TODO y 3 o 4 casos de prueba "
+                "(asserts) que debe pasar, en el lenguaje del alumno (Python si no dice otro).",
+                "Dificultad según lo que domina: si es nuevo en el concepto, un ejercicio guiado; si ya lo domina, un caso límite o un reto.",
+                "Al corregir, en este orden: lo que está bien, una pregunta que le lleve al fallo (no se lo des hecho), los casos "
+                "límite que no cubre y, si procede, una mejora de estilo.",
+                "La solución completa, solo si la pide o tras dos intentos."]},
     {"id": "repaso", "nombre": "Repaso rápido", "para": "Preguntas cortas para recordar, sin rollos.",
      "reglas": ["Haz preguntas cortas de recordar (no de reconocer) de lo que estudia, una cada vez.",
                 "Corrige en una o dos líneas: bien, o qué faltaba; y la siguiente pregunta.",
@@ -349,3 +364,19 @@ async def para_explicar() -> str:
     except Exception:  # noqa: BLE001
         return ""
     return texto_preferencias({**p, "modo": None, "longitud": "normal", "diagramas": True, "tests": True, "opciones": True})
+
+
+
+async def conceptos_dominados(n: int = 8) -> list[str]:
+    """Conceptos cuyos dos últimos repasos espaciados fueron «bien» o «perfecta»."""
+    from sqlalchemy import text
+
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s:
+        filas = (await s.execute(text(
+            "select c.nombre from (select plan_id, concepto_id, coalesce(nota_usuario, nota_corrector) as nota, "
+            "row_number() over (partition by plan_id, concepto_id order by momento desc) as k from intentos where tipo = 'espaciado') u "
+            "join conceptos c on c.plan_id = u.plan_id and c.id = u.concepto_id join planes p on p.id = u.plan_id and p.estado = 'aceptado' "
+            "where u.k <= 2 group by c.nombre having count(*) = 2 and bool_and(u.nota in ('bien', 'perfecta')) limit :n"), {"n": n})).all()
+    return [f[0] for f in filas]

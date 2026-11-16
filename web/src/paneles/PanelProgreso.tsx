@@ -168,6 +168,89 @@ function TablaCalibracion({ tuya, modelo }: { tuya: Tramo[]; modelo: Tramo[] }) 
   )
 }
 
+interface EstadoModelo {
+  conceptos_con_repasos: number
+  conceptos_con_dos: number
+  repasos: number
+  umbral_inicial: number
+  umbral_completo: number
+  activo: { etapa: string; fecha: string; perdida_antes: number; perdida_despues: number; conceptos: number } | null
+}
+
+// «Tu modelo»: cuándo olvidas tú, no la media. FSRS ajustado a tus repasos, por escalones y solo si mejora.
+function TuModelo() {
+  const [e, setE] = useState<EstadoModelo | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const [haciendo, setHaciendo] = useState(false)
+  useEffect(() => {
+    pedir<EstadoModelo>('/api/progreso/modelo').then(setE).catch(() => undefined)
+  }, [])
+  if (!e) return null
+  const etapa = e.activo ? (e.activo.etapa === 'completo' ? 'Ajustado entero a ti' : 'Ajustado a ti (estabilidad inicial)') : 'Por defecto'
+  const siguiente = e.conceptos_con_dos < e.umbral_inicial ? e.umbral_inicial : e.umbral_completo
+  const ajustar = async () => {
+    setHaciendo(true)
+    try {
+      const r = await pedir<{ hecho: boolean; motivo?: string | null; perdida_antes?: number; perdida_despues?: number; estado: EstadoModelo }>(
+        '/api/progreso/modelo/ajustar',
+        { method: 'POST' },
+      )
+      setE(r.estado)
+      setAviso(
+        r.hecho
+          ? `Hecho: ahora predice tus aciertos mejor (pérdida ${String(r.perdida_antes).replace('.', ',')} → ${String(r.perdida_despues).replace('.', ',')}).`
+          : (r.motivo ?? 'Sin cambios.'),
+      )
+    } finally {
+      setHaciendo(false)
+    }
+  }
+  return (
+    <section className="pg-seccion tu-modelo">
+      <h2>Tu modelo de olvido</h2>
+      <p className="pg-explica">
+        Magister decide cuándo repasas con FSRS. Con tus repasos, aprende cuánto aguantas tú cada concepto y se reajusta solo una vez al
+        día, solo si predice tus aciertos mejor que antes. Lo que fallas vuelve en la misma sesión, y lo recién aprendido vuelve
+        pronto (a los 3 y a los 9 días como mucho).
+      </p>
+      <div className="tu-modelo-cifras">
+        <div>
+          <strong>{etapa}</strong>
+          <small>{e.activo ? `desde el ${new Date(e.activo.fecha).toLocaleDateString('es-ES')}` : 'aún sin datos tuyos'}</small>
+        </div>
+        <div>
+          <strong>
+            {e.conceptos_con_dos} <small>de {siguiente}</small>
+          </strong>
+          <small>conceptos con dos repasos o más</small>
+        </div>
+        <div>
+          <strong>{e.repasos}</strong>
+          <small>repasos tuyos</small>
+        </div>
+      </div>
+      <span className="barra">
+        <span style={{ width: `${Math.min(100, (e.conceptos_con_dos / siguiente) * 100)}%` }} />
+      </span>
+      <p className="nota">
+        {e.conceptos_con_dos < e.umbral_inicial
+          ? `Con ${e.umbral_inicial} conceptos repasados dos veces, empieza a ajustarse a ti. Con ${e.umbral_completo}, del todo.`
+          : e.conceptos_con_dos < e.umbral_completo
+            ? `Con ${e.umbral_completo} conceptos, el ajuste completo.`
+            : 'Tienes datos para el ajuste completo.'}{' '}
+        <button className="boton-mini" onClick={ajustar} disabled={haciendo}>
+          {haciendo ? 'Ajustando…' : 'Ajustar ahora'}
+        </button>
+      </p>
+      {aviso && (
+        <p className="nota" role="status">
+          {aviso}
+        </p>
+      )}
+    </section>
+  )
+}
+
 // Progreso: dónde estás en el plan, lección a lección, y qué toca ahora.
 export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
   const [planes, setPlanes] = useState<ResumenPlan[] | null>(null)
@@ -502,6 +585,8 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
             </>
           )}
         </section>
+
+        <TuModelo />
 
         <section className="pg-seccion">
           <h2>¿Aciertas tanto como crees?</h2>

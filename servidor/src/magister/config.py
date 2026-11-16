@@ -70,6 +70,8 @@ class Ajustes(BaseSettings):
 
     # Aprender (Parte V)
     programador: str = "fsrs"  # leitner, fsrs o modelo (ADR-0013)
+    # Tope en los dos primeros intervalos de lo recién aprendido (3 y 9 días), por encima de FSRS.
+    tope_inicial: bool = True
     retencion: float = 0.9
     inicio_dia: str = "04:00"
     zona: str = "Europe/Madrid"

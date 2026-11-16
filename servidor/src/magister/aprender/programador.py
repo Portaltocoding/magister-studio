@@ -66,13 +66,15 @@ class Leitner:
 class FSRS:
     """Envoltorio sobre la librería `fsrs` con sus parámetros por defecto, en días (sin pasos cortos)."""
 
-    def __init__(self, retencion: float | None = None) -> None:
+    def __init__(self, retencion: float | None = None, parametros: list[float] | None = None, etiqueta: str = "defecto") -> None:
         from fsrs import Scheduler
 
         self.retencion = retencion or ajustes.retencion
+        extra = {"parameters": tuple(parametros)} if parametros else {}
         self.programador = Scheduler(desired_retention=self.retencion, learning_steps=(), relearning_steps=(),
-                                     enable_fuzzing=False)
-        self.version = f"fsrs-6-defecto-r{self.retencion}"
+                                     enable_fuzzing=False, **extra)
+        self.tope = ajustes.tope_inicial
+        self.version = f"fsrs-6-{etiqueta}-r{self.retencion}" + ("-tope" if self.tope else "")
 
     def tarjeta(self, estado: EstadoConcepto):
         from fsrs import Card, Rating
@@ -88,11 +90,22 @@ class FSRS:
         return float(self.programador.get_card_retrievability(self.tarjeta(estado), ahora))
 
     def proxima(self, estado):
-        return self.tarjeta(estado).due if estado.repasos else None
+        if not estado.repasos:
+            return None
+        due = self.tarjeta(estado).due
+        # Lo recién aprendido vuelve pronto aunque FSRS diga más: las primeras sesiones espaciadas son las que más
+        # fijan (reaprendizaje sucesivo, Rawson y Dunlosky). Como mucho 3 días tras el primer repaso y 9 tras el segundo.
+        if self.tope and len(estado.repasos) <= 2:
+            tope = estado.repasos[-1][0] + timedelta(days=TOPES_INICIALES[len(estado.repasos) - 1])
+            return min(due, tope)
+        return due
 
     def siguiente(self, estado, nota, ahora):
         nuevo = _con(estado, nota, ahora)
         return nuevo, self.proxima(nuevo)
+
+
+TOPES_INICIALES = (3, 9)
 
 
 class ModeloOlvido:
@@ -134,6 +147,11 @@ CARPETA_MODELOS = Path(__file__).resolve().parents[3] / "evals" / "olvido" / "mo
 def programador(nombre: str | None = None) -> Programador:
     nombre = nombre or ajustes.programador
     if nombre == "fsrs":
+        from magister.aprender.personal import parametros_guardados
+
+        personal = parametros_guardados()
+        if personal:
+            return FSRS(parametros=personal["parametros"], etiqueta=f"personal-{personal['etapa']}-{personal['huella']}")
         return FSRS()
     if nombre == "modelo":
         ruta = CARPETA_MODELOS / "actual.joblib"

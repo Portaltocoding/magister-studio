@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 
-// La mascota de Magister. Tres formas propias para elegir en «Afina a tu tutor»: búho (por defecto), birrete y gota
-// de tinta. Las pupilas siguen al cursor y de vez en cuando parpadea.
+// La mascota de Magister, a elegir en «Afina a tu tutor»: el búho (por defecto) o la sencilla, una piedra redondeada
+// con dos ojos. Las pupilas siguen al cursor y de vez en cuando parpadea.
 // Es decorativa: no recibe foco ni la leen los lectores de pantalla.
 
-export type FormaMascota = 'buho' | 'birrete' | 'tinta'
+export type FormaMascota = 'buho' | 'sencilla'
 export const FORMAS: { id: FormaMascota; nombre: string }[] = [
   { id: 'buho', nombre: 'Búho' },
-  { id: 'birrete', nombre: 'Birrete' },
-  { id: 'tinta', nombre: 'Gota de tinta' },
+  { id: 'sencilla', nombre: 'Sencilla' },
 ]
 
 const CLAVE = 'magister-mascota'
@@ -101,24 +100,11 @@ export default function Mascota({ mini = false, forma: fija }: { mini?: boolean;
           <path className="mascota-pico" d="M55 70 L65 70 L60 79 Z" />
         </>
       )}
-      {forma === 'birrete' && (
+      {forma === 'sencilla' && (
         <>
-          <rect className="mascota-cara" x="22" y="40" width="76" height="70" rx="26" />
-          <path className="mascota-cuerpo" d="M60 14 L106 32 L60 50 L14 32 Z" />
-          <path className="mascota-cuerpo" d="M36 38 L36 50 Q60 60 84 50 L84 38 L60 47 Z" />
-          <path className="mascota-borla" d="M96 36 L96 58" />
-          <circle className="mascota-borla-punta" cx="96" cy="61" r="3.5" />
-          <Ojo cx={46} cy={76} r={9} p={4.5} m={m} />
-          <Ojo cx={74} cy={76} r={9} p={4.5} m={m} />
-          <path className="mascota-boca" d="M53 93 Q60 98 67 93" />
-        </>
-      )}
-      {forma === 'tinta' && (
-        <>
-          <path className="mascota-cuerpo" d="M60 8 Q74 34 92 56 Q108 78 96 98 Q82 116 60 114 Q38 116 24 98 Q12 78 28 56 Q46 34 60 8 Z" />
-          <path className="mascota-reflejo" d="M36 70 Q34 84 42 94" />
-          <Ojo cx={47} cy={78} r={11} p={5} m={m} />
-          <Ojo cx={73} cy={78} r={11} p={5} m={m} />
+          <path className="mascota-cuerpo" d="M60 12 C92 12 108 30 108 62 C108 94 90 110 60 110 C30 110 12 94 12 62 C12 30 28 12 60 12 Z" />
+          <Ojo cx={44} cy={58} r={11} p={5.5} m={m} />
+          <Ojo cx={76} cy={58} r={11} p={5.5} m={m} />
         </>
       )}
     </svg>

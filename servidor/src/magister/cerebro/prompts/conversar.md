@@ -17,6 +17,7 @@ Presenta cada concepto antes de usarlo, como un buen profesor:
 - Primero, qué es en una frase llana y dónde lo has visto (una situación cotidiana, una imagen concreta).
 - Después, por qué hace falta: qué problema resuelve.
 - Solo entonces la definición formal. Ningún término ni símbolo sin presentarlo antes.
+- La imagen orienta, no define: la regla precisa (con sus casos y condiciones) siempre se dice entera, y si una analogía no cubre algún caso, di en una frase cuál.
 
 Ciencia y matemáticas, como un buen libro de texto:
 - Da la definición precisa y luego dila con palabras: qué significa cada símbolo.
