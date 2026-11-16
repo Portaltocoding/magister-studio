@@ -170,6 +170,21 @@ function Foco({ hoy, leccion, inicial, alSalir, irA }: PropsFoco) {
   const [descanso, setDescanso] = useState<number | null>(null)
   const [avisoPausa, setAvisoPausa] = useState(false)
   const [glosario, setGlosario] = useState(false)
+  // Lupa: el párrafo bajo el ratón se acerca y el resto se atenúa.
+  const [lupa, setLupa] = useState(() => {
+    try {
+      return localStorage.getItem('magister-lupa') !== 'no'
+    } catch {
+      return true
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem('magister-lupa', lupa ? 'si' : 'no')
+    } catch {
+      /* sin almacenamiento: vale para esta sesión */
+    }
+  }, [lupa])
   const [cerrada, setCerrada] = useState(false)
   const [pantalla, setPantalla] = useState(!!document.fullscreenElement)
 
@@ -244,6 +259,7 @@ function Foco({ hoy, leccion, inicial, alSalir, irA }: PropsFoco) {
       if (e.key === 'ArrowRight') ir(1)
       else if (e.key === 'ArrowLeft') ir(-1)
       else if (e.key === 'g') setGlosario((g) => !g)
+      else if (e.key === 'l') setLupa((x) => !x)
     }
     window.addEventListener('keydown', tecla)
     return () => window.removeEventListener('keydown', tecla)
@@ -265,7 +281,7 @@ function Foco({ hoy, leccion, inicial, alSalir, irA }: PropsFoco) {
   const previsto = (hoy.horas ?? 0) * 3600
 
   return (
-    <div className="foco" role="dialog" aria-modal="true" aria-label={`Modo foco: ${hoy.titulo}`}>
+    <div className={`foco ${lupa ? 'lupa' : ''}`} role="dialog" aria-modal="true" aria-label={`Modo foco: ${hoy.titulo}`}>
       <header className="foco-barra">
         <div className="foco-titulo">
           <span className="bloques-clave">{hoy.leccion_clave}</span>
@@ -292,6 +308,9 @@ function Foco({ hoy, leccion, inicial, alSalir, irA }: PropsFoco) {
           >
             {pausado ? '▶' : '❚❚'} {reloj(segundos)}
             {previsto > 0 && <small> / {reloj(previsto)}</small>}
+          </button>
+          <button className="foco-boton" aria-pressed={lupa} onClick={() => setLupa(!lupa)} title="Acercar el párrafo bajo el ratón (L)">
+            Lupa
           </button>
           {leccion.definiciones.length > 0 && (
             <button className="foco-boton" aria-pressed={glosario} onClick={() => setGlosario(!glosario)} title="Términos (G)">
@@ -400,7 +419,7 @@ function Foco({ hoy, leccion, inicial, alSalir, irA }: PropsFoco) {
             ← Anterior
           </button>
           <span className="foco-atajos">
-            {puedeSeguir ? '← → para moverte · G términos · Esc salir' : 'Para seguir, contesta la comprobación del final de la idea (o sáltala).'}
+            {puedeSeguir ? '← → para moverte · L lupa · G términos · Esc salir' : 'Para seguir, contesta la comprobación del final de la idea (o sáltala).'}
           </span>
           {b.pregunta && !comprobado[b.clave] && (
             <button className="boton-mini" onClick={() => setComprobado((c) => ({ ...c, [b.clave]: 'saltada' }))}>
