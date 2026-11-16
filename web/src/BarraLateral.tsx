@@ -10,6 +10,8 @@ interface Props {
   alElegirConversacion: (id: number | null) => void
   alCambiar: () => void
   alCerrar?: () => void
+  fija?: boolean
+  alFijar?: (si: boolean) => void
 }
 
 const CLAVE_PLEGADOS = 'magister-secciones-plegadas'
@@ -31,6 +33,8 @@ export default function BarraLateral({
   alElegirConversacion,
   alCambiar,
   alCerrar,
+  fija = false,
+  alFijar,
 }: Props) {
   const [plegados, setPlegados] = useState<string[]>(leerPlegados)
   const alternar = (nombre: string) =>
@@ -46,8 +50,23 @@ export default function BarraLateral({
   return (
     <aside className="lateral">
       <div className="marca">
-        <span>Magister</span>
-        {alCerrar && (
+        <span className="marca-nombre">Magister</span>
+        {alFijar && (
+          <button
+            type="button"
+            className={`boton-plegar boton-fijar ${fija ? 'activo' : ''}`}
+            onClick={() => alFijar(!fija)}
+            aria-pressed={fija}
+            aria-label={fija ? 'Soltar la barra lateral' : 'Fijar la barra lateral'}
+            title={fija ? 'Soltar: vuelve a plegarse y se abre por encima' : 'Fijar: se queda siempre abierta a la izquierda'}
+          >
+            <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden>
+              <path d="M7.5 3.5h5l-.8 4.2 2.8 2.8H5.5l2.8-2.8z" fill={fija ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              <line x1="10" y1="10.5" x2="10" y2="16.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+        {alCerrar && !fija && (
           <button type="button" className="boton-plegar" onClick={alCerrar} aria-label="Plegar la barra lateral" title="Plegar (Ctrl+B o Esc)">
             <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden>
               <rect x="2.5" y="3.5" width="15" height="13" rx="3" fill="none" stroke="currentColor" strokeWidth="1.4" />

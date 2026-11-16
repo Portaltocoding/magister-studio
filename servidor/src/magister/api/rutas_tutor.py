@@ -131,3 +131,48 @@ async def guardar_preferencias(cuerpo: PreferenciasTutor) -> dict:
         await s.execute(insert(Ajuste).values(clave="tutor", valor=cuerpo.model_dump())
                         .on_conflict_do_update(index_elements=[Ajuste.clave], set_={"valor": cuerpo.model_dump()}))
     return cuerpo.model_dump()
+
+
+
+class ReglaPreparar(BaseModel):
+    activa: bool = False
+    dias_antes: int = 1
+
+
+class ReglaSimple(BaseModel):
+    activa: bool = False
+
+
+class ReglaVideo(BaseModel):
+    activa: bool = False
+    estilo: Literal["clase", "resumen", "analogias", "examen"] = "clase"
+    minutos: int = 6
+
+
+class Automatizaciones(BaseModel):
+    preparar_siguiente: ReglaPreparar = ReglaPreparar()
+    diapositivas_al_preparar: ReglaSimple = ReglaSimple()
+    video_al_preparar: ReglaVideo = ReglaVideo()
+    solo_de_noche: bool = False
+
+
+@rutas.get("/automatizaciones")
+async def ver_automatizaciones() -> dict:
+    from magister.trabajos import automatizar
+
+    return {"reglas": await automatizar.leer(), "registro": await automatizar.ver_registro()}
+
+
+@rutas.put("/automatizaciones")
+async def guardar_automatizaciones(cuerpo: Automatizaciones) -> dict:
+    from magister.trabajos import automatizar
+
+    return {"reglas": await automatizar.guardar(cuerpo.model_dump()), "registro": await automatizar.ver_registro()}
+
+
+@rutas.post("/automatizaciones/ahora")
+async def automatizar_ahora() -> dict:
+    """Revisa las reglas ya, sin esperar a la siguiente vuelta (respeta «solo de noche»)."""
+    from magister.trabajos import automatizar
+
+    return {"hecho": await automatizar.una_vuelta()}

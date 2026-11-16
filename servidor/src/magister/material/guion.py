@@ -20,10 +20,22 @@ def escenas(texto: str) -> list[tuple[str, str]]:
             for i, m in enumerate(marcas)]
 
 
-async def generar_guion(entrada: EntradaMaterial, apuntes: str, minutos: int) -> str:
+ESTILOS_VIDEO = {
+    "clase": "Como una buena clase: cada idea se razona y se apoya en un ejemplo concreto.",
+    "resumen": "Resumen rápido para repasar: lo esencial de cada escena, sin rodeos ni ejemplos largos.",
+    "analogias": "Con analogías cotidianas: en la intuición y en la teoría, una comparación con algo de la vida diaria que lo haga evidente.",
+    "examen": "Pensado para el examen: en la teoría, di el tipo de pregunta que suele caer y el error típico que hay que evitar.",
+}
+
+
+async def generar_guion(entrada: EntradaMaterial, apuntes: str, minutos: int, estilo: str = "clase",
+                        concepto: str | None = None) -> str:
     nucleo = [c.nombre for c in entrada.conceptos if c.nucleo] or [c.nombre for c in entrada.conceptos]
+    if concepto:
+        nucleo = [concepto]
     sistema = cargar("guion").rellenar(palabras=minutos * PALABRAS_MINUTO, minutos=minutos, conceptos=", ".join(nucleo),
-                                       apuntes=apuntes.split("\n# Repaso")[0][:20000])
+                                       apuntes=apuntes.split("\n# Repaso")[0][:20000],
+                                       estilo=ESTILOS_VIDEO.get(estilo, ESTILOS_VIDEO["clase"]))
     texto = "".join([t async for t in generar(sistema, [Turno("usuario", "Escribe el guion.")])]).strip()
     primera = MARCADOR.search(texto)
     return texto[primera.start():] if primera else texto

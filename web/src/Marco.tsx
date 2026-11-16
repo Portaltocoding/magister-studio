@@ -37,6 +37,23 @@ export default function Marco() {
   // La barra lateral va siempre plegada (queda la tira de iconos) y se abre por encima del contenido;
   // se vuelve a plegar al elegir algo, al pulsar fuera o con Esc. Ctrl+B la abre y la cierra.
   const [menu, setMenu] = useState(false)
+  // Fijada: la barra lateral ocupa su sitio y no se cierra sola. Sin fijar: tira de iconos y se abre por encima.
+  const [fija, setFija] = useState(() => {
+    try {
+      return localStorage.getItem('magister-lateral-fija') === 'si'
+    } catch {
+      return false
+    }
+  })
+  const fijar = useCallback((si: boolean) => {
+    setFija(si)
+    setMenu(false)
+    try {
+      localStorage.setItem('magister-lateral-fija', si ? 'si' : 'no')
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, [])
   const hoy = usarHoy()
   useEffect(() => {
     if (!hoy || !('Notification' in window) || Notification.permission !== 'granted' || !avisosActivos()) return
@@ -100,11 +117,13 @@ export default function Marco() {
   const tipo: 'libre' | 'plan' = actual ? (actual.tipo === 'plan' ? 'plan' : 'libre') : tipoNueva
 
   return (
-    <div className={`marco ${menu ? 'menu-abierto' : ''}`} style={variables(acentoDe(colores, null))}>
+    <div className={`marco ${menu ? 'menu-abierto' : ''} ${fija ? 'lateral-fija' : ''}`} style={variables(acentoDe(colores, null))}>
       <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />
       <Riel modo={modo} hoy={hoy} alAbrir={() => setMenu(true)} alIr={(m) => setModo(m)} />
       <BarraLateral
         alCerrar={() => setMenu(false)}
+        fija={fija}
+        alFijar={fijar}
         modoActivo={modo}
         alElegir={(m) => {
           if (m === 'libre') {

@@ -70,6 +70,10 @@ async def ciclo_de_vida(_: FastAPI):
 
     # El trabajador de la cola corre dentro de la API salvo que se lance aparte (magister-trabajador).
     trabajador = asyncio.create_task(bucle_trabajos()) if ajustes.trabajos_en_api else None
+    from magister.trabajos.automatizar import bucle as bucle_automatizaciones
+
+    # Las automatizaciones que enciendes (preparar la próxima lección, vídeos...) se revisan cada pocos minutos.
+    automatizaciones = asyncio.create_task(bucle_automatizaciones()) if ajustes.trabajos_en_api else None
     async with AsyncSqliteSaver.from_conn_string(ajustes.checkpoints) as saver:
         iniciar_grafo(saver, buscador)
         yield

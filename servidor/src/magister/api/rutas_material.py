@@ -36,6 +36,17 @@ class Preferencias(BaseModel):
     cantidad: Literal["pocas", "normal", "muchas"] = "normal"
     enfoque: str | None = Field(None, max_length=300)
     estilo: Literal["libro", "ficha"] = "libro"
+    video: "Video | None" = None
+
+
+class Video(BaseModel):
+    """Qué vídeo hacer: estilo, un solo concepto (o la lección entera) y duración."""
+    estilo: Literal["clase", "resumen", "analogias", "examen"] = "clase"
+    concepto: str | None = Field(None, max_length=200)
+    minutos: int = Field(6, ge=2, le=15)
+
+
+Preferencias.model_rebuild()
 
 
 class PedirMaterial(BaseModel):
@@ -78,6 +89,30 @@ async def crear_tests(plan_id: int, clave: str, n: int = 5, s: AsyncSession = De
     await s.close()
     ids = await anadir_tests(plan_id, clave, [(c, nombre) for c, nombre in conceptos], "\n\n".join(textos), max(2, min(8, n)))
     return {"tests": ids}
+
+
+@rutas.get("/planes/{plan_id}/videos")
+async def videos(plan_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> list[dict]:
+    """Todos los vídeos (guiones) del plan, con su lección, estilo, concepto y duración."""
+    filas = (await s.execute(select(Material).where(Material.plan_id == plan_id, Material.tipo == "guion",
+                                                    Material.estado != "generando").order_by(Material.id.desc()))).scalars().all()
+    titulos = dict((await s.execute(select(LeccionFila.clave, LeccionFila.titulo).where(LeccionFila.plan_id == plan_id))).all())
+    salida = []
+    for m in filas:
+        meta = next((i for i in (m.informes or []) if i.get("nodo") == "video"), {})
+        salida.append({"material_id": m.id, "clave": m.leccion_clave, "titulo": titulos.get(m.leccion_clave, m.leccion_clave),
+                       "estilo": meta.get("estilo", "clase"), "concepto": meta.get("concepto"), "minutos": meta.get("minutos"),
+                       "creado": m.creado_en.isoformat() if getattr(m, "creado_en", None) else None})
+    return salida
+
+
+@rutas.delete("/materiales/{mid}", status_code=204)
+async def borrar_un_material(mid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> None:
+    m = await s.get(Material, mid)
+    if m is None:
+        raise HTTPException(404, "material no encontrado")
+    await s.delete(m)
+    await s.commit()
 
 
 @rutas.get("/planes/{plan_id}/materiales")

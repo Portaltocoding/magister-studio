@@ -9,6 +9,8 @@ El nombre del concepto y su definición en una frase.
 [[teoria]]
 Cómo funciona por dentro, con un ejemplo dicho con palabras.
 
+Estilo de este vídeo: {estilo}
+
 Reglas de voz:
 - Nada antes del primer marcador.
 - Frases cortas, para el oído. Nada de fórmulas escritas (sin $, =, ^): dilas con palabras.

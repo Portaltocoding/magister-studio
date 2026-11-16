@@ -101,11 +101,15 @@ async def _extras(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], e
         await progreso("guion", 0, 1)
         gid = await almacen.nuevo_material(plan_id, clave, "guion", trabajo_id)
         materiales.append(gid)
-        texto = await generar_guion(entrada, texto_apuntes, ajustes.duracion_guion_min)
-        hallazgos = auditar_guion(texto, ajustes.duracion_guion_min) + lint.revisar(texto, "guion")
+        video = (entrada.preferencias or {}).get("video") or {}
+        minutos = int(video.get("minutos") or ajustes.duracion_guion_min)
+        texto = await generar_guion(entrada, texto_apuntes, minutos, video.get("estilo", "clase"), video.get("concepto"))
+        hallazgos = auditar_guion(texto, minutos) + lint.revisar(texto, "guion")
         ruta = almacen.carpeta_salidas(plan_id, clave) / "guion.md"
         ruta.write_text(texto, encoding="utf-8")
         estado = "bloqueado" if lint.vetos(hallazgos) else "listo"
         await almacen.actualizar(gid, texto=texto, rutas={"md": str(ruta)}, estado=estado,
-                                 informes=[{"nodo": "auditoria", "hallazgos": [h.model_dump() for h in hallazgos]}])
+                                 informes=[{"nodo": "auditoria", "hallazgos": [h.model_dump() for h in hallazgos]},
+                                           {"nodo": "video", "estilo": video.get("estilo", "clase"),
+                                            "concepto": video.get("concepto"), "minutos": minutos}])
     return materiales

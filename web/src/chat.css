@@ -332,3 +332,18 @@ button.grupo-titulo:hover { color: var(--texto); }
 .agendar-editar input { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--borde); background: transparent; color: var(--texto); }
 .agendar-tarjeta.hecho { border-color: color-mix(in srgb, #3c9b6b 50%, var(--borde)); }
 .agendar-tarjeta.no { opacity: 0.6; }
+
+
+/* ===== Barra lateral fijada: ocupa su sitio, sin tira ni velo ===== */
+.marca-nombre { margin-right: auto; }
+.marca { gap: 4px; }
+.boton-fijar.activo { color: var(--texto); }
+@media (min-width: 821px) {
+  .marco.lateral-fija { grid-template-columns: 264px minmax(0, 1fr); }
+  .marco.lateral-fija .riel { display: none; }
+  .marco.lateral-fija .lateral {
+    position: relative; grid-area: lateral; transform: none; box-shadow: none; width: auto; z-index: auto;
+    transition: none;
+  }
+  .marco.lateral-fija .velo-menu { display: none; }
+}

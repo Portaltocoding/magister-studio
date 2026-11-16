@@ -18,6 +18,7 @@ export type IdModo =
   | 'triaje'
   | 'hablar'
   | 'animaciones'
+  | 'automatizar'
 
 export interface Modo {
   id: IdModo
@@ -62,6 +63,7 @@ export const GRUPOS: Grupo[] = [
       { id: 'roadmap', nombre: 'Roadmap', encendido: true, ayuda: 'Las lecciones del plan y su orden' },
       { id: 'calendario', nombre: 'Calendario', encendido: true, ayuda: 'Tu mes: sesiones, deberes y exámenes' },
       { id: 'progreso', nombre: 'Progreso', encendido: true, ayuda: 'Cuánto llevas y qué dominas' },
+      { id: 'automatizar', nombre: 'Automatizar', encendido: true, ayuda: 'Lo que Magister hace solo: preparar, diapositivas, vídeos' },
     ],
   },
   {

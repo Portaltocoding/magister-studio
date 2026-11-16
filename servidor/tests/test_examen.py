@@ -136,3 +136,36 @@ async def test_afinar_el_tutor(cliente):
     texto = texto_preferencias(p)
     assert "150 palabras" in texto and "avanzado" in texto and "analogía" in texto and "No dibujes" in texto
     assert "test" not in texto
+
+
+
+def test_automatizaciones_eligen_lo_que_toca():
+    from datetime import date
+
+    from magister.trabajos.automatizar import PREDETERMINADAS, elegir_tarea, es_de_noche
+
+    hoy = date(2026, 11, 16)
+    lecciones = [
+        {"plan_id": 1, "clave": "L1", "titulo": "a", "fecha": None, "tipos": {"apuntes", "preguntas"}},
+        {"plan_id": 1, "clave": "L2", "titulo": "b", "fecha": date(2026, 11, 17), "tipos": set()},
+        {"plan_id": 1, "clave": "L3", "titulo": "c", "fecha": date(2026, 11, 25), "tipos": set()},
+    ]
+    apagadas = {**PREDETERMINADAS}
+    assert elegir_tarea(apagadas, lecciones, hoy) is None
+    preparar = {**PREDETERMINADAS, "preparar_siguiente": {"activa": True, "dias_antes": 1}}
+    lec, tipos, _ = elegir_tarea(preparar, lecciones, hoy)
+    assert lec["clave"] == "L2" and tipos == ["apuntes", "preguntas"]  # L3 queda lejos todavía
+    video = {**PREDETERMINADAS, "video_al_preparar": {"activa": True, "estilo": "resumen", "minutos": 3}}
+    lec, tipos, pref = elegir_tarea(video, lecciones, hoy)
+    assert lec["clave"] == "L1" and tipos == ["guion"] and pref["video"]["estilo"] == "resumen"
+    from datetime import datetime
+
+    assert es_de_noche(datetime(2026, 11, 16, 3)) and not es_de_noche(datetime(2026, 11, 16, 15))
+
+
+@pytest.mark.anyio
+async def test_automatizaciones_se_guardan(cliente):
+    r = (await cliente.get("/api/automatizaciones")).json()
+    assert r["reglas"]["preparar_siguiente"]["activa"] is False
+    r = await cliente.put("/api/automatizaciones", json={"preparar_siguiente": {"activa": True, "dias_antes": 2}, "solo_de_noche": True})
+    assert r.json()["reglas"]["preparar_siguiente"] == {"activa": True, "dias_antes": 2} and r.json()["reglas"]["solo_de_noche"] is True
