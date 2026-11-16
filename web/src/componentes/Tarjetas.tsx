@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Markdown from 'react-markdown'
+import { enviarJson, pedir } from '../api.ts'
 
 export interface Ficha {
   id: string
@@ -27,6 +28,9 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
   const [girada, setGirada] = useState(false)
   const [res, setRes] = useState<Record<string, Resultado>>({})
   const [todas, setTodas] = useState(false)
+  // Lo que marcas cuenta para tu repaso, una vez por ficha en esta sesión (repetir las falladas no cuenta doble).
+  const [contadas] = useState(() => new Set<string>())
+  const [aviso, setAviso] = useState<string | null>(null)
   const f = lista[Math.min(i, lista.length - 1)]
   const hechas = lista.filter((x) => res[x.id]).length
   const fin = lista.length > 0 && hechas === lista.length
@@ -42,13 +46,28 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
     (r: Resultado) => {
       if (!f) return
       setRes((x) => ({ ...x, [f.id]: r }))
+      if (!contadas.has(f.id)) {
+        contadas.add(f.id)
+        pedir<{ proxima_fecha: string | null }>(
+          '/api/practica/autoevaluacion',
+          enviarJson({ pregunta_id: f.id, nota: r === 'sabia' ? 'bien' : 'fallo', origen: 'ficha', clave: `ficha-${f.id}-${Date.now()}` }),
+        )
+          .then((x) =>
+            setAviso(
+              x.proxima_fecha
+                ? `Anotado en tu repaso: vuelve el ${new Date(x.proxima_fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}.`
+                : 'Anotado en tu repaso.',
+            ),
+          )
+          .catch(() => setAviso('No se pudo anotar en el repaso.'))
+      }
       const siguiente = lista.findIndex((x, k) => k > i && !res[x.id])
       if (siguiente >= 0) {
         setGirada(false)
         setI(siguiente)
       }
     },
-    [f, lista, i, res],
+    [f, lista, i, res, contadas],
   )
 
   useEffect(() => {
@@ -93,6 +112,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
         <span className="nota">
           {sabidas} sabidas · {falladas.length} por repasar · {lista.length - hechas} sin hacer
         </span>
+        {aviso && <span className="nota tarjetas-aviso">{aviso}</span>}
         <button className="boton-mini" onClick={() => setTodas(!todas)}>
           {todas ? 'Una a una' : 'Ver todas'}
         </button>

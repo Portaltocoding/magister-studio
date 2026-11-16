@@ -47,3 +47,22 @@ async def corregir(pregunta: str, referencia: str, fragmentos: list[str], respue
                          fragmentos="\n\n".join(f"<fragmento>{f}</fragmento>" for f in fragmentos) or "(sin fragmentos)")
     c = await estructurar(sistema, "Devuelve la corrección.", Correccion)
     return comprobar(c, fragmentos), p.etiqueta
+
+
+class CorreccionItem(Correccion):
+    id: str
+    explicacion: str = ""
+
+
+class CorreccionExamen(BaseModel):
+    correcciones: list[CorreccionItem]
+
+
+async def corregir_examen(items: list[dict]) -> tuple[dict[str, CorreccionItem], str]:
+    """Corrige un examen entero en una sola llamada. `items`: id, pregunta, referencia y respuesta."""
+    p = cargar("corrector_examen")
+    bloque = "\n\n".join(
+        f'<item id="{x["id"]}">\n<pregunta>{x["pregunta"]}</pregunta>\n<referencia>{x["referencia"]}</referencia>\n'
+        f'<respuesta_del_alumno>{x["respuesta"]}</respuesta_del_alumno>\n</item>' for x in items)
+    r = await estructurar(p.rellenar(items=bloque), "Devuelve la corrección de cada respuesta.", CorreccionExamen)
+    return {c.id: comprobar(c, []) for c in r.correcciones}, p.etiqueta

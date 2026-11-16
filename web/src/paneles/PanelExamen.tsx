@@ -23,6 +23,8 @@ interface PreguntaExamen {
   leccion_clave: string
   tipo: string
   enunciado: string
+  // Solo las tipo test: se corrigen sin modelo.
+  opciones?: string[]
 }
 
 interface Examen {
@@ -75,6 +77,7 @@ const TIPOS: Record<string, string> = {
   fallo: 'Encuentra el fallo',
   escenario: 'Escenario',
   hablada: 'En voz alta',
+  test: 'Tipo test',
 }
 const nueva = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
 const conMates = { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }
@@ -300,7 +303,7 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
   const [i, setI] = useState(0)
   const [resp, setResp] = useState<Record<string, Respuesta>>({})
   const [segundos, setSegundos] = useState(0)
-  const [corrigiendo, setCorrigiendo] = useState<{ hechas: number; total: number } | null>(null)
+  const [corrigiendo, setCorrigiendo] = useState<{ hechas: number; total: number; deUnaVez?: boolean } | null>(null)
   const [corrigiendoUna, setCorrigiendoUna] = useState(false)
   const [confirmar, setConfirmar] = useState(false)
   const servidas = useMemo(() => new Set<string>(), [])
@@ -326,6 +329,28 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
   const entregar = useCallback(async () => {
     setConfirmar(false)
     const finales = { ...resp }
+    // Primero, todo el examen en una sola corrección; si falla, se corrige de una en una.
+    const pendientesUna = preguntas.filter((q) => finales[q.pregunta_id]?.texto.trim() && !finales[q.pregunta_id].nota)
+    if (pendientesUna.length > 0 && pendientesUna.length === preguntas.filter((q) => finales[q.pregunta_id]?.texto.trim()).length) {
+      setCorrigiendo({ hechas: 0, total: pendientesUna.length, deUnaVez: true })
+      try {
+        const fin = await pedir<Resumen>(
+          `/api/examenes/${examen.id}/corregir`,
+          enviarJson({
+            segundos,
+            resultados: preguntas.map((q) => ({
+              pregunta_id: q.pregunta_id,
+              respuesta: finales[q.pregunta_id]?.texto ?? '',
+              confianza: finales[q.pregunta_id]?.confianza ?? null,
+            })),
+          }),
+        )
+        alAcabar(fin)
+        return
+      } catch {
+        /* sigue abajo, de una en una */
+      }
+    }
     const pendientes = preguntas.filter((q) => finales[q.pregunta_id]?.texto.trim() && !finales[q.pregunta_id].nota)
     setCorrigiendo({ hechas: 0, total: pendientes.length })
     // De tres en tres, para no saturar el modelo.
@@ -463,7 +488,9 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
             <Pensando />
           </div>
           <p>
-            {corrigiendo.hechas} de {corrigiendo.total} respuestas corregidas. El corrector lee cada una contra la respuesta de referencia y tus fuentes.
+            {corrigiendo.deUnaVez
+              ? `Corrigiendo tus ${corrigiendo.total} respuestas de una vez contra las respuestas de referencia. Los tipo test ya están corregidos.`
+              : `${corrigiendo.hechas} de ${corrigiendo.total} respuestas corregidas. El corrector lee cada una contra la respuesta de referencia y tus fuentes.`}
           </p>
         </section>
       ) : (
@@ -474,6 +501,22 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
           <div className="examen-enunciado">
             <Markdown {...conMates}>{p.enunciado}</Markdown>
           </div>
+          {p.opciones && p.opciones.length > 0 ? (
+            <div className="examen-test">
+              {p.opciones.map((o, k) => (
+                <button
+                  key={o}
+                  type="button"
+                  className={`test-opcion ${r.texto === o ? 'elegida' : ''}`}
+                  disabled={corregida || corrigiendoUna}
+                  onClick={() => poner({ texto: o })}
+                >
+                  <span className="test-letra">{String.fromCharCode(65 + k)}</span>
+                  <Markdown {...conMates}>{o}</Markdown>
+                </button>
+              ))}
+            </div>
+          ) : (
           <textarea
             className="examen-respuesta"
             value={r.texto}
@@ -483,6 +526,7 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
             aria-label="Tu respuesta"
             autoFocus
           />
+          )}
           <div className="foco-confianza">
             <span>¿Cómo de seguro estás?</span>
             {CONFIANZAS.map(([v, t]) => (

@@ -16,6 +16,7 @@ from magister.aprender import andamiajes, practica, progreso
 from magister.aprender.corrector import corregir
 from magister.cerebro.modelo import ErrorModelo, Turno, generar
 from magister.datos.aprender import Intento
+from magister.datos.material import PreguntaConcepto
 from magister.datos.sesion import nueva_sesion, sesion_por_peticion
 from magister.tono.lint import revisar, vetos
 
@@ -101,23 +102,63 @@ async def intentar(cuerpo: IntentoEntrada) -> AsyncIterator[ServerSentEvent]:
         pass
     finally:
         with anyio.CancelScope(shield=True):
-            estado, prog = await practica.estado_y_programador(servida.plan_id if servida else 0, cuerpo.concepto_id, momento)
-            proxima = None
-            if cuerpo.tipo == "espaciado":
-                _, proxima = prog.siguiente(estado, c.nota, momento)
-            plan_id = servida.plan_id if servida else await progreso.plan_de_pregunta(cuerpo.pregunta_id)
-            async with nueva_sesion() as s, s.begin():
-                i = Intento(plan_id=plan_id, concepto_id=cuerpo.concepto_id, pregunta_id=cuerpo.pregunta_id, momento=momento,
-                            tipo=cuerpo.tipo, respuesta=cuerpo.respuesta, explicacion="".join(partes), confianza=cuerpo.confianza,
-                            latencia_ms=cuerpo.latencia_ms or int((time.perf_counter() - t0) * 1000),
-                            nota_corrector=c.nota, correccion=c.model_dump(),
-                            p_predicha=servida.p_predicha if servida and cuerpo.tipo == "espaciado" else None,
-                            version_programador=prog.version, version_corrector=version_corrector,
-                            clave_idempotencia=cuerpo.clave)
-                s.add(i)
-                await s.flush()
-                intento_id = str(i.id)
+            intento_id, proxima = await registrar(
+                pregunta_id=cuerpo.pregunta_id, concepto_id=cuerpo.concepto_id, momento=momento, tipo=cuerpo.tipo,
+                respuesta=cuerpo.respuesta, explicacion="".join(partes), confianza=cuerpo.confianza,
+                latencia_ms=cuerpo.latencia_ms or int((time.perf_counter() - t0) * 1000), nota=c.nota,
+                correccion=c.model_dump(), version_corrector=version_corrector, clave=cuerpo.clave, servida=servida)
     yield ServerSentEvent(data={"intento_id": intento_id, "proxima_fecha": proxima.isoformat() if proxima else None}, event="fin")
+
+
+async def registrar(*, pregunta_id: str, concepto_id: str, momento: datetime, tipo: str, respuesta: str, explicacion: str | None,
+                    confianza: float | None, latencia_ms: int | None, nota: str, correccion: dict, version_corrector: str,
+                    clave: str, servida=None) -> tuple[str, datetime | None]:
+    """Guarda un intento y devuelve su id y la próxima fecha de repaso. Lo usan el repaso, el examen y las fichas."""
+    plan_id = servida.plan_id if servida else await progreso.plan_de_pregunta(pregunta_id)
+    estado, prog = await practica.estado_y_programador(plan_id or 0, concepto_id, momento)
+    proxima = None
+    if tipo == "espaciado":
+        _, proxima = prog.siguiente(estado, nota, momento)
+    async with nueva_sesion() as s, s.begin():
+        i = Intento(plan_id=plan_id, concepto_id=concepto_id, pregunta_id=pregunta_id, momento=momento, tipo=tipo,
+                    respuesta=respuesta, explicacion=explicacion, confianza=confianza, latencia_ms=latencia_ms,
+                    nota_corrector=nota, correccion=correccion,
+                    p_predicha=servida.p_predicha if servida and tipo == "espaciado" else None,
+                    version_programador=prog.version, version_corrector=version_corrector, clave_idempotencia=clave)
+        s.add(i)
+        await s.flush()
+        return str(i.id), proxima
+
+
+class Autoevaluacion(BaseModel):
+    pregunta_id: str
+    nota: Literal["fallo", "parcial", "bien", "perfecta"]
+    clave: str = Field(min_length=8, max_length=80)
+    # «ficha»: te la marcas tú; «test»: elegiste una opción y se corrigió sola.
+    origen: Literal["ficha", "test"] = "ficha"
+    respuesta: str = Field(default="", max_length=2000)
+
+
+@rutas.post("/practica/autoevaluacion")
+async def autoevaluar(cuerpo: Autoevaluacion) -> dict:
+    """Una ficha marcada o un test respondido: cuenta para el repaso espaciado sin llamar al modelo.
+
+    Va sin seguridad apostada, así que no entra en la calibración.
+    """
+    previo = await _existente(cuerpo.clave)
+    if previo is not None:
+        return {"intento_id": str(previo.id), "proxima_fecha": None}
+    async with nueva_sesion() as s:
+        concepto = await s.scalar(select(PreguntaConcepto.concepto_id).where(PreguntaConcepto.pregunta_id == cuerpo.pregunta_id))
+    if concepto is None:
+        raise HTTPException(404, "pregunta no encontrada")
+    servida = await practica.ultima_servida(cuerpo.pregunta_id)
+    intento_id, proxima = await registrar(
+        pregunta_id=cuerpo.pregunta_id, concepto_id=concepto, momento=ahora(), tipo="espaciado",
+        respuesta=cuerpo.respuesta or f"({cuerpo.origen})", explicacion=None, confianza=None, latencia_ms=None,
+        nota=cuerpo.nota, correccion={"origen": cuerpo.origen}, version_corrector=cuerpo.origen, clave=cuerpo.clave,
+        servida=servida if cuerpo.origen == "test" else None)
+    return {"intento_id": intento_id, "proxima_fecha": proxima.isoformat() if proxima else None}
 
 
 @rutas.patch("/practica/intentos/{intento_id}")

@@ -104,7 +104,7 @@ class BloqueMaterial(Base):
 class Pregunta(Base):
     __tablename__ = "preguntas"
     __table_args__ = (
-        CheckConstraint("tipo in ('conceptual', 'calculo', 'fallo', 'escenario', 'hablada')", name="ck_preguntas_tipo"),
+        CheckConstraint("tipo in ('conceptual', 'calculo', 'fallo', 'escenario', 'hablada', 'test')", name="ck_preguntas_tipo"),
         CheckConstraint("estado in ('borrador', 'activa', 'retirada')", name="ck_preguntas_estado"),
         ForeignKeyConstraint(
             ["plan_id", "leccion_clave"], ["lecciones.plan_id", "lecciones.clave"], ondelete="CASCADE",
@@ -120,6 +120,8 @@ class Pregunta(Base):
     tipo: Mapped[str] = mapped_column(String(12))
     enunciado: Mapped[str] = mapped_column(Text)
     fantasma: Mapped[str] = mapped_column(Text)
+    # Solo las de tipo test: [{"texto": ..., "buena": bool}]; se corrigen sin modelo.
+    opciones: Mapped[list[dict] | None] = mapped_column(JSONB)
     donde: Mapped[str | None] = mapped_column(String(10))
     sonda: Mapped[bool] = mapped_column(Boolean, server_default="false")
     estado: Mapped[str] = mapped_column(String(10), server_default="borrador")

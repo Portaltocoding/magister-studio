@@ -86,3 +86,19 @@ async def test_un_prompt_editado_pasa_a_ser_el_activo(base, monkeypatch):
     async with nueva_sesion() as s:
         assert await s.scalar(select(PromptActivo.version).where(PromptActivo.nombre == "prueba")) == "aaaaaaaaaaaa"
     prompts.ACTIVAS.clear()
+
+
+@pytest.mark.anyio
+async def test_el_examen_se_corrige_en_una_llamada():
+    from magister.aprender.corrector import CorreccionExamen, corregir_examen
+    from magister.cerebro.estructura import eco
+
+    eco.encolar(CorreccionExamen, [{"correcciones": [
+        {"id": "p1", "nota": "bien", "explicacion": "Lo tienes."},
+        {"id": "p2", "nota": "fallo", "ideas_ausentes": [], "errores": [], "tipo_error": "concepto", "explicacion": "No."},
+    ]}])
+    items = [{"id": "p1", "pregunta": "a", "referencia": "b", "respuesta": "c"}, {"id": "p2", "pregunta": "d", "referencia": "e", "respuesta": "f"}]
+    hechas, version = await corregir_examen(items)
+    assert hechas["p1"].nota == "bien" and version.startswith("corrector_examen@")
+    # Un fallo sin decir qué falta pasa a parcial, como en el corrector de una en una.
+    assert hechas["p2"].nota == "parcial"

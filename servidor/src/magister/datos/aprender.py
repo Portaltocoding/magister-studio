@@ -35,7 +35,8 @@ class Intento(Base):
     tipo: Mapped[str] = mapped_column(String(10), server_default="espaciado")
     respuesta: Mapped[str] = mapped_column(Text)
     explicacion: Mapped[str | None] = mapped_column(Text)
-    confianza: Mapped[float] = mapped_column(Float)
+    # Vacía cuando no apuestas seguridad (una ficha que te marcas tú): así no entra en la calibración.
+    confianza: Mapped[float | None] = mapped_column(Float)
     latencia_ms: Mapped[int | None] = mapped_column(Integer)
     nota_corrector: Mapped[str] = mapped_column(String(10))
     nota_usuario: Mapped[str | None] = mapped_column(String(10))

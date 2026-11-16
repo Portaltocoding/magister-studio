@@ -32,3 +32,10 @@
 .diagrama { margin: 14px 0; padding: 14px; border-radius: 12px; background: #fbf9f4; border: 1px solid var(--borde); text-align: center; }
 .diagrama img { max-width: 100%; height: auto; max-height: 380px; }
 .diagrama-esperando { color: #8a867e; font-size: 0.9rem; padding: 28px; }
+
+/* Preguntas tipo test en el examen */
+.examen-test { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.examen-test .test-opcion { color: #e9e9e9; border-color: #45443f; padding: 12px 14px; font-size: 1.02rem; }
+.examen-test .test-opcion.elegida { border-color: var(--t-acento, #f2c200); background: color-mix(in srgb, var(--t-acento, #f2c200) 14%, transparent); }
+.examen-test .test-opcion.elegida .test-letra { background: var(--t-acento, #f2c200); border-color: var(--t-acento, #f2c200); color: #141414; }
+.tarjetas-aviso { margin-left: auto; }
