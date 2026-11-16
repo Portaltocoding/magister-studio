@@ -49,7 +49,9 @@ export default function Central({
         />
       )
     case 'tutor':
-      return <PanelTutor irA={irA} />
+      return <PanelTutor key="tutor" irA={irA} />
+    case 'foco':
+      return <PanelTutor key="foco" irA={irA} vista="foco" />
     case 'roadmap':
       return <PanelPlan alNuevoPlan={alNuevoPlan} />
     case 'calendario':

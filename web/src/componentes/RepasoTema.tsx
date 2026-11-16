@@ -60,7 +60,7 @@ export default function RepasoTema({ alPracticar, alExaminar }: { alPracticar: (
           planId={volcando.plan_id}
           clave={volcando.clave}
           titulo={volcando.titulo}
-          alEstudiar={() => irARuta(`#/tutor/foco/${volcando.material_id}`)}
+          alEstudiar={() => irARuta(`#/foco/${volcando.material_id}`)}
           alCerrar={() => {
             setVolcando(null)
             cargar()

@@ -206,3 +206,9 @@
 .repaso-tema-lista li { display: flex; align-items: center; gap: 10px; }
 .repaso-tema-titulo { flex: 1; display: flex; flex-direction: column; }
 .repaso-tema-titulo small { color: var(--suave); }
+
+/* Modo foco: elegir lección */
+.foco-elegir header { margin-bottom: 18px; }
+.foco-elegir header h1 { margin: 0 0 4px; }
+.tutor-otra.sin-preparar { opacity: 0.6; }
+.tutor-otras-enlace { margin-top: 22px; }

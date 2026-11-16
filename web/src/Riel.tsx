@@ -51,6 +51,12 @@ const ICONOS: Record<string, ReactElement> = {
       <path d="M7 8l1.5 1.5L11.5 6.5M7 13h6" />
     </svg>
   ),
+  foco: (
+    <svg viewBox="0 0 20 20" aria-hidden>
+      <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7M13 3h2.5A1.5 1.5 0 0 1 17 4.5V7M17 13v2.5a1.5 1.5 0 0 1-1.5 1.5H13M7 17H4.5A1.5 1.5 0 0 1 3 15.5V13" />
+      <circle cx="10" cy="10" r="2.5" />
+    </svg>
+  ),
   llamada: (
     <svg viewBox="0 0 20 20" aria-hidden>
       <path d="M6.2 3.5l2 3.2-1.4 1.6a9 9 0 0 0 4.9 4.9l1.6-1.4 3.2 2-1 2.4c-6.5.4-11.8-4.9-11.4-11.4z" />
@@ -66,6 +72,7 @@ const ICONOS: Record<string, ReactElement> = {
 
 const ATAJOS: { id: IdModo; nombre: string }[] = [
   { id: 'libre', nombre: 'Estudio libre' },
+  { id: 'foco', nombre: 'Modo foco' },
   { id: 'fichas', nombre: 'Lecciones' },
   { id: 'llamada', nombre: 'Llamada' },
   { id: 'repaso', nombre: 'Repaso' },

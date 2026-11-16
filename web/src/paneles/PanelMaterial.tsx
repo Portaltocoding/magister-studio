@@ -391,7 +391,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               )}
               <div className="bloque-acciones">
                 {apuntes && (
-                  <button className="boton boton-principal" onClick={() => irARuta(`#/tutor/foco/${apuntes.id}`)}>
+                  <button className="boton boton-principal" onClick={() => irARuta(`#/foco/${apuntes.id}`)}>
                     Estudiar en modo foco
                   </button>
                 )}

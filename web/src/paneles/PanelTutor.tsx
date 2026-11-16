@@ -66,7 +66,9 @@ interface Leccion {
 interface Opcion {
   clave: string
   titulo: string
-  material_id: number
+  material_id: number | null // null: aún sin preparar
+  plan_id: number
+  tema_id: number
 }
 
 // Lo que llevas de una lección, para seguir donde lo dejaste.
@@ -735,7 +737,8 @@ const saludo = () => {
 }
 
 // Modo Tutor: la tarjeta «Hoy», otras lecciones para estudiar en foco y, al empezar, el modo foco.
-export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
+// vista «foco»: su propia entrada en la barra lateral, con todas las lecciones para elegir.
+export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) => void; vista?: 'hoy' | 'foco' }) {
   const [hoy, setHoy] = useState<Hoy | null>(null)
   const indiceHoy = usarIndice(hoy?.plan_id)
   const [leccion, setLeccion] = useState<Leccion | null>(null)
@@ -751,8 +754,12 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
 
   useEffect(() => {
     // #/tutor/foco entra en la lección de hoy; #/tutor/foco/12, en la de esos apuntes.
-    const [, foco, mid] = window.location.hash.replace(/^#\/?/, '').split('/')
-    if (foco === 'foco') window.history.replaceState(null, '', '#/tutor')
+    // En la vista foco, #/foco abre la lista y #/foco/12 esos apuntes.
+    // #/foco abre la lista; #/foco/12, esos apuntes directamente.
+    const partes = window.location.hash.replace(/^#\/?/, '').split('/')
+    const foco = vista === 'foco' ? (partes[1] ? 'foco' : null) : partes[1]
+    const mid = vista === 'foco' ? partes[1] : partes[2]
+    if (foco === 'foco') window.history.replaceState(null, '', vista === 'foco' ? '#/foco' : '#/tutor')
     pedir<Hoy>('/api/hoy').then((h) => {
       setHoy(h)
       if (h.material_id) setAvance(leerAvance(h.material_id))
@@ -783,12 +790,12 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
           pedir<Record<string, { apuntes_id?: number }>>(`/api/planes/${p.plan_id}/materiales`),
         ])
         for (const l of v.lecciones) {
-          const id = estados[l.clave]?.apuntes_id
-          if (id) lista.push({ clave: l.clave, titulo: l.titulo, material_id: id })
+          lista.push({ clave: l.clave, titulo: l.titulo, material_id: estados[l.clave]?.apuntes_id ?? null, plan_id: p.plan_id, tema_id: p.tema_id })
         }
       }
       setOtras(lista)
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abrir])
 
   const empezar = (mid: number, desdeCero = false) => {
@@ -816,6 +823,8 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
       />
     )
 
+  if (vista === 'foco') return <ElegirFoco hoy={hoy} otras={otras} empezar={empezar} />
+
   if (hoy.estado === 'sin_plan')
     return (
       <div className="panel">
@@ -828,7 +837,6 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
       </div>
     )
 
-  const otrasSinHoy = otras.filter((o) => o.material_id !== hoy.material_id)
   const seguir = avance && hoy.material_id ? `Seguir por la idea ${avance.i + 1}` : null
   // Si el examen cubre lecciones que aún tienes pendientes hoy, va después de ellas.
   const examenDespues = hoy.examen
@@ -939,22 +947,89 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
         />
       )}
       {hoy.examen && examenDespues.length > 0 && <TarjetaExamen examen={hoy.examen} despues={examenDespues} />}
-      {otrasSinHoy.length > 0 && (
-        <section className="tutor-otras">
-          <h2>O estudia otra lección en modo foco</h2>
-          <ul>
-            {otrasSinHoy.map((o) => (
-              <li key={o.material_id}>
-                <button className="tutor-otra" onClick={() => empezar(o.material_id)}>
-                  <span className="bloques-clave">{o.clave}</span>
-                  <span>{o.titulo}</span>
-                  <small>{leerAvance(o.material_id) ? 'a medias' : 'Empezar →'}</small>
-                </button>
-              </li>
-            ))}
-          </ul>
+      {otras.some((o) => o.material_id && o.material_id !== hoy.material_id) && (
+        <p className="tutor-otras-enlace">
+          <button className="boton" onClick={() => irA('foco')}>
+            Estudiar otra lección en modo foco →
+          </button>
+        </p>
+      )}
+    </div>
+  )
+}
+
+// El modo foco con su propia entrada: la de hoy arriba y, debajo, todas las lecciones por temas.
+function ElegirFoco({ hoy, otras, empezar }: { hoy: Hoy; otras: Opcion[]; empezar: (mid: number, desdeCero?: boolean) => void }) {
+  const planId = otras[0]?.plan_id ?? hoy.plan_id
+  const ix = usarIndice(planId)
+  const deHoy = hoy.material_id && hoy.estado !== 'sin_preparar' && hoy.estado !== 'solo_repaso' ? otras.find((o) => o.material_id === hoy.material_id) : undefined
+  const avanceHoy = deHoy?.material_id ? leerAvance(deHoy.material_id) : null
+  // Agrupadas por los temas del índice sencillo; si aún no hay índice, en una sola lista.
+  const grupos: { nombre: string; lecciones: Opcion[] }[] = ix
+    ? ix.temas.map((t) => ({ nombre: t.nombre, lecciones: otras.filter((o) => o.plan_id === planId && t.lecciones.includes(o.clave)) }))
+    : [{ nombre: '', lecciones: otras }]
+  const sueltas = ix ? otras.filter((o) => !grupos.some((g) => g.lecciones.includes(o))) : []
+  if (sueltas.length) grupos.push({ nombre: 'Otras', lecciones: sueltas })
+  if (!otras.length)
+    return (
+      <div className="panel">
+        <Vacio
+          etiqueta="Modo foco"
+          titulo="Aún no hay lecciones"
+          texto="Crea tu plan y prepara una lección: aquí la estudiarás a pantalla completa, idea a idea, con una comprobación al final de cada una."
+          acciones={[{ texto: 'Crear mi plan', principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
+        />
+      </div>
+    )
+  return (
+    <div className="tutor-inicio foco-elegir">
+      <header>
+        <h1>Modo foco</h1>
+        <p className="nota">Pantalla completa, una idea cada vez y una comprobación al final de cada una. Esc para salir; guarda dónde lo dejas.</p>
+      </header>
+      {deHoy?.material_id && (
+        <section className="tutor-hoy">
+          <span className="vacio-etq">La de hoy</span>
+          <h1>
+            <span className="bloques-clave">{deHoy.clave}</span> {tituloSencillo(ix, deHoy.clave, deHoy.titulo)}
+          </h1>
+          <div className="vacio-acciones">
+            <button className="boton boton-principal" onClick={() => empezar(deHoy.material_id!)}>
+              {avanceHoy ? `Seguir por la idea ${avanceHoy.i + 1}` : 'Empezar'}
+            </button>
+            {avanceHoy && (
+              <button className="boton" onClick={() => empezar(deHoy.material_id!, true)}>
+                Empezar de cero
+              </button>
+            )}
+          </div>
         </section>
       )}
+      {grupos
+        .filter((g) => g.lecciones.length)
+        .map((g) => (
+          <section key={g.nombre} className="tutor-otras">
+            {g.nombre && <h2>{g.nombre}</h2>}
+            <ul>
+              {g.lecciones.map((o) => {
+                const av = o.material_id ? leerAvance(o.material_id) : null
+                return (
+                  <li key={`${o.plan_id}-${o.clave}`}>
+                    <button
+                      className={`tutor-otra ${o.material_id ? '' : 'sin-preparar'}`}
+                      onClick={() => (o.material_id ? empezar(o.material_id) : irARuta(`#/fichas/${o.tema_id}/${o.clave}`))}
+                      title={o.material_id ? o.titulo : 'Aún sin preparar: te llevo a prepararla'}
+                    >
+                      <span className="bloques-clave">{o.clave}</span>
+                      <span>{tituloSencillo(ix, o.clave, o.titulo)}</span>
+                      <small>{!o.material_id ? 'Prepararla →' : av ? `a medias · idea ${av.i + 1}` : 'Empezar →'}</small>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ))}
     </div>
   )
 }
