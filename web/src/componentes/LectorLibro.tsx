@@ -1,4 +1,4 @@
-import { Children, isValidElement, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Children, isValidElement, useEffect, useMemo, useState, type ReactNode, createContext, useContext } from 'react'
 import Markdown, { type Components } from 'react-markdown'
 import katex from 'katex'
 import rehypeKatex from 'rehype-katex'
@@ -81,6 +81,73 @@ export const ancla = (t: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 
+// Rehacer un bloque desde la propia lectura. El panel dice qué títulos son bloques y qué hacer al pedirlo.
+export interface Rehacer {
+  bloques: Record<string, string> // título -> clave
+  alRehacer: (clave: string, como: string) => Promise<void>
+}
+const RehacerContexto = createContext<Rehacer | null>(null)
+
+const MANERAS: [string, string][] = [
+  ['sencillo', 'Más sencillo'],
+  ['ejemplos', 'Con más ejemplos'],
+  ['codigo', 'Con código'],
+  ['fondo', 'Más a fondo'],
+  ['corto', 'Más corto'],
+]
+
+function TituloBloque({ texto: t, children }: { texto: string; children: ReactNode }) {
+  const r = useContext(RehacerContexto)
+  const [abierto, setAbierto] = useState(false)
+  const [haciendo, setHaciendo] = useState(false)
+  const [propio, setPropio] = useState('')
+  const limpio = t.replace(/\s*\{[^}]*\}\s*$/, '').trim()
+  const clave = r?.bloques[limpio]
+  const pedir = async (como: string) => {
+    if (!r || !clave) return
+    setAbierto(false)
+    setHaciendo(true)
+    try {
+      await r.alRehacer(clave, como)
+    } finally {
+      setHaciendo(false)
+    }
+  }
+  return (
+    <h2 id={ancla(t)} className={clave ? 'con-rehacer' : undefined}>
+      {children}
+      {clave && (
+        <span className="rehacer">
+          {haciendo ? (
+            <small className="rehacer-haciendo">Rehaciendo este apartado…</small>
+          ) : (
+            <button type="button" className="rehacer-boton" aria-expanded={abierto} onClick={() => setAbierto(!abierto)} title="Rehacer solo este apartado, a tu manera">
+              Rehacer ▾
+            </button>
+          )}
+          {abierto && (
+            <span className="rehacer-menu" role="menu">
+              {MANERAS.map(([id, nombre]) => (
+                <button key={id} type="button" role="menuitem" onClick={() => pedir(id)}>
+                  {nombre}
+                </button>
+              ))}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (propio.trim().length > 1) pedir(propio.trim())
+                }}
+              >
+                <input value={propio} onChange={(e) => setPropio(e.target.value)} placeholder="O dime cómo…" aria-label="Cómo rehacerlo" />
+              </form>
+            </span>
+          )}
+        </span>
+      )}
+    </h2>
+  )
+}
+
 const componentes: Components = {
   // Los diagramas ```svg de los apuntes, como imagen (no ejecuta nada).
   pre: ({ children }) => {
@@ -89,7 +156,7 @@ const componentes: Components = {
       return <Diagrama svg={String(hijo.props.children ?? '')} completo />
     return <pre>{children}</pre>
   },
-  h2: ({ children }) => <h2 id={ancla(texto(children))}>{children}</h2>,
+  h2: ({ children }) => <TituloBloque texto={texto(children)}>{children}</TituloBloque>,
   h6: ({ children }) => <span className="lb-etq">{children}</span>,
   a: ({ children, href }) => (
     <a href={href} target="_blank" rel="noreferrer">
@@ -145,9 +212,10 @@ interface Props {
   markdown: string
   // Contenedor que se desplaza (para saber qué sección estás leyendo).
   raiz?: Element | null
+  rehacer?: Rehacer
 }
 
-export default function LectorLibro({ markdown, raiz }: Props) {
+export default function LectorLibro({ markdown, raiz, rehacer }: Props) {
   const cuerpo = useMemo(() => markdown.replace(/^---\n[\s\S]*?\n---\n/, ''), [markdown])
   const nodos = useMemo(() => arbol(cuerpo), [cuerpo])
   const indice = useMemo(() => secciones(cuerpo), [cuerpo])
@@ -186,7 +254,9 @@ export default function LectorLibro({ markdown, raiz }: Props) {
         </ol>
       </nav>
       <article className="lector-texto">
-        <Pintar nodo={nodos} />
+        <RehacerContexto.Provider value={rehacer ?? null}>
+          <Pintar nodo={nodos} />
+        </RehacerContexto.Provider>
       </article>
     </div>
   )

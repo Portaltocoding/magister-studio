@@ -7,6 +7,7 @@ Reglas:
 - De uno a cinco conceptos por lección. Cada concepto tiene un `id` en minúsculas con guiones (por ejemplo `clave-primaria`), único en todo el plan: son lo que el tutor medirá después, así que tienen que ser concretos y evaluables.
 - Cada objetivo empieza por un verbo observable (explicar, escribir, calcular, comparar, diseñar), nunca por «entender» o «conocer».
 - Ajusta la profundidad al nivel y al objetivo del alumno.
+- Si su nivel es «nada», la primera lección es de fundamentos: lo que el resto da por sabido (vocabulario básico y las ideas previas imprescindibles), explicado desde cero. Si es «básico», incluye esos previos dentro de la primera lección que los necesite.
 - Si hay fuentes del alumno en <fuentes>, apóyate en ellas para el orden y el contenido.
 
 <perfil>

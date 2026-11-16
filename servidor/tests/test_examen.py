@@ -202,3 +202,9 @@ def test_el_nivel_llega_al_material():
     from magister.material.preferencias import texto
 
     assert "cero" in texto({"nivel": "nada"}) and "avanzado" in texto({"nivel": "avanzado"})
+
+
+@pytest.mark.anyio
+async def test_rehacer_bloque_rechaza_lo_que_no_existe(cliente):
+    r = await cliente.post("/api/materiales/999999/bloques/b1/rehacer", json={"como": "sencillo"})
+    assert r.status_code == 400

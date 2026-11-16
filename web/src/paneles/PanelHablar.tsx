@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { crearConversacion, enviar } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Mascota from '../Mascota.tsx'
+import { Locutor } from '../componentes/voz.ts'
 
 // Hablar: estudias de palabra. Dices tu pregunta, el tutor contesta para el oído y te lo lee; luego vuelve a escucharte.
 // La respuesta se lee con una voz instalada en tu equipo. El dictado usa el reconocimiento de voz del navegador.
@@ -58,6 +59,7 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
   const rec = useRef<Reconocimiento | null>(null)
   const voz = useRef<SpeechSynthesisVoice | null>(null)
   const control = useRef<AbortController | null>(null)
+  const locutor = useRef(new Locutor())
 
   useEffect(() => {
     const cargar = () => (voz.current = vozLocal())
@@ -107,24 +109,6 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const leer = (texto: string) =>
-    new Promise<void>((fin) => {
-      const frases = paraLeer(texto).split(/(?<=[.!?…])\s+/).filter(Boolean)
-      let k = 0
-      const siguiente = () => {
-        if (k >= frases.length) return fin()
-        const u = new SpeechSynthesisUtterance(frases[k++])
-        u.lang = 'es-ES'
-        if (voz.current) u.voice = voz.current
-        u.rate = velocidad
-        u.onend = siguiente
-        u.onerror = () => fin()
-        window.speechSynthesis.speak(u)
-      }
-      window.speechSynthesis.cancel()
-      siguiente()
-    })
-
   const mandar = async (texto: string) => {
     setParcial('')
     setTurnos((t) => [...t, { rol: 'usuario', texto }, { rol: 'tutor', texto: '' }])
@@ -137,14 +121,20 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
       }
       control.current = new AbortController()
       let respuesta = ''
+      // Empieza a hablar con la primera frase, sin esperar a la respuesta entera.
+      const l = locutor.current
+      l.nueva()
+      l.velocidad = velocidad
+      l.alFrase = () => setEstado('hablando')
       for await (const ev of enviar(cid.current, texto, control.current.signal, true, true)) {
         if (ev.tipo === 'delta') {
           respuesta += ev.t
+          l.empujar(respuesta)
           setTurnos((t) => [...t.slice(0, -1), { rol: 'tutor', texto: respuesta }])
         } else if (ev.tipo === 'error') throw new Error(ev.detalle)
       }
-      setEstado('hablando')
-      await leer(respuesta)
+      l.empujar(respuesta, true)
+      await l.terminado()
       setEstado('quieto')
       if (seguido && Reconocedor) escuchar()
     } catch (e) {
@@ -156,7 +146,7 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
   const parar = () => {
     rec.current?.abort()
     control.current?.abort()
-    window.speechSynthesis.cancel()
+    locutor.current.parar()
     setEstado('quieto')
   }
 

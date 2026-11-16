@@ -51,6 +51,11 @@ const ICONOS: Record<string, ReactElement> = {
       <path d="M7 8l1.5 1.5L11.5 6.5M7 13h6" />
     </svg>
   ),
+  llamada: (
+    <svg viewBox="0 0 20 20" aria-hidden>
+      <path d="M6.2 3.5l2 3.2-1.4 1.6a9 9 0 0 0 4.9 4.9l1.6-1.4 3.2 2-1 2.4c-6.5.4-11.8-4.9-11.4-11.4z" />
+    </svg>
+  ),
   progreso: (
     <svg viewBox="0 0 20 20" aria-hidden>
       <path d="M3.5 16.5h13" />
@@ -62,6 +67,7 @@ const ICONOS: Record<string, ReactElement> = {
 const ATAJOS: { id: IdModo; nombre: string }[] = [
   { id: 'libre', nombre: 'Estudio libre' },
   { id: 'fichas', nombre: 'Lecciones' },
+  { id: 'llamada', nombre: 'Llamada' },
   { id: 'repaso', nombre: 'Repaso' },
   { id: 'examen', nombre: 'Examen' },
   { id: 'progreso', nombre: 'Progreso' },

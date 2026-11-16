@@ -482,7 +482,28 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               ))}
             </nav>
             {pestana === 'apuntes' && textos.apuntes && (
-              <LectorLibro markdown={textos.apuntes} raiz={raiz.current?.closest('.central')} />
+              <LectorLibro
+                markdown={textos.apuntes}
+                raiz={raiz.current?.closest('.central')}
+                rehacer={
+                  datos?.materiales.apuntes
+                    ? {
+                        bloques: Object.fromEntries(Object.entries(contrato).map(([k, t]) => [t, k])),
+                        alRehacer: async (claveBloque, como) => {
+                          try {
+                            const r = await pedir<{ texto: string }>(
+                              `/api/materiales/${datos.materiales.apuntes!.id}/bloques/${claveBloque}/rehacer`,
+                              enviarJson({ como }),
+                            )
+                            setTextos((x) => ({ ...x, apuntes: r.texto }))
+                          } catch (e) {
+                            alert(`No se pudo rehacer: ${(e as Error).message}`)
+                          }
+                        },
+                      }
+                    : undefined
+                }
+              />
             )}
             {pestana === 'fichas' && <Tarjetas key={clave} fichas={datos.preguntas} bloques={contrato} />}
             {pestana === 'diapositivas' && diapos?.ficheros.includes('html') && (

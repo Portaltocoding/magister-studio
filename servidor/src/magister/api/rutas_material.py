@@ -115,6 +115,28 @@ async def borrar_un_material(mid: int, s: AsyncSession = Depends(sesion_por_peti
     await s.commit()
 
 
+class Rehacer(BaseModel):
+    # «sencillo», «ejemplos», «codigo», «fondo», «corto» o lo que pidas con tus palabras.
+    como: str = Field(min_length=2, max_length=300)
+
+
+@rutas.post("/materiales/{mid}/bloques/{clave}/rehacer")
+async def rehacer(mid: int, clave: str, cuerpo: Rehacer) -> dict:
+    """Rehace un solo bloque de los apuntes a tu manera. Tarda lo que un bloque (unos 30 s); el PDF se repinta después."""
+    from magister.flujo.comun import preferencias_tutor
+    from magister.material.rehacer import NoSePuede, rehacer_bloque
+
+    p = await preferencias_tutor()
+    extra = {"instrucciones": p.get("instrucciones") or []}
+    if p.get("nivel") in ("cero", "experto"):
+        extra["nivel_tutor"] = {"cero": "nada", "experto": "avanzado"}[p["nivel"]]
+    try:
+        texto = await rehacer_bloque(mid, clave, cuerpo.como, extra)
+    except NoSePuede as e:
+        raise HTTPException(400, str(e)) from e
+    return {"texto": texto}
+
+
 @rutas.get("/planes/{plan_id}/materiales")
 async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     """Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha."""
