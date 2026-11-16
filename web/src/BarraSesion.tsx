@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { pedir } from './api.ts'
 import Afinar from './componentes/Afinar.tsx'
+import Tomate from './componentes/Tomate.tsx'
 
 type Estado = 'comprobando' | 'conectado' | 'sin conexión'
 
@@ -51,7 +52,11 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
           </button>
         </span>
       ))}
+      <button type="button" className="boton-buscar" onClick={() => window.dispatchEvent(new Event('magister-paleta'))} title="Ir a o hacer (Ctrl+K)">
+        Buscar <kbd>Ctrl K</kbd>
+      </button>
       <span className={estado === 'conectado' ? 'estado estado-si' : 'estado estado-no'}>{estado}</span>
+      <Tomate />
       <Afinar />
     </header>
   )

@@ -493,12 +493,19 @@ function TarjetaExamen({ examen }: { examen: HitoExamen }) {
   )
 }
 
+const saludo = () => {
+  const h = new Date().getHours()
+  return h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'
+}
+
 // Modo Tutor: la tarjeta «Hoy», otras lecciones para estudiar en foco y, al empezar, el modo foco.
 export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
   const [hoy, setHoy] = useState<Hoy | null>(null)
   const [leccion, setLeccion] = useState<Leccion | null>(null)
   const [otras, setOtras] = useState<Opcion[]>([])
   const [avance, setAvance] = useState<Avance | null>(null)
+  const [minutosRepaso, setMinutosRepaso] = useState<number | null>(null)
+  const [semana, setSemana] = useState<{ hechas: number; total: number; sesiones: number; hechasN: number } | null>(null)
 
   const abrir = useCallback(async (mid: number) => {
     setAvance(leerAvance(mid))
@@ -517,7 +524,21 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
         if (elegido) abrir(elegido)
       }
     })
+    pedir<{ minutos: number }[]>('/api/practica/cola').then((c) => setMinutosRepaso(Math.round(c.reduce((a, x) => a + x.minutos, 0))))
     listarPlanes().then(async (ps) => {
+      // Esta semana: horas y sesiones hechas frente a las previstas (lunes a domingo).
+      if (ps[0]) {
+        const v = await verPlan(ps[0].tema_id)
+        const hoyIso = new Date().toISOString().slice(0, 10)
+        const s = v.semanas.find((w) => w.dias.some((d) => d.fecha === hoyIso)) ?? v.semanas[0]
+        const ses = s ? s.dias.flatMap((d) => d.sesiones) : []
+        setSemana({
+          total: ses.reduce((a, x) => a + x.horas, 0),
+          hechas: ses.filter((x) => x.estado === 'hecha').reduce((a, x) => a + x.horas, 0),
+          sesiones: ses.length,
+          hechasN: ses.filter((x) => x.estado === 'hecha').length,
+        })
+      }
       const lista: Opcion[] = []
       for (const p of ps) {
         const [v, estados] = await Promise.all([
@@ -575,7 +596,40 @@ export default function PanelTutor({ irA }: { irA: (m: IdModo) => void }) {
 
   return (
     <div className="tutor-inicio">
-      <Mascota />
+      <header className="hoy-cabecera">
+        <Mascota mini />
+        <div>
+          <p className="hoy-saludo">{saludo()}</p>
+          <h1>Hoy</h1>
+          <p className="nota hoy-fecha">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        </div>
+      </header>
+      <div className="hoy-resumen">
+        <button className="hoy-cifra" onClick={() => irA('repaso')} disabled={!hoy.repasos}>
+          <strong>{hoy.repasos}</strong>
+          <span>{hoy.repasos === 1 ? 'repaso' : 'repasos'}</span>
+          <small>{hoy.repasos ? `unos ${minutosRepaso ?? '·'} min · Repasar →` : 'nada pendiente'}</small>
+        </button>
+        {semana && (
+          <div className="hoy-cifra">
+            <strong>
+              {String(Math.round(semana.hechas * 10) / 10).replace('.', ',')} <small>de {String(Math.round(semana.total * 10) / 10).replace('.', ',')} h</small>
+            </strong>
+            <span>esta semana</span>
+            <span className="barra">
+              <span style={{ width: `${semana.total ? (semana.hechas / semana.total) * 100 : 0}%` }} />
+            </span>
+            <small>
+              {semana.hechasN} de {semana.sesiones} sesiones
+            </small>
+          </div>
+        )}
+        <button className="hoy-cifra" onClick={() => irA('examen')}>
+          <strong>{hoy.examen ? '1' : '0'}</strong>
+          <span>{hoy.examen ? 'examen pendiente' : 'exámenes pendientes'}</span>
+          <small>{hoy.examen ? `${hoy.examen.titulo} →` : 'Hacer uno cuando quieras →'}</small>
+        </button>
+      </div>
       {hoy.examen && <TarjetaExamen examen={hoy.examen} />}
       {hoy.titulo && hoy.estado !== 'solo_repaso' ? (
         <section className="tutor-hoy">

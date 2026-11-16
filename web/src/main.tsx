@@ -8,6 +8,7 @@ import './chat.css'
 import './movil.css'
 import './viz.css'
 import './video.css'
+import './itunes.css'
 import Marco from './Marco.tsx'
 
 createRoot(document.getElementById('root')!).render(

@@ -41,9 +41,9 @@ export const GRUPOS: Grupo[] = [
     modos: [{ id: 'libre', nombre: 'Estudio libre', encendido: true, ayuda: 'Pregunta lo que quieras al tutor' }],
   },
   {
-    nombre: 'Hoy',
+    nombre: 'Cada día',
     modos: [
-      { id: 'tutor', nombre: 'Tutor', encendido: true, ayuda: 'La lección que toca, en modo foco' },
+      { id: 'tutor', nombre: 'Hoy', encendido: true, ayuda: 'Lo que toca hoy: la lección, los repasos y el examen' },
       { id: 'repaso', nombre: 'Repaso', encendido: true, ayuda: 'Lo que toca recordar hoy' },
       { id: 'examen', nombre: 'Examen', encendido: true, ayuda: 'Ponte a prueba y saca nota' },
     ],

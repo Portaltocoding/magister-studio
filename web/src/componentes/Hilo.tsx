@@ -196,16 +196,6 @@ export default function Hilo({
             )}
             {b.estado === 'interrumpido' && <small className="nota">Interrumpido</small>}
             {b.acciones && b.acciones.length > 0 && b.estado === 'completo' && <Acciones acciones={b.acciones} />}
-            {b.sinFuentes && (
-              <small className="sin-fuentes" title="No había nada en tus fuentes sobre esto: es una respuesta general del tutor.">
-                Sin tus fuentes · respuesta general
-              </small>
-            )}
-            {b.tiempos && (
-              <small className="nota">
-                primer trozo {b.tiempos.primero ?? '·'} ms · total {b.tiempos.total} ms
-              </small>
-            )}
             {b.rol === 'tutor' && b.traza && b.estado === 'completo' && (
               <Valorar traza={b.traza} inicial={b.voto ?? null} alPedirOtra={escribiendo ? undefined : alEnviar} />
             )}

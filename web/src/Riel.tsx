@@ -10,6 +10,7 @@ interface Hoy {
   leccion_clave?: string
   titulo?: string
   fecha?: string
+  inicio?: string | null
   repasos: number
   examen?: { titulo: string } | null
 }

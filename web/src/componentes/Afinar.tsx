@@ -27,11 +27,20 @@ const EXTRAS: { campo: 'diagramas' | 'tests' | 'opciones'; texto: string }[] = [
   { campo: 'opciones', texto: 'Preguntas para seguir' },
 ]
 
+export const avisosActivos = () => {
+  try {
+    return localStorage.getItem('magister-avisos') !== 'no'
+  } catch {
+    return true
+  }
+}
+
 export default function Afinar() {
   const [abierto, setAbierto] = useState(false)
   const [p, setP] = useState<Preferencias | null>(null)
   const [guardado, setGuardado] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
+  const [avisos, setAvisos] = useState(() => 'Notification' in window && Notification.permission === 'granted' && avisosActivos())
 
   useEffect(() => {
     if (abierto && !p) pedir<Preferencias>('/api/preferencias').then(setP)
@@ -109,6 +118,24 @@ export default function Afinar() {
                   </label>
                 ))}
               </div>
+              <label className="afinar-avisos">
+                <input
+                  type="checkbox"
+                  checked={avisos}
+                  onChange={async (e) => {
+                    if (!('Notification' in window)) return
+                    if (e.target.checked && Notification.permission !== 'granted') await Notification.requestPermission()
+                    const si = e.target.checked && Notification.permission === 'granted'
+                    try {
+                      localStorage.setItem('magister-avisos', si ? 'si' : 'no')
+                    } catch {
+                      /* sin almacenamiento */
+                    }
+                    setAvisos(si)
+                  }}
+                />
+                Avisos del navegador: tu sesión de hoy y el pomodoro (el tomate)
+              </label>
               <div className="afinar-pie">
                 <Colores clase="boton-mini" />
                 <button type="button" className="boton-mini" onClick={() => (window.location.hash = '#/animaciones')}>

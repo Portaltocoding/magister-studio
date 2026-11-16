@@ -40,7 +40,7 @@ async def examen_pendiente(hoy_: date) -> dict | None:
 @rutas.get("/hoy")
 async def hoy(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     fila = (await s.execute(text(
-        "select s.id, s.plan_id, s.leccion_clave, l.titulo, s.fecha, s.horas, t.nombre, t.id from sesiones s "
+        "select s.id, s.plan_id, s.leccion_clave, l.titulo, s.fecha, s.horas, t.nombre, t.id, s.inicio from sesiones s "
         "join planes p on p.id = s.plan_id join lecciones l on l.plan_id = s.plan_id and l.clave = s.leccion_clave "
         "join temas t on t.id = p.tema_id where p.estado = 'aceptado' and s.estado = 'pendiente' "
         "order by (s.fecha < :hoy) desc, s.fecha, s.inicio nulls last, s.id limit 1"), {"hoy": date.today()})).first()
@@ -49,7 +49,7 @@ async def hoy(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     examen = await examen_pendiente(date.today())
     if fila is None:
         return {"estado": "sin_plan" if not repasos and not examen else "solo_repaso", "repasos": len(repasos), "examen": examen}
-    sid, plan_id, clave, titulo, fecha, horas, tema, tema_id = fila
+    sid, plan_id, clave, titulo, fecha, horas, tema, tema_id, inicio = fila
     async with nueva_sesion() as s2:
         material = await s2.scalar(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave,
                                                           Material.tipo == "apuntes").order_by(Material.id.desc()).limit(1))
@@ -57,7 +57,7 @@ async def hoy(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     if material is None or material.estado == "generando":
         estado = "sin_preparar"
     return {"estado": estado, "sesion_id": sid, "plan_id": plan_id, "tema_id": tema_id, "tema": tema, "leccion_clave": clave,
-            "titulo": titulo, "fecha": fecha.isoformat(), "horas": horas, "material_id": material.id if material else None,
+            "titulo": titulo, "fecha": fecha.isoformat(), "inicio": inicio.strftime("%H:%M") if inicio else None, "horas": horas, "material_id": material.id if material else None,
             "repasos": len(repasos), "examen": examen,
             "razon": ("Toca hoy según tu calendario." if fecha == date.today() else
                       "Vas con retraso: es la primera sesión pendiente." if fecha < date.today() else

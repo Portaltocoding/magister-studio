@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { listarConversaciones, type Conversacion } from './api.ts'
 import BarraLateral from './BarraLateral.tsx'
 import BarraSesion from './BarraSesion.tsx'
-import Riel, { usarHoy } from './Riel.tsx'
+import Riel, { pendienteDeHoy, usarHoy } from './Riel.tsx'
+import Paleta from './componentes/Paleta.tsx'
+import { avisosActivos } from './componentes/Afinar.tsx'
+import { avisar } from './componentes/pomodoro.ts'
 import { acentoDe, usarColores, variables } from './componentes/colores.ts'
 import Central from './Central.tsx'
 import { MODOS, type IdModo } from './modos.ts'
@@ -35,6 +38,29 @@ export default function Marco() {
   // se vuelve a plegar al elegir algo, al pulsar fuera o con Esc. Ctrl+B la abre y la cierra.
   const [menu, setMenu] = useState(false)
   const hoy = usarHoy()
+  useEffect(() => {
+    if (!hoy || !('Notification' in window) || Notification.permission !== 'granted' || !avisosActivos()) return
+    const fecha = new Date().toISOString().slice(0, 10)
+    const clave = `magister-avisado-${fecha}`
+    try {
+      if (localStorage.getItem(clave)) return
+    } catch {
+      return
+    }
+    const p = pendienteDeHoy(hoy)
+    if (!p.n) return
+    const [h, m] = (hoy.inicio ?? '00:00').split(':').map(Number)
+    const espera = Math.max(0, new Date().setHours(h, m, 0, 0) - Date.now())
+    const t = window.setTimeout(() => {
+      avisar('Magister · Hoy', p.texto.replace(/^Hoy: /, ''))
+      try {
+        localStorage.setItem(clave, 'si')
+      } catch {
+        /* sin almacenamiento */
+      }
+    }, espera)
+    return () => window.clearTimeout(t)
+  }, [hoy])
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
@@ -97,6 +123,7 @@ export default function Marco() {
         alCambiar={recargar}
       />
       <BarraSesion alMenu={() => setMenu(!menu)} />
+      <Paleta conversaciones={conversaciones} alPlegar={() => setMenu((x) => !x)} />
       <main className="central">
         <Central
           modo={modo}
