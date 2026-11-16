@@ -562,3 +562,41 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
   .companera-bocadillo { right: 0; top: 68px; }
 }
 @media (prefers-reduced-motion: reduce) { .companera-boton.salta, .companera-globo { animation: none; } }
+
+/* ===== La página del foco: ancho a tu gusto y la mascota en el margen ===== */
+/* El carril de la derecha es para la mascota y sus globos: nunca tapan la página. */
+.foco-lectura {
+  --carril: 380px;
+  max-width: none; box-sizing: border-box;
+  width: min(100%, calc(var(--ancho-papel, 780px) + var(--carril)));
+  padding-right: var(--carril);
+}
+.foco-lectura .foco-papel-envoltura { width: 100%; }
+.foco-lectura .companera { left: calc(100% + 14px); right: auto; }
+.foco-lectura .companera-globo {
+  left: 74px; right: auto; max-width: calc(var(--carril) - 96px); border-radius: 4px 14px 14px 14px;
+}
+.foco-lectura .companera-bocadillo { left: 74px; right: auto; width: calc(var(--carril) - 96px); border-radius: 4px 16px 16px 16px; }
+@keyframes aparecer-globo-d { from { opacity: 0; transform: translateX(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+.foco-lectura .companera-globo { animation-name: aparecer-globo-d; }
+/* El asa del borde derecho */
+.foco-asa { position: absolute; top: 0; bottom: 0; right: -7px; width: 14px; cursor: ew-resize; touch-action: none; z-index: 4; }
+.foco-asa::after {
+  content: ""; position: absolute; top: 50%; left: 5px; width: 4px; height: 56px; margin-top: -28px; border-radius: 4px;
+  background: currentColor; opacity: 0; transition: opacity 0.2s;
+}
+.foco-papel-envoltura:hover .foco-asa::after { opacity: 0.25; }
+.foco-asa:hover::after, .foco-asa:focus-visible::after, body.redimensionando .foco-asa::after { opacity: 0.6; }
+body.redimensionando { cursor: ew-resize; user-select: none; }
+.foco-ancho { display: flex; flex-direction: column; gap: 4px; }
+.foco-ancho-opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.foco-ancho-opciones .foco-boton { width: 100%; text-align: center; font-size: 0.82rem; }
+.foco-ancho small { opacity: 0.6; font-size: 0.75rem; }
+/* Pantallas estrechas: no hay margen; la mascota va dentro, en la esquina, y los globos debajo de ella. */
+@media (max-width: 1000px) {
+  .foco-lectura { --carril: 0px; padding-right: 0; }
+  .foco-lectura .companera { left: auto; right: 8px; }
+  .foco-lectura .companera-globo, .foco-lectura .companera-bocadillo { left: auto; right: 0; top: 68px; width: min(300px, 80vw); max-width: none; border-radius: 14px; }
+  .foco-asa { display: none; }
+  .foco-lectura .foco-papel.lector-texto { padding-right: 78px; }
+}

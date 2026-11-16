@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as EventoPuntero } from 'react'
 import { tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import Volcado from '../componentes/Volcado.tsx'
 import Companera from '../componentes/Companera.tsx'
@@ -107,6 +107,70 @@ function guardarRitmo(r: Ritmo) {
   }
 }
 const DESCANSO = 5 * 60
+
+// El ancho de la página del foco: lo eliges en Ajustes o arrastrando su borde derecho.
+const ANCHOS: [number, string][] = [
+  [640, 'Estrecha'],
+  [780, 'Normal'],
+  [1000, 'Ancha'],
+  [4000, 'Toda la pantalla'],
+]
+const ANCHO_MIN = 480
+function leerAncho(): number {
+  try {
+    const n = Number(localStorage.getItem('magister-ancho-papel'))
+    return n >= ANCHO_MIN ? n : 780
+  } catch {
+    return 780
+  }
+}
+function guardarAncho(n: number) {
+  try {
+    localStorage.setItem('magister-ancho-papel', String(Math.round(n)))
+  } catch {
+    /* sin almacenamiento */
+  }
+}
+
+// El asa del borde derecho de la página: arrastrar para ensanchar o estrechar; doble clic, vuelve a la normal.
+function AsaAncho({ ancho, alCambiar, papel }: { ancho: number; alCambiar: (n: number) => void; papel: HTMLElement | null }) {
+  const empezar = (e: EventoPuntero<HTMLDivElement>) => {
+    e.preventDefault()
+    const x0 = e.clientX
+    // Si el ancho guardado es mayor que el sitio que hay, se parte del real.
+    const real = papel?.getBoundingClientRect().width ?? ancho
+    const desde = Math.min(ancho, real)
+    const asa = e.currentTarget
+    asa.setPointerCapture(e.pointerId)
+    document.body.classList.add('redimensionando')
+    // La página va centrada: al mover un borde, crecen los dos; por eso el doble.
+    const mover = (ev: PointerEvent) => alCambiar(Math.max(ANCHO_MIN, desde + (ev.clientX - x0) * 2))
+    const soltar = () => {
+      asa.removeEventListener('pointermove', mover)
+      asa.removeEventListener('pointerup', soltar)
+      document.body.classList.remove('redimensionando')
+    }
+    asa.addEventListener('pointermove', mover)
+    asa.addEventListener('pointerup', soltar)
+  }
+  return (
+    <div
+      className="foco-asa"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Ancho de la página"
+      aria-valuenow={Math.round(ancho)}
+      tabIndex={0}
+      title="Arrastra para cambiar el ancho de la página (doble clic: la normal)"
+      onPointerDown={empezar}
+      onDoubleClick={() => alCambiar(780)}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') alCambiar(Math.max(ANCHO_MIN, ancho - 40))
+        if (e.key === 'ArrowRight') alCambiar(ancho + 40)
+      }}
+    />
+  )
+}
 
 const claveAvance = (mid: number) => `magister-foco-${mid}`
 function leerAvance(mid: number): Avance | null {
@@ -283,6 +347,11 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
   // Cada 25 minutos: reexplicar lo que llevas antes de la pausa.
   const [reexplicando, setReexplicando] = useState(false)
   const [ritmo, setRitmo] = useState<Ritmo>(leerRitmo)
+  const [ancho, setAncho] = useState<number>(leerAncho)
+  const cambiarAncho = (n: number) => {
+    setAncho(n)
+    guardarAncho(n)
+  }
   const [verMapa, setVerMapa] = useState(false)
   const { mapa, cambiar: cambiarMapa, anadir: anadirAlMapa } = usarMapa(mid)
   const [papel, setPapel] = useState<HTMLDivElement | null>(null)
@@ -436,6 +505,17 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
       }
       ajustes={
         <span className="foco-ritmo-ajustes">
+          <span className="foco-ancho">
+            Ancho de la página
+            <span className="foco-ancho-opciones">
+              {ANCHOS.map(([n, t]) => (
+                <button key={n} type="button" className="foco-boton" aria-pressed={Math.abs(ancho - n) < 20} onClick={() => cambiarAncho(n)}>
+                  {t}
+                </button>
+              ))}
+            </span>
+            <small>También puedes arrastrar el borde derecho de la página.</small>
+          </span>
           <label>
             Pausa
             <select value={ritmo.pausa} onChange={(e) => { const r = { ...ritmo, pausa: Number(e.target.value) }; setRitmo(r); guardarRitmo(r) }}>
@@ -605,7 +685,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
           </div>
         </section>
       ) : (
-        <article className="foco-idea">
+        <article className="foco-idea foco-lectura" style={{ '--ancho-papel': `${ancho}px` } as CSSProperties}>
           <span className="foco-etq">
             Idea {i + 1} de {bloques.length}
           </span>
@@ -624,6 +704,7 @@ function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA 
             }}
           >
             <TextoLibro markdown={b.texto} className="foco-papel" />
+            <AsaAncho ancho={ancho} alCambiar={cambiarAncho} papel={papel} />
             {seleccion && (
               <button
                 className="al-mapa"
