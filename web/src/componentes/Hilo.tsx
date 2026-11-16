@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { Diagrama, Opciones, TestRapido } from './Interactivo.tsx'
 import { AgendarTarjeta, PreguntaTarjeta } from './Preguntas.tsx'
+import { ModoTarjeta, RecordarTarjeta } from './Modos.tsx'
 import Revelar from './Revelar.tsx'
 import type { CitaInfo } from '../api.ts'
 import { conMarcas, PanelCita } from '../Cita.tsx'
@@ -76,6 +77,8 @@ function CuerpoTutor({
           if (clase.includes('language-pregunta'))
             return <PreguntaTarjeta texto={texto} completo={completo} alResponder={escribiendo ? undefined : alEnviar} />
           if (clase.includes('language-agendar')) return <AgendarTarjeta texto={texto} completo={completo} />
+          if (clase.includes('language-recordar')) return <RecordarTarjeta texto={texto} completo={completo} />
+          if (clase.includes('language-modo')) return <ModoTarjeta texto={texto} completo={completo} />
           if (clase.includes('language-opciones')) return <Opciones texto={texto} activo={completo && !escribiendo} alElegir={alEnviar} />
         }
         return <pre>{children}</pre>
@@ -137,6 +140,22 @@ export default function Hilo({
   const [cita, setCita] = useState<{ id: number; info?: CitaInfo } | null>(null)
 
   const pegado = useRef(true)
+
+  // Otras partes (el selector de modo) pueden dejarte un texto empezado en el cuadro.
+  useEffect(() => {
+    const al = (e: Event) => {
+      setBorrador((e as CustomEvent<string>).detail)
+      window.setTimeout(() => {
+        const c = caja.current
+        if (c) {
+          c.focus()
+          c.setSelectionRange(c.value.length, c.value.length)
+        }
+      }, 0)
+    }
+    window.addEventListener('magister-escribir', al)
+    return () => window.removeEventListener('magister-escribir', al)
+  }, [])
 
   useEffect(() => {
     const zona = final.current?.closest('.central')

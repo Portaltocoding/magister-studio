@@ -1,19 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { enviarJson, pedir } from '../api.ts'
+import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from './preferencias.ts'
 import Mascota from '../Mascota.tsx'
 import Colores from './Colores.tsx'
 
 // La mascota de la barra de arriba: siempre a la vista; al pulsarla, «Afina a tu tutor».
 // Lo que eliges se guarda en el servidor y el tutor lo tiene en cuenta desde el siguiente mensaje.
 
-interface Preferencias {
-  longitud: 'breve' | 'normal' | 'detallada'
-  nivel: 'cero' | 'normal' | 'experto'
-  estilo: 'directo' | 'analogias' | 'codigo'
-  diagramas: boolean
-  tests: boolean
-  opciones: boolean
-}
+type Preferencias = PreferenciasTutor
 
 const GRUPOS: { campo: 'longitud' | 'nivel' | 'estilo'; titulo: string; opciones: [string, string][] }[] = [
   { campo: 'longitud', titulo: 'Respuestas', opciones: [['breve', 'Breves'], ['normal', 'Normales'], ['detallada', 'Detalladas']] },
@@ -37,14 +30,11 @@ export const avisosActivos = () => {
 
 export default function Afinar() {
   const [abierto, setAbierto] = useState(false)
-  const [p, setP] = useState<Preferencias | null>(null)
+  const p = usarPreferencias()
+  const [nueva, setNueva] = useState('')
   const [guardado, setGuardado] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
   const [avisos, setAvisos] = useState(() => 'Notification' in window && Notification.permission === 'granted' && avisosActivos())
-
-  useEffect(() => {
-    if (abierto && !p) pedir<Preferencias>('/api/preferencias').then(setP)
-  }, [abierto, p])
 
   useEffect(() => {
     if (!abierto) return
@@ -62,9 +52,7 @@ export default function Afinar() {
 
   const cambiar = async (cambio: Partial<Preferencias>) => {
     if (!p) return
-    const nuevo = { ...p, ...cambio }
-    setP(nuevo)
-    await pedir('/api/preferencias', enviarJson(nuevo, 'PUT'))
+    await cambiarPreferencias(cambio)
     setGuardado(true)
     window.setTimeout(() => setGuardado(false), 1500)
   }
@@ -117,6 +105,48 @@ export default function Afinar() {
                     {x.texto}
                   </label>
                 ))}
+              </div>
+              <div className="afinar-grupo">
+                <span>Modo de aprendizaje</span>
+                <select value={p.modo ?? ''} onChange={(e) => cambiar({ modo: e.target.value || null })} aria-label="Modo de aprendizaje">
+                  <option value="">Normal</option>
+                  {todosLosModos(p).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="afinar-grupo">
+                <span>Lo que recuerda de ti</span>
+                {p.instrucciones.length ? (
+                  <ul className="afinar-recuerda">
+                    {p.instrucciones.map((x, i) => (
+                      <li key={i}>
+                        <span>{x}</span>
+                        <button className="borrar" aria-label="Olvidar esto" onClick={() => cambiar({ instrucciones: p.instrucciones.filter((_, k) => k !== i) })}>
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="nota">Nada aún. Díselo en el chat («a partir de ahora...») o escríbelo aquí.</p>
+                )}
+                <form
+                  className="afinar-anadir"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    if (!nueva.trim()) return
+                    cambiar({ instrucciones: [...p.instrucciones, nueva.trim()] })
+                    setNueva('')
+                  }}
+                >
+                  <input value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Por ejemplo: ejemplos de código en Python" aria-label="Nueva instrucción" />
+                  <button className="boton-mini" disabled={!nueva.trim()}>
+                    Añadir
+                  </button>
+                </form>
               </div>
               <label className="afinar-avisos">
                 <input

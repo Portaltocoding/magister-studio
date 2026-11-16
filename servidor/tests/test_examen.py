@@ -169,3 +169,36 @@ async def test_automatizaciones_se_guardan(cliente):
     assert r["reglas"]["preparar_siguiente"]["activa"] is False
     r = await cliente.put("/api/automatizaciones", json={"preparar_siguiente": {"activa": True, "dias_antes": 2}, "solo_de_noche": True})
     assert r.json()["reglas"]["preparar_siguiente"] == {"activa": True, "dias_antes": 2} and r.json()["reglas"]["solo_de_noche"] is True
+
+
+
+@pytest.mark.anyio
+async def test_instrucciones_y_modos_del_tutor(cliente):
+    from magister.flujo.comun import texto_preferencias
+
+    r = await cliente.put("/api/preferencias", json={"instrucciones": ["Pon los ejemplos en Python."],
+                                                     "modos": [{"id": "metro", "nombre": "Metro", "para": "Ratos cortos",
+                                                                "reglas": ["Como mucho 80 palabras."]}],
+                                                     "modo": "metro"})
+    assert r.status_code == 200
+    # Cambiar solo la longitud no borra lo anterior.
+    p = (await cliente.put("/api/preferencias", json={"longitud": "breve"})).json()
+    assert p["instrucciones"] == ["Pon los ejemplos en Python."] and p["modo"] == "metro" and p["modos_de_serie"]
+    texto = texto_preferencias(p)
+    assert "Python" in texto and "«Metro»" in texto and "80 palabras" in texto
+    p = (await cliente.put("/api/preferencias", json={"modo": "socratico"})).json()
+    assert "Socrático" in texto_preferencias(p)
+
+
+def test_modo_no_es_plan():
+    from magister.flujo.intencion import pide_plan
+
+    assert not pide_plan("crea un modo de aprendizaje para repasar con un plan rápido")
+    assert not pide_plan("a partir de ahora hazme el plan de cada respuesta en tres pasos")
+    assert pide_plan("hazme un plan de estudio para 3 semanas")
+
+
+def test_el_nivel_llega_al_material():
+    from magister.material.preferencias import texto
+
+    assert "cero" in texto({"nivel": "nada"}) and "avanzado" in texto({"nivel": "avanzado"})

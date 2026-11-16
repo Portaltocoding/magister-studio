@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -104,6 +104,13 @@ async def servir(pregunta_id: str) -> dict:
 
 
 
+class ModoPropio(BaseModel):
+    id: str = Field(max_length=60)
+    nombre: str = Field(max_length=60)
+    para: str = Field("", max_length=200)
+    reglas: list[str] = Field(default_factory=list, max_length=10)
+
+
 class PreferenciasTutor(BaseModel):
     longitud: Literal["breve", "normal", "detallada"] = "normal"
     nivel: Literal["cero", "normal", "experto"] = "normal"
@@ -111,13 +118,16 @@ class PreferenciasTutor(BaseModel):
     diagramas: bool = True
     tests: bool = True
     opciones: bool = True
+    instrucciones: list[str] = Field(default_factory=list, max_length=30)
+    modos: list[ModoPropio] = Field(default_factory=list, max_length=20)
+    modo: str | None = None
 
 
 @rutas.get("/preferencias")
 async def ver_preferencias() -> dict:
-    from magister.flujo.comun import preferencias_tutor
+    from magister.flujo.comun import MODOS_DE_SERIE, preferencias_tutor
 
-    return await preferencias_tutor()
+    return {**await preferencias_tutor(), "modos_de_serie": MODOS_DE_SERIE}
 
 
 @rutas.put("/preferencias")
@@ -127,10 +137,14 @@ async def guardar_preferencias(cuerpo: PreferenciasTutor) -> dict:
 
     from magister.datos.produccion import Ajuste
 
+    from magister.flujo.comun import MODOS_DE_SERIE, preferencias_tutor
+
+    # Se mezcla con lo guardado: quien solo cambia la longitud no borra tus instrucciones ni tus modos.
+    valor = {**await preferencias_tutor(), **cuerpo.model_dump(exclude_unset=True)}
     async with nueva_sesion() as s, s.begin():
-        await s.execute(insert(Ajuste).values(clave="tutor", valor=cuerpo.model_dump())
-                        .on_conflict_do_update(index_elements=[Ajuste.clave], set_={"valor": cuerpo.model_dump()}))
-    return cuerpo.model_dump()
+        await s.execute(insert(Ajuste).values(clave="tutor", valor=valor)
+                        .on_conflict_do_update(index_elements=[Ajuste.clave], set_={"valor": valor}))
+    return {**valor, "modos_de_serie": MODOS_DE_SERIE}
 
 
 

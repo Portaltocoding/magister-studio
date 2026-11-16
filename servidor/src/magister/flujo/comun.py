@@ -206,7 +206,40 @@ async def acciones_de_estudio(estado: dict, sin_fuentes: bool) -> None:
 
 # Lo que el alumno ajusta desde la mascota («Afina a tu tutor»).
 PREFERENCIAS_POR_DEFECTO = {"longitud": "normal", "nivel": "normal", "estilo": "directo",
-                            "diagramas": True, "tests": True, "opciones": True}
+                            "diagramas": True, "tests": True, "opciones": True,
+                            # Lo que le has dicho que recuerde («a partir de ahora...») y tus modos de aprendizaje.
+                            "instrucciones": [], "modos": [], "modo": None}
+
+# Modos de aprendizaje de serie. Los tuyos se guardan igual, en «modos».
+MODOS_DE_SERIE = [
+    {"id": "socratico", "nombre": "Socrático", "para": "Aprender pensando: te pregunto en vez de explicarte.",
+     "reglas": ["No des la explicación de entrada: guía con una sola pregunta cada vez, que le acerque un paso.",
+                "Si se equivoca, dale la pista mínima para que lo vea él; no la respuesta.",
+                "Explica directamente solo tras dos intentos fallidos o si te lo pide.",
+                "Cierra resumiendo en dos frases lo que ha descubierto él."]},
+    {"id": "feynman", "nombre": "Explícamelo tú", "para": "Tú explicas, yo busco los huecos (técnica Feynman).",
+     "reglas": ["Pídele que te explique el concepto con sus palabras, como a alguien que no sabe nada.",
+                "Señala cada hueco, imprecisión o término sin explicar, uno a uno, y pídele que lo arregle.",
+                "No reescribas tú su explicación hasta que lo haya intentado dos veces.",
+                "Al final, dale su explicación pulida y lo que le faltaba."]},
+    {"id": "entrevista", "nombre": "Entrevista técnica", "para": "Te entrevisto como un senior y te puntúo.",
+     "reglas": ["Haz una pregunta de entrevista cada vez, de las lecciones del plan si las hay; empieza fácil y sube.",
+                "Tras su respuesta, ponle nota de 0 a 10 como lo haría un entrevistador senior y di qué faltó.",
+                "Da la respuesta modelo en 4 a 6 líneas y pasa a la siguiente pregunta.",
+                "Nada de test ni de diagramas salvo que lo pida."]},
+    {"id": "desde_cero", "nombre": "Desde cero", "para": "Sin dar nada por sabido, paso a paso.",
+     "reglas": ["No des nada por sabido: cada término técnico, con una frase llana y un ejemplo cotidiano antes de usarlo.",
+                "Un solo paso por respuesta, corto, y comprueba con una pregunta sencilla antes de seguir.",
+                "Si un concepto necesita otro previo, explica antes el previo en dos o tres frases."]},
+    {"id": "repaso", "nombre": "Repaso rápido", "para": "Preguntas cortas para recordar, sin rollos.",
+     "reglas": ["Haz preguntas cortas de recordar (no de reconocer) de lo que estudia, una cada vez.",
+                "Corrige en una o dos líneas: bien, o qué faltaba; y la siguiente pregunta.",
+                "Nada de explicaciones largas, test ni diagramas salvo que lo pida."]},
+]
+
+
+def modo_activo(p: dict) -> dict | None:
+    return next((x for x in [*MODOS_DE_SERIE, *(p.get("modos") or [])] if x.get("id") == p.get("modo")), None)
 
 
 async def preferencias_tutor() -> dict:
@@ -234,4 +267,9 @@ def texto_preferencias(p: dict) -> str:
         salida.append("No pongas preguntas tipo test.")
     if not p.get("opciones", True):
         salida.append("No pongas el bloque de opciones para seguir.")
+    salida += [str(x) for x in (p.get("instrucciones") or []) if str(x).strip()]
+    modo = modo_activo(p)
+    if modo:
+        salida.append(f"Modo de aprendizaje activo «{modo['nombre']}» ({modo.get('para', '')}). Sus reglas mandan sobre la forma "
+                      "de las respuestas: " + " ".join(modo.get("reglas") or []))
     return "\n".join(f"- {x}" for x in salida)

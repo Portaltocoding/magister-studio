@@ -25,7 +25,7 @@ const ESTILOS = [
 
 function Interruptor({ activo, alCambiar, etiqueta }: { activo: boolean; alCambiar: (v: boolean) => void; etiqueta: string }) {
   return (
-    <button type="button" role="switch" aria-checked={activo} aria-label={etiqueta} className={`interruptor ${activo ? 'activo' : ''}`} onClick={() => alCambiar(!activo)}>
+    <button type="button" role="switch" aria-checked={activo} aria-label={etiqueta} className={`conmutador ${activo ? 'activo' : ''}`} onClick={() => alCambiar(!activo)}>
       <span />
     </button>
   )

@@ -52,7 +52,7 @@ export default function Revelar({ texto, animar, children }: Props) {
     // Los bloques que se pulsan (opciones, test, pregunta, agendar) salen enteros o no salen: si no, un clic
     // a medio revelar mandaría el texto cortado.
     const inicio = visible.lastIndexOf('```')
-    if (/^```(opciones|test|pregunta|agendar)\b/.test(visible.slice(inicio))) visible = visible.slice(0, inicio)
+    if (/^```(opciones|test|pregunta|agendar|recordar|modo)\b/.test(visible.slice(inicio))) visible = visible.slice(0, inicio)
     else visible += '\n```'
   }
   else if ((visible.replace(/```/g, '').match(/`/g) ?? []).length % 2) visible += '`'

@@ -16,6 +16,7 @@ import Hilo from './componentes/Hilo.tsx'
 import { aBurbuja, usarConversacion } from './componentes/usarConversacion.ts'
 import Mascota from './Mascota.tsx'
 import PropuestaPlan from './PropuestaPlan.tsx'
+import { SelectorModo } from './componentes/Modos.tsx'
 
 interface Props {
   conversacionId: number | null
@@ -141,10 +142,13 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
         </p>
       )}
       {tipo === 'libre' && (
-        <label className="interruptor" title="Para explorar o equivocarte a propósito sin falsear tu perfil">
-          <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} /> Esto no
-          cuenta para el tutor
-        </label>
+        <div className="pie-chat">
+          <SelectorModo />
+          <label className="interruptor" title="Para explorar o equivocarte a propósito sin falsear tu perfil">
+            <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} /> Esto no
+            cuenta para el tutor
+          </label>
+        </div>
       )}
     </>
   )

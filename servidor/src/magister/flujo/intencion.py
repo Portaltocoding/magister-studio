@@ -27,6 +27,8 @@ def _norm(t: str) -> str:
 
 def pide_plan(mensaje: str) -> bool:
     t = COLOQUIAL.sub(" ", _norm(mensaje))
+    if re.search(r"\b(modo|a partir de ahora|de ahora en adelante|desde ahora)\b", t) and not INEQUIVOCO.search(t):
+        return False
     if not PIDE_PLAN.search(t):
         return False
     return not (EXPLICAR.search(t) and not INEQUIVOCO.search(t))
