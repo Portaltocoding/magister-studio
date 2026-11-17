@@ -711,3 +711,10 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .biblioteca-enlaces { width: 100%; box-sizing: border-box; font: inherit; font-family: var(--mono, ui-monospace, monospace); font-size: 0.9rem; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 10px 0; resize: vertical; }
 .biblioteca-opciones { gap: 14px; align-items: center; flex-wrap: wrap; }
 .biblioteca-opciones select { font: inherit; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 8px; padding: 4px 8px; }
+
+/* Desde Estudio libre, el camino al plan. */
+.libre-a-plan {
+  border: 0; background: none; padding: 2px 0; margin: -4px 0 14px; cursor: pointer; font: inherit; font-size: 0.92rem;
+  color: var(--suave);
+}
+.libre-a-plan:hover { color: var(--texto); text-decoration: underline; text-underline-offset: 3px; }

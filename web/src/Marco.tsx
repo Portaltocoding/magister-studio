@@ -113,6 +113,9 @@ export default function Marco() {
   useEffect(() => {
     const alCambiar = () => {
       const r = leerRuta()
+      // «Crear mi plan» (tutor, Tu día, foco, Ctrl+K) llega aquí: abre el cuestionario del plan, no el chat libre.
+      if (window.location.hash.startsWith('#/nuevo-plan')) setTipoNueva('plan')
+      else if (r.modo === 'libre' && r.conversacion == null) setTipoNueva('libre')
       setModo(r.modo)
       setActiva(r.conversacion)
     }
@@ -134,6 +137,8 @@ export default function Marco() {
         oculta={!menu && !fija}
         modoActivo={modo}
         alElegir={(m) => {
+          // Aunque ya estés en ese modo (p. ej. «Magister» desde Estudio libre), la barra se pliega.
+          setMenu(false)
           if (m === 'libre') {
             setActiva(null)
             setTipoNueva('libre')

@@ -11,6 +11,7 @@ import {
   type Propuesta,
 } from './api.ts'
 import Cuestionario from './componentes/Cuestionario.tsx'
+import { irARuta } from './componentes/Vacio.tsx'
 import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
 import { aBurbuja, usarConversacion } from './componentes/usarConversacion.ts'
@@ -179,6 +180,11 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
             Cuéntamelo con tus palabras: el tema, para qué lo quieres, lo que ya sabes, cuántas horas tienes y hasta
             cuándo. Si falta algo, te lo pregunto.
           </p>
+        )}
+        {tipo === 'libre' && (
+          <button type="button" className="libre-a-plan" onClick={() => irARuta('#/nuevo-plan')}>
+            ¿Quieres estudiarlo con un plan, con lecciones y calendario? Crear un plan →
+          </button>
         )}
         {error && <p role="alert">{error}</p>}
         <Hilo
