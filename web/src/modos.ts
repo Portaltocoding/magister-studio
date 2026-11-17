@@ -4,6 +4,7 @@
 export type IdModo =
   | 'libre'
   | 'tutor'
+  | 'hoy'
   | 'foco'
   | 'roadmap'
   | 'calendario'
@@ -46,7 +47,8 @@ export const GRUPOS: Grupo[] = [
   {
     nombre: 'Cada día',
     modos: [
-      { id: 'tutor', nombre: 'Hoy', encendido: true, ayuda: 'Lo que toca hoy: la lección, los repasos y el examen' },
+      { id: 'tutor', nombre: 'Tutor', encendido: true, ayuda: 'Te guía por lo de hoy: repasos, lección y examen, paso a paso' },
+      { id: 'hoy', nombre: 'Hoy', encendido: true, ayuda: 'Tus cifras, tu semana y lo que toca hoy' },
       { id: 'repaso', nombre: 'Repaso', encendido: true, ayuda: 'Lo que toca recordar hoy' },
       { id: 'examen', nombre: 'Examen', encendido: true, ayuda: 'Ponte a prueba y saca nota' },
     ],

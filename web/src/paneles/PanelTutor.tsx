@@ -12,7 +12,7 @@ import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Mascota from '../Mascota.tsx'
 import type { IdModo } from '../modos.ts'
 
-interface Hoy {
+export interface Hoy {
   estado: 'propuesta' | 'adelantar' | 'sin_preparar' | 'sin_plan' | 'solo_repaso'
   sesion_id?: number
   plan_id?: number
@@ -24,7 +24,7 @@ interface Hoy {
   material_id?: number | null
   repasos: number
   nuevos?: number
-  dia?: { clave: string; titulo: string; horas: number; estado: string }[]
+  dia?: { clave: string; titulo: string; horas: number; estado: string; sesion_id?: number; plan_id?: number; material_id?: number | null }[]
   temas?: { clave: string; titulo: string; material_id: number }[]
   razon?: string
   // El examen del plan que ya toca y aún no has aprobado.
@@ -50,7 +50,7 @@ interface Formula {
   significado: string
 }
 
-interface Leccion {
+export interface Leccion {
   material_id: number
   plan_id?: number
   leccion_clave: string
@@ -173,7 +173,7 @@ function AsaAncho({ ancho, alCambiar, papel }: { ancho: number; alCambiar: (n: n
 }
 
 const claveAvance = (mid: number) => `magister-foco-${mid}`
-function leerAvance(mid: number): Avance | null {
+export function leerAvance(mid: number): Avance | null {
   try {
     const t = localStorage.getItem(claveAvance(mid))
     return t ? (JSON.parse(t) as Avance) : null
@@ -192,7 +192,7 @@ function guardarAvance(mid: number, a: Avance | null) {
 
 export const NOTA: Record<string, string> = { perfecta: 'Perfecta', bien: 'Bien', parcial: 'A medias', fallo: 'Fallada', saltada: 'Saltada' }
 
-async function cargarLeccion(mid: number): Promise<Leccion> {
+export async function cargarLeccion(mid: number): Promise<Leccion> {
   const l = await pedir<Omit<Leccion, 'material_id'>>(`/api/tutor/leccion/${mid}`)
   return { ...l, material_id: mid, formulas: l.formulas ?? [] }
 }
@@ -328,7 +328,7 @@ interface PropsFoco {
 }
 
 // Una lección en modo foco: una idea cada vez, con su comprobación.
-function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA }: PropsFoco) {
+export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA }: PropsFoco) {
   const { bloques } = leccion
   const mid = leccion.material_id
   const [i, setI] = useState(inicial?.i ?? 0)
@@ -812,12 +812,12 @@ function TarjetaExamen({ examen, despues }: { examen: HitoExamen; despues?: stri
   )
 }
 
-const saludo = () => {
+export const saludo = () => {
   const h = new Date().getHours()
   return h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'
 }
 
-// Modo Tutor: la tarjeta «Hoy», otras lecciones para estudiar en foco y, al empezar, el modo foco.
+// «Hoy»: tus cifras, tu día y la lección de hoy (el tutor que te guía está en PanelGuia).
 // vista «foco»: su propia entrada en la barra lateral, con todas las lecciones para elegir.
 export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) => void; vista?: 'hoy' | 'foco' }) {
   const [hoy, setHoy] = useState<Hoy | null>(null)
@@ -834,13 +834,13 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
   }, [])
 
   useEffect(() => {
-    // #/tutor/foco entra en la lección de hoy; #/tutor/foco/12, en la de esos apuntes.
-    // En la vista foco, #/foco abre la lista y #/foco/12 esos apuntes.
+    // #/hoy/foco entra en la lección de hoy; #/hoy/foco/12, en la de esos apuntes.
+    // En la vista foco, #/foco abre la lista, #/foco/hoy la de hoy y #/foco/12 esos apuntes.
     // #/foco abre la lista; #/foco/12, esos apuntes directamente.
     const partes = window.location.hash.replace(/^#\/?/, '').split('/')
     const foco = vista === 'foco' ? (partes[1] ? 'foco' : null) : partes[1]
-    const mid = vista === 'foco' ? partes[1] : partes[2]
-    if (foco === 'foco') window.history.replaceState(null, '', vista === 'foco' ? '#/foco' : '#/tutor')
+    const mid = vista === 'foco' ? (partes[1] === 'hoy' ? '' : partes[1]) : partes[2]
+    if (foco === 'foco') window.history.replaceState(null, '', vista === 'foco' ? '#/foco' : '#/hoy')
     pedir<Hoy>('/api/hoy').then((h) => {
       setHoy(h)
       if (h.material_id) setAvance(leerAvance(h.material_id))

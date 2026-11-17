@@ -3,7 +3,7 @@ import { pedir } from './api.ts'
 import type { IdModo } from './modos.ts'
 
 // La tira fina de la izquierda: siempre a la vista con la barra lateral plegada.
-// El icono de Hoy lleva un globito con lo pendiente para que no se te pase.
+// El icono del tutor lleva un globito con lo pendiente para que no se te pase.
 
 interface Hoy {
   estado: string

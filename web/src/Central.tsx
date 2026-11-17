@@ -16,6 +16,7 @@ import PanelVideo from './paneles/PanelVideo.tsx'
 import PanelHablar from './paneles/PanelHablar.tsx'
 import PanelAutomatizar from './paneles/PanelAutomatizar.tsx'
 import PanelLlamada from './paneles/PanelLlamada.tsx'
+import PanelGuia from './paneles/PanelGuia.tsx'
 
 interface Props {
   modo: IdModo
@@ -49,7 +50,9 @@ export default function Central({
         />
       )
     case 'tutor':
-      return <PanelTutor key="tutor" irA={irA} />
+      return <PanelGuia irA={irA} />
+    case 'hoy':
+      return <PanelTutor key="hoy" irA={irA} />
     case 'foco':
       return <PanelTutor key="foco" irA={irA} vista="foco" />
     case 'roadmap':

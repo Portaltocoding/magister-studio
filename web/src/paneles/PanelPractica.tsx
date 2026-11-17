@@ -52,7 +52,10 @@ const NOTAS = ['fallo', 'parcial', 'bien', 'perfecta']
 const nueva = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
 
 // Repaso: lo que toca hoy, una pregunta cada vez, respondida de memoria y corregida en flujo.
-export default function PanelPractica({ concepto, irA }: { concepto?: string; irA: (m: IdModo) => void }) {
+// guiada: dentro del tutor. Empieza sola y, al acabar la tanda (o al salir), devuelve cuántas has hecho.
+export default function PanelPractica({ concepto, irA, guiada }: { concepto?: string; irA: (m: IdModo) => void; guiada?: { alAcabar: (hechas: number) => void } }) {
+  const hechasGuia = useRef(0)
+  const empezada = useRef(false)
   const [cola, setCola] = useState<EnCola[] | null>(null)
   const [pregunta, setPregunta] = useState<Servida | null>(null)
   const [respuesta, setRespuesta] = useState('')
@@ -87,7 +90,17 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
 
   useEffect(cargar, [cargar])
 
+  // En el tutor no hace falta pulsar «Empezar»: la primera pregunta sale sola.
+  useEffect(() => {
+    if (!guiada || !cola || empezada.current) return
+    empezada.current = true
+    if (cola.length) siguiente()
+    else guiada.alAcabar(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cola])
+
   const salir = () => {
+    if (guiada) return guiada.alAcabar(hechasGuia.current)
     setPregunta(null)
     setTanda(null)
     cargar()
@@ -103,7 +116,9 @@ export default function PanelPractica({ concepto, irA }: { concepto?: string; ir
     setConfianza(null)
     setError(null)
     setAvisoConfianza(null)
+    if (pregunta) hechasGuia.current += 1
     const p = await pedir<Servida | null>(`/api/practica/siguiente${concepto ? `?concepto_id=${concepto}` : ''}`)
+    if (!p && guiada) return guiada.alAcabar(hechasGuia.current)
     setPregunta(p)
     servidaEn.current = Date.now()
     cargar()

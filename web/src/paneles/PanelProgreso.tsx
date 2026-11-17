@@ -430,7 +430,7 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
                   <strong>
                     {hoy.leccion_clave} · {hoy.titulo}
                   </strong>
-                  <button className="boton boton-principal" onClick={() => (hoy.material_id ? irARuta('#/tutor/foco') : irA('tutor'))}>
+                  <button className="boton boton-principal" onClick={() => (hoy.material_id ? irARuta('#/foco/hoy') : irA('tutor'))}>
                     {hoy.material_id ? 'Estudiarla en modo foco' : 'Prepararla'}
                   </button>
                 </>

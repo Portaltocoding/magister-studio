@@ -600,3 +600,35 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
   .foco-asa { display: none; }
   .foco-lectura .foco-papel.lector-texto { padding-right: 78px; }
 }
+
+/* ===== El tutor que te guía ===== */
+.guia { max-width: 820px; margin: 0 auto; padding: 48px 24px 60px; }
+.guia-cabeza { display: flex; gap: 18px; align-items: flex-start; }
+.guia-mascota { flex: none; width: 96px; height: 96px; display: grid; place-items: center; }
+.guia-mascota .mascota { width: 92px; height: 92px; }
+.guia-bocadillo {
+  position: relative; flex: 1; padding: 18px 22px; border-radius: 6px 20px 20px 20px; background: var(--tarjeta); border: 1px solid var(--borde);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.12); animation: aparecer-globo-d 0.3s ease-out;
+}
+.guia-bocadillo p { margin: 6px 0 14px; font-size: 1.15rem; line-height: 1.55; }
+.guia-bocadillo .vacio-acciones { margin: 0; }
+.guia-pasos { list-style: none; padding: 0; margin: 30px 0 0 114px; display: flex; flex-direction: column; gap: 8px; }
+.guia-paso { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--borde); background: var(--tarjeta); }
+.guia-num { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 0.85rem; background: var(--fondo); border: 1px solid var(--borde); }
+.guia-texto { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.guia-texto small, .guia-estado { opacity: 0.6; font-size: 0.82rem; }
+.guia-paso.ahora { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento); }
+.guia-paso.ahora .guia-num { background: var(--acento); color: var(--fondo); border-color: var(--acento); }
+.guia-paso.hecho { opacity: 0.55; }
+.guia-paso.hecho strong { text-decoration: line-through; text-decoration-thickness: 1px; }
+.guia-paso.saltado { opacity: 0.45; border-style: dashed; }
+.guia-pie { margin: 26px 0 0 114px; }
+.boton-suave { opacity: 0.75; }
+@media (max-width: 700px) {
+  .guia { padding: 28px 16px 40px; }
+  .guia-cabeza { flex-direction: column; align-items: center; }
+  .guia-mascota { width: 72px; height: 72px; }
+  .guia-mascota .mascota { width: 68px; height: 68px; }
+  .guia-bocadillo { border-radius: 20px; }
+  .guia-pasos, .guia-pie { margin-left: 0; }
+}

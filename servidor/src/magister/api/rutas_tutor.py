@@ -51,12 +51,17 @@ async def hoy(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
 
     temas = [t for t in await repasos_de_tema() if t["vencido"]]
     async with nueva_sesion() as s3:
-        dia = [{"clave": c, "titulo": t, "horas": h, "estado": e} for c, t, h, e in (await s3.execute(text(
-            "select s.leccion_clave, l.titulo, s.horas, s.estado from sesiones s join planes p on p.id = s.plan_id and p.estado = 'aceptado' "
+        # Cada sesión del día con lo necesario para estudiarla desde el tutor: su id y sus apuntes (si ya están).
+        dia = [{"clave": c, "titulo": t, "horas": h, "estado": e, "sesion_id": sid_, "plan_id": pid_, "material_id": mid_}
+               for c, t, h, e, sid_, pid_, mid_ in (await s3.execute(text(
+            "select s.leccion_clave, l.titulo, s.horas, s.estado, s.id, s.plan_id, "
+            "(select m.id from materiales m where m.plan_id = s.plan_id and m.leccion_clave = s.leccion_clave and m.tipo = 'apuntes' "
+            "and m.estado <> 'generando' order by m.id desc limit 1) "
+            "from sesiones s join planes p on p.id = s.plan_id and p.estado = 'aceptado' "
             "join lecciones l on l.plan_id = s.plan_id and l.clave = s.leccion_clave where s.fecha = :hoy order by s.inicio nulls last, s.id"),
             {"hoy": date.today()})).all()]
     if fila is None:
-        return {"estado": "sin_plan" if not repasos and not examen else "solo_repaso", "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia, "temas": temas, "temas": temas}
+        return {"estado": "sin_plan" if not repasos and not examen else "solo_repaso", "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia, "temas": temas}
     sid, plan_id, clave, titulo, fecha, horas, tema, tema_id, inicio = fila
     async with nueva_sesion() as s2:
         material = await s2.scalar(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave,
@@ -66,7 +71,7 @@ async def hoy(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
         estado = "sin_preparar"
     return {"estado": estado, "sesion_id": sid, "plan_id": plan_id, "tema_id": tema_id, "tema": tema, "leccion_clave": clave,
             "titulo": titulo, "fecha": fecha.isoformat(), "inicio": inicio.strftime("%H:%M") if inicio else None, "horas": horas, "material_id": material.id if material else None,
-            "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia,
+            "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia, "temas": temas,
             "razon": ("Toca hoy según tu calendario." if fecha == date.today() else
                       "Vas con retraso: es la primera sesión pendiente." if fecha < date.today() else
                       f"Lo siguiente de tu calendario es el {fecha:%d-%m}.")}

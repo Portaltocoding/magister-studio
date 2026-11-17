@@ -74,7 +74,7 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
 
   const entradas = useMemo<Entrada[]>(
     () => [
-      { grupo: 'Acciones', texto: 'Empezar la lección de hoy en modo foco', hacer: ir('#/tutor/foco') },
+      { grupo: 'Acciones', texto: 'Empezar la lección de hoy en modo foco', hacer: ir('#/foco/hoy') },
       { grupo: 'Acciones', texto: 'Repasar lo de hoy', hacer: ir('#/repaso') },
       { grupo: 'Acciones', texto: 'Nueva conversación', detalle: 'Estudio libre', hacer: ir('#/libre') },
       { grupo: 'Acciones', texto: 'Nuevo plan', hacer: ir('#/nuevo-plan') },
