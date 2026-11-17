@@ -18,6 +18,7 @@ import PanelAutomatizar from './paneles/PanelAutomatizar.tsx'
 import PanelLlamada from './paneles/PanelLlamada.tsx'
 import PanelGuia from './paneles/PanelGuia.tsx'
 import PanelBiblioteca from './paneles/PanelBiblioteca.tsx'
+import PanelNotas from './paneles/PanelNotas.tsx'
 
 interface Props {
   modo: IdModo
@@ -86,6 +87,8 @@ function Panel({
       return <PanelCalendario />
     case 'temas':
       return <PanelFuentes />
+    case 'notas':
+      return <PanelNotas />
     case 'buscar':
       return <PanelBiblioteca key="buscar" vista="buscar" />
     case 'web':

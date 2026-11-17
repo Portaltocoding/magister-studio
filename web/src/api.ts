@@ -53,6 +53,8 @@ export type EventoTutor =
   | { tipo: 'fase'; nodo: string }
   | ({ tipo: 'plan' } & Propuesta)
   | { tipo: 'guardado'; plan_id: number; tema_id: number }
+  // «Guárdalo» en el chat: la respuesta anterior ya está en Mis notas.
+  | { tipo: 'nota'; id: number; mensaje_id: number }
   | { tipo: 'opciones'; campo: string; opciones: { valor: string; etiqueta: string }[] }
   | { tipo: 'acciones'; acciones: { tipo: 'ir' | 'buscar'; etiqueta: string; ruta?: string; consulta?: string }[] }
 
@@ -350,3 +352,22 @@ export const verResearch = (id: number) =>
 export const listarPropuestas = () => pedir<PropuestaInfo[]>('/api/propuestas?estado=pendiente')
 export const decidirPropuesta = (id: number, accion: 'aprobar' | 'rechazar') =>
   pedir<{ estado: string }>(`/api/propuestas/${id}`, enviarJson({ accion }))
+
+// Mis notas: lo que guardas de Estudio libre (una respuesta entera o un trozo marcado).
+export interface Nota {
+  id: number
+  texto: string
+  comentario: string | null
+  mensaje_id: number | null
+  conversacion_id: number | null
+  origen: string | null
+  completa: boolean
+  creada_en: string
+}
+export const EVENTO_NOTAS = 'magister-notas'
+export const listarNotas = () => pedir<Nota[]>('/api/notas')
+export const guardarNota = (d: { texto: string; mensaje_id?: number | null; completa?: boolean; comentario?: string | null }) =>
+  pedir<Nota>('/api/notas', enviarJson(d))
+export const comentarNota = (id: number, comentario: string | null) =>
+  pedir<Nota>(`/api/notas/${id}`, enviarJson({ comentario }, 'PATCH'))
+export const borrarNota = (id: number) => pedir<void>(`/api/notas/${id}`, { method: 'DELETE' })

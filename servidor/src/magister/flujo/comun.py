@@ -99,6 +99,9 @@ async def lecciones_del_alumno() -> str:
 async def sistema_de_estudio(base: str, estado: dict) -> str:
     """El prompt de estudio con lo que el tutor debe saber del alumno en este turno."""
     partes = [base]
+    if estado.get("nota_guardada"):
+        partes.append("Magister acaba de guardar en «Mis notas» tu respuesta anterior, como pidió el alumno (lo ha hecho la app). "
+                      "Empieza confirmándolo en una frase corta y sigue con lo demás que pida, si pide algo más.")
     if estado.get("hoy"):
         from datetime import date
 

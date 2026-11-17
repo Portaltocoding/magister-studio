@@ -11,6 +11,7 @@ export type IdModo =
   | 'roadmap'
   | 'calendario'
   | 'temas'
+  | 'notas'
   | 'buscar'
   | 'web'
   | 'proyectos'
@@ -89,6 +90,7 @@ export const GRUPOS: Grupo[] = [
     ayuda: 'De dónde sale lo que estudias',
     modos: [
       { id: 'temas', nombre: 'Tus fuentes', encendido: true, ayuda: 'Tus PDF, libros, notas y webs guardadas' },
+      { id: 'notas', nombre: 'Mis notas', encendido: true, ayuda: 'Lo que guardaste de Estudio libre: respuestas enteras o trozos marcados' },
       { id: 'buscar', nombre: 'Buscar fuentes', encendido: true, ayuda: 'Rastrea la web en busca de buenas fuentes para un tema o una lección' },
       { id: 'web', nombre: 'Guardar de la web', encendido: true, ayuda: 'Pega enlaces (páginas o PDF) y se guardan con su texto' },
     ],

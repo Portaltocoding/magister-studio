@@ -23,6 +23,7 @@ from magister.config import ajustes
 from magister.datos import conversaciones as dc
 from magister.datos.sesion import sesion_por_peticion
 from magister.flujo import ejecutar
+from magister.flujo.intencion import pide_guardar
 
 rutas = APIRouter(prefix="/api")
 
@@ -94,6 +95,28 @@ class Preparado:
     tipo: str
     turnos: list[dict]
     cuenta: bool
+    nota: dict | None = None  # la nota que acaba de guardar «guárdalo»
+
+
+async def guardar_respuesta_anterior(s: AsyncSession, cid: int) -> dict | None:
+    """«Guárdalo»: la última respuesta completa del tutor va a Mis notas (una sola vez)."""
+    from sqlalchemy import select
+
+    from magister.datos.modelos import Conversacion, Mensaje
+    from magister.datos.notas import Nota
+
+    m = await s.scalar(select(Mensaje).where(Mensaje.conversacion_id == cid, Mensaje.rol == "tutor",
+                                             Mensaje.estado == "completo").order_by(Mensaje.id.desc()).limit(1))
+    if m is None or not m.contenido.strip():
+        return None
+    n = await s.scalar(select(Nota).where(Nota.mensaje_id == m.id, Nota.completa.is_(True)))
+    if n is None:
+        c = await s.get(Conversacion, cid)
+        n = Nota(texto=m.contenido.strip(), mensaje_id=m.id, conversacion_id=cid, origen=c.titulo if c else None, completa=True)
+        s.add(n)
+        await s.commit()
+        await s.refresh(n)
+    return {"id": n.id, "mensaje_id": m.id}
 
 
 def guardador(cid: int, cuenta: bool):
@@ -121,9 +144,12 @@ async def preparar_mensaje(
     if c is None:
         raise HTTPException(404, "conversación no encontrada")
     tipo = c.tipo
+    nota = None
+    if tipo != "plan" and not cuerpo.voz and pide_guardar(cuerpo.contenido):
+        nota = await guardar_respuesta_anterior(s, cid)
     await dc.guardar_pregunta(s, cid, cuerpo.contenido, cuerpo.cuenta)
     turnos = [{"rol": m.rol, "contenido": m.contenido} for m in await dc.historial_completo(s, cid)]
-    return Preparado(tipo, turnos, cuerpo.cuenta)
+    return Preparado(tipo, turnos, cuerpo.cuenta, nota)
 
 
 @rutas.post("/conversaciones/{cid}/mensajes", response_class=EventSourceResponse)
@@ -133,9 +159,19 @@ async def enviar_mensaje(
     fase_inicial = "diagnostico" if p.tipo == "plan" else "estudio"
     eventos = ejecutar.mensaje(cid, cuerpo.contenido, p.turnos, hoy(), fase_inicial, voz=cuerpo.voz,
                                 extra={"llamada": cuerpo.llamada, "modo": cuerpo.modo, "plan_id_leccion": cuerpo.plan_id,
-                                       "leccion_clave": cuerpo.leccion_clave, "contexto": cuerpo.contexto})
+                                       "leccion_clave": cuerpo.leccion_clave, "contexto": cuerpo.contexto,
+                                       "nota_guardada": p.nota is not None})
+    if p.nota is not None:
+        eventos = _con_nota(p.nota, eventos)
     async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid}):
         yield evento
+
+
+async def _con_nota(nota: dict, eventos: AsyncIterator[dict]) -> AsyncIterator[dict]:
+    """Primero el aviso de la nota guardada (la pantalla lo enseña al momento), luego el flujo de siempre."""
+    yield {"tipo": "nota", **nota}
+    async for ev in eventos:
+        yield ev
 
 
 async def preparar_decision(cid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> list[dict]:

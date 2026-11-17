@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { ErrorApi, type EventoTutor, type Mensaje, type Propuesta } from '../api.ts'
+import { ErrorApi, EVENTO_NOTAS, type EventoTutor, type Mensaje, type Propuesta } from '../api.ts'
 import type { Burbuja } from './Hilo.tsx'
 
 let contador = 0
@@ -82,6 +82,10 @@ export function usarConversacion(
               break
             case 'acciones':
               actualizarUltima((b) => ({ ...b, acciones: ev.acciones }))
+              break
+            case 'nota':
+              actualizarUltima((b) => ({ ...b, notaGuardada: true }))
+              window.dispatchEvent(new Event(EVENTO_NOTAS))
               break
             case 'guardado':
               alGuardado?.(ev.plan_id, ev.tema_id)

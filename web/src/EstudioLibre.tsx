@@ -203,7 +203,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   return (
     <div className="vista-hilo">
       {error && <p role="alert">{error}</p>}
-      <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} fase={fase} {...conAdjuntos} />
+      <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} fase={fase} guardable={tipo === 'libre'} {...conAdjuntos} />
     </div>
   )
 }

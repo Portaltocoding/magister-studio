@@ -20,6 +20,7 @@ class Estado(TypedDict, total=False):
     plan_id_leccion: int | None  # lección de la que se habla
     leccion_clave: str | None
     contexto: str | None  # dónde está la llamada
+    nota_guardada: bool  # la app acaba de guardar en Mis notas la respuesta anterior
     turnos: list[Turno]  # historial completo de la conversación (lo pasa la API)
     perfil: dict
     plan: dict | None

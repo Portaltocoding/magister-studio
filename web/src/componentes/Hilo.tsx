@@ -13,6 +13,7 @@ import { conMarcas, PanelCita } from '../Cita.tsx'
 import Valorar from './Valorar.tsx'
 import Acciones, { type AccionArnes } from './Acciones.tsx'
 import { ACEPTA, type Adjunto } from './usarAdjuntos.ts'
+import { BotonGuardar, GuardarMarcado, usarGuardadas } from './GuardarNota.tsx'
 
 export interface Burbuja {
   clave: string
@@ -25,6 +26,8 @@ export interface Burbuja {
   voto?: boolean | null
   sinFuentes?: boolean
   acciones?: AccionArnes[]
+  // Dijiste «guárdalo»: la respuesta anterior acaba de ir a Mis notas.
+  notaGuardada?: boolean
 }
 
 interface Props {
@@ -41,6 +44,8 @@ interface Props {
   alQuitarAdjunto?: (nombre: string) => void
   // Lo que está haciendo el tutor («Buscando en tus fuentes»): va dentro de la burbuja que espera.
   fase?: string | null
+  // Estudio libre: cada respuesta se puede guardar en Mis notas, entera o el trozo que marques.
+  guardable?: boolean
 }
 
 const ESTADO_ADJUNTO: Record<Adjunto['estado'], string> = {
@@ -132,7 +137,10 @@ export default function Hilo({
   adjuntos,
   alQuitarAdjunto,
   fase,
+  guardable = false,
 }: Props) {
+  const guardadas = usarGuardadas(guardable)
+  const zonaMensajes = useRef<HTMLDivElement>(null)
   const [encima, setEncima] = useState(false)
   const [borrador, setBorrador] = useState('')
   const caja = useRef<HTMLTextAreaElement>(null)
@@ -212,10 +220,18 @@ export default function Hilo({
 
   return (
     <div className="hilo">
-      <div className="mensajes" aria-live="polite" aria-busy={escribiendo}>
+      <div className="mensajes" aria-live="polite" aria-busy={escribiendo} ref={zonaMensajes}>
+        {guardable && <GuardarMarcado zona={zonaMensajes} />}
         {/* Clave por posición: al acabar, la burbuja cambia de id y no debe volver a montarse (cortaría el texto que aparece). */}
-        {burbujas.map((b, i) => (
-          <div key={i} className={`burbuja burbuja-${b.rol} burbuja-${b.estado}`}>
+        {burbujas.map((b, i) => {
+          const mid = b.clave.startsWith('m-') ? Number(b.clave.slice(2)) : null
+          return (
+          <div key={i} className={`burbuja burbuja-${b.rol} burbuja-${b.estado}`} data-mensaje={mid ?? undefined}>
+            {b.notaGuardada && (
+              <p className="aviso-nota">
+                Guardado en <a href="#/notas">Mis notas</a>
+              </p>
+            )}
             {b.rol === 'tutor' && b.estado === 'llegando' && !b.contenido ? (
               <Pensando texto={fase ? `${fase}…` : 'Pensando…'} />
             ) : b.estado === 'error' ? (
@@ -227,11 +243,15 @@ export default function Hilo({
             )}
             {b.estado === 'interrumpido' && <small className="nota">Interrumpido</small>}
             {b.acciones && b.acciones.length > 0 && b.estado === 'completo' && <Acciones acciones={b.acciones} />}
+            {guardable && b.rol === 'tutor' && b.estado === 'completo' && mid != null && b.contenido.trim() && (
+              <BotonGuardar mensajeId={mid} texto={b.contenido} guardada={guardadas.has(mid)} />
+            )}
             {b.rol === 'tutor' && b.traza && b.estado === 'completo' && (
               <Valorar traza={b.traza} inicial={b.voto ?? null} alPedirOtra={escribiendo ? undefined : alEnviar} />
             )}
           </div>
-        ))}
+          )
+        })}
         <div ref={final} />
       </div>
       {cita && <PanelCita id={cita.id} info={cita.info} alCerrar={() => setCita(null)} />}
