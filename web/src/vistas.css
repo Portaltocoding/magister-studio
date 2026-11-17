@@ -662,3 +662,23 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .anim-svg .fourier-trazo { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .anim-svg .fourier-punta { fill: currentColor; }
 .anim-svg .fourier-enlace { stroke: currentColor; stroke-width: 0.6; opacity: 0.45; stroke-dasharray: 1.5 1.5; }
+
+/* ===== Barra lateral: siete entradas unidas por una línea ===== */
+.grupos-modos .grupo-modos.grupo-lista::before { top: 19px; bottom: 19px; height: auto; }
+.grupo-lista .modos { padding-left: 22px; }
+.enlace-taller {
+  align-self: flex-start; margin: 6px 0 0 30px; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 0.78rem; color: var(--suave); opacity: 0.7;
+}
+.enlace-taller:hover, .enlace-taller.actual { opacity: 1; color: var(--texto); }
+/* ===== Pestañas dentro de una entrada ===== */
+.pestanas-modo {
+  display: flex; gap: 4px; width: fit-content; max-width: 100%; overflow-x: auto; margin: 0 auto 18px; padding: 4px;
+  border-radius: 999px; background: color-mix(in srgb, var(--texto) 6%, transparent);
+}
+.pestanas-modo button {
+  border: 0; background: none; cursor: pointer; font: inherit; font-size: 0.9rem; color: var(--suave); white-space: nowrap;
+  padding: 6px 14px; border-radius: 999px; transition: background 200ms ease, color 200ms ease;
+}
+.pestanas-modo button:hover { color: var(--texto); }
+.pestanas-modo button.actual { background: var(--tarjeta); color: var(--texto); font-weight: 600; box-shadow: 0 1px 4px rgb(0 0 0 / 0.12); }

@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import { borrarConversacion, type Conversacion } from './api.ts'
-import { GRUPOS, type IdModo } from './modos.ts'
+import { GRUPOS, padreDe, type IdModo } from './modos.ts'
 
 interface Props {
   modoActivo: IdModo
@@ -16,17 +15,6 @@ interface Props {
   alFijar?: (si: boolean) => void
 }
 
-const CLAVE_PLEGADOS = 'magister-secciones-plegadas'
-
-function leerPlegados(): string[] {
-  try {
-    const t = localStorage.getItem(CLAVE_PLEGADOS)
-    return t ? (JSON.parse(t) as string[]) : GRUPOS.filter((g) => g.plegado).map((g) => g.nombre)
-  } catch {
-    return GRUPOS.filter((g) => g.plegado).map((g) => g.nombre)
-  }
-}
-
 export default function BarraLateral({
   modoActivo,
   alElegir,
@@ -39,17 +27,7 @@ export default function BarraLateral({
   oculta = false,
   alFijar,
 }: Props) {
-  const [plegados, setPlegados] = useState<string[]>(leerPlegados)
-  const alternar = (nombre: string) =>
-    setPlegados((x) => {
-      const nuevo = x.includes(nombre) ? x.filter((y) => y !== nombre) : [...x, nombre]
-      try {
-        localStorage.setItem(CLAVE_PLEGADOS, JSON.stringify(nuevo))
-      } catch {
-        /* sin almacenamiento: vale para esta sesión */
-      }
-      return nuevo
-    })
+  const actual = padreDe(modoActivo)
   return (
     <aside className="lateral" inert={oculta}>
       <div className="marca">
@@ -93,7 +71,7 @@ export default function BarraLateral({
                     className="modo"
                     disabled={!m.encendido}
                     title={m.ayuda}
-                    aria-current={m.id === modoActivo ? 'page' : undefined}
+                    aria-current={m.id === actual ? 'page' : undefined}
                     onClick={() => alElegir(m.id)}
                   >
                     <span>{m.nombre}</span>
@@ -109,22 +87,16 @@ export default function BarraLateral({
                 {lista}
               </div>
             )
-          // Una sección plegada se abre sola si estás en uno de sus modos.
-          const abierta = !plegados.includes(g.nombre) || g.modos.some((m) => m.id === modoActivo)
+          // Las seis entradas, unidas por una línea.
           return (
-            <div key={g.nombre} className={`grupo-modos ${abierta ? 'abierto' : 'cerrado'}`} data-rama={ig}>
-              <button type="button" className="grupo-titulo" aria-expanded={abierta} onClick={() => alternar(g.nombre)}>
-                <span>{g.nombre}</span>
-                <span className="grupo-flecha" aria-hidden>
-                  ›
-                </span>
-              </button>
-              <div className="grupo-cuerpo">
-                <div>{lista}</div>
-              </div>
+            <div key={g.nombre} className="grupo-modos grupo-lista" data-rama={ig}>
+              {lista}
             </div>
           )
         })}
+        <button type="button" className={`enlace-taller ${actual === 'etiquetar' ? 'actual' : ''}`} onClick={() => alElegir('etiquetar')} title="Para calibrar Magister: tono, banco de preguntas y animaciones">
+          Taller
+        </button>
       </nav>
 
       <section className="conversaciones">

@@ -1,7 +1,7 @@
 import Vacio from './componentes/Vacio.tsx'
 import Pensando from './componentes/Pensando.tsx'
 import EstudioLibre from './EstudioLibre.tsx'
-import type { IdModo } from './modos.ts'
+import { familiaDe, type IdModo } from './modos.ts'
 import PanelCalendario from './paneles/PanelCalendario.tsx'
 import PanelEtiquetar from './paneles/PanelEtiquetar.tsx'
 import PanelMaterial from './paneles/PanelMaterial.tsx'
@@ -28,8 +28,32 @@ interface Props {
   irA: (modo: IdModo) => void
 }
 
+// Las pestañas de la entrada en la que estás (Practicar: Repaso y Examen…).
+function Pestanas({ modo, irA }: { modo: IdModo; irA: (m: IdModo) => void }) {
+  const familia = familiaDe(modo)
+  if (!familia) return null
+  return (
+    <nav className="pestanas-modo" role="tablist" aria-label="Secciones">
+      {familia.map(([id, texto]) => (
+        <button key={id} type="button" role="tab" aria-selected={id === modo} className={id === modo ? 'actual' : ''} onClick={() => irA(id)}>
+          {texto}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+export default function Central(props: Props) {
+  return (
+    <>
+      <Pestanas modo={props.modo} irA={props.irA} />
+      <Panel {...props} />
+    </>
+  )
+}
+
 // Recibe el modo como dato; no sabe nada de la barra lateral.
-export default function Central({
+function Panel({
   modo,
   conversacionId,
   tipoConversacion,

@@ -1,4 +1,5 @@
-// Los modos de la barra lateral, agrupados por para qué sirven.
+// Los modos. La barra lateral enseña solo siete entradas; el resto son pestañas dentro de su entrada
+// (Practicar: Repaso y Examen; Plan: Roadmap, Calendario…). Todos conservan su ruta (#/examen sigue valiendo).
 // Solo los que ya tienen lógica detrás van encendidos.
 
 export type IdModo =
@@ -34,8 +35,6 @@ export interface Modo {
 export interface Grupo {
   nombre: string
   modos: Modo[]
-  // Los del taller van plegados: son para calibrar Magister, no para estudiar.
-  plegado?: boolean
 }
 
 export const GRUPOS: Grupo[] = [
@@ -44,59 +43,72 @@ export const GRUPOS: Grupo[] = [
     nombre: '',
     modos: [{ id: 'libre', nombre: 'Estudio libre', encendido: true, ayuda: 'Pregunta lo que quieras al tutor' }],
   },
-  // Luego, el tutor que te guía y tu día.
+  // Las seis entradas, cada una responde a una pregunta: qué hago hoy, qué aprendo, cómo me lo explicas,
+  // me pongo a prueba, cómo voy y de dónde sale.
   {
-    nombre: 'Hoy',
+    nombre: 'principal',
     modos: [
-      { id: 'tutor', nombre: 'Tutor', encendido: true, ayuda: 'Te guía por lo de hoy: repasos, lección y examen, paso a paso' },
-      { id: 'hoy', nombre: 'Tu día', encendido: true, ayuda: 'Tus cifras, tu semana y lo que toca hoy' },
-    ],
-  },
-  // Aprender algo nuevo: entenderlo por primera vez.
-  {
-    nombre: 'Aprende',
-    modos: [
-      { id: 'foco', nombre: 'Modo foco', encendido: true, ayuda: 'Estudia una lección a pantalla completa, idea a idea' },
-      { id: 'fichas', nombre: 'Lecciones', encendido: true, ayuda: 'Apuntes, fichas, diapositivas y guion de cada lección' },
-      { id: 'video', nombre: 'Vídeo', encendido: true, ayuda: 'Entender un tema antes de estudiarlo' },
-      { id: 'llamada', nombre: 'Llamada', encendido: true, ayuda: 'Habla con tu tutor como por teléfono: clase, entrevista o charla' },
-      { id: 'hablar', nombre: 'Hablar', encendido: true, ayuda: 'Pregunta en voz alta y escucha la respuesta' },
-    ],
-  },
-  // Estudiar lo aprendido: recordarlo de memoria y ponerte a prueba.
-  {
-    nombre: 'Estudia',
-    modos: [
-      { id: 'repaso', nombre: 'Repaso', encendido: true, ayuda: 'Lo que toca recordar hoy' },
-      { id: 'examen', nombre: 'Examen', encendido: true, ayuda: 'Ponte a prueba y saca nota' },
-    ],
-  },
-  {
-    nombre: 'Tu plan',
-    modos: [
-      { id: 'roadmap', nombre: 'Roadmap', encendido: true, ayuda: 'Las lecciones del plan y su orden' },
-      { id: 'calendario', nombre: 'Calendario', encendido: true, ayuda: 'Tu mes: sesiones, deberes y exámenes' },
-      { id: 'progreso', nombre: 'Progreso', encendido: true, ayuda: 'Cuánto llevas y qué dominas' },
-      { id: 'automatizar', nombre: 'Automatizar', encendido: true, ayuda: 'Lo que Magister hace solo: preparar, diapositivas, vídeos' },
-    ],
-  },
-  {
-    nombre: 'Biblioteca',
-    modos: [
-      { id: 'temas', nombre: 'Temas y fuentes', encendido: true, ayuda: 'Tus PDF, libros y webs' },
-      { id: 'proyectos', nombre: 'Proyectos', encendido: false, ayuda: 'El camino que sale de lo que construyes' },
-      { id: 'construccion', nombre: 'Construcción', encendido: false, ayuda: 'Un libro a tu medida, por bloques' },
-    ],
-  },
-  {
-    nombre: 'Taller',
-    plegado: true,
-    modos: [
-      { id: 'etiquetar', nombre: 'Etiquetar tono', encendido: true, ayuda: 'Calibrar el juez de tono' },
-      { id: 'triaje', nombre: 'Triaje del banco', encendido: true, ayuda: 'Revisar preguntas del banco' },
-      { id: 'animaciones', nombre: 'Animaciones', encendido: true, ayuda: 'Las animaciones de espera, todas juntas' },
+      { id: 'tutor', nombre: 'Tutor', encendido: true, ayuda: 'Lo de hoy, paso a paso: repasos, lección y examen' },
+      { id: 'fichas', nombre: 'Lecciones', encendido: true, ayuda: 'Tus lecciones: leerlas, en modo foco, diapositivas y vídeos' },
+      { id: 'llamada', nombre: 'Llamada', encendido: true, ayuda: 'Habla con tu tutor como por teléfono' },
+      { id: 'repaso', nombre: 'Practicar', encendido: true, ayuda: 'Repasa de memoria y hazte exámenes' },
+      { id: 'roadmap', nombre: 'Plan', encendido: true, ayuda: 'Tu plan, tu calendario y cómo vas' },
+      { id: 'temas', nombre: 'Biblioteca', encendido: true, ayuda: 'Tus PDF, libros y webs' },
     ],
   },
 ]
 
-export const MODOS: Modo[] = GRUPOS.flatMap((g) => g.modos)
+// Los que no salen en la barra: se llega por las pestañas de su entrada, por Ctrl+K o por un enlace.
+const OTROS: Modo[] = [
+  { id: 'hoy', nombre: 'Tu día', encendido: true, ayuda: 'Tus cifras, tu semana y lo que toca hoy' },
+  { id: 'foco', nombre: 'Modo foco', encendido: true, ayuda: 'Estudia una lección a pantalla completa, idea a idea' },
+  { id: 'video', nombre: 'Vídeos', encendido: true, ayuda: 'Entender un tema antes de estudiarlo' },
+  { id: 'hablar', nombre: 'Pregunta rápida', encendido: true, ayuda: 'Pregunta en voz alta y escucha la respuesta' },
+  { id: 'examen', nombre: 'Examen', encendido: true, ayuda: 'Ponte a prueba y saca nota' },
+  { id: 'calendario', nombre: 'Calendario', encendido: true, ayuda: 'Tu mes: sesiones, deberes y exámenes' },
+  { id: 'progreso', nombre: 'Progreso', encendido: true, ayuda: 'Cuánto llevas y qué dominas' },
+  { id: 'automatizar', nombre: 'Automatizar', encendido: true, ayuda: 'Lo que Magister hace solo: preparar, diapositivas, vídeos' },
+  { id: 'etiquetar', nombre: 'Etiquetar tono', encendido: true, ayuda: 'Taller: calibrar el juez de tono' },
+  { id: 'triaje', nombre: 'Triaje del banco', encendido: true, ayuda: 'Taller: revisar preguntas del banco' },
+  { id: 'animaciones', nombre: 'Animaciones', encendido: true, ayuda: 'Taller: las animaciones de espera, todas juntas' },
+  { id: 'proyectos', nombre: 'Proyectos', encendido: false, ayuda: 'El camino que sale de lo que construyes' },
+  { id: 'construccion', nombre: 'Construcción', encendido: false, ayuda: 'Un libro a tu medida, por bloques' },
+]
+
+export const MODOS: Modo[] = [...GRUPOS.flatMap((g) => g.modos), ...OTROS]
+
+// Las pestañas de cada entrada: el primero es la entrada de la barra.
+export const FAMILIAS: [IdModo, string][][] = [
+  [
+    ['tutor', 'Sesión de hoy'],
+    ['hoy', 'Tu día'],
+  ],
+  [
+    ['fichas', 'Lecciones'],
+    ['foco', 'Modo foco'],
+    ['video', 'Vídeos'],
+  ],
+  [
+    ['llamada', 'Llamada'],
+    ['hablar', 'Pregunta rápida'],
+  ],
+  [
+    ['repaso', 'Repaso'],
+    ['examen', 'Examen'],
+  ],
+  [
+    ['roadmap', 'Roadmap'],
+    ['calendario', 'Calendario'],
+    ['progreso', 'Progreso'],
+    ['automatizar', 'Automatizar'],
+  ],
+  [
+    ['etiquetar', 'Etiquetar tono'],
+    ['triaje', 'Triaje del banco'],
+    ['animaciones', 'Animaciones'],
+  ],
+]
+
+export const familiaDe = (m: IdModo) => FAMILIAS.find((f) => f.some(([id]) => id === m)) ?? null
+// La entrada de la barra que se ilumina estando en un modo (en Examen se ilumina Practicar).
+export const padreDe = (m: IdModo): IdModo => familiaDe(m)?.[0][0] ?? m

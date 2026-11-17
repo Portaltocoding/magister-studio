@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { pedir } from './api.ts'
-import type { IdModo } from './modos.ts'
+import { padreDe, type IdModo } from './modos.ts'
 
 // La tira fina de la izquierda: siempre a la vista con la barra lateral plegada.
 // El icono del tutor lleva un globito con lo pendiente para que no se te pase.
@@ -62,7 +62,13 @@ const ICONOS: Record<string, ReactElement> = {
       <path d="M6.2 3.5l2 3.2-1.4 1.6a9 9 0 0 0 4.9 4.9l1.6-1.4 3.2 2-1 2.4c-6.5.4-11.8-4.9-11.4-11.4z" />
     </svg>
   ),
-  progreso: (
+  temas: (
+    <svg viewBox="0 0 20 20" aria-hidden>
+      <path d="M4 3.5v13M7.5 3.5v13" />
+      <path d="M11 4.2l3.2-.9 3 12.5-3.2.9z" />
+    </svg>
+  ),
+  roadmap: (
     <svg viewBox="0 0 20 20" aria-hidden>
       <path d="M3.5 16.5h13" />
       <path d="M6 13.5v-3M10 13.5v-7M14 13.5v-5" />
@@ -72,12 +78,11 @@ const ICONOS: Record<string, ReactElement> = {
 
 const ATAJOS: { id: IdModo; nombre: string }[] = [
   { id: 'libre', nombre: 'Estudio libre' },
-  { id: 'foco', nombre: 'Modo foco' },
   { id: 'fichas', nombre: 'Lecciones' },
   { id: 'llamada', nombre: 'Llamada' },
-  { id: 'repaso', nombre: 'Repaso' },
-  { id: 'examen', nombre: 'Examen' },
-  { id: 'progreso', nombre: 'Progreso' },
+  { id: 'repaso', nombre: 'Practicar' },
+  { id: 'roadmap', nombre: 'Plan' },
+  { id: 'temas', nombre: 'Biblioteca' },
 ]
 
 export function usarHoy() {
@@ -126,7 +131,7 @@ export default function Riel({ modo, alAbrir, alIr, hoy }: { modo: IdModo; alAbr
       </button>
       <button
         type="button"
-        className={`riel-boton riel-hoy ${modo === 'tutor' ? 'actual' : ''} ${p.n ? 'con-aviso' : ''}`}
+        className={`riel-boton riel-hoy ${padreDe(modo) === 'tutor' ? 'actual' : ''} ${p.n ? 'con-aviso' : ''}`}
         onClick={() => alIr('tutor')}
         title={p.texto}
         aria-label={p.texto}
@@ -139,7 +144,7 @@ export default function Riel({ modo, alAbrir, alIr, hoy }: { modo: IdModo; alAbr
         <button
           key={a.id}
           type="button"
-          className={`riel-boton ${modo === a.id ? 'actual' : ''}`}
+          className={`riel-boton ${padreDe(modo) === a.id ? 'actual' : ''}`}
           onClick={() => alIr(a.id)}
           title={a.nombre}
           aria-label={a.nombre}
