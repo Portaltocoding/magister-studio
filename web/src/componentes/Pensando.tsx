@@ -174,69 +174,45 @@ function Ordenar() {
   )
 }
 
-// ---------- Fourier: unos círculos que giran, uno sobre otro, y la punta del último dibuja un corazón ----------
+// ---------- Fourier: una onda cuadrada hecha de círculos que giran (los armónicos impares 1, 3, 5, 7) ----------
 
-// La serie de Fourier del corazón, calculada una vez: los términos más grandes, de mayor a menor.
-const SERIE = (() => {
-  const M = 96
-  const puntos: [number, number][] = []
-  for (let k = 0; k < M; k++) {
-    const t = (2 * Math.PI * k) / M
-    const x = 16 * Math.sin(t) ** 3
-    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
-    puntos.push([x * 1.15, y * 1.15 - 3])
-  }
-  const terminos: { f: number; r: number; fase: number }[] = []
-  let centro: [number, number] = [0, 0]
-  for (let f = -12; f <= 12; f++) {
-    let re = 0
-    let im = 0
-    for (let k = 0; k < M; k++) {
-      const a = (-2 * Math.PI * f * k) / M
-      re += (puntos[k][0] * Math.cos(a) - puntos[k][1] * Math.sin(a)) / M
-      im += (puntos[k][0] * Math.sin(a) + puntos[k][1] * Math.cos(a)) / M
-    }
-    if (f === 0) centro = [re, im]
-    else terminos.push({ f, r: Math.hypot(re, im), fase: Math.atan2(im, re) })
-  }
-  terminos.sort((x, y) => y.r - x.r)
-  return { centro, terminos: terminos.slice(0, 10) }
-})()
-
-function cadena(t: number): [number, number][] {
-  let x = 27 + SERIE.centro[0]
-  let y = 27 + SERIE.centro[1]
-  const puntos: [number, number][] = [[x, y]]
-  for (const c of SERIE.terminos) {
-    x += c.r * Math.cos(c.f * t + c.fase)
-    y += c.r * Math.sin(c.f * t + c.fase)
-    puntos.push([x, y])
-  }
-  return puntos
-}
+const ARMONICOS = [1, 3, 5, 7].map((n) => ({ n, r: (4 / (n * Math.PI)) * 9 }))
+const ONDA = 34 // puntos de la onda que se ven
 
 function Fourier() {
   const fase = usarFase()
-  const t = fase * 0.8
-  const brazos = cadena(t)
+  const t = fase * 1.6
+  const brazos = useMemo(() => {
+    let x = 20
+    let y = 27
+    const ps: [number, number][] = [[x, y]]
+    for (const a of ARMONICOS) {
+      x += a.r * Math.cos(a.n * t)
+      y += a.r * Math.sin(a.n * t)
+      ps.push([x, y])
+    }
+    return ps
+  }, [t])
   const punta = brazos[brazos.length - 1]
-  // La estela: lo que ha dibujado la punta en el último 85 % de la vuelta.
-  const estela = useMemo(() => {
+  // La onda: la altura de la punta en los instantes anteriores, saliendo hacia la derecha.
+  const onda = useMemo(() => {
     const ps: string[] = []
-    for (let k = 0; k <= 80; k++) {
-      const [x, y] = cadena(t - (k / 80) * Math.PI * 2 * 0.85).at(-1)!
-      ps.push(`${x.toFixed(2)},${y.toFixed(2)}`)
+    for (let k = 0; k <= ONDA; k++) {
+      const tt = t - k * 0.09
+      const y = 27 + ARMONICOS.reduce((acc, a) => acc + a.r * Math.sin(a.n * tt), 0)
+      ps.push(`${(44 + k * 1.0).toFixed(2)},${y.toFixed(2)}`)
     }
     return `M${ps.join('L')}`
   }, [t])
   return (
-    <svg className="anim-svg" viewBox="0 0 54 54" width={54} height={54} aria-hidden>
+    <svg className="anim-svg" viewBox="0 0 80 54" width={80} height={54} aria-hidden>
       {brazos.slice(0, -1).map(([x, y], i) => (
-        <circle key={i} className="fourier-circulo" cx={x} cy={y} r={SERIE.terminos[i].r} />
+        <circle key={i} className="fourier-circulo" cx={x} cy={y} r={ARMONICOS[i].r} />
       ))}
       <polyline className="fourier-radio" points={brazos.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')} fill="none" />
-      <path className="fourier-trazo" d={estela} />
-      <circle className="fourier-punta" cx={punta[0]} cy={punta[1]} r={1.3} />
+      <line className="fourier-enlace" x1={punta[0]} y1={punta[1]} x2={44} y2={punta[1]} />
+      <path className="fourier-trazo" d={onda} />
+      <circle className="fourier-punta" cx={punta[0]} cy={punta[1]} r={1.2} />
     </svg>
   )
 }
