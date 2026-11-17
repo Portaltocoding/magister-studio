@@ -301,7 +301,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
 
       <p className="guia-pie">
         <button className="enlace" onClick={() => irA('hoy')}>
-          Tus cifras y tu semana, en Hoy →
+          Tus cifras y tu semana, en Tu día →
         </button>
       </p>
     </div>

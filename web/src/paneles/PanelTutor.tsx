@@ -748,7 +748,7 @@ function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | 
   return (
     <section className="tu-dia">
       <h2>
-        Tu día <small>{quedan > 0 ? `quedan unas ${horas(quedan)} h` : 'todo hecho'}</small>
+        Lo que toca <small>{quedan > 0 ? `quedan unas ${horas(quedan)} h` : 'todo hecho'}</small>
       </h2>
       <ol>
         {(hoy.temas ?? []).map((t) => (
@@ -930,7 +930,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
         <Mascota mini />
         <div>
           <p className="hoy-saludo">{saludo()}</p>
-          <h1>Hoy</h1>
+          <h1>Tu día</h1>
           <p className="nota hoy-fecha">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
       </header>

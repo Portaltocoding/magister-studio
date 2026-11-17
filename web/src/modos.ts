@@ -39,28 +39,32 @@ export interface Grupo {
 }
 
 export const GRUPOS: Grupo[] = [
-  // Lo primero, solo y sin título: preguntar lo que sea.
+  // Lo primero: el tutor que te guía y tu día.
   {
-    nombre: '',
-    modos: [{ id: 'libre', nombre: 'Estudio libre', encendido: true, ayuda: 'Pregunta lo que quieras al tutor' }],
-  },
-  {
-    nombre: 'Cada día',
+    nombre: 'Hoy',
     modos: [
       { id: 'tutor', nombre: 'Tutor', encendido: true, ayuda: 'Te guía por lo de hoy: repasos, lección y examen, paso a paso' },
-      { id: 'hoy', nombre: 'Hoy', encendido: true, ayuda: 'Tus cifras, tu semana y lo que toca hoy' },
-      { id: 'repaso', nombre: 'Repaso', encendido: true, ayuda: 'Lo que toca recordar hoy' },
-      { id: 'examen', nombre: 'Examen', encendido: true, ayuda: 'Ponte a prueba y saca nota' },
+      { id: 'hoy', nombre: 'Tu día', encendido: true, ayuda: 'Tus cifras, tu semana y lo que toca hoy' },
     ],
   },
+  // Aprender algo nuevo: entenderlo por primera vez.
   {
-    nombre: 'Estudiar',
+    nombre: 'Aprende',
     modos: [
       { id: 'foco', nombre: 'Modo foco', encendido: true, ayuda: 'Estudia una lección a pantalla completa, idea a idea' },
       { id: 'fichas', nombre: 'Lecciones', encendido: true, ayuda: 'Apuntes, fichas, diapositivas y guion de cada lección' },
+      { id: 'video', nombre: 'Vídeo', encendido: true, ayuda: 'Entender un tema antes de estudiarlo' },
       { id: 'llamada', nombre: 'Llamada', encendido: true, ayuda: 'Habla con tu tutor como por teléfono: clase, entrevista o charla' },
       { id: 'hablar', nombre: 'Hablar', encendido: true, ayuda: 'Pregunta en voz alta y escucha la respuesta' },
-      { id: 'video', nombre: 'Vídeo', encendido: true, ayuda: 'Entender un tema antes de estudiarlo' },
+      { id: 'libre', nombre: 'Estudio libre', encendido: true, ayuda: 'Pregunta lo que quieras al tutor' },
+    ],
+  },
+  // Estudiar lo aprendido: recordarlo de memoria y ponerte a prueba.
+  {
+    nombre: 'Estudia',
+    modos: [
+      { id: 'repaso', nombre: 'Repaso', encendido: true, ayuda: 'Lo que toca recordar hoy' },
+      { id: 'examen', nombre: 'Examen', encendido: true, ayuda: 'Ponte a prueba y saca nota' },
     ],
   },
   {
