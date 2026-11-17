@@ -315,7 +315,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     esperandoSeguir.current = false
     try {
       const titulo =
-        tipo === 'oral' ? `Llamada: examen oral de ${clave}` : tipo === 'clase' ? `Llamada: clase de ${clave}` : tipo === 'entrevista' ? `Llamada: entrevista${clave ? ` de ${clave}` : ''}` : 'Llamada'
+        tipo === 'oral' ? `Charla: examen oral de ${clave}` : tipo === 'clase' ? `Charla: clase de ${clave}` : tipo === 'entrevista' ? `Charla: entrevista${clave ? ` de ${clave}` : ''}` : 'Charla'
       cid.current = (await crearConversacion(titulo)).id
       alCambiar?.()
     } catch (e) {
@@ -457,7 +457,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     const modos = prefs ? todosLosModos(prefs) : []
     return (
       <div className="panel llamada-preparar">
-        <h1>Llamada</h1>
+        <h1>Charla</h1>
         <p className="nota">Habla con tu tutor como por teléfono: sin pulsar nada, interrumpiéndole cuando quieras.</p>
         <div className="llamada-tipos" role="radiogroup" aria-label="Tipo de llamada">
           {(
@@ -528,7 +528,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     return (
       <div className="panel llamada-colgada">
         <Mascota />
-        <h1>Llamada terminada</h1>
+        <h1>Charla terminada</h1>
         <p className="nota">
           {reloj(segundos)} · {turnos.filter((t) => t.rol === 'tu').length} intervenciones tuyas
         </p>

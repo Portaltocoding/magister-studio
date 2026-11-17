@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import Vacio from '../componentes/Vacio.tsx'
+import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import {
   pedir,
   crearFuente,
-  decidirPropuesta,
   estadoIndice,
   listarDocumentos,
   listarFuentes,
   listarPropuestas,
   listarTemas,
   subirFichero,
-  subirUrl,
   type DocumentoInfo,
   type Fuente,
   type PropuestaInfo,
@@ -35,7 +33,6 @@ export default function PanelFuentes() {
   const [estado, setEstado] = useState<{ documentos: number; fragmentos: number } | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [nueva, setNueva] = useState({ nombre: '', tipo: 'pdf' as Fuente['tipo'], confianza: 3 })
-  const [url, setUrl] = useState('')
   const [tema, setTema] = useState<number | null>(null)
 
   const recargar = useCallback(() => {
@@ -79,7 +76,7 @@ export default function PanelFuentes() {
 
   return (
     <div className="panel">
-      <h1>Temas y fuentes</h1>
+      <h1>Tus fuentes</h1>
       <p className="nota">
         {estado ? `${estado.documentos} documentos · ${estado.fragmentos} fragmentos indexados` : ''} · El tutor responde
         con tus fuentes y cita cada afirmación.
@@ -91,33 +88,11 @@ export default function PanelFuentes() {
       )}
 
       {propuestas.length > 0 && (
-        <section className="propuesta">
-          <h2>Propuestas del research ({propuestas.length})</h2>
-          <ul className="lista-propuestas">
-            {propuestas.map((p) => (
-              <li key={p.id}>
-                <a href={p.url} target="_blank" rel="noreferrer">
-                  {p.titulo || p.url}
-                </a>{' '}
-                <span className="nota-linea">
-                  {p.leccion_clave} · {p.motivo}
-                </span>{' '}
-                <button
-                  className="boton-mini"
-                  onClick={() => conAviso(() => decidirPropuesta(p.id, 'aprobar'), 'Aprobada: entra por la ingesta.')}
-                >
-                  Aprobar
-                </button>{' '}
-                <button
-                  className="boton-mini"
-                  onClick={() => conAviso(() => decidirPropuesta(p.id, 'rechazar'), 'Rechazada.')}
-                >
-                  Rechazar
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <p className="nota">
+          <button className="enlace" onClick={() => irARuta('#/buscar')}>
+            {propuestas.length} {propuestas.length === 1 ? 'fuente propuesta' : 'fuentes propuestas'} por revisar, en Buscar fuentes →
+          </button>
+        </p>
       )}
 
       {fuentes.length === 0 && (
@@ -227,18 +202,9 @@ export default function PanelFuentes() {
                 }}
               />
             </label>
-            <form
-              className="fila"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (!url.trim()) return
-                conAviso(() => subirUrl(activa, url.trim(), tema), 'Página en cola.')
-                setUrl('')
-              }}
-            >
-              <input placeholder="https://..." aria-label="URL" value={url} onChange={(e) => setUrl(e.target.value)} />
-              <button className="boton-mini">Añadir URL</button>
-            </form>
+            <button className="boton-mini" onClick={() => irARuta('#/web')}>
+              Guardar páginas o PDF de la web →
+            </button>
           </div>
           <p className="nota">
             Para una carpeta entera o tu vault de Obsidian: <code>uv run magister ingerir RUTA --fuente NOMBRE</code>

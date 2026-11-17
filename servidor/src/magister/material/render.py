@@ -16,6 +16,28 @@ from magister.material.almacen import carpeta_salidas
 from magister.material.plantillas import ESTILOS
 
 MOTOR = Path(__file__).parent / "motor_pdf"
+_HEX = re.compile(r"#[0-9a-fA-F]{6}")
+
+
+async def color_acento(clave: str) -> str | None:
+    """El acento que elegiste en la app («Afinar»): fijo, o por turnos según la lección (L3 → el tercero)."""
+    from magister.datos.produccion import Ajuste
+    from magister.datos.sesion import nueva_sesion
+
+    try:
+        async with nueva_sesion() as s:
+            fila = await s.get(Ajuste, "acento")
+    except Exception:  # noqa: BLE001 - sin base de datos (pruebas): el color de la maqueta
+        return None
+    v = fila.valor if fila else None
+    if not isinstance(v, dict):
+        return None
+    color = v.get("color")
+    paleta = [c for c in v.get("paleta", []) if isinstance(c, str) and _HEX.fullmatch(c)]
+    n = re.sub(r"\D", "", clave)
+    if v.get("modo") == "auto" and paleta and n:
+        color = paleta[(int(n) - 1) % len(paleta)]
+    return color if isinstance(color, str) and _HEX.fullmatch(color) else None
 GIT_BIN = Path("C:/Program Files/Git/mingw64/bin")
 
 
@@ -28,11 +50,15 @@ class Render:
     error: str | None = None
 
 
-def _entorno(estilo: str = "libro") -> dict:
+def _entorno(estilo: str = "libro", acento: str | None = None) -> dict:
     extra = [ajustes.pandoc, str(GIT_BIN)]
     # La maqueta del libro (practica.css), no la de las fichas generales.
-    return {**os.environ, "PATH": os.pathsep.join([*extra, os.environ.get("PATH", "")]), "PYTHONUTF8": "1",
-            "FICHA_CSS": ESTILOS.get(estilo, "practica.css")}
+    entorno = {**os.environ, "PATH": os.pathsep.join([*extra, os.environ.get("PATH", "")]), "PYTHONUTF8": "1",
+               "FICHA_CSS": ESTILOS.get(estilo, "practica.css")}
+    entorno.pop("FICHA_ACENTO", None)
+    if acento and _HEX.fullmatch(acento):
+        entorno["FICHA_ACENTO"] = acento
+    return entorno
 
 
 def _avisos(salida: str) -> list[dict]:
@@ -81,10 +107,11 @@ async def pintar(markdown: str, plan_id: int, clave: str, nombre: str = "apuntes
     md = svg_en_linea(re.sub(r"^salida: .*$", f"salida: {pdf.as_posix()}", markdown, count=1, flags=re.M))
     (trabajo / "ficha.md").write_text(md, encoding="utf-8")
     (carpeta / f"{nombre}.md").write_text(md, encoding="utf-8")
+    acento = await color_acento(clave)
     try:
         proc = await asyncio.create_subprocess_exec(
             sys.executable, str(MOTOR / "build_win.py"), str(trabajo),
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=_entorno(estilo), cwd=str(MOTOR),
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=_entorno(estilo, acento), cwd=str(MOTOR),
         )
         salida, _ = await asyncio.wait_for(proc.communicate(), timeout=300)
     except (TimeoutError, OSError) as e:

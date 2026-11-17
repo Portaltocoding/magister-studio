@@ -152,6 +152,26 @@ class ModoPropio(BaseModel):
     reglas: list[str] = Field(default_factory=list, max_length=10)
 
 
+class Apariencia(BaseModel):
+    modo: Literal["auto", "fijo"] = "fijo"
+    color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
+    paleta: list[str] = Field(default_factory=list, max_length=20)
+
+
+@rutas.put("/apariencia")
+async def guardar_apariencia(a: Apariencia) -> dict:
+    """El acento de la app, para que los PDF (apuntes y libro del tema) salgan con el mismo color."""
+    from sqlalchemy.dialects.postgresql import insert
+
+    from magister.datos.produccion import Ajuste
+
+    valor = {"modo": a.modo, "color": a.color, "paleta": [c for c in a.paleta if len(c) == 7 and c.startswith("#")]}
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(insert(Ajuste).values(clave="acento", valor=valor)
+                        .on_conflict_do_update(index_elements=[Ajuste.clave], set_={"valor": valor}))
+    return valor
+
+
 class PreferenciasTutor(BaseModel):
     longitud: Literal["breve", "normal", "detallada"] = "normal"
     nivel: Literal["cero", "normal", "experto"] = "normal"

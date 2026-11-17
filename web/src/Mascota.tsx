@@ -107,9 +107,21 @@ export default function Mascota({ mini = false, forma: fija, gesto = 'normal' }:
       <g className="mascota-figura">
         {forma === 'buho' && (
           <>
-            {/* Silueta de búho: cuerpo redondeado con dos orejas en punta; nada más. */}
-            <path className="mascota-cuerpo" d="M22 34 L30 8 L48 26 Q60 23 72 26 L90 8 L98 34 Q110 58 104 84 Q96 113 60 113 Q24 113 16 84 Q10 58 22 34 Z" />
-            <Ojos izq={{ x: 44, y: 60 }} der={{ x: 76, y: 60 }} ancho={9} alto={16} m={m} />
+            {/* Búho plano: cuerpo de huevo, penachos cortos que se abren hacia fuera (no cuernos), disco facial más
+                claro con ojos redondos, pico ámbar, alas, plumas en el pecho y patitas. */}
+            {/* Una sola silueta (cuerpo y penachos), para que el contorno del modo oscuro no deje costuras. */}
+            <path
+              className="mascota-cuerpo"
+              d="M16 68 C16 50 21 40 30 34 C22 28 16 21 15 13 C25 16 34 21 42 27 C47 24 53 22 60 22 C67 22 73 24 78 27 C86 21 95 16 105 13 C104 21 98 28 90 34 C99 40 104 50 104 68 C104 98 86 112 60 112 C34 112 16 98 16 68 Z"
+            />
+            <path className="mascota-ala" d="M22 62 C16 80 22 96 38 104" />
+            <path className="mascota-ala" d="M98 62 C104 80 98 96 82 104" />
+            <circle className="mascota-disco" cx="43" cy="58" r="19" />
+            <circle className="mascota-disco" cx="77" cy="58" r="19" />
+            <path className="mascota-pluma" d="M50 90 l5 4 l5 -4 M60 90 l5 4 l5 -4 M55 98 l5 4 l5 -4" />
+            <Ojos izq={{ x: 43, y: 58 }} der={{ x: 77, y: 58 }} ancho={10} alto={11} m={m} />
+            <path className="mascota-pico" d="M54.5 69 Q60 66 65.5 69 L60 79 Z" />
+            <path className="mascota-pata" d="M44 111 q2 4 4 0 q2 4 4 0 M68 111 q2 4 4 0 q2 4 4 0" />
           </>
         )}
         {forma === 'sencilla' && (

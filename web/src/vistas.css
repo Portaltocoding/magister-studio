@@ -633,28 +633,8 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
   .guia-pasos, .guia-pie { margin-left: 0; }
 }
 
-/* ===== La barra lateral: una sola línea recta que une secciones y modos =====
-   Sin sangría: los modos van alineados con el título de su sección. Cada uno, un punto sobre la línea. */
 .marca-nombre { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 .marca-nombre:hover { opacity: 0.75; }
-.grupos-modos { gap: 10px; }
-.grupo-modos[data-rama] { position: relative; --linea: color-mix(in srgb, var(--suave) 45%, transparent); --nodo-fondo: var(--panel, var(--fondo)); }
-.grupo-modos[data-rama]::before { content: ""; position: absolute; left: 13px; top: 0; bottom: -10px; width: 1px; background: var(--linea); }
-.grupo-inicio + .grupo-modos[data-rama]::before { top: 11px; }
-.grupo-modos[data-rama]:last-child::before { bottom: auto; height: 11px; }
-.grupo-modos[data-rama] > button.grupo-titulo { position: relative; padding-left: 30px; }
-.grupo-modos[data-rama] > button.grupo-titulo::before {
-  content: ""; position: absolute; left: 10px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%;
-  background: var(--suave); box-shadow: 0 0 0 3px var(--nodo-fondo);
-}
-.grupo-modos[data-rama] .modos { padding-left: 22px; }
-.grupo-modos[data-rama] .modos > li { position: relative; }
-.grupo-modos[data-rama] .modos > li::before {
-  content: ""; position: absolute; left: -11px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%;
-  background: var(--nodo-fondo); border: 1px solid var(--suave); opacity: 0.8;
-}
-.grupo-modos[data-rama] .modos > li:has(.modo[aria-current="page"])::before { background: var(--texto); border-color: var(--texto); opacity: 1; }
-.grupo-modos[data-rama] .modo { padding-left: 8px; }
 
 /* ===== Animaciones de espera: solas, sin fondo ni marco detrás ===== */
 .anim-svg .fourier-circulo { fill: none; stroke: currentColor; stroke-width: 0.7; opacity: 0.5; }
@@ -663,11 +643,28 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .anim-svg .fourier-punta { fill: currentColor; }
 .anim-svg .fourier-enlace { stroke: currentColor; stroke-width: 0.6; opacity: 0.45; stroke-dasharray: 1.5 1.5; }
 
-/* ===== Barra lateral: siete entradas unidas por una línea ===== */
-.grupos-modos .grupo-modos.grupo-lista::before { top: 19px; bottom: 19px; height: auto; }
-.grupo-lista .modos { padding-left: 22px; }
+/* ===== Barra lateral: entradas y, debajo, sus subsecciones unidas por una línea ===== */
+.grupos-modos { gap: 6px; }
+.grupo-entrada .entrada {
+  display: block; width: 100%; text-align: left; border: 0; background: none; cursor: pointer; font: inherit;
+  font-weight: 650; color: var(--texto); padding: 6px 8px 2px; border-radius: 8px;
+}
+.grupo-entrada .entrada:hover { opacity: 0.75; }
+.grupo-entrada .modos { position: relative; margin: 0 0 2px 8px; padding-left: 8px; gap: 0; }
+.grupo-entrada .modos::before {
+  content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px;
+  background: color-mix(in srgb, var(--suave) 45%, transparent);
+}
+.grupo-entrada .modo { padding-top: 4px; padding-bottom: 4px; font-size: 0.92rem; color: var(--suave); }
+.grupo-entrada .modo:hover:not(:disabled) { color: var(--texto); }
+.grupo-entrada .modo[aria-current="page"] { color: var(--texto); font-weight: 600; }
+/* La subsección en la que estás: la línea se marca a su altura. */
+.grupo-entrada .modos > li { position: relative; }
+.grupo-entrada .modos > li:has(.modo[aria-current="page"])::before {
+  content: ""; position: absolute; left: -8px; top: 5px; bottom: 5px; width: 2px; border-radius: 2px; background: var(--texto);
+}
 .enlace-taller {
-  align-self: flex-start; margin: 6px 0 0 30px; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  align-self: flex-start; margin: 10px 0 0 8px; padding: 2px 0; border: 0; background: none; cursor: pointer;
   font: inherit; font-size: 0.78rem; color: var(--suave); opacity: 0.7;
 }
 .enlace-taller:hover, .enlace-taller.actual { opacity: 1; color: var(--texto); }
@@ -682,3 +679,18 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 }
 .pestanas-modo button:hover { color: var(--texto); }
 .pestanas-modo button.actual { background: var(--tarjeta); color: var(--texto); font-weight: 600; box-shadow: 0 1px 4px rgb(0 0 0 / 0.12); }
+
+/* ===== Biblioteca: buscar fuentes y guardar de la web ===== */
+.biblioteca { max-width: 860px; }
+.biblioteca section { margin-top: 26px; }
+.biblioteca-buscar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 14px; }
+.biblioteca-buscar input, .biblioteca-buscar select { flex: 1; min-width: 220px; font: inherit; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 8px 12px; }
+.biblioteca-lista { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.biblioteca-lista li { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 10px 14px; border: 1px solid var(--borde); border-radius: 12px; background: var(--tarjeta); }
+.biblioteca-lista li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.biblioteca-lista a { color: var(--texto); font-weight: 600; overflow-wrap: anywhere; }
+.biblioteca-lista small { color: var(--suave); font-size: 0.85rem; }
+.biblioteca-botones { display: flex; gap: 6px; flex: none; }
+.biblioteca-enlaces { width: 100%; box-sizing: border-box; font: inherit; font-family: var(--mono, ui-monospace, monospace); font-size: 0.9rem; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 10px 0; resize: vertical; }
+.biblioteca-opciones { gap: 14px; align-items: center; flex-wrap: wrap; }
+.biblioteca-opciones select { font: inherit; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 8px; padding: 4px 8px; }

@@ -79,7 +79,6 @@ const ICONOS: Record<string, ReactElement> = {
 const ATAJOS: { id: IdModo; nombre: string }[] = [
   { id: 'libre', nombre: 'Estudio libre' },
   { id: 'fichas', nombre: 'Lecciones' },
-  { id: 'llamada', nombre: 'Llamada' },
   { id: 'repaso', nombre: 'Practicar' },
   { id: 'roadmap', nombre: 'Plan' },
   { id: 'temas', nombre: 'Biblioteca' },

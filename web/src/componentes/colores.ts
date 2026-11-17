@@ -39,6 +39,16 @@ function leer(): AjusteColores {
   }
 }
 
+// El servidor también lo sabe: así los PDF (apuntes y libro del tema) salen con el mismo acento.
+export function sincronizarAcento(a: AjusteColores) {
+  const color = (ACENTOS.find((x) => x.id === a.acento) ?? ACENTOS[0]).color
+  fetch('/api/apariencia', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modo: a.modo, color, paleta: ACENTOS.map((x) => x.color) }),
+  }).catch(() => undefined)
+}
+
 // El ajuste compartido entre Lecciones y el foco: cambiarlo en uno repinta el otro al momento.
 export function usarColores(): [AjusteColores, (a: AjusteColores) => void] {
   const [ajuste, setAjuste] = useState(leer)
@@ -54,6 +64,7 @@ export function usarColores(): [AjusteColores, (a: AjusteColores) => void] {
       /* sin almacenamiento: vale hasta recargar */
     }
     setAjuste(a)
+    sincronizarAcento(a)
     window.dispatchEvent(new Event(EVENTO))
   }
   return [ajuste, guardar]

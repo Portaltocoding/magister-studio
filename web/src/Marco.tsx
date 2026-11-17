@@ -6,7 +6,7 @@ import Riel, { pendienteDeHoy, usarHoy } from './Riel.tsx'
 import Paleta from './componentes/Paleta.tsx'
 import { avisosActivos } from './componentes/Afinar.tsx'
 import { avisar } from './componentes/pomodoro.ts'
-import { acentoDe, usarColores, variables } from './componentes/colores.ts'
+import { acentoDe, sincronizarAcento, usarColores, variables } from './componentes/colores.ts'
 import Central from './Central.tsx'
 import { MODOS, type IdModo } from './modos.ts'
 
@@ -94,6 +94,9 @@ export default function Marco() {
   }, [])
   // El acento elegido vale para toda la app (Progreso, Tutor, foco), no solo para Lecciones.
   const [colores] = usarColores()
+  // Al abrir, el servidor se entera del acento (por si lo cambiaste en otro navegador o antes de esto).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => sincronizarAcento(colores), [])
   useEffect(() => setMenu(false), [modo, activa])
   const [tipoNueva, setTipoNueva] = useState<'libre' | 'plan'>(() =>
     window.location.hash.startsWith('#/nuevo-plan') ? 'plan' : 'libre',

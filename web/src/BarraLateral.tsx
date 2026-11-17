@@ -1,5 +1,5 @@
 import { borrarConversacion, type Conversacion } from './api.ts'
-import { GRUPOS, padreDe, type IdModo } from './modos.ts'
+import { GRUPOS, TALLER, type IdModo } from './modos.ts'
 
 interface Props {
   modoActivo: IdModo
@@ -27,7 +27,6 @@ export default function BarraLateral({
   oculta = false,
   alFijar,
 }: Props) {
-  const actual = padreDe(modoActivo)
   return (
     <aside className="lateral" inert={oculta}>
       <div className="marca">
@@ -71,7 +70,7 @@ export default function BarraLateral({
                     className="modo"
                     disabled={!m.encendido}
                     title={m.ayuda}
-                    aria-current={m.id === actual ? 'page' : undefined}
+                    aria-current={m.id === modoActivo ? 'page' : undefined}
                     onClick={() => alElegir(m.id)}
                   >
                     <span>{m.nombre}</span>
@@ -87,14 +86,18 @@ export default function BarraLateral({
                 {lista}
               </div>
             )
-          // Las seis entradas, unidas por una línea.
+          // Cada entrada, con sus subsecciones debajo unidas por una línea.
+          const dentro = g.modos.some((m) => m.id === modoActivo)
           return (
-            <div key={g.nombre} className="grupo-modos grupo-lista" data-rama={ig}>
+            <div key={g.nombre} className={`grupo-modos grupo-entrada ${dentro ? 'dentro' : ''}`} data-orden={ig}>
+              <button type="button" className="entrada" title={g.ayuda} onClick={() => alElegir(g.modos[0].id)}>
+                {g.nombre}
+              </button>
               {lista}
             </div>
           )
         })}
-        <button type="button" className={`enlace-taller ${actual === 'etiquetar' ? 'actual' : ''}`} onClick={() => alElegir('etiquetar')} title="Para calibrar Magister: tono, banco de preguntas y animaciones">
+        <button type="button" className={`enlace-taller ${TALLER.some((m) => m.id === modoActivo) ? 'actual' : ''}`} onClick={() => alElegir('etiquetar')} title="Para calibrar Magister: tono, banco de preguntas y animaciones">
           Taller
         </button>
       </nav>

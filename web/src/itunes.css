@@ -188,3 +188,11 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
   .mascota .mascota-cuerpo { stroke: color-mix(in srgb, #fff 22%, transparent) !important; stroke-width: 2; }
 }
 @media (prefers-reduced-motion: reduce) { .mascota-ojos { transition: none; } }
+
+/* ===== Búho: disco facial, pico, alas, plumas y patitas ===== */
+.mascota .mascota-disco { fill: color-mix(in srgb, var(--m-cuerpo) 78%, var(--m-claro)); }
+.mascota .mascota-ala { fill: none; stroke: color-mix(in srgb, var(--m-cuerpo) 70%, var(--m-claro)); stroke-width: 3; stroke-linecap: round; }
+.mascota .mascota-pluma { fill: none; stroke: color-mix(in srgb, var(--m-cuerpo) 65%, var(--m-claro)); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.mascota .mascota-pico { fill: #e3a33b; stroke: #e3a33b; stroke-width: 1.5; stroke-linejoin: round; }
+.mascota .mascota-pata { fill: none; stroke: #e3a33b; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.mascota-mini .mascota-pluma, .mascota-mini .mascota-pata { display: none; }

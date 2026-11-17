@@ -102,6 +102,10 @@ def to_html(md, m):
     body = body.replace("<p>[[INDICE]]</p>", index(body))
     body = body.replace('<input type="checkbox" disabled="" />', '<span class="chk"></span>')
     css = open(os.path.join(MOTOR, os.environ.get("FICHA_CSS", "ficha.css")), encoding="utf8").read()
+    acento = os.environ.get("FICHA_ACENTO", "")
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", acento):
+        # El acento que elegiste en la app: números, etiquetas y resaltes del PDF.
+        css += f"\n:root {{ --amarillo: {acento}; --amarillo-claro: color-mix(in srgb, {acento} 30%, #fff); }}\n"
     return f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><title>{H.escape(m['titulo'])}</title>
 <link rel="stylesheet" href="file:///{KATEX.replace(chr(92), "/")}/katex.min.css"><style>{css}</style>
 <script src="file:///{KATEX.replace(chr(92), "/")}/katex.min.js"></script></head><body>{body}
