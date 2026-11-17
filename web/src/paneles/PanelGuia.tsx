@@ -108,6 +108,8 @@ function pasosDe(hoy: Hoy, minutos: number | null, dia: Dia, titulo: (clave: str
 function frase(pasos: Paso[], actual: Paso | undefined, hoy: Hoy, comentario: string | null): string {
   const pendientes = pasos.filter((p) => !p.hecho)
   const hechos = pasos.filter((p) => p.hecho)
+  if (hoy.estado === 'sin_plan' && !pasos.length)
+    return `${saludo()}. Empezamos de cero: dime qué quieres aprender y te monto el plan, con sus lecciones y su calendario. Mientras, puedes preguntarme lo que quieras en Estudio libre.`
   if (!pasos.length)
     return hoy.titulo && hoy.estado === 'adelantar'
       ? `${saludo()}. Hoy no te toca nada. Si te apetece, adelantamos ${hoy.leccion_clave}; si no, descansa, que también cuenta.`
@@ -256,7 +258,17 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
               </button>
             </div>
           )}
-          {!actual && (
+          {!actual && hoy.estado === 'sin_plan' && (
+            <div className="vacio-acciones">
+              <button className="boton boton-principal" onClick={() => irARuta('#/nuevo-plan')}>
+                Crear mi plan
+              </button>
+              <button className="boton" onClick={() => irA('libre')}>
+                Estudio libre
+              </button>
+            </div>
+          )}
+          {!actual && hoy.estado !== 'sin_plan' && (
             <div className="vacio-acciones">
               <button className="boton" onClick={() => irARuta('#/llamada')}>
                 Charlar por llamada

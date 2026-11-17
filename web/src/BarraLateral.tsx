@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { borrarConversacion, type Conversacion } from './api.ts'
 import { GRUPOS, TALLER, type IdModo } from './modos.ts'
 
@@ -15,6 +16,17 @@ interface Props {
   alFijar?: (si: boolean) => void
 }
 
+// Las secciones plegadas se recuerdan en este navegador.
+const CLAVE_PLEGADAS = 'magister-secciones-plegadas'
+function leerPlegadas(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_PLEGADAS) ?? '[]')
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 export default function BarraLateral({
   modoActivo,
   alElegir,
@@ -27,6 +39,16 @@ export default function BarraLateral({
   oculta = false,
   alFijar,
 }: Props) {
+  const [plegadas, setPlegadas] = useState<string[]>(leerPlegadas)
+  const plegar = (nombre: string, si: boolean) => {
+    const nuevas = si ? [...plegadas.filter((n) => n !== nombre), nombre] : plegadas.filter((n) => n !== nombre)
+    setPlegadas(nuevas)
+    try {
+      localStorage.setItem(CLAVE_PLEGADAS, JSON.stringify(nuevas))
+    } catch {
+      /* sin almacenamiento: vale para esta sesión */
+    }
+  }
   return (
     <aside className="lateral" inert={oculta}>
       <div className="marca">
@@ -87,13 +109,39 @@ export default function BarraLateral({
               </div>
             )
           // Cada entrada, con sus subsecciones debajo unidas por una línea.
+          // Se puede plegar con la flecha; al entrar por su nombre se despliega.
           const dentro = g.modos.some((m) => m.id === modoActivo)
+          const plegada = plegadas.includes(g.nombre)
+          const idLista = `seccion-${ig}`
           return (
-            <div key={g.nombre} className={`grupo-modos grupo-entrada ${dentro ? 'dentro' : ''}`} data-orden={ig}>
-              <button type="button" className="entrada" title={g.ayuda} onClick={() => alElegir(g.modos[0].id)}>
-                {g.nombre}
-              </button>
-              {lista}
+            <div key={g.nombre} className={`grupo-modos grupo-entrada ${dentro ? 'dentro' : ''} ${plegada ? 'plegada' : ''}`} data-orden={ig}>
+              <div className="entrada-fila">
+                <button
+                  type="button"
+                  className="entrada"
+                  title={g.ayuda}
+                  onClick={() => {
+                    if (plegada) plegar(g.nombre, false)
+                    alElegir(g.modos[0].id)
+                  }}
+                >
+                  {g.nombre}
+                </button>
+                <button
+                  type="button"
+                  className="plegar-seccion"
+                  aria-expanded={!plegada}
+                  aria-controls={idLista}
+                  aria-label={plegada ? `Desplegar ${g.nombre}` : `Plegar ${g.nombre}`}
+                  title={plegada ? 'Desplegar' : 'Plegar'}
+                  onClick={() => plegar(g.nombre, !plegada)}
+                >
+                  <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden>
+                    <path d="M3 4.5 L6 7.5 L9 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              {!plegada && <div id={idLista}>{lista}</div>}
             </div>
           )
         })}

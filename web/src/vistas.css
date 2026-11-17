@@ -650,6 +650,23 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
   font-weight: 650; color: var(--texto); padding: 6px 8px 2px; border-radius: 8px;
 }
 .grupo-entrada .entrada:hover { opacity: 0.75; }
+.grupo-entrada .entrada-fila { display: flex; align-items: center; }
+.grupo-entrada .entrada-fila .entrada { flex: 1; min-width: 0; }
+.plegar-seccion {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin: 4px 4px 0 0; padding: 0;
+  border: 0; border-radius: 6px; background: none; cursor: pointer; color: var(--suave); opacity: 0;
+  transition: opacity 150ms ease, transform 200ms ease, background 150ms ease;
+}
+.plegar-seccion svg { transition: transform 200ms ease; }
+.grupo-entrada:hover .plegar-seccion, .plegar-seccion:focus-visible, .grupo-entrada.plegada .plegar-seccion { opacity: 1; }
+.plegar-seccion:hover { color: var(--texto); background: color-mix(in srgb, var(--texto) 7%, transparent); }
+.grupo-entrada.plegada .plegar-seccion svg { transform: rotate(-90deg); }
+/* Plegada pero estás dentro: una marca junto al nombre para no perderte. */
+.grupo-entrada.plegada.dentro .entrada::after {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 8px; border-radius: 50%;
+  background: var(--acento); vertical-align: middle;
+}
+@media (hover: none) { .plegar-seccion { opacity: 1; } }
 .grupo-entrada .modos { position: relative; margin: 0 0 2px 8px; padding-left: 8px; gap: 0; }
 .grupo-entrada .modos::before {
   content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px;
