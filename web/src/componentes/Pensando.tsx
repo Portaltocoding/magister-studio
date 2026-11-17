@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 // Animaciones de espera mientras el tutor piensa o genera. Todas en línea, sin relleno,
 // pequeñas, y una al azar cada vez para que no aburran.
 
-export type Variante = 'rubik' | 'hanoi' | 'ordenar' | 'vida' | 'lissajous'
-const VARIANTES: Variante[] = ['rubik', 'hanoi', 'ordenar', 'vida', 'lissajous']
+export type Variante = 'rubik' | 'hanoi' | 'ordenar' | 'fourier' | 'lissajous'
+const VARIANTES: Variante[] = ['rubik', 'hanoi', 'ordenar', 'fourier', 'lissajous']
 
 const quieto = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
@@ -174,38 +174,69 @@ function Ordenar() {
   )
 }
 
-// ---------- Juego de la vida: un planeador que cruza un tablero que se repite ----------
+// ---------- Fourier: unos círculos que giran, uno sobre otro, y la punta del último dibuja un corazón ----------
 
-const N = 10
-function vida(vivas: Set<string>): Set<string> {
-  const cuenta = new Map<string, number>()
-  for (const c of vivas) {
-    const [x, y] = c.split(',').map(Number)
-    for (let dx = -1; dx <= 1; dx++)
-      for (let dy = -1; dy <= 1; dy++)
-        if (dx || dy) {
-          const k = `${(x + dx + N) % N},${(y + dy + N) % N}`
-          cuenta.set(k, (cuenta.get(k) ?? 0) + 1)
-        }
+// La serie de Fourier del corazón, calculada una vez: los términos más grandes, de mayor a menor.
+const SERIE = (() => {
+  const M = 96
+  const puntos: [number, number][] = []
+  for (let k = 0; k < M; k++) {
+    const t = (2 * Math.PI * k) / M
+    const x = 16 * Math.sin(t) ** 3
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+    puntos.push([x * 1.15, y * 1.15 - 3])
   }
-  return new Set([...cuenta].filter(([k, n]) => n === 3 || (n === 2 && vivas.has(k))).map(([k]) => k))
+  const terminos: { f: number; r: number; fase: number }[] = []
+  let centro: [number, number] = [0, 0]
+  for (let f = -12; f <= 12; f++) {
+    let re = 0
+    let im = 0
+    for (let k = 0; k < M; k++) {
+      const a = (-2 * Math.PI * f * k) / M
+      re += (puntos[k][0] * Math.cos(a) - puntos[k][1] * Math.sin(a)) / M
+      im += (puntos[k][0] * Math.sin(a) + puntos[k][1] * Math.cos(a)) / M
+    }
+    if (f === 0) centro = [re, im]
+    else terminos.push({ f, r: Math.hypot(re, im), fase: Math.atan2(im, re) })
+  }
+  terminos.sort((x, y) => y.r - x.r)
+  return { centro, terminos: terminos.slice(0, 10) }
+})()
+
+function cadena(t: number): [number, number][] {
+  let x = 27 + SERIE.centro[0]
+  let y = 27 + SERIE.centro[1]
+  const puntos: [number, number][] = [[x, y]]
+  for (const c of SERIE.terminos) {
+    x += c.r * Math.cos(c.f * t + c.fase)
+    y += c.r * Math.sin(c.f * t + c.fase)
+    puntos.push([x, y])
+  }
+  return puntos
 }
 
-function Vida() {
-  const [vivas, setVivas] = useState(() => new Set(['1,0', '2,1', '0,2', '1,2', '2,2']))
-  useEffect(() => {
-    if (quieto()) return
-    const t = setInterval(() => setVivas((v) => vida(v)), 320)
-    return () => clearInterval(t)
-  }, [])
-  const c = 5.2
+function Fourier() {
+  const fase = usarFase()
+  const t = fase * 0.8
+  const brazos = cadena(t)
+  const punta = brazos[brazos.length - 1]
+  // La estela: lo que ha dibujado la punta en el último 85 % de la vuelta.
+  const estela = useMemo(() => {
+    const ps: string[] = []
+    for (let k = 0; k <= 80; k++) {
+      const [x, y] = cadena(t - (k / 80) * Math.PI * 2 * 0.85).at(-1)!
+      ps.push(`${x.toFixed(2)},${y.toFixed(2)}`)
+    }
+    return `M${ps.join('L')}`
+  }, [t])
   return (
-    <svg className="anim-svg" viewBox={`0 0 ${N * c} ${N * c}`} width={54} height={54} aria-hidden>
-      <rect className="guia" x={0.5} y={0.5} width={N * c - 1} height={N * c - 1} rx={3} fill="none" />
-      {[...vivas].map((k) => {
-        const [x, y] = k.split(',').map(Number)
-        return <rect key={k} className="trazo" x={x * c + 0.9} y={y * c + 0.9} width={c - 1.8} height={c - 1.8} rx={1} />
-      })}
+    <svg className="anim-svg" viewBox="0 0 54 54" width={54} height={54} aria-hidden>
+      {brazos.slice(0, -1).map(([x, y], i) => (
+        <circle key={i} className="fourier-circulo" cx={x} cy={y} r={SERIE.terminos[i].r} />
+      ))}
+      <polyline className="fourier-radio" points={brazos.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')} fill="none" />
+      <path className="fourier-trazo" d={estela} />
+      <circle className="fourier-punta" cx={punta[0]} cy={punta[1]} r={1.3} />
     </svg>
   )
 }
@@ -259,7 +290,7 @@ function usarFase() {
   return fase
 }
 
-const ANIMACIONES: Record<Variante, () => React.JSX.Element> = { rubik: Rubik, hanoi: Hanoi, ordenar: Ordenar, vida: Vida, lissajous: Lissajous }
+const ANIMACIONES: Record<Variante, () => React.JSX.Element> = { rubik: Rubik, hanoi: Hanoi, ordenar: Ordenar, fourier: Fourier, lissajous: Lissajous }
 
 export default function Pensando({ texto, variante, estilo }: { texto?: string; variante?: Variante; estilo?: CSSProperties }) {
   const [elegida] = useState<Variante>(() => variante ?? VARIANTES[Math.floor(Math.random() * VARIANTES.length)])

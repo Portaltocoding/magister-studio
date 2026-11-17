@@ -39,7 +39,12 @@ export interface Grupo {
 }
 
 export const GRUPOS: Grupo[] = [
-  // Lo primero: el tutor que te guía y tu día.
+  // Estudio libre va siempre suelto, arriba del todo y sin título: preguntar lo que sea.
+  {
+    nombre: '',
+    modos: [{ id: 'libre', nombre: 'Estudio libre', encendido: true, ayuda: 'Pregunta lo que quieras al tutor' }],
+  },
+  // Luego, el tutor que te guía y tu día.
   {
     nombre: 'Hoy',
     modos: [
@@ -56,7 +61,6 @@ export const GRUPOS: Grupo[] = [
       { id: 'video', nombre: 'Vídeo', encendido: true, ayuda: 'Entender un tema antes de estudiarlo' },
       { id: 'llamada', nombre: 'Llamada', encendido: true, ayuda: 'Habla con tu tutor como por teléfono: clase, entrevista o charla' },
       { id: 'hablar', nombre: 'Hablar', encendido: true, ayuda: 'Pregunta en voz alta y escucha la respuesta' },
-      { id: 'libre', nombre: 'Estudio libre', encendido: true, ayuda: 'Pregunta lo que quieras al tutor' },
     ],
   },
   // Estudiar lo aprendido: recordarlo de memoria y ponerte a prueba.

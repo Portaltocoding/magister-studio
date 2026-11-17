@@ -281,7 +281,7 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .grupos-modos .modo { padding-top: 6px; padding-bottom: 6px; }
 .grupos-modos .pronto { font-size: 0.68rem; }
 
-/* ===== Animaciones de espera: Rubik, Hanói, ordenar, vida y Lissajous ===== */
+/* ===== Animaciones de espera: Rubik, Hanói, ordenar, Fourier y Lissajous ===== */
 .pensando { display: inline-flex; align-items: center; gap: 14px; color: var(--suave); }
 .pensando-texto { font-size: 0.92rem; }
 .pensando-anim {
@@ -632,3 +632,63 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
   .guia-bocadillo { border-radius: 20px; }
   .guia-pasos, .guia-pie { margin-left: 0; }
 }
+
+/* ===== La barra lateral como ramas de git =====
+   Un tronco (la rama madre) baja por todas las secciones; cada sección sale de él con su color,
+   sus modos son nodos sobre la rama y al final vuelve a unirse al tronco. */
+.marca-nombre { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.marca-nombre:hover { opacity: 0.75; }
+.grupos-modos { gap: 10px; }
+.grupo-modos[data-rama] { position: relative; --rama: #8b949e; --nodo-fondo: var(--panel, var(--fondo)); }
+.grupo-modos[data-rama="1"] { --rama: #f0883e; }
+.grupo-modos[data-rama="2"] { --rama: #58a6ff; }
+.grupo-modos[data-rama="3"] { --rama: #3fb950; }
+.grupo-modos[data-rama="4"] { --rama: #bc8cff; }
+.grupo-modos[data-rama="5"] { --rama: #d29922; }
+.grupo-modos[data-rama="6"] { --rama: #8b949e; }
+/* El tronco */
+.grupo-modos[data-rama]::before {
+  content: ""; position: absolute; left: 13px; top: 0; bottom: -10px; width: 2px; border-radius: 2px;
+  background: color-mix(in srgb, var(--suave) 55%, transparent);
+}
+.grupo-inicio + .grupo-modos[data-rama]::before { top: 11px; }
+.grupo-modos[data-rama]:last-child::before { bottom: auto; height: 11px; }
+/* El nodo de la sección, sobre el tronco */
+.grupo-modos[data-rama] > button.grupo-titulo { position: relative; padding-left: 30px; }
+.grupo-modos[data-rama] > button.grupo-titulo::before {
+  content: ""; position: absolute; left: 9px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%;
+  background: var(--rama); box-shadow: 0 0 0 3px var(--nodo-fondo); z-index: 1;
+}
+.grupo-modos[data-rama] > button.grupo-titulo span:first-child { color: var(--rama); }
+/* La rama: sale del tronco con una curva y baja junto a sus modos */
+.grupo-modos[data-rama] .modos { position: relative; padding-left: 40px; }
+.grupo-modos[data-rama] .modos::before {
+  content: ""; position: absolute; left: 29px; top: 8px; bottom: 19px; width: 2px; background: var(--rama); opacity: 0.85;
+}
+.grupo-modos[data-rama] .modos::after {
+  content: ""; position: absolute; left: 13px; top: -6px; width: 18px; height: 15px; box-sizing: border-box;
+  border-top: 2px solid var(--rama); border-right: 2px solid var(--rama); border-top-right-radius: 12px; opacity: 0.85;
+}
+/* Cada modo, un nodo sobre la rama */
+.grupo-modos[data-rama] .modos > li { position: relative; }
+.grupo-modos[data-rama] .modos > li::before {
+  content: ""; position: absolute; left: -15px; top: 50%; width: 10px; height: 10px; margin-top: -5px; box-sizing: border-box; border-radius: 50%;
+  background: var(--nodo-fondo); border: 2px solid var(--rama); z-index: 1; transition: transform 200ms ease, background 200ms ease;
+}
+.grupo-modos[data-rama] .modos > li:has(.modo[aria-current="page"])::before { background: var(--rama); transform: scale(1.25); }
+.grupo-modos[data-rama] .modos > li:has(.modo:hover:not(:disabled))::before { transform: scale(1.2); }
+.grupo-modos[data-rama] .modos > li:has(.modo:disabled)::before { border-style: dashed; opacity: 0.6; }
+/* Al final, la rama vuelve al tronco */
+.grupo-modos[data-rama] .modos > li:last-child::after {
+  content: ""; position: absolute; left: -27px; top: 50%; width: 18px; height: 22px; box-sizing: border-box;
+  border-bottom: 2px solid var(--rama); border-right: 2px solid var(--rama); border-bottom-right-radius: 12px; opacity: 0.5;
+}
+.grupo-modos[data-rama]:last-child .modos > li:last-child::after { display: none; }
+.grupo-modos[data-rama] .modo[aria-current="page"] { color: var(--texto); }
+@media (prefers-reduced-motion: reduce) { .grupo-modos[data-rama] .modos > li::before { transition: none; } }
+
+/* ===== Animaciones de espera: solas, sin fondo ni marco detrás ===== */
+.anim-svg .fourier-circulo { fill: none; stroke: currentColor; stroke-width: 0.7; opacity: 0.5; }
+.anim-svg .fourier-radio { stroke: currentColor; stroke-width: 0.8; opacity: 0.6; stroke-linecap: round; }
+.anim-svg .fourier-trazo { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.anim-svg .fourier-punta { fill: currentColor; }

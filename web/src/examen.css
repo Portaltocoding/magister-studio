@@ -137,7 +137,8 @@
 .adjuntar { cursor: pointer; align-self: stretch; display: inline-flex; align-items: center; padding: 8px 12px; font-size: 1.05rem; }
 
 .galeria-animaciones { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-top: 16px; }
-.galeria-animaciones figure { --fondo-anim: var(--tarjeta); margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 12px; border-radius: 14px; background: var(--tarjeta); border: 1px solid var(--borde); }
+/* Solas, como un PNG flotando: sin tarjeta ni marco detrás. */
+.galeria-animaciones figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 12px; }
 .galeria-animaciones .pensando-anim { transform: scale(1.3); margin: 14px 0; }
 .galeria-animaciones figcaption { font-size: 0.85rem; opacity: 0.75; }
 

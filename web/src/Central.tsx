@@ -83,10 +83,10 @@ export default function Central({
           <h1>Animaciones de espera</h1>
           <p className="nota">Salen al azar mientras el tutor piensa o genera.</p>
           <div className="galeria-animaciones">
-            {(['rubik', 'hanoi', 'ordenar', 'vida', 'lissajous'] as const).map((v) => (
+            {(['rubik', 'hanoi', 'ordenar', 'fourier', 'lissajous'] as const).map((v) => (
               <figure key={v}>
                 <Pensando variante={v} />
-                <figcaption>{{ rubik: 'Cubo de Rubik', hanoi: 'Torre de Hanói', ordenar: 'Ordenación', vida: 'Juego de la vida', lissajous: 'Lissajous' }[v]}</figcaption>
+                <figcaption>{{ rubik: 'Cubo de Rubik', hanoi: 'Torre de Hanói', ordenar: 'Ordenación', fourier: 'Fourier', lissajous: 'Lissajous' }[v]}</figcaption>
               </figure>
             ))}
           </div>

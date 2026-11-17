@@ -53,7 +53,9 @@ export default function BarraLateral({
   return (
     <aside className="lateral" inert={oculta}>
       <div className="marca">
-        <span className="marca-nombre">Magister</span>
+        <button type="button" className="marca-nombre" onClick={() => alElegir('libre')} title="Estudio libre">
+          Magister
+        </button>
         {alFijar && (
           <button
             type="button"
@@ -80,7 +82,7 @@ export default function BarraLateral({
       </div>
 
       <nav aria-label="Modos" className="grupos-modos">
-        {GRUPOS.map((g) => {
+        {GRUPOS.map((g, ig) => {
           const lista = (
             <ul className="modos">
               {g.modos.map((m) => (
@@ -110,7 +112,7 @@ export default function BarraLateral({
           // Una sección plegada se abre sola si estás en uno de sus modos.
           const abierta = !plegados.includes(g.nombre) || g.modos.some((m) => m.id === modoActivo)
           return (
-            <div key={g.nombre} className={`grupo-modos ${abierta ? 'abierto' : 'cerrado'}`}>
+            <div key={g.nombre} className={`grupo-modos ${abierta ? 'abierto' : 'cerrado'}`} data-rama={ig}>
               <button type="button" className="grupo-titulo" aria-expanded={abierta} onClick={() => alternar(g.nombre)}>
                 <span>{g.nombre}</span>
                 <span className="grupo-flecha" aria-hidden>
