@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown from './Markdown.tsx'
 import remarkMath from 'remark-math'
 import { reaccionar } from './animo.ts'
 import { conKatex, tieneMates, usarKatex } from './katexPerezoso.ts'

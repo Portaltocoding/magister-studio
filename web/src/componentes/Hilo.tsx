@@ -1,6 +1,6 @@
 import Pensando from './Pensando.tsx'
 import { Children, isValidElement, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import Markdown, { type Components } from 'react-markdown'
+import Markdown, { type Components } from './Markdown.tsx'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { Diagrama, Opciones, TestRapido } from './Interactivo.tsx'

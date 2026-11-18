@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown from '../componentes/Markdown.tsx'
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
 import { enviarJson, flujo, listarPlanes, pedir, type ResumenPlan } from '../api.ts'

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown from '../componentes/Markdown.tsx'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'

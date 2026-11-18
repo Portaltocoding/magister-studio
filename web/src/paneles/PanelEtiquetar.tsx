@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown from '../componentes/Markdown.tsx'
 import { enviarJson, pedir } from '../api.ts'
 
 interface Bloque {

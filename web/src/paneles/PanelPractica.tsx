@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown from '../componentes/Markdown.tsx'
 import { enviarJson, flujo, pedir } from '../api.ts'
 import Vacio from '../componentes/Vacio.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'

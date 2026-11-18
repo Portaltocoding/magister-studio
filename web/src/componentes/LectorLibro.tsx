@@ -1,5 +1,5 @@
 import { Children, isValidElement, useEffect, useMemo, useState, type ReactNode, createContext, useContext } from 'react'
-import Markdown, { type Components } from 'react-markdown'
+import Markdown, { type Components } from './Markdown.tsx'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { Diagrama } from './Interactivo.tsx'

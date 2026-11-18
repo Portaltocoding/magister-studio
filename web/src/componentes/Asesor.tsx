@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown from './Markdown.tsx'
 import { crearConversacion, enviar, listarMensajes } from '../api.ts'
 import Mascota from '../Mascota.tsx'
 import { MODOS } from '../modos.ts'
