@@ -4,7 +4,7 @@ import { crearConversacion, enviar, listarMensajes } from '../api.ts'
 import Mascota from '../Mascota.tsx'
 import { MODOS } from '../modos.ts'
 import { EVENTO_SUENO } from './animo.ts'
-import { buscarFaq, faqsDe, type Faq } from './faqs.ts'
+import { buscarFaq, faqsDe } from './faqs.ts'
 import { aCss } from './escala.ts'
 
 // El asesor: la mascota de la barra de arriba, cogida y dejada donde quieras. Se queda flotando sobre la pantalla y,
@@ -48,8 +48,6 @@ interface Hilo {
 interface Mensaje {
   rol: 'usuario' | 'tutor'
   texto: string
-  // Contestada al instante desde las preguntas frecuentes: la pregunta original, por si hay que pasársela al tutor.
-  rapida?: string
 }
 
 const leer = <T,>(clave: string, defecto: T): T => {
@@ -424,7 +422,6 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   const [texto, setTexto] = useState(textoInicial)
   const [pensando, setPensando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [verTodas, setVerTodas] = useState(false)
   const control = useRef<AbortController | null>(null)
   const fondo = useRef<HTMLDivElement | null>(null)
 
@@ -461,18 +458,11 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   useEffect(() => alPensar(pensando), [pensando, alPensar])
   useEffect(() => () => control.current?.abort(), [])
 
-  // Una pregunta frecuente se contesta al instante, aquí mismo, sin llamar al modelo.
-  const responderFaq = (f: Faq, pregunta: string) => {
-    setTexto('')
-    setError(null)
-    setMensajes((m) => [...m, { rol: 'usuario', texto: pregunta }, { rol: 'tutor', texto: f.respuesta, rapida: pregunta }])
-  }
-
-  const preguntar = async (pregunta: string, alModelo = false) => {
+  const preguntar = async (pregunta: string) => {
     pregunta = pregunta.trim()
     if (!pregunta || pensando) return
-    const frecuente = alModelo ? null : buscarFaq(pregunta)
-    if (frecuente) return responderFaq(frecuente, pregunta)
+    // Las preguntas frecuentes no se enseñan: si la pregunta se parece a una, su respuesta va al tutor como referencia.
+    const frecuente = buscarFaq(pregunta)
     setTexto('')
     setError(null)
     setPensando(true)
@@ -494,7 +484,8 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
       const { rutas, pasos } = rutasPosibles()
       const contexto =
         `Sección: ${s.nombre}\nRuta: ${window.location.hash || '#/'}\n<pantalla>\n${textoPantalla()}\n</pantalla>\n` +
-        `<rutas>\n${rutas.join(' ')}${pasos.length ? `\nPasos en pantalla: ${pasos.map((p) => `paso:${p.id} «${p.titulo}»`).join('; ')}` : ''}\n</rutas>`
+        `<rutas>\n${rutas.join(' ')}${pasos.length ? `\nPasos en pantalla: ${pasos.map((p) => `paso:${p.id} «${p.titulo}»`).join('; ')}` : ''}\n</rutas>` +
+        (frecuente ? `\n<referencia>\nCómo funciona esto en Magister (úsalo si viene al caso): ${frecuente.respuesta}\n</referencia>` : '')
       control.current = new AbortController()
       let acumulado = ''
       for await (const ev of enviar(h.cid, pregunta, control.current.signal, true, false, { asesor: true, contexto })) {
@@ -513,24 +504,15 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
     }
   }
 
-  // Pestañas: la sección en la que estás y las últimas en las que hablasteis.
-  const pestanas = [
-    { clave: aqui.clave, nombre: aqui.nombre },
-    ...Object.entries(hilos)
-      .filter(([k]) => k !== aqui.clave)
-      .sort((a, b) => b[1].usado - a[1].usado)
-      .slice(0, 5)
-      .map(([k, h]) => ({ clave: k, nombre: h.nombre })),
-  ]
-  const enOtra = viendo !== aqui.clave
-  const frecuentes = faqsDe(aqui.clave.split('/')[0])
+  // Una sola pantalla: la conversación de la sección en la que estás. Tres sugerencias para empezar; si no, escribes.
+  const sugerencias = ['Explícame esta pantalla', ...faqsDe(aqui.clave.split('/')[0]).map((f) => f.pregunta)].slice(0, 3)
 
   return (
     <section className={`asesor-chat ${lado} ${vertical}`} role="dialog" aria-label={`Tu asesor · ${aqui.nombre}`}>
       <header className="asesor-cabeza">
         <div>
           <span className="asesor-etq">Tu asesor</span>
-          <strong>{pestanas.find((p) => p.clave === viendo)?.nombre ?? aqui.nombre}</strong>
+          <strong>{aqui.nombre}</strong>
         </div>
         <button type="button" className="asesor-x" onClick={alDevolver} title="Devolver la mascota a la barra" aria-label="Devolver la mascota a la barra">
           ⤴
@@ -539,39 +521,17 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
           ×
         </button>
       </header>
-      {pestanas.length > 1 && (
-        <nav className="asesor-pestanas" aria-label="Secciones con conversación">
-          {pestanas.map((p) => (
-            <button key={p.clave} type="button" className={p.clave === viendo ? 'actual' : ''} onClick={() => setViendo(p.clave)} title={p.nombre}>
-              {p.clave === aqui.clave ? 'Aquí' : p.nombre}
-            </button>
-          ))}
-        </nav>
-      )}
       <div className="asesor-hilo" ref={fondo} role="log" aria-live="polite">
-        {!mensajes.length && !enOtra && (
+        {!mensajes.length && (
           <div className="asesor-vacio">
             <p>Estoy aquí para lo que tienes delante. ¿En qué te ayudo?</p>
             <div className="asesor-sugerencias">
-              <button type="button" onClick={() => void preguntar('Explícame esta pantalla', true)}>
-                Explícame esta pantalla
-              </button>
-            </div>
-            <details className="asesor-faqs" open>
-              <summary>Preguntas frecuentes · al instante</summary>
-              <div className="asesor-sugerencias">
-                {(verTodas ? frecuentes : frecuentes.slice(0, 4)).map((f) => (
-                  <button key={f.id} type="button" onClick={() => responderFaq(f, f.pregunta)}>
-                    {f.pregunta}
-                  </button>
-                ))}
-              </div>
-              {!verTodas && frecuentes.length > 4 && (
-                <button type="button" className="asesor-todas" onClick={() => setVerTodas(true)}>
-                  Ver todas ({frecuentes.length})
+              {sugerencias.map((s) => (
+                <button key={s} type="button" onClick={() => void preguntar(s)}>
+                  {s}
                 </button>
-              )}
-            </details>
+              ))}
+            </div>
           </div>
         )}
         {mensajes.map((m, i) =>
@@ -582,37 +542,23 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
           ) : (
             <div key={i}>
               <RespuestaAsesor texto={m.texto} />
-              {m.rapida && (
-                <p className="asesor-rapida">
-                  Respuesta al instante ·{' '}
-                  <button type="button" onClick={() => void preguntar(m.rapida!, true)}>
-                    No era esto: pregúntaselo al tutor
-                  </button>
-                </p>
-              )}
             </div>
           ),
         )}
         {error && <p className="nota">{error}</p>}
       </div>
-      {enOtra ? (
-        <p className="asesor-otra nota">
-          Esta conversación es de otra sección. Para seguirla, vuelve allí; aquí, pulsa «Aquí».
-        </p>
-      ) : (
-        <form
-          className="asesor-escribir"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void preguntar(texto)
-          }}
-        >
-          <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Pregúntame sobre esta pantalla" aria-label="Tu pregunta" autoFocus={enfocar} />
-          <button className="boton-mini" disabled={!texto.trim() || pensando}>
-            {pensando ? '…' : 'Enviar'}
-          </button>
-        </form>
-      )}
+      <form
+        className="asesor-escribir"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void preguntar(texto)
+        }}
+      >
+        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="O escríbeme tu pregunta" aria-label="Tu pregunta" autoFocus={enfocar} />
+        <button className="boton-mini" disabled={!texto.trim() || pensando}>
+          {pensando ? '…' : 'Enviar'}
+        </button>
+      </form>
     </section>
   )
 }

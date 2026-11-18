@@ -5,9 +5,9 @@
   border-radius: 50%; animation: asesor-llegar 460ms var(--asesor-curva) both;
   transition: scale 260ms var(--asesor-curva);
 }
-/* En reposo, un poco más pequeña (52 px); al pasarle el cursor, abrir el chat o cogerla vuelve a su tamaño. */
+/* Fuera de su casa, un poco más grande que en la barra (unos 61 px); al pasarle el cursor, abrir el chat o cogerla, a su tamaño entero. */
 .asesor-mascota .mascota { width: 60px; height: 60px; margin: 0; }
-.asesor-mascota { scale: 0.82; }
+.asesor-mascota { scale: 0.95; }
 .asesor-mascota:hover, .asesor.abierto .asesor-mascota { scale: 1; }
 .asesor-mascota:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 /* Cogida: se agranda, deja de flotar y cierra los ojos mientras la llevas. */
