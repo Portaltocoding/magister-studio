@@ -6,6 +6,8 @@ aquí solo se lee y se actualiza con bloqueo de fila, para que dos juicios a la 
 
 from collections.abc import Callable
 
+from sqlalchemy.dialects.postgresql import insert
+
 from magister.datos.produccion import Ajuste
 from magister.datos.sesion import nueva_sesion
 
@@ -20,10 +22,9 @@ async def leer() -> dict:
 
 async def actualizar(cambio: Callable[[dict], dict]) -> dict:
     async with nueva_sesion() as s, s.begin():
-        fila = await s.get(Ajuste, CLAVE, with_for_update=True)
-        nuevo = cambio(dict(fila.valor) if fila else {})
-        if fila:
-            fila.valor = nuevo
-        else:
-            s.add(Ajuste(clave=CLAVE, valor=nuevo))
+        # Primero la fila existe (si dos llegan a la vez sin ella, la segunda no falla) y luego se bloquea.
+        await s.execute(insert(Ajuste).values(clave=CLAVE, valor={}).on_conflict_do_nothing(index_elements=[Ajuste.clave]))
+        fila = await s.get(Ajuste, CLAVE, with_for_update=True, populate_existing=True)
+        nuevo = cambio(dict(fila.valor or {}))
+        fila.valor = nuevo
     return nuevo

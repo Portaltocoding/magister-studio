@@ -4,8 +4,12 @@ confianza decide cuánto se juzga, y lo que repites al valorar se vuelve una reg
 Las reglas se guardan ya calculadas en el estado (`reglas`), para que el flujo las lea de `datos` sin importar `tono`.
 """
 
+import logging
+
 from magister.datos import afinado as datos_afinado
 from magister.tono import confianza as cf
+
+registro = logging.getLogger("magister.observar.afinado")
 
 
 def _con_reglas(e: dict) -> dict:
@@ -13,23 +17,39 @@ def _con_reglas(e: dict) -> dict:
     return e
 
 
+async def _actualizar(cambio) -> None:
+    """Aprender es instrumentación: si falla (la base, una carrera), se anota y la petición sigue."""
+    try:
+        await datos_afinado.actualizar(cambio)
+    except Exception:  # noqa: BLE001
+        registro.exception("afinado: no se pudo actualizar")
+
+
 async def registrar_valoracion(bien: bool, motivos: list[str]) -> None:
-    await datos_afinado.actualizar(lambda e: _con_reglas(cf.registrar_usuario(e, bien, motivos)))
+    await _actualizar(lambda e: _con_reglas(cf.registrar_usuario(e, bien, motivos)))
 
 
 async def registrar_juicio(aprobadas: dict[str, bool]) -> None:
-    await datos_afinado.actualizar(lambda e: cf.registrar_juez(e, aprobadas))
+    await _actualizar(lambda e: cf.registrar_juez(e, aprobadas))
 
 
 async def anotar_salto() -> None:
-    await datos_afinado.actualizar(lambda e: {**e, "saltadas": int(e.get("saltadas", 0)) + 1})
+    await _actualizar(lambda e: {**e, "saltadas": int(e.get("saltadas", 0)) + 1})
 
 
-async def toca_juzgar(clave: str) -> bool:
-    return cf.toca_juzgar(await datos_afinado.leer(), clave)
+async def toca_juzgar(clave: str, tope: float = 1.0) -> bool:
+    """Si falla la base, se juzga: ante la duda, vigilar."""
+    try:
+        return cf.toca_juzgar(await datos_afinado.leer(), clave, tope)
+    except Exception:  # noqa: BLE001
+        registro.exception("afinado: no se pudo leer; se juzga")
+        return True
 
 
 async def quitar_regla(motivo: str) -> None:
+    if motivo not in cf.MOTIVOS:
+        raise ValueError(f"motivo desconocido: {motivo}")
+
     def cambio(e: dict) -> dict:
         e = {**cf.nuevo(), **e}
         e["descartadas"] = sorted({*e.get("descartadas", []), motivo})

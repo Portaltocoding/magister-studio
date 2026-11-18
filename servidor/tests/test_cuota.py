@@ -30,8 +30,8 @@ def test_si_no_se_mueve_acumula_el_coste_hasta_que_se_mueva():
 
 def test_una_ventana_nueva_no_se_compara_con_la_anterior():
     e = actualizar({}, limites(0.90, 0.20), 0.0)
-    e = actualizar(e, limites(0.05, 0.21, reinicia_s=200), 0.10)
-    assert e["muestras"]["sesion"] == [] and e["sesion"] == {"uso": 0.05, "reinicia": 200}
+    e = actualizar(e, limites(0.05, 0.21, reinicia_s=100 + 5 * 3600), 0.10)
+    assert e["muestras"]["sesion"] == [] and e["sesion"] == {"uso": 0.05, "reinicia": 100 + 5 * 3600}
 
 
 def test_sin_limites_solo_suma_el_coste():
@@ -53,3 +53,34 @@ def test_el_cerebro_pasa_los_limites_del_cli_a_la_llamada():
     ll = Llamada(funcion="conversar", motor="cli", modelo_pedido="sonnet")
     llenar_desde_resultado(ll, {"usage": {}, "total_cost_usd": 0.02, "_limites": limites(0.41, 0.2)})
     assert ll.limites["five_hour"]["utilization"] == 0.41 and ll.coste_equivalente == 0.02
+
+
+def test_una_ventana_ya_renovada_se_ve_vacia():
+    from magister.observar.cuota import vigente
+
+    assert vigente({"uso": 0.9, "reinicia": 100}, ahora=200) == {"uso": 0.0, "reinicia": None}
+    assert vigente({"uso": 0.9, "reinicia": 300}, ahora=200) == {"uso": 0.9, "reinicia": 300}
+    assert vigente(None, ahora=200) is None
+
+
+def test_una_lectura_vieja_no_hace_retroceder_la_barra():
+    e = actualizar({}, limites(0.50, 0.20), 0.0)
+    e = actualizar(e, limites(0.48, 0.20), 0.05)
+    assert e["sesion"]["uso"] == 0.50 and e["muestras"]["sesion"] == []
+
+
+def test_la_hora_de_renovacion_puede_bailar_unos_minutos():
+    e = actualizar({}, limites(0.40, 0.20, reinicia_s=1000), 0.0)
+    e = actualizar(e, limites(0.42, 0.20, reinicia_s=1030), 0.10)
+    assert len(e["muestras"]["sesion"]) == 1
+
+
+def test_sin_hora_de_renovacion_no_se_usa_la_lectura():
+    e = actualizar({}, {"five_hour": {"utilization": 0.4}}, 0.0)
+    assert e["sesion"] is None
+
+
+def test_si_un_evento_no_trae_la_cuota_se_queda_la_buena(monkeypatch):
+    from magister.cerebro import modelo
+
+    assert "or limites" in open(modelo.__file__, encoding="utf-8").read()

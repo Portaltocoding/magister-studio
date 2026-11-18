@@ -35,7 +35,10 @@ async def _del_tutor() -> dict:
     # Lo aprendido de sus valoraciones («muy largo», «le falta un ejemplo» repetidos): el texto sale ya a su medida.
     from magister.datos import afinado
 
-    aprendido = (await afinado.leer()).get("reglas") or []
+    try:
+        aprendido = (await afinado.leer()).get("reglas") or []
+    except Exception:  # noqa: BLE001  (sin lo aprendido, el material se hace igual)
+        aprendido = []
     if aprendido:
         salida["aprendido"] = list(aprendido)
     return salida

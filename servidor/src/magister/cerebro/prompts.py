@@ -46,7 +46,7 @@ class Plantilla:
 
 
 COMUN = CARPETA / "comun"
-INCLUIR = re.compile(r"^@incluir ([a-z_]+)[ \t]*$", re.M)
+INCLUIR = re.compile(r"^@incluir ([a-z_]+)[ \t\r]*$", re.M)
 
 
 def _expandir(texto: str, profundidad: int = 0) -> str:
@@ -68,8 +68,9 @@ def _del_fichero(nombre: str) -> Plantilla:
     if not re.fullmatch(r"[a-z_]+", nombre):
         raise ErrorPlantilla(f"nombre de plantilla no válido: {nombre}")
     ruta = CARPETA / f"{nombre}.md"
-    crudo = _expandir(ruta.read_bytes().decode("utf-8")).encode("utf-8")
-    return Plantilla(nombre, hashlib.sha256(crudo).hexdigest()[:12], crudo.decode("utf-8").strip())
+    # Sin finales de línea de Windows: con CRLF el @incluir no se reconocería y la versión cambiaría según el checkout.
+    texto = _expandir(ruta.read_bytes().decode("utf-8").replace("\r\n", "\n"))
+    return Plantilla(nombre, hashlib.sha256(texto.encode("utf-8")).hexdigest()[:12], texto.strip())
 
 
 # Versiones activas (Parte VI, «Vuelta atrás de un prompt»): `sincronizar()` las carga de la

@@ -92,10 +92,11 @@ def muestra(estado: dict | None) -> float:
     return max(MUESTRA_MINIMA, min(1.0, 1.0 - peor))
 
 
-def toca_juzgar(estado: dict | None, clave: str) -> bool:
-    """Decisión determinista por clave (una traza, un bloque): repetir el mismo trabajo decide lo mismo."""
+def toca_juzgar(estado: dict | None, clave: str, tope: float = 1.0) -> bool:
+    """Decisión determinista por clave (una traza, un bloque): repetir el mismo trabajo decide lo mismo. `tope` limita
+    la fracción por arriba (MAGISTER_JUEZ_MUESTRA en el juez online)."""
     azar = int(hashlib.sha256(clave.encode("utf-8")).hexdigest()[:8], 16) / 0xFFFFFFFF
-    return azar < muestra(estado)
+    return azar < min(tope, muestra(estado))
 
 
 def reglas(estado: dict | None) -> list[str]:

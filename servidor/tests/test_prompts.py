@@ -49,3 +49,10 @@ def test_ningun_trozo_comun_tiene_llaves():
 
 def test_todas_las_plantillas_cargan():
     assert all(p.version and "@incluir" not in p.texto for p in prompts.ficheros())
+
+
+def test_incluir_funciona_con_finales_de_linea_de_windows(tmp_path, monkeypatch):
+    (tmp_path / "nucleo.md").write_text("Explica con un ejemplo.", encoding="utf-8")
+    monkeypatch.setattr(prompts, "COMUN", tmp_path)
+    assert prompts._expandir("Antes\r\n@incluir nucleo\r\nDespués".replace("\r\n", "\n")) == "Antes\nExplica con un ejemplo.\nDespués"
+    assert prompts._expandir("@incluir nucleo\r") == "Explica con un ejemplo."

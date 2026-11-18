@@ -50,3 +50,42 @@ def test_el_asesor_contesta_con_el_modelo_rapido() -> None:
     assert tabla()["tareas"]["asesor"]["modelo"] == "haiku"
     motor, _ = ruta("asesor")
     assert motor in ("cli", "eco")
+
+
+@pytest.mark.anyio
+async def test_votar_dos_veces_lo_mismo_no_cuenta_doble(cliente) -> None:
+    for _ in range(3):
+        await cliente.post("/api/trazas/misma/feedback", json={"bien": False, "motivos": ["largo"]})
+    # Tres votos iguales a la misma respuesta son uno: no basta para aprender una regla (hacen falta dos).
+    assert (await cliente.get("/api/afinado")).json()["reglas"] == []
+
+
+@pytest.mark.anyio
+async def test_quitar_una_regla_que_no_existe_es_un_error(cliente) -> None:
+    r = await cliente.post("/api/afinado/reglas/inventado/quitar")
+    assert r.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_sin_coste_conocido_no_se_estima(cliente) -> None:
+    r = (await cliente.get("/api/cuota/estimar", params={"accion": "diapositivas"})).json()
+    assert r["sesion"]["extra"] is None and r["semana"]["extra"] is None
+
+
+@pytest.mark.anyio
+async def test_juez_muestra_cero_apaga_el_juez_online(monkeypatch) -> None:
+    from magister.cerebro.modelo import Llamada
+    from magister.config import ajustes
+    from magister.observar import registro
+    from magister.trabajos import cola
+
+    encolados = []
+
+    async def encolar(tipo, *a, **k):
+        encolados.append(tipo)
+
+    monkeypatch.setattr(cola, "encolar", encolar)
+    monkeypatch.setattr(ajustes, "juez_muestra", 0.0)
+    await registro.encolar_juez(Llamada(funcion="conversar", motor="cli", modelo_pedido="m", sistema="s", prompt_nombre="conversar",
+                                        prompt_version="v", traza_id="t-cero"))
+    assert encolados == []

@@ -58,12 +58,14 @@ async def encolar_juez(ll: Llamada) -> None:
     if ll.funcion == "llamada":
         return
     semilla = _azar.randrange(2**31)
-    # MAGISTER_JUEZ_MUESTRA=1 fuerza juzgarlo todo; si no, decide la confianza aprendida (observar/afinado): al principio
-    # se juzga casi todo y, si tus valoraciones y los juicios van bien, cada vez menos.
+    # MAGISTER_JUEZ_MUESTRA es el tope: 0 apaga el juez, 1 lo fuerza todo; entre medias decide la confianza aprendida
+    # (observar/afinado) sin pasar del tope: al principio se juzga lo más que se deja y, si va bien, cada vez menos.
+    if ajustes.juez_muestra <= 0:
+        return
     if ajustes.juez_muestra < 1.0:
         from magister.observar import afinado
 
-        if not await afinado.toca_juzgar(ll.traza_id):
+        if not await afinado.toca_juzgar(ll.traza_id, ajustes.juez_muestra):
             await afinado.anotar_salto()
             return
     from magister.trabajos import cola

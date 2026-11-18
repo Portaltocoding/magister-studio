@@ -61,3 +61,11 @@ def test_la_decision_es_determinista_por_clave():
 
 def test_motivos_desconocidos_se_ignoran():
     assert cf.registrar_usuario(None, False, ["inventado"])["motivos"] == {}
+
+
+def test_el_tope_limita_cuanto_se_juzga():
+    claves = [f"t{i}" for i in range(2000)]
+    sin_tope = sum(cf.toca_juzgar(None, c) for c in claves) / 2000
+    con_tope = sum(cf.toca_juzgar(None, c, tope=0.3) for c in claves) / 2000
+    assert sin_tope > 0.7 and abs(con_tope - 0.3) < 0.04
+    assert not any(cf.toca_juzgar(None, c, tope=0.0) for c in claves)

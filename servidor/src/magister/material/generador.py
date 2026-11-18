@@ -179,16 +179,26 @@ def construir(progreso: Progreso | None = None, cancelado: Callable[[], Awaitabl
         await avisar("juez", e)
         clave = e["contrato"]["bloques"][e["i"]]["clave"]
         sospechas = [Hallazgo.model_validate(h) for h in e.get("hallazgos", []) if h["gravedad"] == "sospecha"]
-        # Cuánto se juzga lo decide la confianza aprendida de tus valoraciones (tono.confianza): con sospechas del lint
-        # se juzga siempre; si no, la decisión es determinista por el texto del bloque (repetir el nodo decide lo mismo).
-        estado_afinado = await datos_afinado.leer()
-        if not sospechas and not confianza.toca_juzgar(estado_afinado, f"{clave}:{e['texto_actual']}"):
-            await datos_afinado.actualizar(lambda x: {**x, "saltadas": int(x.get("saltadas", 0)) + 1})
+        # Cuánto se juzga lo decide la confianza aprendida de tus valoraciones (tono.confianza). Se juzga siempre con
+        # sospechas del lint y siempre tras reescribir un bloque (hay que comprobar que el arreglo funcionó); si no, la
+        # decisión es determinista por el texto del bloque (repetir el nodo decide lo mismo). Leer o anotar lo aprendido
+        # nunca tumba el trabajo: si falla, se juzga.
+        refinado = e.get("refinados", {}).get(clave, 0) > 0
+        try:
+            saltar = not sospechas and not refinado and not confianza.toca_juzgar(await datos_afinado.leer(), f"{clave}:{e['texto_actual']}")
+            if saltar:
+                await datos_afinado.actualizar(lambda x: {**x, "saltadas": int(x.get("saltadas", 0)) + 1})
+        except Exception:  # noqa: BLE001
+            saltar = False
+        if saltar:
             return {"hallazgos": graves(e), "informes": [{"nodo": "juez", "bloque": clave, "saltado": "confianza alta"}]}
         r = await juez_tono.juzgar(e["texto_actual"], sospechas)
         if isinstance(r, juez_tono.FalloJuez):
             return {"informes": [{"nodo": "juez", "bloque": clave, "fallo_juez": r.motivo}], "hallazgos": graves(e)}
-        await datos_afinado.actualizar(lambda x: confianza.registrar_juez(x, {d: getattr(r.veredicto, d).aprueba for d in confianza.DIMENSIONES}))
+        try:
+            await datos_afinado.actualizar(lambda x: confianza.registrar_juez(x, {d: getattr(r.veredicto, d).aprueba for d in confianza.DIMENSIONES}))
+        except Exception:  # noqa: BLE001
+            pass  # aprender es instrumentación: el bloque sigue con su veredicto
         suspensos = [h.model_dump() for h in r.suspensos(clave)]
         return {"hallazgos": graves(e) + suspensos,
                 "informes": [{"nodo": "juez", "bloque": clave, "veredicto": r.veredicto.model_dump(), "version": r.version_prompt}]}

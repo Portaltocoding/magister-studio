@@ -61,7 +61,8 @@ class Ajustes(BaseSettings):
     # Producción (Parte VI)
     plazo_primer_token_s: int = 60  # sin primer trozo en este plazo, se corta (y se reintenta si toca)
     canario: str = ""  # cadena secreta que nunca debe salir en una respuesta; se genera al instalar
-    juez_muestra: float = 0.5  # fracción de explicaciones que pasa el juez online
+    juez_muestra: float = 0.5  # tope de la fracción de explicaciones que juzga el juez online: 0 lo apaga, 1 lo fuerza
+    # todo; entre medias, la confianza aprendida de tus valoraciones decide cuánto, sin pasar de este tope
     entorno: str = "produccion"  # produccion, desarrollo o evals
     permitir_atacante_local: bool = False  # solo para la suite de ataques
     buscador: str = "hibrido"  # hibrido o falso (mesa de ataque)

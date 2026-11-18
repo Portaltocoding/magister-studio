@@ -118,7 +118,7 @@ async def _lineas_claude(
                     continue
                 # Cuánta cuota de la suscripción queda (ventana de 5 h y de 7 días): llega antes del resultado y viaja con él.
                 if evento.get("type") == "rate_limit_event":
-                    limites = (evento.get("rate_limit_info") or {}).get("unifiedWindows") or None
+                    limites = (evento.get("rate_limit_info") or {}).get("unifiedWindows") or limites
                 if evento.get("type") == "result":
                     if limites:
                         evento["_limites"] = limites

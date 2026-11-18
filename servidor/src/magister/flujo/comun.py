@@ -395,8 +395,12 @@ async def preferencias_tutor() -> dict:
 
     async with nueva_sesion() as s:
         fila = await s.get(Ajuste, "tutor")
-    # Lo aprendido de sus valoraciones (observar/afinado lo deja calculado en «reglas»).
-    aprendido = (await afinado.leer()).get("reglas") or []
+    # Lo aprendido de sus valoraciones (observar/afinado lo deja calculado en «reglas»). Si no se puede leer, el tutor
+    # sigue sin ello.
+    try:
+        aprendido = (await afinado.leer()).get("reglas") or []
+    except Exception:  # noqa: BLE001
+        aprendido = []
     return {**PREFERENCIAS_POR_DEFECTO, **(fila.valor if fila else {}), "aprendido": aprendido}
 
 

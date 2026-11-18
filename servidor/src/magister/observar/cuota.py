@@ -17,6 +17,7 @@ import time
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
 
 from magister.cerebro.modelo import Llamada
 from magister.datos.produccion import Ajuste, LlamadaFila
@@ -27,6 +28,7 @@ VENTANAS = {"sesion": "five_hour", "semana": "seven_day"}
 DURACION = {"sesion": 5 * 3600, "semana": 7 * 24 * 3600}
 MUESTRAS = 40
 MINIMO_MUESTRAS = 3
+MISMA_VENTANA_S = 600
 
 # Los prompts que gasta preparar una lección (apuntes, sus jueces y sus preguntas). Diapositivas y guion van aparte.
 PROMPTS_MATERIAL = ("apuntes_contrato", "apuntes_bloque", "apuntes_refinar", "preguntas", "preguntas_test", "priming",
@@ -47,8 +49,13 @@ def actualizar(estado: dict, limites: dict | None, coste: float) -> dict:
         if not dato or dato.get("utilization") is None:
             continue
         uso, reinicia = float(dato["utilization"]), int(dato.get("resetsAt") or 0)
+        if reinicia <= 0:
+            continue  # sin hora de renovación no se sabe a qué ventana pertenece
         previo = e.get(v)
-        if previo and previo["reinicia"] == reinicia:
+        # La misma ventana aunque su hora de renovación baile unos minutos entre llamadas.
+        if previo and abs(previo["reinicia"] - reinicia) <= MISMA_VENTANA_S:
+            if uso < previo["uso"]:
+                continue  # una lectura vieja que llega tarde (dos llamadas a la vez): no hace retroceder la barra
             if uso > previo["uso"] and e["pendiente"][v] > 0:
                 e["muestras"][v] = (e["muestras"][v] + [(uso - previo["uso"]) / e["pendiente"][v]])[-MUESTRAS:]
                 e["pendiente"][v] = 0.0
@@ -77,13 +84,12 @@ async def guardar_cuota(ll: Llamada) -> None:
     if ll.motor == "eco" or (not ll.limites and not ll.coste_equivalente):
         return
     async with nueva_sesion() as s, s.begin():
-        fila = await s.get(Ajuste, CLAVE, with_for_update=True)
-        nuevo = actualizar(fila.valor if fila else {}, ll.limites, ll.coste_equivalente)
+        # Primero la fila existe (dos llamadas a la vez en el primer uso no chocan) y luego se bloquea.
+        await s.execute(insert(Ajuste).values(clave=CLAVE, valor={}).on_conflict_do_nothing(index_elements=[Ajuste.clave]))
+        fila = await s.get(Ajuste, CLAVE, with_for_update=True, populate_existing=True)
+        nuevo = actualizar(fila.valor or {}, ll.limites, ll.coste_equivalente)
         nuevo["actualizado"] = int(time.time())
-        if fila:
-            fila.valor = nuevo
-        else:
-            s.add(Ajuste(clave=CLAVE, valor=nuevo))
+        fila.valor = nuevo
 
 
 async def _estado_guardado() -> dict:
@@ -134,26 +140,38 @@ async def coste_de(accion: str, minutos: int | None = None) -> float:
     raise ValueError(f"acción desconocida: {accion}")
 
 
+def vigente(d: dict | None, ahora: float) -> dict | None:
+    """La ventana tal como está ahora: si su hora de renovación ya pasó, se renovó y está vacía (hasta la próxima
+    llamada no se sabe cuándo vuelve a renovarse)."""
+    if not d:
+        return None
+    if d["reinicia"] <= ahora:
+        return {"uso": 0.0, "reinicia": None}
+    return {"uso": d["uso"], "reinicia": d["reinicia"]}
+
+
 async def estado() -> dict:
     """Lo que enseña la barra: uso de cada ventana (0 a 1) y cuándo se renueva."""
     e = await _estado_guardado()
-    salida: dict = {"actualizado": e.get("actualizado")}
-    for v in VENTANAS:
-        d = e.get(v)
-        salida[v] = {"uso": d["uso"], "reinicia": d["reinicia"]} if d else None
-    return salida
+    ahora = time.time()
+    return {v: vigente(e.get(v), ahora) for v in VENTANAS}
 
 
 async def estimar(accion: str, minutos: int | None = None) -> dict:
     """Cuánto subiría cada barra con esta acción (fracción de la ventana), y si la cifra está calibrada."""
     e = await _estado_guardado()
     coste = await coste_de(accion, minutos)
+    ahora = time.time()
     salida: dict = {"accion": accion}
     for v in VENTANAS:
         por_coste = fraccion_por_coste(e, v)
         calibrada = por_coste is not None
-        if not calibrada and e.get(v):
-            gastado = await _coste_en_ventana(v, e[v]["reinicia"])
-            por_coste = e[v]["uso"] / gastado if gastado > 0 else None
-        salida[v] = {"extra": round(coste * por_coste, 4) if por_coste else None, "calibrada": calibrada}
+        d = e.get(v)
+        # Sin muestras, la cota prudente solo vale con una ventana vigente (la de una renovada ya no dice nada).
+        if not calibrada and d and d["reinicia"] > ahora:
+            gastado = await _coste_en_ventana(v, d["reinicia"])
+            por_coste = d["uso"] / gastado if gastado > 0 else None
+        # Sin coste conocido (aún no hay llamadas de esa acción) no hay estimación: mejor «sin datos» que «gratis».
+        extra = round(coste * por_coste, 4) if por_coste and coste > 0 else None
+        salida[v] = {"extra": extra, "calibrada": calibrada}
     return salida
