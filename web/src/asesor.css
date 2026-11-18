@@ -56,6 +56,13 @@
 .asesor-tutor :is(ul, ol) { margin: 4px 0; padding-left: 20px; }
 .asesor-tutor pre { font-size: 0.8rem; overflow-x: auto; background: var(--fondo); padding: 8px; border-radius: 8px; }
 .asesor-escribiendo { display: inline-block; width: 30px; height: 10px; background: radial-gradient(circle, currentColor 2.5px, transparent 3px) 0 50% / 10px 10px repeat-x; opacity: 0.5; animation: asesor-puntos 1s steps(3) infinite; }
+.asesor-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.asesor-acciones button {
+  font: inherit; font-size: 0.84rem; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--acento); background: color-mix(in srgb, var(--acento) 10%, var(--fondo)); color: var(--texto);
+  animation: asesor-mensaje 300ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both; transition: transform 200ms ease;
+}
+.asesor-acciones button:hover { transform: translateX(2px); }
 .asesor-otra { margin: 0; padding: 10px 14px; border-top: 1px solid var(--borde); }
 .asesor-escribir { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--borde); }
 .asesor-escribir input { flex: 1; min-width: 0; font: inherit; font-size: 0.92rem; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 999px; padding: 8px 12px; }

@@ -67,6 +67,46 @@ function seccionActual(): { clave: string; nombre: string } {
   }
 }
 
+// A dónde puede llevarte el asesor: las secciones de la app y los pasos de proyecto que hay en pantalla.
+function rutasPosibles(): { rutas: string[]; pasos: { id: string; titulo: string }[] } {
+  const rutas = MODOS.filter((m) => m.encendido).map((m) => `#/${m.id}`)
+  const pasos = Array.from(document.querySelectorAll<HTMLElement>('main.central [id^="paso-"]')).slice(0, 40).map((el) => ({
+    id: el.id.slice(5),
+    titulo: el.querySelector('strong')?.textContent?.trim() ?? '',
+  }))
+  return { rutas, pasos }
+}
+
+interface Accion {
+  texto: string
+  destino: string
+}
+
+// El bloque ```acciones de una respuesta: «Texto | destino» por línea. Solo vale un destino que exista de verdad.
+function separarAcciones(texto: string): { cuerpo: string; acciones: Accion[] } {
+  const acciones: Accion[] = []
+  const cuerpo = texto.replace(/```acciones[^\n]*\n([\s\S]*?)(```|$)/g, (_, dentro: string) => {
+    for (const linea of dentro.split('\n')) {
+      const [t, d] = linea.split('|').map((x) => x?.trim().replace(/^[-*]\s*/, ''))
+      if (t && d && acciones.length < 3) acciones.push({ texto: t.slice(0, 60), destino: d })
+    }
+    return ''
+  })
+  return { cuerpo, acciones }
+}
+
+function ejecutar(a: Accion) {
+  if (a.destino.startsWith('paso:')) {
+    const el = document.getElementById(`paso-${a.destino.slice(5)}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('destacado')
+    window.setTimeout(() => el.classList.remove('destacado'), 1800)
+  } else if (/^#\/[\w-]+(\/[\w-]+)*$/.test(a.destino) && MODOS.some((m) => m.encendido && a.destino.slice(2).split('/')[0] === m.id)) {
+    window.location.hash = a.destino
+  }
+}
+
 // Lo que pone la pantalla, en texto y sin el propio asesor (va al tutor marcado como datos de la página).
 function textoPantalla(): string {
   const main = document.querySelector('main.central') as HTMLElement | null
@@ -208,6 +248,28 @@ export default function Asesor() {
   )
 }
 
+// Una respuesta del asesor: el texto y, debajo, sus botones (si propuso alguno). Los bloques del chat grande que
+// aquí no se ven (test, opciones, dibujos) se quitan.
+function RespuestaAsesor({ texto }: { texto: string }) {
+  if (!texto) return <div className="asesor-tutor"><span className="asesor-escribiendo" aria-label="Pensando" /></div>
+  const { cuerpo, acciones } = separarAcciones(texto)
+  const limpio = cuerpo.replace(/```[\s\S]*?(```|$)/g, (b) => (/^```(svg|test|opciones|concepto|ficha)/.test(b) ? '' : b))
+  return (
+    <div className="asesor-tutor">
+      <Markdown>{limpio}</Markdown>
+      {acciones.length > 0 && (
+        <div className="asesor-acciones">
+          {acciones.map((a) => (
+            <button key={a.texto} type="button" onClick={() => ejecutar(a)}>
+              {a.texto} →
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar }: {
   lado: 'izquierda' | 'derecha'
   vertical: 'arriba' | 'abajo'
@@ -274,7 +336,10 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar }: {
       setHilos(nuevos)
       guardar(CLAVE_HILOS, nuevos)
       setMensajes((m) => [...m, { rol: 'usuario', texto: pregunta }, { rol: 'tutor', texto: '' }])
-      const contexto = `Sección: ${s.nombre}\nRuta: ${window.location.hash || '#/'}\n<pantalla>\n${textoPantalla()}\n</pantalla>`
+      const { rutas, pasos } = rutasPosibles()
+      const contexto =
+        `Sección: ${s.nombre}\nRuta: ${window.location.hash || '#/'}\n<pantalla>\n${textoPantalla()}\n</pantalla>\n` +
+        `<rutas>\n${rutas.join(' ')}${pasos.length ? `\nPasos en pantalla: ${pasos.map((p) => `paso:${p.id} «${p.titulo}»`).join('; ')}` : ''}\n</rutas>`
       control.current = new AbortController()
       let acumulado = ''
       for await (const ev of enviar(h.cid, pregunta, control.current.signal, true, false, { asesor: true, contexto })) {
@@ -347,9 +412,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar }: {
               {m.texto}
             </p>
           ) : (
-            <div key={i} className="asesor-tutor">
-              {m.texto ? <Markdown>{m.texto.replace(/```[\s\S]*?(```|$)/g, (b) => (/^```(svg|test|opciones|concepto|ficha)/.test(b) ? '' : b))}</Markdown> : <span className="asesor-escribiendo" aria-label="Pensando" />}
-            </div>
+            <RespuestaAsesor key={i} texto={m.texto} />
           ),
         )}
         {error && <p className="nota">{error}</p>}

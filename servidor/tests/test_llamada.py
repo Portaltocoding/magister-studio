@@ -32,6 +32,7 @@ async def test_el_asesor_contesta_corto_sobre_la_pantalla_y_sus_conversaciones_n
     await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={
         "contenido": "¿qué hago ahora?", "asesor": True, "contexto": "Sección: Proyectos\n<pantalla>Nivel 2 esbozado</pantalla>"})
     assert ASESOR in sistemas[-1] and "Lo que tiene en pantalla ahora" in sistemas[-1] and "Nivel 2 esbozado" in sistemas[-1]
+    assert "bloque `acciones`" in sistemas[-1]  # puede proponer botones (rutas o pasos que están en pantalla)
     assert cid not in [c["id"] for c in (await cliente.get("/api/conversaciones")).json()]
     assert (await cliente.get(f"/api/conversaciones/{cid}/mensajes")).json()[-1]["contenido"] == "Pulsa «Detallar este nivel»."
 
