@@ -1,12 +1,11 @@
 // Las escenas: cada una toma sus datos del guion gráfico y reparte sus entradas a lo largo de su duración.
 // Todo depende del fotograma (se puede pausar, saltar y volver), salvo lo que tú tocas con el vídeo parado.
 import { useState } from 'react'
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion'
-import { C, F, aparecer, atenuado, colorDe, muelle } from './estilo.ts'
+import { useCurrentFrame, useVideoConfig } from 'remotion'
+import { ARRIBA, C, F, aparecer, atenuado, colorDe, muelle, rampa, tinta } from './estilo.ts'
 import { Cable, Codigo, Marca, Ventana } from './piezas.tsx'
 import type { Contraste, Opciones, PorDentro, Pregunta, Tablero } from './tipos.ts'
 
-const ARRIBA = 118
 
 // ===== Tablero: el mapa de la lección, con lo hecho, lo de ahora y lo que falta =====
 export function EscenaTablero({ e }: { e: Tablero }) {
@@ -148,7 +147,7 @@ export function EscenaPorDentro({ e, dur }: { e: PorDentro; dur: number }) {
             <div
               key={i}
               style={{
-                fontFamily: F.serif, fontSize: 22, color: l.estado === 'mal' ? C.mal : l.estado === 'bien' ? C.bien : C.texto,
+                fontFamily: F.serif, fontSize: 22, color: tinta(l.estado, C.texto),
                 padding: '8px 10px', borderRadius: 8, border: `1px solid ${l.estado ? colorDe(l.estado) : C.borde}`,
                 opacity: aparecer(frame, pantallaDesde + i * 8, 10),
               }}
@@ -190,7 +189,7 @@ export function EscenaPorDentro({ e, dur }: { e: PorDentro; dur: number }) {
             y2={yCable(i) + 8}
             desde={empiezaFlujo + i * paso}
             dura={26}
-            color={f.estado === 'mal' ? C.mal : f.estado === 'bien' ? C.bien : C.estado}
+            color={tinta(f.estado, C.estado)}
             etiqueta={f.etiqueta}
             roto={f.estado === 'mal'}
           />
@@ -201,7 +200,7 @@ export function EscenaPorDentro({ e, dur }: { e: PorDentro; dur: number }) {
         <div
           style={{
             position: 'absolute', left: ZONAS.pantalla.x, top: ARRIBA + ALTO_ZONA + 14, width: ZONAS.pantalla.w, fontFamily: F.serif, fontSize: 15,
-            color: C.gris, opacity: interpolate(frame, [dur - 60, dur - 30], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+            color: C.gris, opacity: rampa(frame, [dur - 60, dur - 30], [0, 1]),
           }}
         >
           Para el vídeo y pulsa «{e.pantalla.boton}» para repetirlo tú.
@@ -262,7 +261,7 @@ export function EscenaContraste({ e, dur }: { e: Contraste; dur: number }) {
               background: C.panel, borderRadius: 12, border: `1.5px solid ${color}`, opacity: aparecer(frame, i * 6),
             }}
           >
-            <div style={{ fontFamily: F.serif, fontSize: 26, color: l.estado === 'mal' ? C.mal : l.estado === 'bien' ? C.bien : C.texto }}>{l.etiqueta}</div>
+            <div style={{ fontFamily: F.serif, fontSize: 26, color: tinta(l.estado, C.texto) }}>{l.etiqueta}</div>
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {l.lineas.map((t, j) => (
                 <div key={j} style={{ fontFamily: F.mono, fontSize: 19, color: C.texto, opacity: aparecer(frame, 14 + j * paso, 10) }}>

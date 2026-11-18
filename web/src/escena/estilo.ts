@@ -32,9 +32,19 @@ export const F = {
 export const colorDe = (e?: Estado) =>
   e === 'bien' ? C.bien : e === 'mal' ? C.mal : e === 'foco' ? C.foco : e === 'nuevo' ? C.estado : C.borde
 
+// Donde empieza el contenido de una escena, bajo el título.
+export const ARRIBA = 118
+
+// Interpolar sin salirse del tramo (antes y después, el valor de los extremos).
+export const FIJO = { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' } as const
+export const rampa = (frame: number, entrada: number[], salida: number[]) => interpolate(frame, entrada, salida, FIJO)
+
+// El color de un texto según su estado: rojo si falla, verde si va bien; si no, el que se diga.
+export const tinta = (e: Estado | undefined, otro: string) => (e === 'mal' ? C.mal : e === 'bien' ? C.bien : otro)
+
 // Entradas suaves y deterministas: todo depende del fotograma.
 export const aparecer = (frame: number, desde: number, dura = 12) =>
-  interpolate(frame, [desde, desde + dura], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) })
+  interpolate(frame, [desde, desde + dura], [0, 1], { ...FIJO, easing: Easing.out(Easing.cubic) })
 
 export const muelle = (frame: number, desde: number, fps: number) =>
   spring({ frame: frame - desde, fps, config: { damping: 18, stiffness: 120, mass: 0.7 } })

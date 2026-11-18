@@ -2,11 +2,10 @@
 // norte, proyecciones), fórmulas de verdad con KaTeX y sus símbolos explicados, y una cuenta hecha a mano.
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { interpolate, useCurrentFrame } from 'remotion'
-import { C, F, aparecer, colorDe } from './estilo.ts'
+import { useCurrentFrame } from 'remotion'
+import { ARRIBA, C, F, aparecer, colorDe, rampa } from './estilo.ts'
 import type { Calculo, Figura, Formula } from './tipos.ts'
 
-const ARRIBA = 118
 
 // LaTeX a HTML; si está mal escrito se ve tal cual, en rojo, en vez de romper el vídeo.
 function Tex({ tex, grande = false }: { tex: string; grande?: boolean }) {
@@ -37,7 +36,7 @@ export function EscenaFigura({ e, dur }: { e: Figura; dur: number }) {
   const P = (x: number, y: number): [number, number] => [dx + (x - x0) * escala, dy + (y1 - y) * escala]
   const pasos = Math.max(0, ...e.elementos.map((x) => x.paso ?? 0)) + 1
   const cuando = momentos(pasos, dur)
-  const t = (paso = 0, dura = 18) => interpolate(frame, [cuando(paso), cuando(paso) + dura], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+  const t = (paso = 0, dura = 18) => rampa(frame, [cuando(paso), cuando(paso) + dura], [0, 1])
   // Dirección en pantalla de un acimut en gon (0 = norte, sentido horario).
   const dir = (g: number): [number, number] => [Math.sin((g * Math.PI) / 200), -Math.cos((g * Math.PI) / 200)]
 
@@ -64,7 +63,7 @@ export function EscenaFigura({ e, dur }: { e: Figura; dur: number }) {
           <rect x={0} y={ARRIBA - 34} width={1280} height={585 - ARRIBA + 52} fill={C.fondo} />
           {verticales.map((v, i) => {
             const [sx] = P(v, 0)
-            const t = interpolate(frame, [i * 1.2, i * 1.2 + 14], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+            const t = rampa(frame, [i * 1.2, i * 1.2 + 14], [0, 1])
             return (
               <g key={`v${v}`} opacity={t}>
                 <line x1={sx} y1={585} x2={sx} y2={585 - (585 - ARRIBA + 10) * t} stroke="#2f6a86" strokeWidth={1} opacity={0.32} />
@@ -76,7 +75,7 @@ export function EscenaFigura({ e, dur }: { e: Figura; dur: number }) {
           })}
           {horizontales.map((v, i) => {
             const [, sy] = P(0, v)
-            const t = interpolate(frame, [i * 1.2, i * 1.2 + 14], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+            const t = rampa(frame, [i * 1.2, i * 1.2 + 14], [0, 1])
             return (
               <g key={`h${v}`} opacity={t}>
                 <line x1={70} y1={sy} x2={70 + 1140 * t} y2={sy} stroke="#2f6a86" strokeWidth={1} opacity={0.32} />

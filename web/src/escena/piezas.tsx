@@ -1,7 +1,7 @@
 // Las piezas del vídeo, siempre las mismas: así una hora de explicación se ve como una sola cosa.
 import type { CSSProperties, ReactNode } from 'react'
 import { interpolate, useCurrentFrame } from 'remotion'
-import { C, F, aparecer } from './estilo.ts'
+import { C, F, aparecer, rampa } from './estilo.ts'
 
 // «Concepto · tesis», arriba a la izquierda. El concepto en blanco, la tesis en gris.
 export function Titulo({ concepto, tesis }: { concepto: string; tesis: string }) {
@@ -98,7 +98,7 @@ function pintar(linea: string): ReactNode[] {
 export function Codigo({ lineas, resaltar = [], desde = 0, hasta = 0, tamano = 16 }: { lineas: string[]; resaltar?: number[]; desde?: number; hasta?: number; tamano?: number }) {
   const frame = useCurrentFrame()
   const total = lineas.reduce((n, l) => n + l.length + 1, 0)
-  const visibles = hasta > desde ? Math.floor(interpolate(frame, [desde, hasta], [0, total], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })) : total
+  const visibles = hasta > desde ? Math.floor(rampa(frame, [desde, hasta], [0, total])) : total
   const foco = aparecer(frame, hasta + 6, 10)
   // Dónde empieza cada línea dentro del texto entero (para saber cuánto se ha escrito de ella).
   const empieza = lineas.map((_, i) => lineas.slice(0, i).reduce((n, l) => n + l.length + 1, 0))
@@ -150,7 +150,7 @@ export function Cable({
   x1, y1, x2, y2, desde, dura = 24, color = C.estado, etiqueta, roto = false,
 }: { x1: number; y1: number; x2: number; y2: number; desde: number; dura?: number; color?: string; etiqueta?: string; roto?: boolean }) {
   const frame = useCurrentFrame()
-  const t = interpolate(frame, [desde, desde + dura], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+  const t = rampa(frame, [desde, desde + dura], [0, 1])
   if (t <= 0) return null
   // Con signo: el cable sale hacia donde va (también de derecha a izquierda).
   const dx = Math.max(40, Math.abs(x2 - x1) * 0.45) * (x2 >= x1 ? 1 : -1)

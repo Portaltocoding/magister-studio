@@ -3,11 +3,10 @@
 // que se enciende. Como las demás, todo sale del fotograma.
 import type { ReactNode } from 'react'
 import { Easing, interpolate, useCurrentFrame, useVideoConfig } from 'remotion'
-import { C, F, aparecer, colorDe, muelle } from './estilo.ts'
+import { ARRIBA, C, F, FIJO, aparecer, colorDe, muelle, rampa } from './estilo.ts'
 import { Cable, Codigo } from './piezas.tsx'
 import type { Arbol, Barras, Consulta, Indice, Mitades, Pasos, Tabla } from './tipos.ts'
 
-const ARRIBA = 118
 const BARRA = 34
 const FILA = 38
 const num = (n: number) => Math.round(n).toLocaleString('es-ES')
@@ -59,7 +58,7 @@ export function EscenaTabla({ e, dur }: { e: Tabla; dur: number }) {
   const lector = escaneo && frame >= s0 && frame < s1 ? Math.floor((frame - s0) / 3) % n : -1
   const vistas = escaneo ? Math.floor(Math.max(0, frame - s0) / 3) : 0
   const leidas = escaneo
-    ? interpolate(frame, [s0, s1], [0, escaneo.leidas], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.in(Easing.quad) })
+    ? interpolate(frame, [s0, s1], [0, escaneo.leidas], { ...FIJO, easing: Easing.in(Easing.quad) })
     : 0
   const fin = escaneo ? aparecer(frame, s1, 14) : 0
   return (
@@ -206,7 +205,7 @@ export function EscenaMitades({ e, dur }: { e: Mitades; dur: number }) {
   let k = 0
   while (k < pasos && frame >= comienzo(k + 1)) k++
   const largo = k < lentos ? lento : rapido
-  const t = interpolate(frame, [comienzo(k), comienzo(k) + largo * 0.8], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.inOut(Easing.cubic) })
+  const t = interpolate(frame, [comienzo(k), comienzo(k) + largo * 0.8], [0, 1], { ...FIJO, easing: Easing.inOut(Easing.cubic) })
   const [a0, b0] = intervalos[k]
   const [a1, b1] = intervalos[Math.min(pasos, k + (frame >= inicio ? 1 : 0))]
   const lo = a0 + (a1 - a0) * t
@@ -291,7 +290,7 @@ export function EscenaArbol({ e, dur }: { e: Arbol; dur: number }) {
           const padre = cajas[i][i === 0 ? 0 : e.camino[i]]
           return cajas[i + 1].map((hijo, j) => {
             const enCamino = j === e.camino[i + 1]
-            const t = enCamino ? interpolate(frame, [llegaA(i) + 8, llegaA(i + 1)], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) : 0
+            const t = enCamino ? rampa(frame, [llegaA(i) + 8, llegaA(i + 1)], [0, 1]) : 0
             const x1 = padre.x + padre.w / 2
             const y1 = padre.y + ALTO_NODO
             const x2 = hijo.x + hijo.w / 2
@@ -374,7 +373,7 @@ export function EscenaBarras({ e }: { e: Barras }) {
         </div>
       )}
       {e.barras.map((b, i) => {
-        const crece = interpolate(frame, [14 + i * 26, 44 + i * 26], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) })
+        const crece = interpolate(frame, [14 + i * 26, 44 + i * 26], [0, 1], { ...FIJO, easing: Easing.out(Easing.cubic) })
         const w = Math.max(4, medida(b.valor) * W * crece)
         const color = b.estado ? colorDe(b.estado) : C.estado
         const y = ARRIBA + 90 + i * 92

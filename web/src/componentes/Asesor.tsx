@@ -289,7 +289,7 @@ export default function Asesor() {
         }}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <Mascota gesto={piensa ? 'pensando' : abierto ? 'escuchando' : aviso.texto ? 'escuchando' : 'normal'} />
+        <Mascota gesto={piensa ? 'pensando' : abierto || aviso.texto ? 'escuchando' : 'normal'} />
       </div>
       {aviso.texto && !abierto && !cogida && (
         <div className={`asesor-aviso ${aLaIzquierda ? 'izquierda' : 'derecha'}`} role="status">

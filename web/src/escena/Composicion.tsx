@@ -1,7 +1,7 @@
 // La composición de Remotion: los tramos en fila, cada uno con su título, su escena y su subtítulo.
 // Vídeo = f(fotograma): nada guarda estado del tiempo, así que se puede saltar a cualquier punto.
-import { AbsoluteFill, Sequence, interpolate, useCurrentFrame } from 'remotion'
-import { C } from './estilo.ts'
+import { AbsoluteFill, Sequence, useCurrentFrame } from 'remotion'
+import { C, rampa } from './estilo.ts'
 import { EscenaContraste, EscenaOpciones, EscenaPorDentro, EscenaPregunta, EscenaTablero } from './escenas.tsx'
 import { EscenaArbol, EscenaBarras, EscenaConsulta, EscenaIndice, EscenaMitades, EscenaPasos, EscenaTabla } from './escenas_datos.tsx'
 import { EscenaCalculo, EscenaFigura, EscenaFormula } from './escenas_geo.tsx'
@@ -64,7 +64,7 @@ function VistaTramo({ tramo, subtitulos, ritmo }: { tramo: Tramo; subtitulos: bo
   const frame = useCurrentFrame()
   const dur = duracionTramo(tramo, ritmo)
   // Sin cortes duros: cada tramo nace y se va con un fundido corto.
-  const opacidad = interpolate(frame, [0, 8, dur - 8, dur], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+  const opacidad = rampa(frame, [0, 8, dur - 8, dur], [0, 1, 1, 0])
   const e = tramo.escena
   return (
     <AbsoluteFill style={{ opacity: opacidad }}>

@@ -1,17 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
 
-// Por qué no sirve: cada motivo afina lo que Magister aprende de ti (servidor: tono/confianza.py, MOTIVOS).
-const MOTIVOS: [string, string][] = [
-  ['largo', 'Muy largo'],
-  ['corto', 'Se queda corto'],
-  ['basico', 'Muy básico'],
-  ['tecnico', 'Mucha jerga'],
-  ['sin_ejemplo', 'Le falta un ejemplo'],
-  ['confuso', 'Me he perdido'],
-  ['error', 'Hay un error'],
-  ['tono', 'El tono'],
-]
+// Por qué no sirve: cada motivo afina lo que Magister aprende de ti. La lista la da el servidor (tono/confianza.py,
+// MOTIVOS), una vez por página: Valorar sale junto a cada respuesta.
+type Motivo = { id: string; nombre: string }
+let motivosPedidos: Promise<Motivo[]> | null = null
+const pedirMotivos = () =>
+  (motivosPedidos ??= pedir<{ motivos: Motivo[] }>('/api/afinado')
+    .then((a) => a.motivos)
+    .catch(() => {
+      motivosPedidos = null // se reintenta la próxima vez
+      return []
+    }))
 
 interface Props {
   traza: string
@@ -28,6 +28,10 @@ export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
   const [hecho, setHecho] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [fallo, setFallo] = useState(false)
+  const [lista, setLista] = useState<Motivo[]>([])
+  useEffect(() => {
+    if (abierto) pedirMotivos().then(setLista)
+  }, [abierto])
 
   // Un voto cada vez: mientras se envía, los botones esperan; si falla, se dice y se puede repetir.
   const votar = async (bien: boolean, otra = false) => {
@@ -76,7 +80,7 @@ export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
       {abierto && (
         <div className="valorar-caja">
           <div className="valorar-motivos" role="group" aria-label="Qué ha fallado">
-            {MOTIVOS.map(([id, nombre]) => (
+            {lista.map(({ id, nombre }) => (
               <button
                 key={id}
                 type="button"
