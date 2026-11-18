@@ -73,7 +73,8 @@ async def test_los_turnos_de_la_llamada_no_pasan_por_el_juez_de_explicaciones(mo
 
     monkeypatch.setattr(cola, "encolar", encolar)
     monkeypatch.setattr(ajustes, "juez_muestra", 1.0)
-    comun = dict(motor="cli", modelo_pedido="haiku", sistema="s", prompt_nombre="conversar", prompt_version="v", traza_id="t1")
+    comun = dict(motor="cli", modelo_pedido="haiku", sistema="s", prompt_nombre="conversar", prompt_version="v", traza_id="t1",
+                 respuesta="Un índice guarda las claves ordenadas para no leer la tabla entera. " * 12)
     await registro.encolar_juez(Llamada(funcion="llamada", **comun))
     assert encolados == []
     await registro.encolar_juez(Llamada(funcion="conversar", **comun))
@@ -136,3 +137,16 @@ async def test_lo_que_no_cuenta_se_ve_en_los_mensajes(cliente, monkeypatch) -> N
     await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "probando", "cuenta": False})
     assert {m["cuenta"] for m in (await cliente.get(f"/api/conversaciones/{cid}/mensajes")).json()} == {False}
     assert (await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "   "})).status_code == 422
+
+
+def test_solo_se_juzgan_las_explicaciones() -> None:
+    from magister.observar.registro import es_explicacion
+
+    # Turnos del chat que no explican nada: el saludo de un simulacro, una nota, un «sí, eso es».
+    assert not es_explicacion("Hola, soy tu entrevistador y vamos a repasar HTTP. Primera pregunta: ¿qué es un verbo?")
+    assert not es_explicacion("Te pongo un 5 sobre 10. " * 10)
+    assert not es_explicacion(None)
+    # Mayoría de preguntas: es un examen, no una explicación.
+    assert not es_explicacion("¿Qué devuelve un GET? ¿Y un POST? ¿Por qué? " * 20)
+    explicacion = "Leer la tabla entera cuesta lo mismo encuentres o no la fila. Para no pagarlo, el índice guarda las claves ordenadas. " * 6
+    assert es_explicacion(explicacion) and es_explicacion(explicacion + "¿Lo vemos con un ejemplo?")

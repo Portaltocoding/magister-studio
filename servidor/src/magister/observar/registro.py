@@ -9,6 +9,7 @@
 
 import logging
 import random
+import re
 
 from sqlalchemy.dialects.postgresql import insert
 
@@ -50,8 +51,26 @@ async def guardar_metricas(ll: Llamada) -> None:
         await puntuar(ll.traza_id, f"{ll.funcion}.{nombre}" if ll.estructurada else nombre, valor)
 
 
+# Por debajo de esto, un turno del chat no es una explicación: saludo y primera pregunta de un simulacro, la nota de una
+# respuesta, cómo moverse por la app, un «sí, eso es». Juzgarlos con la rúbrica de una explicación los suspendía casi
+# siempre (38 de los 40 suspensos del 18-11-2026 eran del chat, la mitad de menos de 600 caracteres) y hundía la alerta.
+MINIMO_EXPLICACION = 600
+
+
+def es_explicacion(texto: str | None) -> bool:
+    """¿Merece la rúbrica de una explicación? Largo suficiente y no solo preguntas al alumno."""
+    t = (texto or "").strip()
+    if len(t) < MINIMO_EXPLICACION:
+        return False
+    frases = [f for f in re.split(r"(?<=[.!?])\s+", t) if f.strip()]
+    preguntas = sum(1 for f in frases if f.rstrip().endswith("?"))
+    return preguntas * 2 < len(frases)
+
+
 async def encolar_juez(ll: Llamada) -> None:
     if not ll.traza_id or ll.error or ll.estructurada or (ll.prompt_nombre or ll.funcion) not in EXPLICACIONES:
+        return
+    if not es_explicacion(ll.respuesta):
         return
     # Los turnos de una llamada de voz (2 a 4 frases habladas) no se juzgan con la rúbrica de una explicación escrita:
     # la suspendían siempre y hundían la alerta de tono.

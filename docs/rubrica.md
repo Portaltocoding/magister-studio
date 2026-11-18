@@ -17,6 +17,7 @@ Sin relleno ni metatexto: cada frase aporta.
 
 - **Aprueba.** Quitar cualquier frase pierde información. Ejemplo: «Un índice parcial solo guarda las filas que cumplen una condición; ocupa menos y acelera las consultas que repiten esa condición.»
 - **Suspende.** Frases que anuncian, repiten o recapitulan sin añadir. Ejemplo: «En este apartado vamos a ver los índices parciales, un tema muy importante. Como veremos, los índices parciales son índices que...»
+- **En una conversación.** Si el bloque es un turno de chat (contesta a un mensaje del alumno), dos cosas no son relleno: reconocer en una frase corta lo que el alumno ha dicho cuando lo que sigue lo usa («Tienes razón en que HTTP no lo prohíbe: …»), y cerrar con una sola pregunta breve que comprueba si se ha entendido o propone el siguiente paso concreto. Sí son relleno los saludos, las frases que hablan de la aplicación o del plan en vez del tema, las que anuncian lo que viene y más de una pregunta u oferta de cierre.
 
 ## Trato
 
