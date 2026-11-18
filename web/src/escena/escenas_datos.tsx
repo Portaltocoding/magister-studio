@@ -50,7 +50,9 @@ export function EscenaTabla({ e, dur }: { e: Tabla; dur: number }) {
   const x = escaneo ? 64 : 150
   const n = e.filas.length
   const alto = BARRA + 14 + 30 + n * FILA + (e.resto ? 44 : 10)
-  const plantilla = `90px repeat(${e.columnas.length - 1}, 1fr)`
+  // La primera columna (ids, nombres, URL) tan ancha como su texto más largo, entre 90 y 420 px.
+  const larga = Math.max(...[e.columnas[0], ...e.filas.map((f) => f[0])].map((c) => (c ?? '').length))
+  const plantilla = `${Math.min(420, Math.max(90, larga * 10 + 16))}px repeat(${e.columnas.length - 1}, 1fr)`
   const s0 = Math.round(dur * 0.24)
   const s1 = Math.round(dur * 0.78)
   // El lector baja una fila cada 3 fotogramas y vuelve arriba: sugiere el millón sin enseñarlo.

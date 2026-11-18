@@ -263,7 +263,7 @@ class FilaCalculo(BaseModel):
 
 class Calculo(BaseModel):
     tipo: Literal["calculo"]
-    datos: str | None = Field(None, description="LaTeX sin $: los datos de partida.")
+    datos: str | None = Field(None, description="Los datos de partida, en texto llano (sin LaTeX): «A = (1000 ; 2000) · D = 150 m».")
     filas: list[FilaCalculo] = Field(min_length=1, max_length=5)
     nota: str | None = None
 

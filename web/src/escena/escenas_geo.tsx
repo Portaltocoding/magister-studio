@@ -261,7 +261,7 @@ export function EscenaCalculo({ e, dur }: { e: Calculo; dur: number }) {
     <>
       {e.datos && (
         <div style={{ position: 'absolute', left: 76, right: 76, top: ARRIBA + 6, fontFamily: F.serif, fontSize: 21, color: C.gris, opacity: aparecer(frame, 0) }}>
-          {e.datos}
+          {/\\[a-zA-Z]/.test(e.datos) ? <Tex tex={e.datos} /> : e.datos}
         </div>
       )}
       {e.filas.map((f, i) => {

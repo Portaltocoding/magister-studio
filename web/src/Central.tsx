@@ -14,6 +14,7 @@ const PanelMaterial = lazy(() => import('./paneles/PanelMaterial.tsx'))
 const PanelProgreso = lazy(() => import('./paneles/PanelProgreso.tsx'))
 const PanelTriaje = lazy(() => import('./paneles/PanelTriaje.tsx'))
 const PanelPronunciacion = lazy(() => import('./paneles/PanelPronunciacion.tsx'))
+const PanelModelos = lazy(() => import('./paneles/PanelModelos.tsx'))
 const PanelFuentes = lazy(() => import('./paneles/PanelFuentes.tsx'))
 const PanelPlan = lazy(() => import('./paneles/PanelPlan.tsx'))
 const PanelExamen = lazy(() => import('./paneles/PanelExamen.tsx'))
@@ -124,6 +125,8 @@ function Panel({
       return <PanelTriaje />
     case 'pronunciacion':
       return <PanelPronunciacion />
+    case 'modelos':
+      return <PanelModelos />
     case 'etiquetar':
       return <PanelEtiquetar />
     case 'animaciones':

@@ -62,6 +62,8 @@ interface VideoInfo {
   estilo: string
   concepto: string | null
   minutos: number | null
+  // Con guion gráfico: se ve como vídeo animado (motor de escena); si no, narrado con sus diapositivas.
+  animado?: boolean
 }
 
 interface Escena {
@@ -463,6 +465,49 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
   )
 }
 // «Nuevo vídeo»: qué lección (o qué concepto), con qué estilo y cuánto dura.
+// Un vídeo con guion gráfico se ve animado; «Versión narrada» pasa al reproductor de siempre (con su MP4).
+function VistaVideo({ video, diaposId }: { video: VideoInfo; diaposId?: number }) {
+  const [guion, setGuion] = useState<GuionGrafico | null>(null)
+  const [sencilla, setSencilla] = useState(!video.animado)
+  const [fallo, setFallo] = useState(false)
+  const [ReproductorEscena, setReproductorEscena] = useState(cargarEscena)
+  useEffect(() => {
+    if (!video.animado) return
+    pedir<GuionGrafico>(`/api/materiales/${video.material_id}/guion_grafico`)
+      .then(setGuion)
+      .catch(() => {
+        setFallo(true)
+        setSencilla(true)
+      })
+  }, [video.material_id, video.animado])
+  const cambiar = video.animado && !fallo && (
+    <button className="boton boton-suave video-version" onClick={() => setSencilla((x) => !x)}>
+      {sencilla ? 'Ver animado' : 'Versión narrada (y MP4)'}
+    </button>
+  )
+  if (sencilla)
+    return (
+      <>
+        {cambiar}
+        <Reproductor video={video} diaposId={diaposId} />
+      </>
+    )
+  return (
+    <>
+      {cambiar}
+      {guion ? (
+        <FalloReproductor alReintentar={() => setReproductorEscena(cargarEscena)}>
+          <Suspense fallback={<Pensando texto="Preparando la escena…" />}>
+            <ReproductorEscena guion={guion} />
+          </Suspense>
+        </FalloReproductor>
+      ) : (
+        <Pensando texto="Preparando la escena…" />
+      )}
+    </>
+  )
+}
+
 function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; estados: Estados; alHecho: (clave: string) => void; alCancelar: () => void }) {
   const preparadas = plan.lecciones.filter((l) => estados[l.clave]?.ids?.apuntes)
   const [clave, setClave] = useState(preparadas[0]?.clave ?? '')
@@ -693,7 +738,7 @@ export default function PanelVideo() {
         </p>
       )}
       {actual ? (
-        <Reproductor key={actual.material_id} video={actual} diaposId={estados[actual.clave]?.ids?.diapositivas} />
+        <VistaVideo key={actual.material_id} video={actual} diaposId={estados[actual.clave]?.ids?.diapositivas} />
       ) : (
         !nuevo && (
           <Vacio
@@ -717,6 +762,7 @@ export default function PanelVideo() {
                     <small className="video-meta">
                       {NOMBRE_ESTILO[v.estilo] ?? 'Clase'}
                       {v.minutos ? ` · ${v.minutos} min` : ''}
+                      {v.animado ? ' · animado' : ''}
                     </small>
                   </span>
                   <small>▶</small>

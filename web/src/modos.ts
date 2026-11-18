@@ -25,6 +25,7 @@ export type IdModo =
   | 'hablar'
   | 'animaciones'
   | 'pronunciacion'
+  | 'modelos'
   | 'automatizar'
   | 'llamada'
   | 'ajustes'
@@ -120,6 +121,7 @@ export const TALLER: Modo[] = [
   { id: 'triaje', nombre: 'Triaje del banco', encendido: true, ayuda: 'Taller: revisar preguntas del banco' },
   { id: 'animaciones', nombre: 'Animaciones', encendido: true, ayuda: 'Taller: las animaciones de espera, todas juntas' },
   { id: 'pronunciacion', nombre: 'Pronunciación', encendido: true, ayuda: 'Taller: cómo dice la voz cada término técnico; búscalo y escúchalo' },
+  { id: 'modelos', nombre: 'Modelos', encendido: true, ayuda: 'Taller: qué modelo hace cada tarea, cuánto cuesta, qué tal lo hace y qué cambiar' },
 ]
 
 // Sin sitio en la barra: se llega por Ctrl+K (o aún no existen).
