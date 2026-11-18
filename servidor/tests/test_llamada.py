@@ -49,7 +49,7 @@ async def test_en_la_llamada_no_se_reescribe_ni_se_busca_en_una_leccion() -> Non
     assert r["recuperados"] == []
 
 
-def test_en_la_llamada_contesta_el_rapido_y_corrige_el_grande() -> None:
+def test_la_llamada_tiene_su_tarea_y_corregir_la_suya() -> None:
     from magister.cerebro.enrutador import ruta
     from magister.flujo.comun import tarea_de
 
@@ -57,7 +57,7 @@ def test_en_la_llamada_contesta_el_rapido_y_corrige_el_grande() -> None:
     assert tarea_de({"llamada": True}) == "llamada"
     assert tarea_de({"llamada": True, "corregir": True}) == "corregir"
     if ruta("llamada")[0] != "eco":  # con el motor de pruebas todo es eco
-        assert ruta("llamada")[1] == "haiku" and ruta("corregir")[1] != "haiku"
+        assert ruta("corregir")[1] != "haiku"  # juzgar una respuesta, nunca con el pequeño
 
 
 async def test_los_turnos_de_la_llamada_no_pasan_por_el_juez_de_explicaciones(monkeypatch) -> None:

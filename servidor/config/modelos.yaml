@@ -14,10 +14,10 @@ tareas:
   planificar: {motor: cli, modelo: defecto, datos_personales: true}
   extraer:   {motor: cli, modelo: haiku, datos_personales: true}
   juez:      {motor: cli, modelo: haiku, datos_personales: false}
-  # Los turnos de la llamada de voz: respuestas cortas donde manda la rapidez (Haiku arranca en 1 o 2 s). Recibe el
-  # mismo prompt que el resto (apuntes, contexto de la llamada e historial). Los diagramas de la pizarra y el mapa,
-  # que se generan aparte y se guardan, siguen con el modelo grande.
-  llamada:   {motor: cli, modelo: haiku, datos_personales: true}
+  # Los turnos de la llamada de voz. Se probó Haiku (18-11-2026): no arrancaba antes (unos 3,5 s son del propio
+  # claude -p, sea cual sea el modelo) y corregía peor, así que va con el modelo de siempre. La tarea se mantiene
+  # para poder cambiarlo aquí y para que el juez de tono no puntúe turnos hablados.
+  llamada:   {motor: cli, modelo: defecto, datos_personales: true}
 
 # Qué tarea es cada plantilla de prompt.
 prompts:

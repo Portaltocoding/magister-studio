@@ -7,22 +7,23 @@ from magister.proyectos import roadmap as rm
 pytestmark = pytest.mark.anyio
 
 
-def _paso(t: str) -> rm.PasoGen:
-    return rm.PasoGen(titulo=t, que_haces="Hazlo.", antes="Lo que hay que saber.", hecho_si="Responde.", minutos=30)
+def _paso(t: str, hecho_si: str = "aws sts get-caller-identity devuelve tu usuario", minutos: int = 30) -> rm.PasoGen:
+    return rm.PasoGen(titulo=t, que_haces="Crea un usuario IAM con permisos de solo lectura.",
+                      antes="IAM decide quién puede hacer qué en la cuenta de AWS.", hecho_si=hecho_si, minutos=minutos)
 
 
 def _roadmap(pasos_n1: int = 2) -> rm.RoadmapGen:
     return rm.RoadmapGen(
-        resumen="Línea 1.\nLínea 2.", que_es="Un agente.", por_que="Porque sí.",
-        glosario=[rm.Termino(termino=t, definicion="…") for t in ("IAM", "EC2", "Región")],
-        arquitectura="Agente, herramientas y cuenta.",
+        resumen="Línea 1.\nLínea 2.", que_es="Un agente que lee instancias EC2.", por_que="Porque sí.",
+        glosario=[rm.Termino(termino=t, definicion="…") for t in ("IAM", "Instancia EC2", "Región")],
+        arquitectura="Agente, herramientas y cuenta en una región.",
         niveles=[
             rm.NivelGen(titulo="Solo lectura", objetivo="Lee y propone.", priming="Primero mirar.",
                         bloques=[rm.BloqueGen(titulo="Ver la cuenta", priming="…", pasos=[_paso(f"p{i}") for i in range(pasos_n1)])]),
             rm.NivelGen(titulo="Aprobar y aplicar", objetivo="Aplica.", priming="Después tocar.",
-                        bloques=[rm.BloqueGen(titulo="Plan", priming="…")]),
+                        bloques=[rm.BloqueGen(titulo="Plan", priming="El plan se aprueba antes de aplicarlo.")]),
         ],
-        riesgos=[rm.Riesgo(riesgo="Coste", mitigacion="Tope."), rm.Riesgo(riesgo="Borrar algo", mitigacion="Dry-run.")],
+        riesgos=[rm.Riesgo(riesgo="Coste", mitigacion="Un presupuesto con avisos."), rm.Riesgo(riesgo="Borrar algo", mitigacion="Primero en simulacro (dry-run).")],
     )
 
 
@@ -32,6 +33,20 @@ def test_el_nivel_1_tiene_que_traer_pasos_y_los_priming_son_cortos() -> None:
     largo = _roadmap(2)
     largo.resumen = "\n".join(f"Línea {i}." for i in range(9))
     assert any("resumen" in e for e in rm.reglas_roadmap(largo))
+
+
+def test_un_esqueleto_fiable_sin_juez() -> None:
+    """Pasos comprobables y de tamaño razonable, sin títulos repetidos, y un glosario de lo que sale de verdad."""
+    r = _roadmap(2)
+    r.niveles[0].bloques[0].pasos[0] = _paso("p0", hecho_si="Funciona")
+    r.niveles[0].bloques[0].pasos[1] = _paso("p0", minutos=600)
+    errores = " ".join(rm.reglas_roadmap(r))
+    assert "comprobable" in errores and "dura 600 min" in errores and "mismo título" in errores
+    r = _roadmap(2)
+    r.glosario.append(rm.Termino(termino="CloudTrail", definicion="…"))
+    r.glosario.append(rm.Termino(termino="Instancias EC2", definicion="…"))  # plural de algo que sí sale: vale
+    assert [e for e in rm.reglas_roadmap(r) if "glosario" in e] == [
+        "Estos términos del glosario no salen en el roadmap (quítalos o úsalos donde toque): CloudTrail."]
 
 
 def test_montar_pone_ids_estables_y_marca_el_mvp() -> None:

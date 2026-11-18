@@ -3,6 +3,7 @@ import Markdown from 'react-markdown'
 import { crearConversacion, enviar, listarMensajes } from '../api.ts'
 import Mascota from '../Mascota.tsx'
 import { MODOS } from '../modos.ts'
+import { EVENTO_SUENO } from './animo.ts'
 
 // El asesor: la mascota de la barra de arriba, cogida y dejada donde quieras. Se queda flotando sobre la pantalla y,
 // al pulsarla, abre una ventanita de chat que sabe dónde estás: lo que pone la pantalla le llega con cada pregunta.
@@ -127,6 +128,8 @@ export default function Asesor() {
     })
   }, [])
   const [piensa, setPiensa] = useState(false)
+  const aviso = usarAvisoAtasco(sitio.activo && !abierto)
+  const [textoInicial, setTextoInicial] = useState('')
   const sitioRef = useRef(sitio)
   sitioRef.current = sitio
   const caja = useRef<HTMLDivElement | null>(null)
@@ -233,8 +236,28 @@ export default function Asesor() {
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setAbierto((a) => !a)}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <Mascota gesto={piensa ? 'pensando' : abierto ? 'escuchando' : 'normal'} />
+        <Mascota gesto={piensa ? 'pensando' : abierto ? 'escuchando' : aviso.texto ? 'escuchando' : 'normal'} />
       </div>
+      {aviso.texto && !abierto && !cogida && (
+        <div className={`asesor-aviso ${aLaIzquierda ? 'izquierda' : 'derecha'}`} role="status">
+          <p>{aviso.texto}</p>
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                setTextoInicial(aviso.paso ? `Me he atascado en «${aviso.paso}»: ` : 'Me he atascado: ')
+                aviso.cerrar()
+                setAbierto(true)
+              }}
+            >
+              Me he atascado
+            </button>
+            <button type="button" className="suave" onClick={aviso.cerrar}>
+              Va bien
+            </button>
+          </div>
+        </div>
+      )}
       {abierto && !cogida && (
         <ChatAsesor
           lado={aLaIzquierda ? 'izquierda' : 'derecha'}
@@ -242,10 +265,81 @@ export default function Asesor() {
           alCerrar={() => setAbierto(false)}
           alDevolver={devolver}
           alPensar={setPiensa}
+          textoInicial={textoInicial}
         />
       )}
     </div>
   )
+}
+
+// ¿Te has atascado? Si llevas más de 25 minutos en un proyecto sin marcar ningún paso, al volver (a la ventana, o de
+// la siesta de la mascota) el asesor pregunta por el paso que toca. Como mucho una vez cada 25 minutos.
+const ATASCO_MS = 25 * 60 * 1000
+const CLAVE_VISTO = 'magister-asesor-visto'
+
+function usarAvisoAtasco(activo: boolean): { texto: string | null; paso: string | null; cerrar: () => void } {
+  const [aviso, setAviso] = useState<{ texto: string; paso: string | null } | null>(null)
+  const marcarVisto = (pid: string, ahora = Date.now()) => {
+    const v = leer<Record<string, number>>(CLAVE_VISTO, {})
+    guardar(CLAVE_VISTO, { ...v, [pid]: ahora })
+  }
+  useEffect(() => {
+    if (!activo) return
+    const proyecto = () => window.location.hash.match(/^#\/proyectos\/(\d+)/)?.[1] ?? null
+    // Al entrar en un proyecto empieza a contar (si no estaba contando ya hoy).
+    const alEntrar = () => {
+      const pid = proyecto()
+      if (!pid) return setAviso(null)
+      const v = leer<Record<string, number>>(CLAVE_VISTO, {})
+      if (!v[pid] || Date.now() - v[pid] > 12 * 3600 * 1000) marcarVisto(pid)
+    }
+    const revisar = async () => {
+      const pid = proyecto()
+      if (!pid || document.visibilityState !== 'visible') return
+      const desde = leer<Record<string, number>>(CLAVE_VISTO, {})[pid] ?? Date.now()
+      if (Date.now() - desde < ATASCO_MS) return
+      try {
+        const p = await (await fetch(`/api/proyectos/${pid}`)).json()
+        const fechas = Object.values((p.hechos_en ?? {}) as Record<string, string>).map((x) => new Date(x).getTime())
+        if (fechas.length && Date.now() - Math.max(...fechas) < ATASCO_MS) return marcarVisto(pid, Math.max(...fechas))
+        const hechos = new Set<string>(p.hechos ?? [])
+        type P = { id: string; titulo: string }
+        const siguiente = ((p.roadmap?.niveles ?? []) as { bloques: { pasos: P[] }[] }[])
+          .flatMap((n) => n.bloques.flatMap((b) => b.pasos))
+          .find((x) => !hechos.has(x.id))
+        if (!siguiente) return
+        setAviso({ texto: `¿Qué tal con «${siguiente.titulo}»? Si te has atascado, cuéntamelo.`, paso: siguiente.titulo })
+      } catch {
+        /* sin red: otra vez será */
+      }
+    }
+    alEntrar()
+    const alVolver = () => document.visibilityState === 'visible' && void revisar()
+    const alDespertar = (e: Event) => !(e as CustomEvent<boolean>).detail && void revisar()
+    const cambiar = () => {
+      alEntrar()
+      void revisar()
+    }
+    const t = window.setInterval(() => void revisar(), 5 * 60 * 1000)
+    window.addEventListener('hashchange', cambiar)
+    document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener(EVENTO_SUENO, alDespertar)
+    return () => {
+      window.clearInterval(t)
+      window.removeEventListener('hashchange', cambiar)
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener(EVENTO_SUENO, alDespertar)
+    }
+  }, [activo])
+  return {
+    texto: aviso?.texto ?? null,
+    paso: aviso?.paso ?? null,
+    cerrar: () => {
+      const pid = window.location.hash.match(/^#\/proyectos\/(\d+)/)?.[1]
+      if (pid) marcarVisto(pid)
+      setAviso(null)
+    },
+  }
 }
 
 // Una respuesta del asesor: el texto y, debajo, sus botones (si propuso alguno). Los bloques del chat grande que
@@ -270,18 +364,19 @@ function RespuestaAsesor({ texto }: { texto: string }) {
   )
 }
 
-function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar }: {
+function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInicial = '' }: {
   lado: 'izquierda' | 'derecha'
   vertical: 'arriba' | 'abajo'
   alCerrar: () => void
   alDevolver: () => void
   alPensar: (s: boolean) => void
+  textoInicial?: string
 }) {
   const [aqui, setAqui] = useState(seccionActual)
   const [hilos, setHilos] = useState<Record<string, Hilo>>(() => leer<Record<string, Hilo>>(CLAVE_HILOS, {}))
   const [viendo, setViendo] = useState<string>(() => seccionActual().clave)
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
-  const [texto, setTexto] = useState('')
+  const [texto, setTexto] = useState(textoInicial)
   const [pensando, setPensando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const control = useRef<AbortController | null>(null)

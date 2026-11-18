@@ -7,6 +7,8 @@ decidido en el diario delante.
 """
 
 import json
+import re
+import unicodedata
 
 from pydantic import BaseModel, Field
 
@@ -60,27 +62,93 @@ class NivelDetallado(BaseModel):
     bloques: list[BloqueGen] = Field(min_length=1, max_length=5)
 
 
+# Un «Hecho si» que no se puede comprobar («funciona», «lo entiendes») no le dice al alumno cuándo parar.
+_HECHO_VAGO = re.compile(r"^\s*(ya\s+)?(funciona|est[aá] (hecho|listo|terminado)|lo (entiendes|tienes claro|sabes)|todo (va )?bien)\b", re.IGNORECASE)
+
+
+def _normal(t: str) -> str:
+    t = unicodedata.normalize("NFD", t.lower())
+    return " " + re.sub(r"[^a-z0-9ñ]+", " ", "".join(c for c in t if unicodedata.category(c) != "Mn")) + " "
+
+
 def _con_pasos(bloques: list[BloqueGen], donde: str) -> list[str]:
+    """El esqueleto de un nivel detallado: bloques de 2 a 6 pasos, y cada paso completo y comprobable."""
     errores = []
     for b in bloques:
-        if len(b.pasos) < 2:
-            errores.append(f"El bloque «{b.titulo}» de {donde} necesita de 2 a 6 pasos.")
+        if not 2 <= len(b.pasos) <= 6:
+            errores.append(f"El bloque «{b.titulo}» de {donde} necesita de 2 a 6 pasos (tiene {len(b.pasos)}).")
+        for p in b.pasos:
+            if len(p.hecho_si.strip()) < 20 or _HECHO_VAGO.search(p.hecho_si):
+                errores.append(f"El paso «{p.titulo}» necesita un «hecho_si» comprobable (un comando que responde, una prueba que pasa, algo que se ve), no «{p.hecho_si.strip()[:40]}».")
+            if len(p.antes.strip()) < 20:
+                errores.append(f"El paso «{p.titulo}» necesita su «antes»: lo mínimo que hay que saber, en 2 a 4 frases.")
+            if len(p.que_haces.strip()) < 20:
+                errores.append(f"El paso «{p.titulo}» necesita un «que_haces» concreto.")
+            if not 10 <= p.minutos <= 240:
+                errores.append(f"El paso «{p.titulo}» dura {p.minutos} min: pártelo o júntalo para que dure de 10 min a 4 h.")
+    titulos = [p.titulo.strip().lower() for b in bloques for p in b.pasos]
+    repetidos = sorted({t for t in titulos if titulos.count(t) > 1})
+    if repetidos:
+        errores.append(f"Hay pasos con el mismo título en {donde}: {', '.join(repetidos)}.")
     return errores
 
 
+_VACIAS = {"y", "de", "del", "la", "el", "los", "las", "en", "con", "por", "para", "un", "una", "o"}
+
+
+def _raices(t: str) -> set[str]:
+    """Las palabras importantes, sin plural: «volúmenes EBS» y «Volumen EBS» dan lo mismo."""
+    salida = set()
+    for w in _normal(t).split():
+        if w in _VACIAS:
+            continue
+        for fin in ("es", "s"):
+            if len(w) > 4 and w.endswith(fin):
+                w = w[: -len(fin)]
+                break
+        salida.add(w)
+    return salida
+
+
+def _texto_roadmap(r: RoadmapGen) -> str:
+    partes = [r.resumen, r.que_es, r.por_que, r.arquitectura, *r.fuera_de_alcance]
+    partes += [f"{x.riesgo} {x.mitigacion}" for x in r.riesgos]
+    for n in r.niveles:
+        partes += [n.titulo, n.objetivo, n.priming]
+        for b in n.bloques:
+            partes += [b.titulo, b.priming] + [f"{p.titulo} {p.que_haces} {p.antes} {p.hecho_si}" for p in b.pasos]
+    return " ".join(partes)
+
+
 def reglas_roadmap(r: RoadmapGen) -> list[str]:
-    """Lo que el esquema no puede exigir: el nivel 1 trae sus pasos; los priming son cortos."""
+    """Lo que el esquema no puede exigir, en código y sin juez: un esqueleto fiable cada vez."""
     errores = _con_pasos(r.niveles[0].bloques, "el nivel 1")
     for texto, donde in [(r.resumen, "el resumen")] + [(n.priming, f"el nivel «{n.titulo}»") for n in r.niveles]:
         if len([x for x in texto.splitlines() if x.strip()]) > 6 or len(texto) > 900:
             errores.append(f"El priming de {donde} pasa de 5 líneas.")
+    for n in r.niveles[1:]:
+        for b in n.bloques:
+            if len(b.priming.strip()) < 20:
+                errores.append(f"El bloque «{b.titulo}» del nivel «{n.titulo}» necesita su priming aunque aún no tenga pasos.")
+    objetivos = [n.objetivo.strip().lower() for n in r.niveles]
+    if len(set(objetivos)) < len(objetivos):
+        errores.append("Dos niveles tienen el mismo objetivo: cada nivel debe hacer algo más que el anterior.")
+    # El glosario es de lo que sale en el roadmap: un término que no aparece en ningún sitio es relleno.
+    todo = _raices(_texto_roadmap(r))
+    sueltos = [t.termino for t in r.glosario if not _raices(re.sub(r"\(.*?\)", "", t.termino)) <= todo]
+    if sueltos:
+        errores.append(f"Estos términos del glosario no salen en el roadmap (quítalos o úsalos donde toque): {', '.join(sueltos)}.")
+    terminos = [t.termino.strip().lower() for t in r.glosario]
+    if len(set(terminos)) < len(terminos):
+        errores.append("Hay términos repetidos en el glosario.")
+    for x in r.riesgos:
+        if len(x.mitigacion.strip()) < 15:
+            errores.append(f"El riesgo «{x.riesgo}» necesita una mitigación concreta.")
     return errores
 
 
 def montar(r: RoadmapGen) -> dict:
     """El roadmap como lo guarda Magister: con ids estables (n1, n1-b2, n1-b2-p3) y el MVP marcado."""
-    import re
-
     niveles = []
     for i, n in enumerate(r.niveles, 1):
         # «Nivel 1: solo lee» -> «solo lee» con mayúscula: la pantalla ya pone «Nivel 1» encima.
@@ -157,8 +225,6 @@ async def detallar_nivel(roadmap: dict, numero: int, hechos: list[str], decision
 
 
 def extraer_svg(texto: str) -> str | None:
-    import re
-
     m = re.search(r"<svg\b[\s\S]*?</svg>", texto)
     return m.group(0) if m else None
 

@@ -67,6 +67,18 @@
 .asesor-escribir { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--borde); }
 .asesor-escribir input { flex: 1; min-width: 0; font: inherit; font-size: 0.92rem; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 999px; padding: 8px 12px; }
 
+/* El aviso «¿te has atascado?»: un bocadillo pequeño junto a la mascota. */
+.asesor-aviso {
+  position: absolute; top: 4px; width: 240px; padding: 12px 14px; border-radius: 14px; background: var(--tarjeta); color: var(--texto);
+  border: 1px solid var(--borde); box-shadow: 0 12px 34px rgb(0 0 0 / 0.22); animation: asesor-abrir 320ms var(--asesor-curva) both;
+}
+.asesor-aviso.derecha { left: 64px; transform-origin: top left; }
+.asesor-aviso.izquierda { right: 64px; transform-origin: top right; }
+.asesor-aviso p { margin: 0 0 10px; font-size: 0.9rem; line-height: 1.45; }
+.asesor-aviso div { display: flex; gap: 6px; }
+.asesor-aviso button { font: inherit; font-size: 0.82rem; font-weight: 600; padding: 5px 11px; border-radius: 999px; cursor: pointer; border: 1px solid var(--acento); background: color-mix(in srgb, var(--acento) 10%, var(--fondo)); color: var(--texto); }
+.asesor-aviso button.suave { border-color: var(--borde); background: none; font-weight: 500; }
+
 /* En la barra, mientras está fuera, queda su hueco. */
 .afinar-boton.fuera { opacity: 0.28; outline: 1.5px dashed color-mix(in srgb, var(--texto) 40%, transparent); outline-offset: 2px; }
 

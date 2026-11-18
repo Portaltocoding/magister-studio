@@ -41,8 +41,9 @@ async def hablar(sistema: str, historial: list[Turno], tarea: str | None = None)
 
 
 def tarea_de(estado: Estado) -> str | None:
-    """Qué modelo contesta (por tarea del enrutador): en la llamada, el rápido; si corrige una respuesta, el grande,
-    porque el rápido se liaba al comparar la respuesta con los apuntes. Fuera de la llamada, el de la plantilla."""
+    """Qué modelo contesta (por tarea del enrutador, en config/modelos.yaml): en la llamada, el de «llamada»; si corrige
+    una respuesta, el de «corregir» (nunca el pequeño, que se liaba al comparar con los apuntes). Fuera de la llamada,
+    el de la plantilla."""
     if not estado.get("llamada"):
         return None
     return "corregir" if estado.get("corregir") else "llamada"
