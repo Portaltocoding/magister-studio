@@ -87,18 +87,148 @@ function Ojos({ izq, der, ancho, alto, m }: { izq: Punto; der: Punto; ancho: num
   )
 }
 
-export default function Mascota({ mini = false, forma: fija, gesto = 'normal' }: { mini?: boolean; forma?: FormaMascota; gesto?: GestoMascota }) {
+// Mantener pulsada la mascota la coge: cierra los ojos, te sigue y se queda donde la sueltes (cada pantalla, en su
+// sitio: `lugar`). Un doble clic la devuelve a su sitio. Un clic normal sigue siendo un clic.
+const ESPERA_COGER = 350 // ms pulsando para cogerla
+const HOLGURA = 8 // px que se puede mover el dedo antes de cogerla sin que cuente como arrastrar la página
+const claveSitio = (lugar: string) => `magister-mascota-sitio-${lugar}`
+
+function leerSitio(lugar?: string): Punto {
+  if (!lugar) return { x: 0, y: 0 }
+  try {
+    const p = JSON.parse(localStorage.getItem(claveSitio(lugar)) ?? 'null')
+    return p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : { x: 0, y: 0 }
+  } catch {
+    return { x: 0, y: 0 }
+  }
+}
+
+function guardarSitio(lugar: string | undefined, p: Punto) {
+  if (!lugar) return
+  try {
+    if (p.x === 0 && p.y === 0) localStorage.removeItem(claveSitio(lugar))
+    else localStorage.setItem(claveSitio(lugar), JSON.stringify(p))
+  } catch {
+    /* sin almacenamiento: vale para esta visita */
+  }
+}
+
+function usarArrastre(svg: React.RefObject<SVGSVGElement | null>, lugar: string | undefined, activo: boolean) {
+  const [sitio, setSitio] = useState<Punto>(() => leerSitio(lugar))
+  const [cogida, setCogida] = useState(false)
+  const sitioRef = useRef(sitio)
+  sitioRef.current = sitio
+
+  useEffect(() => {
+    const el = svg.current
+    if (!el || !activo) return
+    let temporizador = 0
+    let inicio: { x: number; y: number; sitio: Punto; caja: DOMRect; id: number } | null = null
+    let arrastrando = false
+    // Que no se salga de la pantalla: su centro siempre dentro de la ventana.
+    const limitar = (p: Punto, caja: DOMRect, base: Punto): Punto => {
+      const cx = caja.left - base.x + caja.width / 2
+      const cy = caja.top - base.y + caja.height / 2
+      return {
+        x: Math.round(Math.max(-cx + 16, Math.min(window.innerWidth - cx - 16, p.x))),
+        y: Math.round(Math.max(-cy + 16, Math.min(window.innerHeight - cy - 16, p.y))),
+      }
+    }
+    const tragarClic = (e: Event) => {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    const soltar = () => {
+      window.clearTimeout(temporizador)
+      if (arrastrando) {
+        guardarSitio(lugar, sitioRef.current)
+        // El clic que llega al soltar no es un clic: no abre nada.
+        window.addEventListener('click', tragarClic, { capture: true, once: true })
+        window.setTimeout(() => window.removeEventListener('click', tragarClic, { capture: true }), 0)
+      }
+      arrastrando = false
+      inicio = null
+      setCogida(false)
+    }
+    const alBajar = (e: PointerEvent) => {
+      if (e.button !== 0) return
+      inicio = { x: e.clientX, y: e.clientY, sitio: sitioRef.current, caja: el.getBoundingClientRect(), id: e.pointerId }
+      temporizador = window.setTimeout(() => {
+        if (!inicio) return
+        arrastrando = true
+        setCogida(true)
+        try {
+          el.setPointerCapture(inicio.id)
+        } catch {
+          /* el puntero ya se fue */
+        }
+      }, ESPERA_COGER)
+    }
+    const alMover = (e: PointerEvent) => {
+      if (!inicio) return
+      const dx = e.clientX - inicio.x
+      const dy = e.clientY - inicio.y
+      if (!arrastrando) {
+        if (Math.hypot(dx, dy) > HOLGURA) {
+          window.clearTimeout(temporizador)
+          inicio = null
+        }
+        return
+      }
+      e.preventDefault()
+      setSitio(limitar({ x: inicio.sitio.x + dx, y: inicio.sitio.y + dy }, inicio.caja, inicio.sitio))
+    }
+    const volver = () => {
+      setSitio({ x: 0, y: 0 })
+      guardarSitio(lugar, { x: 0, y: 0 })
+    }
+    const sinMenu = (e: Event) => arrastrando && e.preventDefault()
+    el.addEventListener('pointerdown', alBajar)
+    el.addEventListener('pointermove', alMover)
+    el.addEventListener('pointerup', soltar)
+    el.addEventListener('pointercancel', soltar)
+    el.addEventListener('dblclick', volver)
+    el.addEventListener('contextmenu', sinMenu)
+    return () => {
+      window.clearTimeout(temporizador)
+      el.removeEventListener('pointerdown', alBajar)
+      el.removeEventListener('pointermove', alMover)
+      el.removeEventListener('pointerup', soltar)
+      el.removeEventListener('pointercancel', soltar)
+      el.removeEventListener('dblclick', volver)
+      el.removeEventListener('contextmenu', sinMenu)
+    }
+  }, [svg, lugar, activo])
+
+  return { sitio, cogida }
+}
+
+export default function Mascota({
+  mini = false,
+  forma: fija,
+  gesto = 'normal',
+  lugar,
+}: {
+  mini?: boolean
+  forma?: FormaMascota
+  gesto?: GestoMascota
+  // Dónde está (tutor, llamada…): si se da, se puede coger y mover, y se recuerda dónde la dejaste.
+  lugar?: string
+}) {
   const svg = useRef<SVGSVGElement>(null)
   const mirada = usarMirada(svg)
   const elegida = usarForma()
   const forma = fija ?? elegida
+  const { sitio, cogida } = usarArrastre(svg, lugar, !!lugar && !mini)
+  const movida = sitio.x !== 0 || sitio.y !== 0
   // Pensando, la mirada se va arriba a un lado, como quien busca la respuesta.
   const m = gesto === 'pensando' ? { x: 3, y: -4 } : mirada
 
   return (
     <svg
       ref={svg}
-      className={`mascota mascota-${forma} gesto-${gesto} ${mini ? 'mascota-mini' : ''}`}
+      className={`mascota mascota-${forma} gesto-${gesto} ${mini ? 'mascota-mini' : ''} ${lugar && !mini ? 'mascota-movible' : ''} ${cogida ? 'cogida' : ''} ${movida ? 'movida' : ''}`}
+      style={movida || cogida ? { translate: `${sitio.x}px ${sitio.y}px` } : undefined}
       viewBox="0 0 120 124"
       aria-hidden="true"
       focusable="false"

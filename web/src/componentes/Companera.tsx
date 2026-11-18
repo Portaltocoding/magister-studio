@@ -201,7 +201,7 @@ export default function Companera({ mid, claveBloque, papel, alPalabras, enMapa 
         aria-label="Pedir ayuda con este párrafo"
         title="¿Te ayudo con este párrafo?"
       >
-        <Mascota gesto={gesto} />
+        <Mascota gesto={gesto} lugar="companera" />
       </button>
       {globo && !abierta && (
         <div className="companera-globo" role="status">

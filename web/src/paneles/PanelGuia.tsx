@@ -258,7 +258,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
     <div className="guia">
       <aside className="guia-lado">
         <div className={`guia-mascota ${abriendo ? 'pensando' : ''}`}>
-          <Mascota gesto={abriendo ? 'pensando' : 'hablando'} />
+          <Mascota gesto={abriendo ? 'pensando' : 'hablando'} lugar="tutor" />
         </div>
         <div className="guia-bocadillo" role="status">
           <span className="vacio-etq">Tu tutor</span>

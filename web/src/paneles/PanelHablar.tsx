@@ -153,7 +153,7 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
 
   return (
     <div className="hablar">
-      <Mascota />
+      <Mascota lugar="hablar" />
       <h1>Hablar</h1>
       <p className="nota">
         Pulsa el micrófono, pregunta en voz alta y escucha la respuesta. Cuando acaba, te vuelve a escuchar.

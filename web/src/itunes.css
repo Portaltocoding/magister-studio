@@ -152,6 +152,12 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 /* Al pasarle el cursor por encima, cierra los ojos (como si le hicieras una caricia) y los abre al irte. */
 .mascota-ojo { transition: transform 180ms ease-out; }
 .mascota:hover .mascota-ojo, .mascota:hover .mascota-ojo + .mascota-ojo { animation: none; transform: scaleY(0.1); }
+/* Se puede coger (mantener pulsada) y dejar donde quieras; cogida, cierra los ojos y se agranda un poco. */
+.mascota-movible { cursor: grab; touch-action: none; -webkit-touch-callout: none; user-select: none; transition: scale 260ms cubic-bezier(0.22, 1, 0.36, 1), translate 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+.mascota-movible.movida { position: relative; z-index: 40; }
+.mascota-movible.cogida { cursor: grabbing; position: relative; z-index: 60; scale: 1.08; transition: scale 260ms cubic-bezier(0.22, 1, 0.36, 1); }
+.mascota.cogida .mascota-ojo, .mascota.cogida .mascota-ojo + .mascota-ojo { animation: none; transform: scaleY(0.1); }
+@media (prefers-reduced-motion: reduce) { .mascota-movible, .mascota-movible.cogida { transition: none; } }
 /* Elegir mascota en «Afina a tu tutor» */
 .afinar-mascotas { display: flex; gap: 8px; }
 .afinar-mascotas button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 8px; font: inherit; font-size: 0.75rem; color: var(--texto); background: transparent; border: 1px solid transparent; border-radius: 12px; cursor: pointer; }

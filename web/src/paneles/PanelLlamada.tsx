@@ -1025,7 +1025,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           <div className="llamada-compacta">
             <div className="llamada-avatar">
               <span className="llamada-onda" aria-hidden />
-              <Mascota gesto={gesto} />
+              <Mascota gesto={gesto} lugar="llamada" />
             </div>
             <div className="llamada-compacta-texto">
               <p className="llamada-estado" aria-live="polite">
@@ -1049,7 +1049,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         <>
           <div className="llamada-avatar">
             <span className="llamada-onda" aria-hidden />
-            <Mascota gesto={gesto} />
+            <Mascota gesto={gesto} lugar="llamada" />
           </div>
           <p className="llamada-estado" aria-live="polite">
             {textoEstado}

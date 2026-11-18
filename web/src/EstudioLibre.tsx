@@ -170,7 +170,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   if (conversacionId == null && !pendiente && tipo === 'plan' && !aMano) {
     return (
       <div className="libre">
-        <Mascota />
+        <Mascota lugar="libre" />
         {error && <p role="alert">{error}</p>}
         <Cuestionario
           titulo="Nuevo plan"
@@ -186,7 +186,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   if (conversacionId == null && !pendiente) {
     return (
       <div className="libre">
-        <Mascota />
+        <Mascota lugar="libre" />
         <h1>{tipo === 'plan' ? '¿Qué quieres aprender, para qué y con cuánto tiempo?' : '¿Qué tema tratamos hoy?'}</h1>
         {tipo === 'plan' && (
           <p className="nota">
