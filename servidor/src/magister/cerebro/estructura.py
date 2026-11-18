@@ -15,7 +15,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from magister.cerebro.modelo import ErrorModelo, Llamada, _lineas_claude, llenar_desde_resultado, notificar, prompt_actual, traza_actual
+from magister.cerebro.modelo import (ErrorModelo, Llamada, _lineas_claude, llenar_desde_resultado, notificar, prompt_actual,
+                                     tarea_actual, traza_actual)
 from magister.cerebro import cache
 from magister.config import RAIZ_SERVIDOR, ajustes
 
@@ -134,6 +135,7 @@ async def estructurar(
             llamada = Llamada(funcion=tarea or (p[0] if p else Modelo.__name__), motor=motor, modelo_pedido=modelo,
                               sistema=sistema, entrada=texto, prompt_nombre=p[0] if p else None,
                               prompt_version=p[1] if p else None, traza_id=traza_actual.get(), estructurada=True)
+            marca_tarea = tarea_actual.set(tarea)
             try:
                 salida, info = await _llamar_cli(sistema, texto, esquema, modelo)
             except ErrorModelo as e:
@@ -141,6 +143,8 @@ async def estructurar(
                 await notificar(llamada)
                 intentos.append(Intento([f"error del modelo: {e}"]))
                 continue
+            finally:
+                tarea_actual.reset(marca_tarea)
             llenar_desde_resultado(llamada, info)
             llamada.respuesta = json.dumps(salida, ensure_ascii=False) if salida is not None else ""
             llamada.total_ms = int((time.perf_counter() - t0) * 1000)

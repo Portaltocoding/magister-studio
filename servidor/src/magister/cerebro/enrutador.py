@@ -47,6 +47,22 @@ def ruta(tarea: str | None, prompt: str | None = None) -> tuple[str, str]:
     return motor, modelo
 
 
+def plazo(tarea: str | None, prompt: str | None = None) -> float | None:
+    """Cuánto puede durar como mucho una llamada (segundos): el del prompt (`plazos_prompt`), si no el de su tarea
+    (`plazo_s`). Pasado, se corta y se reintenta según `reintentos`. None: el plazo general."""
+    t = tabla()
+    if prompt and prompt in t.get("plazos_prompt", {}):
+        return float(t["plazos_prompt"][prompt])
+    conf = t.get("tareas", {}).get(tarea or tarea_de_prompt(prompt), {})
+    return float(conf["plazo_s"]) if "plazo_s" in conf else None
+
+
+def reintentos(tarea: str | None, prompt: str | None = None) -> int:
+    """Cuántas veces se vuelve a intentar una llamada que se cortó (o falló) antes de dar nada."""
+    conf = tabla().get("tareas", {}).get(tarea or tarea_de_prompt(prompt), {})
+    return int(conf.get("reintentos", 2))
+
+
 def comprobar_al_arrancar() -> None:
     """Falla al arrancar si alguna ruta está prohibida (también por variable de entorno)."""
     for t in tabla().get("tareas", {}):

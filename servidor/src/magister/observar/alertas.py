@@ -79,3 +79,18 @@ if __name__ == "__main__":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     for n, d in asyncio.run(comprobar()) or [("ninguna", "todo en orden")]:
         print(f"{n}: {d}")
+
+
+_pendientes: set[asyncio.Task] = set()
+
+
+def instalar_freno() -> None:
+    """Cuando salta el freno de llamadas (cerebro/freno.py), una alerta que se ve arriba, en la app."""
+    from magister.cerebro import freno
+
+    def avisar(_clave: str, detalle: str) -> None:
+        tarea = asyncio.get_running_loop().create_task(escribir("freno_llamadas", detalle))
+        _pendientes.add(tarea)
+        tarea.add_done_callback(_pendientes.discard)
+
+    freno.registrar_aviso(avisar)

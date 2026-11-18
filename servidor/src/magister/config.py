@@ -69,6 +69,10 @@ class Ajustes(BaseSettings):
     plazo_primer_token_s: int = 60  # sin primer trozo en este plazo, se corta (y se reintenta si toca)
     canario: str = ""  # cadena secreta que nunca debe salir en una respuesta; se genera al instalar
     modelo_fondo_a_la_vez: int = 4  # cuántas llamadas al modelo en segundo plano a la vez (material, jueces); ~390 MB cada una
+    # El freno (cerebro/freno.py): tope de llamadas al modelo por prompt y en total en la ventana; al pasarlo, se para.
+    freno_ventana_s: int = 600
+    freno_por_prompt: int = 25
+    freno_total: int = 80
     juez_muestra: float = 0.5  # tope de la fracción de explicaciones que juzga el juez online: 0 lo apaga, 1 lo fuerza
     # todo; entre medias, la confianza aprendida de tus valoraciones decide cuánto, sin pasar de este tope
     entorno: str = "produccion"  # produccion, desarrollo o evals

@@ -107,12 +107,26 @@ def _turno_de_fondo() -> asyncio.Semaphore | None:
 async def _lineas_claude(
     sistema: str, entrada: str, esquema: dict | None = None, modelo: str | None = None
 ) -> AsyncIterator[dict]:
-    """Como `_lanzar_claude`, pero lo de segundo plano espera su turno (TAREAS_DE_FONDO)."""
-    turno = _turno_de_fondo()
-    async with turno if turno is not None else contextlib.nullcontext():
-        async with contextlib.aclosing(_lanzar_claude(sistema, entrada, esquema, modelo)) as lineas:
-            async for evento in lineas:
-                yield evento
+    """Como `_lanzar_claude`, pero lo de segundo plano espera su turno (TAREAS_DE_FONDO) y todo pasa por el freno."""
+    from magister.cerebro import freno
+
+    p = prompt_actual.get()
+    try:
+        freno.comprobar(p[0] if p else None)
+    except freno.Frenado as e:
+        raise ErrorModelo(str(e)) from None
+    from magister.cerebro.enrutador import plazo
+
+    marca = _plazo_actual.set(plazo(tarea_actual.get(), p[0] if p else None))
+    try:
+        turno = _turno_de_fondo()
+        async with turno if turno is not None else contextlib.nullcontext():
+            async with contextlib.aclosing(_lanzar_claude(sistema, entrada, esquema, modelo)) as lineas:
+                async for evento in lineas:
+                    yield evento
+    finally:
+        with contextlib.suppress(ValueError):  # cerrado desde otro contexto: no hay nada que restaurar
+            _plazo_actual.reset(marca)
 
 
 async def _lanzar_claude(
@@ -157,8 +171,10 @@ async def _proceso_claude(args: list[str], entrada: str) -> AsyncIterator[dict]:
         # o más antes de escribir (medido: 75 s de razonamiento y 111 s en total) y no se corta mientras avanza. Con un
         # tope absoluto, por si nunca acaba.
         bucle = asyncio.get_running_loop()
-        tope = bucle.time() + ajustes.timeout_s * TOPE_VECES
-        async with asyncio.timeout(ajustes.timeout_s) as plazo:
+        # El plazo total de esta tarea (config/modelos.yaml: plazo_s o plazos_prompt); si no tiene, 3 veces el general.
+        total = _plazo_actual.get() or ajustes.timeout_s * TOPE_VECES
+        tope = bucle.time() + total
+        async with asyncio.timeout(min(ajustes.timeout_s, total)) as plazo:
             assert proc.stdin is not None and proc.stdout is not None
             proc.stdin.write(entrada.encode("utf-8"))
             await proc.stdin.drain()
@@ -210,6 +226,9 @@ prompt_actual: contextvars.ContextVar[tuple[str, str] | None] = contextvars.Cont
 # Mientras el modelo razona antes de escribir (puede ser más de un minuto), manda señales sin texto. Quien quiera saber
 # que sigue vivo (el chat, para enseñar el pulso) pone aquí una función; se llama con cada señal hasta el primer trozo.
 latido_actual: contextvars.ContextVar[Callable[[], None] | None] = contextvars.ContextVar("latido_actual", default=None)
+# La tarea de la llamada en curso (la eligen generar y estructurar) y el plazo que le toca (config/modelos.yaml).
+tarea_actual: contextvars.ContextVar[str | None] = contextvars.ContextVar("tarea_actual", default=None)
+_plazo_actual: contextvars.ContextVar[float | None] = contextvars.ContextVar("_plazo_actual", default=None)
 
 
 @dataclass
@@ -305,6 +324,8 @@ cortacircuitos: dict[str, Cortacircuitos] = {}
 
 def transitorio(e: ErrorModelo) -> bool:
     texto = str(e).lower()
+    if texto.startswith("freno:"):
+        return False  # el freno no se reintenta: es justo lo que hay que cortar
     return any(x in texto for x in ("plazo", "overloaded", "rate", "529", "500", "502", "503", "timeout", "conexión", "connection"))
 
 
@@ -350,8 +371,12 @@ async def generar(sistema: str, historial: list[Turno], tarea: str | None = None
         raise ErrorModelo("historial vacío")
     from magister.cerebro.enrutador import ruta
 
+    from magister.cerebro.enrutador import reintentos
+
     p = prompt_actual.get()
     motor, modelo = ruta(tarea, p[0] if p else None)
+    intentos = 1 + reintentos(tarea, p[0] if p else None)
+    marca_tarea = tarea_actual.set(tarea)
     llamada = Llamada(funcion=tarea or (p[0] if p else "conversar"), motor=motor, modelo_pedido=modelo, sistema=sistema,
                       prompt_nombre=p[0] if p else None, prompt_version=p[1] if p else None, traza_id=traza_actual.get())
     t0 = time.perf_counter()
@@ -365,7 +390,7 @@ async def generar(sistema: str, historial: list[Turno], tarea: str | None = None
                 yield t
             return
         breaker = cortacircuitos.setdefault(motor, Cortacircuitos())
-        for intento in range(3):
+        for intento in range(intentos):
             if not breaker.permitido():
                 raise ErrorModelo(f"el motor {motor} está en pausa tras varios fallos seguidos; vuelve a probar en un minuto")
             try:
@@ -378,7 +403,7 @@ async def generar(sistema: str, historial: list[Turno], tarea: str | None = None
                 return
             except ErrorModelo as e:
                 breaker.fallo()
-                if partes or intento == 2 or not transitorio(e):
+                if partes or intento == intentos - 1 or not transitorio(e):
                     raise
                 llamada.reintentos += 1
                 await asyncio.sleep(random.uniform(0, min(8.0, 1.0 * 2**intento)))
@@ -386,6 +411,8 @@ async def generar(sistema: str, historial: list[Turno], tarea: str | None = None
         llamada.error = str(e)
         raise
     finally:
+        with contextlib.suppress(ValueError):
+            tarea_actual.reset(marca_tarea)
         llamada.respuesta = "".join(partes)
         llamada.total_ms = int((time.perf_counter() - t0) * 1000)
         with contextlib.suppress(Exception):

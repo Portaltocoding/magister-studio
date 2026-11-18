@@ -65,6 +65,7 @@ async def ciclo_de_vida(_: FastAPI):
 
     comprobar_al_arrancar()
     observar.instalar()
+    alertas.instalar_freno()
     await preparar_instalacion()
     from magister.aprender import personal
 

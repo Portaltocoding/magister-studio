@@ -7,21 +7,30 @@ motores:
   eco: {externo_gratuito: false}
 
 tareas:
-  conversar: {motor: cli, modelo: defecto, datos_personales: true}
-  explicar:  {motor: cli, modelo: defecto, datos_personales: true}
-  corregir:  {motor: cli, modelo: defecto, datos_personales: true}
-  generar:   {motor: cli, modelo: defecto, datos_personales: false}
-  planificar: {motor: cli, modelo: defecto, datos_personales: true}
-  extraer:   {motor: cli, modelo: haiku, datos_personales: true}
-  juez:      {motor: cli, modelo: haiku, datos_personales: false}
+  conversar: {motor: cli, modelo: defecto, datos_personales: true, plazo_s: 300, reintentos: 1}
+  explicar:  {motor: cli, modelo: defecto, datos_personales: true, plazo_s: 300, reintentos: 1}
+  corregir:  {motor: cli, modelo: defecto, datos_personales: true, plazo_s: 180, reintentos: 1}
+  generar:   {motor: cli, modelo: defecto, datos_personales: false, plazo_s: 420, reintentos: 1}
+  planificar: {motor: cli, modelo: defecto, datos_personales: true, plazo_s: 240, reintentos: 1}
+  extraer:   {motor: cli, modelo: haiku, datos_personales: true, plazo_s: 90, reintentos: 2}
+  juez:      {motor: cli, modelo: haiku, datos_personales: false, plazo_s: 150, reintentos: 1}
   # Los turnos de la llamada de voz. Se probó Haiku (18-11-2026): no arrancaba antes (unos 3,5 s son del propio
   # claude -p, sea cual sea el modelo) y corregía peor, así que va con el modelo de siempre. La tarea se mantiene
   # para poder cambiarlo aquí y para que el juez de tono no puntúe turnos hablados.
-  llamada:   {motor: cli, modelo: defecto, datos_personales: true}
+  llamada:   {motor: cli, modelo: defecto, datos_personales: true, plazo_s: 90, reintentos: 1}
   # El asesor (la mascota flotante): preguntas cortas sobre la pantalla que tienes abierta. Haiku gasta mucho menos
   # cuota; el arranque de claude -p es el mismo, así que lo que lo hace instantáneo son las preguntas frecuentes, que se
   # contestan en la propia pantalla sin llegar aquí (web/src/componentes/faqs.ts).
-  asesor:    {motor: cli, modelo: haiku, datos_personales: true}
+  asesor:    {motor: cli, modelo: haiku, datos_personales: true, plazo_s: 60, reintentos: 1}
+
+# Plazos: `plazo_s` de cada tarea es lo que puede durar como mucho una llamada (aunque siga mandando señales); pasado,
+# se corta y se reintenta `reintentos` veces. Aquí, los prompts con un plazo propio, más corto que el de su tarea.
+# Todos los intentos cuentan para el freno de llamadas (cerebro/freno.py): un reintento nunca se vuelve un bucle.
+plazos_prompt:
+  diagrama_chat: 90
+  diagrama_apartado: 90
+  adelanto: 40
+  guion_grafico: 420
 
 # Qué tarea es cada plantilla de prompt.
 prompts:

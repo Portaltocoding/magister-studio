@@ -104,3 +104,13 @@ async def cliente(base):
     eco.vaciar()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://prueba") as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def freno_limpio():
+    # El freno de llamadas cuenta en memoria: cada test empieza con los contadores a cero.
+    from magister.cerebro import freno
+
+    freno.reiniciar()
+    yield
+    freno.reiniciar()
