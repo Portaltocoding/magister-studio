@@ -30,6 +30,10 @@ def _reglas(entrada: EntradaMaterial, claves_bloques: set[str]):
                 errores.append(f"pregunta {i}: conceptos que no son de la lección: {malos}")
             if claves_bloques and p.donde not in claves_bloques:
                 errores.append(f"pregunta {i}: «donde» = {p.donde} no es un bloque ({sorted(claves_bloques)})")
+            if p.tipo == "test" and not test_valido(p):
+                buenas = sum(o.buena for o in p.opciones or [])
+                errores.append(f"pregunta {i}: tipo test con {len(p.opciones or [])} opciones y {buenas} buenas; "
+                               "tienen que ser de 3 a 4 opciones y exactamente una buena")
         return errores
 
     return aplicar
@@ -104,7 +108,9 @@ async def guardar_preguntas(entrada: EntradaMaterial, material_id: int | None, p
         await s.execute(delete(PreguntaConcepto).where(PreguntaConcepto.pregunta_id.in_(viejas)))
         await s.execute(delete(Pregunta).where(Pregunta.plan_id == entrada.plan_id, Pregunta.leccion_clave == entrada.leccion_clave))
         for f in filas:
-            s.add(Pregunta(**{k: v for k, v in f.items() if k != "conceptos"}, estado="activa"))
+            # Una de test sin exactamente una opción buena no se sirve nunca: se queda en borrador (la auditoría lo avisa).
+            mala = f["tipo"] == "test" and sum(o["buena"] for o in f["opciones"] or []) != 1
+            s.add(Pregunta(**{k: v for k, v in f.items() if k != "conceptos"}, estado="borrador" if mala else "activa"))
         await s.flush()
         for f in filas:
             for c in dict.fromkeys(f["conceptos"]):
