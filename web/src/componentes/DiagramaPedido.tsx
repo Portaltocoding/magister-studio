@@ -42,3 +42,4 @@ export default function DiagramaPedido({ encargo, contexto, cerrado }: { encargo
     </div>
   )
 }
+

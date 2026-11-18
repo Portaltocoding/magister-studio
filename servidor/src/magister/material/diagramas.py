@@ -6,8 +6,11 @@ SVG (cientos de tokens) no retrasa la respuesta, y el dibujante tiene una receta
 y de ideas que el chat no tiene. Se guarda en la caché de respuestas: abrir otra vez la conversación no gasta.
 """
 
+import asyncio
+import hashlib
 import logging
 import re
+import time
 
 from pydantic import BaseModel, Field
 
@@ -32,9 +35,51 @@ def reglas(d: Dibujo) -> list[str]:
     return errores
 
 
+# Freno: peticiones iguales a la vez comparten una sola llamada, y como mucho se dibujan dos diagramas a la vez. Un fallo
+# de la web (pedía un dibujo por cada trozo de la respuesta) lanzó 77 llamadas en siete minutos; esto lo habría cortado.
+A_LA_VEZ = 2
+_en_curso: dict[str, asyncio.Task] = {}
+_turnos: dict[int, asyncio.Semaphore] = {}
+
+
+_recientes: dict[str, tuple[float, str]] = {}  # contexto -> (cuándo, encargo)
+VENTANA_S = 60
+
+
+def _repetido(encargo: str, contexto: str, ahora: float) -> bool:
+    """Dos encargos distintos con el mismo texto delante en menos de un minuto son trozos del mismo encargo a medio
+    llegar (dos diagramas de una respuesta tienen distinto texto delante): no se dibujan."""
+    clave = hashlib.sha256(contexto[-6000:].encode()).hexdigest()
+    for k, (t, _e) in list(_recientes.items()):
+        if ahora - t > VENTANA_S:
+            del _recientes[k]
+    previo = _recientes.get(clave)
+    _recientes[clave] = (ahora, encargo)
+    return previo is not None and previo[1] != encargo
+
+
 async def dibujar(encargo: str, contexto: str) -> str | None:
     """El SVG del encargo, o None si el modelo no da uno válido."""
-    entrada = f"<explicacion>\n{contexto[-6000:]}\n</explicacion>\n\n<encargo>\n{encargo}\n</encargo>"
+    if _repetido(encargo, contexto, time.monotonic()):
+        registro.warning("encargo de diagrama descartado: otro distinto con el mismo texto delante hace menos de %s s", VENTANA_S)
+        return None
+    clave = hashlib.sha256(f"{encargo}\x00{contexto[-6000:]}".encode()).hexdigest()
+    tarea = _en_curso.get(clave)
+    if tarea is None:
+        tarea = asyncio.create_task(_dibujar(encargo, contexto))
+        _en_curso[clave] = tarea
+        tarea.add_done_callback(lambda _t: _en_curso.pop(clave, None))
+    return await asyncio.shield(tarea)
+
+
+async def _dibujar(encargo: str, contexto: str) -> str | None:
+    turno = _turnos.setdefault(id(asyncio.get_running_loop()), asyncio.Semaphore(A_LA_VEZ))
+    async with turno:
+        return await _llamar(encargo, contexto)
+
+
+async def _llamar(encargo: str, contexto: str) -> str | None:
+    entrada =f"<explicacion>\n{contexto[-6000:]}\n</explicacion>\n\n<encargo>\n{encargo}\n</encargo>"
     try:
         d = await estructurar(cargar("diagrama_chat").rellenar(), entrada, Dibujo, reglas=reglas, cachear=True)
     except ErrorEstructura as e:

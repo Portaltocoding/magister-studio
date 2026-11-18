@@ -9,6 +9,8 @@ import { AgendarTarjeta, PreguntaTarjeta } from './Preguntas.tsx'
 import { ModoTarjeta, RecordarTarjeta } from './Modos.tsx'
 import Revelar from './Revelar.tsx'
 import DiagramaPedido from './DiagramaPedido.tsx'
+import { bloquesDiagrama } from './bloquesDiagrama.ts'
+import type { Espera } from './usarConversacion.ts'
 import type { CitaInfo } from '../api.ts'
 import { conMarcas, PanelCita } from '../Cita.tsx'
 import Valorar from './Valorar.tsx'
@@ -47,6 +49,7 @@ interface Props {
   alQuitarAdjunto?: (nombre: string) => void
   // Lo que está haciendo el tutor («Buscando en tus fuentes»): va dentro de la burbuja que espera.
   fase?: string | null
+  espera?: Espera
   // Estudio libre: cada respuesta se puede guardar en Mis notas, entera o el trozo que marques.
   guardable?: boolean
 }
@@ -86,11 +89,11 @@ function CuerpoTutor({
           if (clase.includes('language-test')) return <TestRapido texto={texto} completo={completo} />
           if (clase.includes('language-svg')) return <Diagrama svg={texto} completo={completo} />
           if (clase.includes('language-diagrama')) {
-            // El encargo se pide en cuanto su bloque se cierra, aunque el resto de la respuesta siga llegando.
-            const todo = contenido.current
-            const donde = todo.indexOf(texto.trim())
-            const cerrado = completo || (donde >= 0 && todo.slice(donde + texto.trim().length).includes('```'))
-            return <DiagramaPedido encargo={texto} contexto={donde >= 0 ? todo.slice(0, todo.lastIndexOf('```', donde)) : ''} cerrado={cerrado} />
+            // El encargo se pide en cuanto su bloque se cierra, aunque el resto de la respuesta siga llegando. Solo cuenta un
+            // bloque con su cierre ya en el texto y el mismo encargo entero: buscar el trozo a medio llegar lo encontraba
+            // antes en la respuesta, lo daba por cerrado y pedía un dibujo por cada trozo (un bucle de llamadas).
+            const hecho = bloquesDiagrama(contenido.current).find((d) => d.encargo === texto.trim())
+            return <DiagramaPedido encargo={texto.trim()} contexto={hecho?.contexto ?? ''} cerrado={!!hecho} />
           }
           if (clase.includes('language-pregunta'))
             return <PreguntaTarjeta texto={texto} completo={completo} alResponder={escribiendo ? undefined : alEnviar} />
@@ -168,6 +171,7 @@ export default function Hilo({
   adjuntos,
   alQuitarAdjunto,
   fase,
+  espera,
   guardable = false,
 }: Props) {
   const guardadas = usarGuardadas(guardable)
@@ -264,7 +268,7 @@ export default function Hilo({
               </p>
             )}
             {b.rol === 'tutor' && b.estado === 'llegando' && !b.contenido ? (
-              <Esperando fase={fase} />
+              <Esperando fase={fase} espera={espera} alParar={alParar} />
             ) : b.estado === 'error' ? (
               <p role="alert">{b.contenido}</p>
             ) : b.rol === 'tutor' ? (
@@ -370,20 +374,57 @@ export default function Hilo({
   )
 }
 
-// Mientras llega la respuesta: la fase y, si tarda, cuánto lleva. Una pregunta difícil hace que el modelo razone un
-// minuto o más antes de escribir la primera palabra (medido: 75 s con una de filosofía de máster); sin el contador
-// parece que se ha colgado.
-function Esperando({ fase }: { fase?: string | null }) {
-  const [segundos, setSegundos] = useState(0)
+// Mientras llega la respuesta. Una pregunta difícil hace que el modelo razone un minuto o más antes de escribir
+// (medido: 61 s con una de filosofía de máster), y sin nada que mirar parece colgado. Por eso:
+// - los pasos hechos (✓) y el actual, con un punto que late con cada señal real del modelo mientras razona;
+// - si tarda, frases con gracia sobre el tema («Delirando un poco…») y el guion de por dónde irá la respuesta;
+// - si dejan de llegar señales 30 s, se dice: entonces sí puede haberse colgado.
+const SIN_SENAL_MS = 30_000
+
+function Esperando({ fase, espera, alParar }: { fase?: string | null; espera?: Espera; alParar: () => void }) {
+  const [ahora, setAhora] = useState(() => Date.now())
+  const [inicio] = useState(() => Date.now())
   useEffect(() => {
-    const inicio = Date.now()
-    const t = window.setInterval(() => setSegundos(Math.floor((Date.now() - inicio) / 1000)), 1000)
+    const t = window.setInterval(() => setAhora(Date.now()), 1000)
     return () => window.clearInterval(t)
   }, [])
-  if (segundos < 10) return <Pensando texto={fase ? `${fase}…` : 'Pensando…'} />
+  const segundos = Math.floor((ahora - inicio) / 1000)
+  const pasos = espera?.pasos ?? []
+  const razonando = (espera?.pulsos ?? 0) > 0
+  const frases = espera?.frases ?? []
+  const frase = frases.length ? frases[Math.floor(segundos / 4) % frases.length] : null
+  const actual = frase ?? (razonando ? 'Razonando' : fase ?? 'Pensando')
+  const colgada = razonando && espera?.ultimo != null && ahora - espera.ultimo > SIN_SENAL_MS
+  if (!pasos.length && segundos < 3) return <Pensando texto={fase ? `${fase}…` : 'Pensando…'} />
   return (
-    <Pensando
-      texto={`Pensando a fondo · ${segundos} s${segundos >= 20 ? ': las preguntas difíciles tardan hasta un par de minutos' : ''}`}
-    />
+    <div className="espera" aria-live="polite">
+      <ol className="espera-pasos">
+        {pasos.slice(0, -1).map((p) => (
+          <li key={p} className="hecho">
+            {p}
+          </li>
+        ))}
+        <li className="actual">
+          <span key={espera?.pulsos ?? 0} className={`espera-pulso ${razonando ? 'late' : ''}`} aria-hidden />
+          <span className={frase ? 'espera-frase' : undefined}>{actual.replace(/…$/, '')}…</span>
+          {segundos >= 5 && <small> {segundos} s</small>}
+        </li>
+      </ol>
+      {espera?.guion && (
+        <div className="espera-guion">
+          <small>Mientras piensa, por dónde va a ir</small>
+          <Markdown>{espera.guion}</Markdown>
+        </div>
+      )}
+      {colgada && (
+        <p className="espera-colgada" role="alert">
+          No llegan señales del modelo desde hace {Math.round((ahora - (espera?.ultimo ?? ahora)) / 1000)} s: puede que se haya
+          colgado.{' '}
+          <button type="button" className="boton-mini" onClick={alParar}>
+            Parar
+          </button>
+        </p>
+      )}
+    </div>
   )
 }
