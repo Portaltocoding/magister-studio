@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Markdown from 'react-markdown'
 import { enviarJson, pedir } from '../api.ts'
+import { reaccionar } from './animo.ts'
 
 export interface Ficha {
   id: string
@@ -48,6 +49,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
     (r: Resultado) => {
       if (!f) return
       setRes((x) => ({ ...x, [f.id]: r }))
+      reaccionar(r === 'sabia' ? 'acierto' : 'fallo')
       if (!contadas.has(f.id)) {
         contadas.add(f.id)
         pedir<{ proxima_fecha: string | null }>(

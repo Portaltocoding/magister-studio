@@ -6,6 +6,7 @@ import MarcoFoco from '../componentes/MarcoFoco.tsx'
 import RepasoTema from '../componentes/RepasoTema.tsx'
 import type { IdModo } from '../modos.ts'
 import { barajar } from '../barajar.ts'
+import { celebrar, reaccionar } from '../componentes/animo.ts'
 
 interface EnCola {
   concepto_id: string
@@ -79,6 +80,7 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
         enviarJson({ pregunta_id: pregunta.pregunta_id, opcion, confianza, clave: nueva() }),
       )
       setTest({ ...r, elegida: opcion })
+      reaccionar(r.acierto ? 'acierto' : 'fallo')
     } catch (e) {
       setError(String((e as Error).message))
     }
@@ -118,6 +120,8 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
     setAvisoConfianza(null)
     if (pregunta) hechasGuia.current += 1
     const p = await pedir<Servida | null>(`/api/practica/siguiente${concepto ? `?concepto_id=${concepto}` : ''}`)
+    // Se acabó la tanda: se celebra.
+    if (!p && pregunta) celebrar(null, true)
     if (!p && guiada) return guiada.alAcabar(hechasGuia.current)
     setPregunta(p)
     servidaEn.current = Date.now()
@@ -148,8 +152,11 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
           latencia_ms: Date.now() - servidaEn.current,
         },
       )) {
-        if (ev.tipo === 'nota') setNota(ev)
-        else if (ev.tipo === 'delta') setExplicacion((x) => x + ev.t)
+        if (ev.tipo === 'nota') {
+          setNota(ev)
+          if (ev.nota === 'bien' || ev.nota === 'perfecta') reaccionar('acierto')
+          else if (ev.nota === 'fallo') reaccionar('fallo')
+        } else if (ev.tipo === 'delta') setExplicacion((x) => x + ev.t)
         else if (ev.tipo === 'fin') setFin(ev)
         else if (ev.tipo === 'error') setError(ev.detalle)
         else if (ev.tipo === 'aviso') setAvisoConfianza(ev.texto)

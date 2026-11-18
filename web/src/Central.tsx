@@ -51,7 +51,10 @@ export default function Central(props: Props) {
   return (
     <>
       <Pestanas modo={props.modo} irA={props.irA} />
-      <Panel {...props} />
+      {/* La clave hace que cada pantalla nueva entre con su fundido (animo.css). */}
+      <div key={props.modo} className="pantalla">
+        <Panel {...props} />
+      </div>
     </>
   )
 }

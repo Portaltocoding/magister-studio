@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Markdown from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
+import { reaccionar } from './animo.ts'
 
 // Bloques que el tutor escribe en Markdown y la pantalla convierte en botones:
 // ```test     → una pregunta tipo test que se corrige aquí mismo, sin gastar otra respuesta del modelo.
@@ -45,7 +46,10 @@ export function TestRapido({ texto, completo }: { texto: string; completo: boole
             type="button"
             disabled={!completo || elegida != null}
             className={`test-opcion ${elegida != null && o.buena ? 'buena' : ''} ${elegida === i && !o.buena ? 'mala' : ''}`}
-            onClick={() => setElegida(i)}
+            onClick={() => {
+              setElegida(i)
+              reaccionar(o.buena ? 'acierto' : 'fallo')
+            }}
           >
             <span className="test-letra">{String.fromCharCode(65 + i)}</span>
             <Markdown {...mates}>{o.texto}</Markdown>

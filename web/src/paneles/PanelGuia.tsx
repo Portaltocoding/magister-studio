@@ -5,6 +5,7 @@ import type { IdModo } from '../modos.ts'
 import { irARuta } from '../componentes/Vacio.tsx'
 import { tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import PanelPractica from './PanelPractica.tsx'
+import { celebrar } from '../componentes/animo.ts'
 import { cargarLeccion, FocoLeccion, leerAvance, saludo, type Hoy, type Leccion } from './PanelTutor.tsx'
 
 // El tutor que te guía: te recibe, te dice qué toca y te lleva de la mano por los repasos, las lecciones
@@ -170,7 +171,10 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
           guiada={{
             alAcabar: (hechas) => {
               setEnCurso(null)
-              if (hechas > 0) cambiarDia({ ...dia, repasosHechos: true })
+              if (hechas > 0) {
+                cambiarDia({ ...dia, repasosHechos: true })
+                celebrar(null, true)
+              }
               setComentario(hechas > 0 ? `Hecho: ${hechas} ${hechas === 1 ? 'repaso' : 'repasos'}.` : null)
               cargar()
             },
@@ -193,6 +197,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
           const av = leerAvance(enCurso.leccion.material_id)
           setEnCurso(null)
           setComentario(av ? `Lo dejamos en la idea ${av.i + 1}; luego seguimos desde ahí.` : '¡Lección hecha!')
+          if (!av) window.setTimeout(() => celebrar(null, true), 450)
           cargar()
         }}
       />

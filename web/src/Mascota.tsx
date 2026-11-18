@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { estaDormida, EVENTO_REACCION, EVENTO_SUENO, vigilarSueno, type Reaccion } from './componentes/animo.ts'
 
 // La mascota de Magister, a elegir en «Afina a tu tutor»: el búho (por defecto) o la sencilla. Las dos en el estilo de
 // la primera: silueta negra y plana con dos ojos blancos alargados, sin pupila, que miran hacia el cursor y parpadean.
@@ -203,6 +204,32 @@ function usarArrastre(svg: React.RefObject<SVGSVGElement | null>, lugar: string 
   return { sitio, cogida }
 }
 
+// Lo que le pasa a la mascota además de su gesto: una reacción breve (asentir, ladearse, saltar) y el sueño.
+function usarAnimo(): { reaccion: Reaccion | null; dormida: boolean } {
+  const [reaccion, setReaccion] = useState<Reaccion | null>(null)
+  const [dormida, setDormida] = useState(estaDormida)
+  useEffect(() => {
+    vigilarSueno()
+    let t = 0
+    const alReaccion = (e: Event) => {
+      window.clearTimeout(t)
+      setReaccion(null)
+      // Un fotograma sin clase: así la misma reacción dos veces seguidas vuelve a animarse.
+      requestAnimationFrame(() => setReaccion((e as CustomEvent<Reaccion>).detail))
+      t = window.setTimeout(() => setReaccion(null), 1100)
+    }
+    const alSueno = (e: Event) => setDormida((e as CustomEvent<boolean>).detail)
+    window.addEventListener(EVENTO_REACCION, alReaccion)
+    window.addEventListener(EVENTO_SUENO, alSueno)
+    return () => {
+      window.clearTimeout(t)
+      window.removeEventListener(EVENTO_REACCION, alReaccion)
+      window.removeEventListener(EVENTO_SUENO, alSueno)
+    }
+  }, [])
+  return { reaccion, dormida }
+}
+
 export default function Mascota({
   mini = false,
   forma: fija,
@@ -221,13 +248,14 @@ export default function Mascota({
   const forma = fija ?? elegida
   const { sitio, cogida } = usarArrastre(svg, lugar, !!lugar && !mini)
   const movida = sitio.x !== 0 || sitio.y !== 0
+  const { reaccion, dormida } = usarAnimo()
   // Pensando, la mirada se va arriba a un lado, como quien busca la respuesta.
   const m = gesto === 'pensando' ? { x: 3, y: -4 } : mirada
 
   return (
     <svg
       ref={svg}
-      className={`mascota mascota-${forma} gesto-${gesto} ${mini ? 'mascota-mini' : ''} ${lugar && !mini ? 'mascota-movible' : ''} ${cogida ? 'cogida' : ''} ${movida ? 'movida' : ''}`}
+      className={`mascota mascota-${forma} gesto-${gesto} ${mini ? 'mascota-mini' : ''} ${lugar && !mini ? 'mascota-movible' : ''} ${cogida ? 'cogida' : ''} ${movida ? 'movida' : ''} ${reaccion ? `reacciona-${reaccion}` : ''} ${dormida && !cogida ? 'dormida' : ''}`}
       style={movida || cogida ? { translate: `${sitio.x}px ${sitio.y}px` } : undefined}
       viewBox="0 0 120 124"
       aria-hidden="true"

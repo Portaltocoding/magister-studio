@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { crearConversacion, enviarJson, pedir } from '../api.ts'
 import Diagrama from '../componentes/Diagrama.tsx'
 import Pensando from '../componentes/Pensando.tsx'
+import { celebrar } from '../componentes/animo.ts'
 
 // Proyectos: le cuentas lo que quieres construir y saca el roadmap de construcción. Arriba, la explicación del
 // proyecto (qué es, por qué, arquitectura, glosario, riesgos); debajo, los niveles con sus bloques y pasos. Encima de
@@ -239,8 +240,17 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   if (!p) return <div className="panel"><Pensando /></div>
   const r = p.roadmap
   const hechos = new Set(p.hechos)
-  const marcar = async (paso: string, hecho: boolean) => {
-    setP({ ...p, hechos: hecho ? [...p.hechos, paso] : p.hechos.filter((x) => x !== paso) })
+  const marcar = async (paso: string, hecho: boolean, donde?: Element | null) => {
+    const nuevos = hecho ? [...p.hechos, paso] : p.hechos.filter((x) => x !== paso)
+    setP({ ...p, hechos: nuevos })
+    if (hecho && r) {
+      // Un paso, un estallido pequeño; si cierra su bloque (o su nivel), uno grande.
+      const hechosSet = new Set(nuevos)
+      const nivel = r.niveles.find((n) => n.bloques.some((b) => b.pasos.some((x) => x.id === paso)))
+      const bloque = nivel?.bloques.find((b) => b.pasos.some((x) => x.id === paso))
+      const cierra = !!bloque && bloque.pasos.every((x) => hechosSet.has(x.id))
+      celebrar(donde ?? null, cierra)
+    }
     const s = await pedir<ProyectoResumen>(`/api/proyectos/${id}/pasos/${paso}`, enviarJson({ hecho }, 'PUT'))
     setP((x) => (x ? { ...x, progreso: s.progreso } : x))
   }
@@ -375,7 +385,7 @@ function NivelVista({ n, hechos, proyecto, alMarcar, alDetallar, ocupado }: {
   n: Nivel
   hechos: Set<string>
   proyecto: Proyecto
-  alMarcar: (paso: string, hecho: boolean) => void
+  alMarcar: (paso: string, hecho: boolean, donde?: Element | null) => void
   alDetallar: () => void
   ocupado: boolean
 }) {
@@ -427,9 +437,11 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
   proyecto: Proyecto
   nivel: Nivel
   bloque: Bloque
-  alMarcar: (paso: string, hecho: boolean) => void
+  alMarcar: (paso: string, hecho: boolean, donde?: Element | null) => void
 }) {
   const [atasco, setAtasco] = useState<string | null>(null)
+  // Recién marcado: la fila da un pequeño salto (animo.css).
+  const [recien, setRecien] = useState(false)
   const [abriendo, setAbriendo] = useState(false)
   // «Me he atascado»: abre una conversación con el tutor que ya sabe en qué proyecto y en qué paso estás.
   const pedirAyuda = async () => {
@@ -448,9 +460,19 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
     window.location.hash = `#/conversacion/${c.id}`
   }
   return (
-    <li className={`proyecto-paso ${hecho ? 'hecho' : ''}`}>
+    <li className={`proyecto-paso ${hecho ? 'hecho' : ''} ${recien ? 'recien' : ''}`}>
       <label className="proyecto-paso-titulo">
-        <input type="checkbox" checked={hecho} onChange={(e) => alMarcar(x.id, e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={hecho}
+          onChange={(e) => {
+            alMarcar(x.id, e.target.checked, e.target)
+            if (e.target.checked) {
+              setRecien(true)
+              window.setTimeout(() => setRecien(false), 600)
+            }
+          }}
+        />
         <strong>{x.titulo}</strong>
         <span className="nota">{horas(x.minutos)}</span>
       </label>

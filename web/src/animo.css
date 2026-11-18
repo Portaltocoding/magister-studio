@@ -1,0 +1,51 @@
+/* ===== Ánimo: la mascota reacciona, se duerme, se celebra lo que terminas y las pantallas entran suaves ===== */
+
+/* Reacciones breves (encima del gesto que tenga): asentir al acertar, ladear la cabeza al fallar, saltar al terminar. */
+.mascota.reacciona-acierto .mascota-figura { animation: m-asentir 900ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+.mascota.reacciona-fallo .mascota-figura { animation: m-ladear 1000ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+.mascota.reacciona-celebrar .mascota-figura { animation: m-saltar 760ms cubic-bezier(0.34, 1.5, 0.64, 1); }
+@keyframes m-asentir { 0%, 100% { transform: none; } 20% { transform: translateY(4px) scaleY(0.97); } 40% { transform: none; } 60% { transform: translateY(4px) scaleY(0.97); } }
+@keyframes m-ladear { 0%, 100% { transform: none; } 25% { transform: rotate(-11deg); } 55% { transform: rotate(-8deg); } 75% { transform: rotate(3deg); } }
+@keyframes m-saltar {
+  0% { transform: none; } 18% { transform: translateY(2px) scale(1.06, 0.92); } 45% { transform: translateY(-16px) scale(0.96, 1.05); }
+  70% { transform: translateY(0) scale(1.05, 0.95); } 100% { transform: none; }
+}
+
+/* Dormida: cierra los ojos despacio y respira más lento; al volver, despierta. */
+.mascota.dormida .mascota-ojo, .mascota.dormida .mascota-ojo + .mascota-ojo { animation: none; transform: scaleY(0.1); transition: transform 1200ms ease-in-out; }
+.mascota.dormida .mascota-figura { animation: m-dormir 5s ease-in-out infinite; }
+@keyframes m-dormir { 0%, 100% { transform: none; } 50% { transform: translateY(2px) scale(1.02, 0.98); } }
+
+/* Confeti: un estallido pequeño desde lo que acabas de terminar. */
+.confeti { position: fixed; z-index: 500; width: 0; height: 0; pointer-events: none; }
+/* Colores propios y suaves (el acento puede ser casi blanco o casi negro según el tema). */
+.confeti span {
+  position: absolute; left: -5px; top: -3px; width: 10px; height: 6px; border-radius: 2px; background: #e0a23c; opacity: 0;
+  animation: confeti 1100ms cubic-bezier(0.15, 0.8, 0.3, 1) var(--retraso, 0ms) forwards;
+}
+.confeti span:nth-child(5n + 1) { background: #5bb8a6; }
+.confeti span:nth-child(5n + 2) { background: #e57f6b; }
+.confeti span:nth-child(5n + 3) { background: #9b8cf2; }
+.confeti span:nth-child(5n + 4) { background: #f2c94c; }
+.confeti span.redonda { width: 7px; height: 7px; border-radius: 50%; }
+@keyframes confeti {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(0.6); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 40px)) rotate(var(--giro)) scale(1); }
+}
+
+/* Al cambiar de pantalla, la nueva entra con un fundido y un pequeño desplazamiento. */
+.pantalla { animation: pantalla-entra 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes pantalla-entra { from { opacity: 0; translate: 0 10px; } }
+
+/* Marcar un paso de un proyecto: la casilla da un pequeño salto y la fila se asienta. */
+.proyecto-paso.recien { animation: paso-hecho 520ms cubic-bezier(0.34, 1.5, 0.64, 1); }
+@keyframes paso-hecho { 0% { scale: 1; } 35% { scale: 1.018; } 100% { scale: 1; } }
+.proyecto-paso-titulo input:checked { animation: casilla 420ms cubic-bezier(0.34, 1.6, 0.64, 1); }
+@keyframes casilla { 0% { scale: 0.6; } 60% { scale: 1.25; } 100% { scale: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mascota.reacciona-acierto .mascota-figura, .mascota.reacciona-fallo .mascota-figura, .mascota.reacciona-celebrar .mascota-figura,
+  .mascota.dormida .mascota-figura, .pantalla, .proyecto-paso.recien, .proyecto-paso-titulo input:checked { animation: none; }
+  .confeti { display: none; }
+}
