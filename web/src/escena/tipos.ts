@@ -124,6 +124,9 @@ export type ElementoFigura = { paso?: number; estado?: Estado } & (
 export interface Figura {
   tipo: 'figura'
   elementos: ElementoFigura[]
+  // La rejilla de coordenadas alineada con el mundo, con sus valores en los bordes (por defecto, sí).
+  rejilla?: boolean
+  ejes?: { x: string; y: string }
   // Ancho de la zona de dibujo (por defecto, casi toda la pantalla).
   ancho?: number
 }
@@ -155,6 +158,8 @@ export interface Tramo {
 export interface GuionGrafico {
   titulo: string
   tramos: Tramo[]
+  // «cartesiano»: una rejilla suave de fondo en todas las escenas, al estilo de 3Blue1Brown (matemáticas, topografía).
+  fondo?: 'liso' | 'cartesiano'
 }
 
 export const FPS = 30

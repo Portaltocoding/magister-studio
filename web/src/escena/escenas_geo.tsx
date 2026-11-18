@@ -41,8 +41,59 @@ export function EscenaFigura({ e, dur }: { e: Figura; dur: number }) {
   // Dirección en pantalla de un acimut en gon (0 = norte, sentido horario).
   const dir = (g: number): [number, number] => [Math.sin((g * Math.PI) / 200), -Math.cos((g * Math.PI) / 200)]
 
+  // La rejilla cartesiana, alineada con el mundo (las coordenadas de verdad): paso redondo de unos 70 px.
+  const rejilla = e.rejilla !== false
+  const paso = (() => {
+    const bruto = 70 / escala
+    const potencia = 10 ** Math.floor(Math.log10(bruto))
+    return [1, 2, 5, 10].map((m) => m * potencia).find((p) => p >= bruto) ?? 10 * potencia
+  })()
+  const mundo = (sx: number, sy: number): [number, number] => [x0 + (sx - dx) / escala, y1 - (sy - dy) / escala]
+  const [mx0, my1] = mundo(70, ARRIBA - 10)
+  const [mx1, my0] = mundo(1210, 585)
+  const verticales: number[] = []
+  for (let v = Math.ceil(mx0 / paso) * paso; v <= mx1; v += paso) verticales.push(v)
+  const horizontales: number[] = []
+  for (let v = Math.ceil(my0 / paso) * paso; v <= my1; v += paso) horizontales.push(v)
+  const etiqueta = (v: number) => v.toLocaleString('es-ES', { maximumFractionDigits: paso < 1 ? 2 : 0 })
+
   return (
     <svg style={{ position: 'absolute', inset: 0, overflow: 'visible' }} width="1280" height="720">
+      {rejilla && (
+        <g>
+          <rect x={0} y={ARRIBA - 34} width={1280} height={585 - ARRIBA + 52} fill={C.fondo} />
+          {verticales.map((v, i) => {
+            const [sx] = P(v, 0)
+            const t = interpolate(frame, [i * 1.2, i * 1.2 + 14], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+            return (
+              <g key={`v${v}`} opacity={t}>
+                <line x1={sx} y1={585} x2={sx} y2={585 - (585 - ARRIBA + 10) * t} stroke="#2f6a86" strokeWidth={1} opacity={0.32} />
+                <text x={sx} y={599} textAnchor="middle" fontFamily={F.mono} fontSize={12} fill={C.grisOscuro}>
+                  {etiqueta(v)}
+                </text>
+              </g>
+            )
+          })}
+          {horizontales.map((v, i) => {
+            const [, sy] = P(0, v)
+            const t = interpolate(frame, [i * 1.2, i * 1.2 + 14], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+            return (
+              <g key={`h${v}`} opacity={t}>
+                <line x1={70} y1={sy} x2={70 + 1140 * t} y2={sy} stroke="#2f6a86" strokeWidth={1} opacity={0.32} />
+                <text x={64} y={sy + 4} textAnchor="end" fontFamily={F.mono} fontSize={12} fill={C.grisOscuro}>
+                  {etiqueta(v)}
+                </text>
+              </g>
+            )
+          })}
+          <text x={1210} y={ARRIBA - 16} textAnchor="end" fontFamily={F.serif} fontSize={15} fill={C.gris} opacity={aparecer(frame, 10)}>
+            {e.ejes?.x ?? 'X · este (m)'}
+          </text>
+          <text x={70} y={ARRIBA - 16} fontFamily={F.serif} fontSize={15} fill={C.gris} opacity={aparecer(frame, 10)}>
+            {e.ejes?.y ?? 'Y · norte (m)'}
+          </text>
+        </g>
+      )}
       <defs>
         {[C.texto, C.foco, C.bien, C.mal, C.estado, C.gris].map((c) => (
           <marker key={c} id={`flecha${c.slice(1)}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">

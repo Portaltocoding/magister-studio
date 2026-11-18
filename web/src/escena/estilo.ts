@@ -23,7 +23,8 @@ export const C = {
 }
 
 export const F = {
-  serif: "'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif",
+  // Georgia: serif de remates redondeados; la Palatino de Windows quedaba demasiado afilada.
+  serif: "Georgia, 'Iowan Old Style', 'Source Serif 4', serif",
   mono: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
   sans: "'Inter', 'Segoe UI', system-ui, sans-serif",
 }

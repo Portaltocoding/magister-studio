@@ -6,6 +6,12 @@ import { Locutor } from '../componentes/voz.ts'
 import { Composicion, type PropsComposicion } from './Composicion.tsx'
 import { ALTO, ANCHO, FPS, duracionTotal, frases, inicios, type GuionGrafico } from './tipos.ts'
 
+// Una frase en tramos para respirar: corta tras «,», «;» o «:» seguidos de espacio (la coma decimal de «121,353» no
+// lleva espacio y no corta). Cada tramo se dice aparte, con su pausa: «mil, dos mil» suena como dos coordenadas.
+function respiros(frase: string): string[] {
+  return frase.split(/(?<=[,;:])\s+/).filter(Boolean)
+}
+
 function tramoEn(desde: number[], frame: number): number {
   let i = 0
   while (i + 1 < desde.length && desde[i + 1] <= frame) i++
@@ -36,8 +42,9 @@ export default function ReproductorEscena({ guion, segundo = 0 }: { guion: Guion
       dicho = i
       l.nueva()
       if (!vozRef.current) return
-      // El locutor ya pasa cada frase por `pronunciar` antes de decirla.
-      for (const f of frases(guion.tramos[i].narracion)) l.decir(f)
+      // El locutor ya pasa cada frase por `pronunciar`. Cada frase va en tramos cortados en comas, punto y coma y dos
+      // puntos (no en la coma decimal de «121,353»): así la voz respira donde el texto lo pide.
+      for (const f of frases(guion.tramos[i].narracion)) for (const t of respiros(f)) l.decir(t)
       l.cerrar()
     }
     const alFotograma = (e: { detail: { frame: number } }) => {

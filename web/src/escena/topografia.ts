@@ -30,6 +30,7 @@ const B = { x: 1121.353, y: 2088.168 }
 
 export const DEMO_TOPOGRAFIA: GuionGrafico = {
   titulo: 'Topografía · Coordenadas',
+  fondo: 'cartesiano',
   tramos: [
     // ===== Parte 1: medir =====
     {

@@ -74,8 +74,8 @@
 }
 .escena-esqueleto button:hover { background: var(--tarjeta); }
 .escena-esqueleto button.actual { border-color: var(--acento); background: var(--tarjeta); }
-.escena-concepto { font-family: 'Newsreader', Georgia, serif; font-size: 1.02rem; }
-.escena-tesis { font-family: 'Newsreader', Georgia, serif; font-size: 0.92rem; color: var(--suave); }
+.escena-concepto { font-family: Georgia, serif; font-size: 1.02rem; }
+.escena-tesis { font-family: Georgia, serif; font-size: 0.92rem; color: var(--suave); }
 @media (max-width: 900px) { .escena { grid-template-columns: minmax(0, 1fr); } }
 
 /* ===== Taller → Pronunciación ===== */

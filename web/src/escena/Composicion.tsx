@@ -15,10 +15,27 @@ export interface PropsComposicion {
   [clave: string]: unknown
 }
 
+// Una rejilla suave de fondo, al estilo de 3Blue1Brown, para los vídeos de matemáticas y ciencias. Las figuras pintan
+// la suya, alineada con las coordenadas de verdad.
+function FondoCartesiano() {
+  const lineas = (n: number, paso: number) => Array.from({ length: n }, (_, i) => i * paso)
+  return (
+    <svg style={{ position: 'absolute', inset: 0 }} width="1280" height="720" aria-hidden>
+      {lineas(21, 64).map((x) => (
+        <line key={`v${x}`} x1={x} y1={0} x2={x} y2={720} stroke="#2f6a86" strokeWidth={1} opacity={x === 640 ? 0.22 : 0.1} />
+      ))}
+      {lineas(12, 64).map((y) => (
+        <line key={`h${y}`} x1={0} y1={y + 40} x2={1280} y2={y + 40} stroke="#2f6a86" strokeWidth={1} opacity={y + 40 === 360 ? 0.22 : 0.1} />
+      ))}
+    </svg>
+  )
+}
+
 export function Composicion({ guion, subtitulos }: PropsComposicion) {
   const desde = inicios(guion)
   return (
     <AbsoluteFill style={{ background: C.fondo }}>
+      {guion.fondo === 'cartesiano' && <FondoCartesiano />}
       {guion.tramos.map((t, i) => (
         <Sequence key={i} from={desde[i]} durationInFrames={duracionTramo(t)} name={`${t.concepto} · ${t.tesis}`}>
           <VistaTramo tramo={t} subtitulos={subtitulos} />
