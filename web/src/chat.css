@@ -133,12 +133,16 @@
   border: 1px solid var(--borde); background: color-mix(in srgb, var(--texto) 6%, transparent);
 }
 .afinar-boton .mascota.mascota-mini { width: 24px; height: 24px; margin: 0; }
-.afinar-boton:hover { transform: scale(1.08) rotate(-4deg); }
+/* Quieta en su sitio: al pasar por encima solo se marca el borde (no crece ni gira). */
+.afinar-boton:hover { border-color: var(--texto); }
 .afinar-boton:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 .mascota.mascota-mini { width: 30px; height: 30px; margin: 0; }
+/* El panel de la mascota: si no cabe, se desplaza dentro con su barra a la vista. */
 .afinar-caja {
-  position: absolute; z-index: 150; top: calc(100% + 10px); right: 0; width: 340px; padding: 16px 18px; border-radius: 14px;
+  position: absolute; z-index: 150; top: calc(100% + 10px); right: 0; width: 320px; padding: 14px 16px; border-radius: 14px;
   background: var(--tarjeta); border: 1px solid var(--borde); box-shadow: 0 16px 40px rgb(0 0 0 / 0.35); text-align: left;
+  max-height: calc(100vh - 90px); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: auto; scrollbar-color: var(--suave) transparent;
 }
 .afinar-cabecera { display: flex; justify-content: space-between; align-items: center; }
 .afinar-cabecera small { opacity: 0; transition: opacity 200ms; color: #3c9b6b; }

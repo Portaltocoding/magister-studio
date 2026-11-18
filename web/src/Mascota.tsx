@@ -235,12 +235,15 @@ export default function Mascota({
   forma: fija,
   gesto = 'normal',
   lugar,
+  quieta = false,
 }: {
   mini?: boolean
   forma?: FormaMascota
   gesto?: GestoMascota
   // Dónde está (tutor, llamada…): si se da, se puede coger y mover, y se recuerda dónde la dejaste.
   lugar?: string
+  // Quieta del todo: ni mira, ni parpadea, ni reacciona, ni se duerme (la de la barra, hasta que la sacas).
+  quieta?: boolean
 }) {
   const svg = useRef<SVGSVGElement>(null)
   const mirada = usarMirada(svg)
@@ -248,14 +251,16 @@ export default function Mascota({
   const forma = fija ?? elegida
   const { sitio, cogida } = usarArrastre(svg, lugar, !!lugar && !mini)
   const movida = sitio.x !== 0 || sitio.y !== 0
-  const { reaccion, dormida } = usarAnimo()
-  // Pensando, la mirada se va arriba a un lado, como quien busca la respuesta.
-  const m = gesto === 'pensando' ? { x: 3, y: -4 } : mirada
+  const animo = usarAnimo()
+  const reaccion = quieta ? null : animo.reaccion
+  const dormida = quieta ? false : animo.dormida
+  // Pensando, la mirada se va arriba a un lado, como quien busca la respuesta. Quieta, mira al frente.
+  const m = quieta ? { x: 0, y: 0 } : gesto === 'pensando' ? { x: 3, y: -4 } : mirada
 
   return (
     <svg
       ref={svg}
-      className={`mascota mascota-${forma} gesto-${gesto} ${mini ? 'mascota-mini' : ''} ${lugar && !mini ? 'mascota-movible' : ''} ${cogida ? 'cogida' : ''} ${movida ? 'movida' : ''} ${reaccion ? `reacciona-${reaccion}` : ''} ${dormida && !cogida ? 'dormida' : ''}`}
+      className={`mascota mascota-${forma} gesto-${gesto} ${mini ? 'mascota-mini' : ''} ${lugar && !mini ? 'mascota-movible' : ''} ${cogida ? 'cogida' : ''} ${movida ? 'movida' : ''} ${reaccion ? `reacciona-${reaccion}` : ''} ${dormida && !cogida ? 'dormida' : ''} ${quieta ? 'quieta' : ''}`}
       style={movida || cogida ? { translate: `${sitio.x}px ${sitio.y}px` } : undefined}
       viewBox="0 0 120 124"
       aria-hidden="true"

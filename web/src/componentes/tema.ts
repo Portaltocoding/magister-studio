@@ -1,10 +1,10 @@
-// El aspecto de Magister: «clásico» (el de siempre, claro u oscuro según el sistema) o «riso» (risografía: papel
-// crema y tintas de imprenta planas, una por sección). Se guarda en el navegador y se aplica a <html data-tema>.
+// El aspecto de Magister: «clásico» (el de siempre, claro u oscuro según el sistema) o «Parchís» (id «riso»: blanco,
+// líneas negras y rojo, azul, amarillo y verde, uno por sección). Se guarda en el navegador y se aplica a <html data-tema>.
 
 export type Tema = 'clasico' | 'riso'
 export const TEMAS: { id: Tema; nombre: string; descripcion: string }[] = [
   { id: 'clasico', nombre: 'Clásico', descripcion: 'Sobrio, claro u oscuro según tu equipo' },
-  { id: 'riso', nombre: 'Risografía', descripcion: 'Papel crema y una tinta de imprenta por sección' },
+  { id: 'riso', nombre: 'Parchís', descripcion: 'Blanco, líneas negras y rojo, azul, amarillo y verde' },
 ]
 const CLAVE = 'magister-tema'
 export const EVENTO_TEMA = 'magister-tema'

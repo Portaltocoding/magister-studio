@@ -11,6 +11,7 @@ import {
   type Propuesta,
 } from './api.ts'
 import Cuestionario from './componentes/Cuestionario.tsx'
+import BarraCuota from './componentes/BarraCuota.tsx'
 import { irARuta } from './componentes/Vacio.tsx'
 import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
@@ -179,6 +180,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           alTerminar={(r) => alEnviar(mensajePlan(r))}
           alSaltar={() => setAMano(true)}
         />
+        <BarraCuota accion={{ accion: 'plan' }} />
       </div>
     )
   }

@@ -17,7 +17,14 @@ interface Estimacion {
   semana: { extra: number | null; calibrada: boolean }
 }
 
-export type Accion = { accion: 'video'; minutos: number } | { accion: 'material' } | { accion: 'diapositivas' } | { accion: 'mensaje' }
+export type Accion =
+  | { accion: 'video'; minutos: number }
+  | { accion: 'material' }
+  | { accion: 'diapositivas' }
+  | { accion: 'mensaje' }
+  | { accion: 'proyecto' }
+  | { accion: 'nivel' }
+  | { accion: 'plan' }
 
 const pct = (x: number) => Math.round(x * 100)
 

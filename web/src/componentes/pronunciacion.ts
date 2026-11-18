@@ -24,7 +24,9 @@ export const GLOSARIO: Termino[] = [
   // ===== Bases de datos =====
   { escrito: 'SQL', se_dice: 'ese cu ele', grupo: 'Bases de datos' },
   { escrito: 'NoSQL', se_dice: 'no ese cu ele', grupo: 'Bases de datos' },
-  { escrito: 'id', se_dice: 'íd', grupo: 'Bases de datos', variantes: ['ID', 'IDs', 'ids'] },
+  // Letra a letra, como se dice en español: «i de» (no «íd»).
+  { escrito: 'id', se_dice: 'i de', grupo: 'Bases de datos', variantes: ['ID', 'Id'] },
+  { escrito: 'IDs', se_dice: 'i des', grupo: 'Bases de datos', variantes: ['ids', 'Ids'] },
   { escrito: 'SELECT', se_dice: 'select', grupo: 'Bases de datos' },
   { escrito: 'INSERT', se_dice: 'insert', grupo: 'Bases de datos' },
   { escrito: 'UPDATE', se_dice: 'ápdeit', grupo: 'Bases de datos' },

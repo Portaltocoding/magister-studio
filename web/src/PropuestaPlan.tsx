@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Propuesta } from './api.ts'
+import BarraCuota from './componentes/BarraCuota.tsx'
 
 interface Props {
   propuesta: Propuesta
@@ -98,6 +99,8 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
           </button>
         </div>
       )}
+      {/* Aceptar pone en marcha el plan (y la búsqueda de fuentes): lo que gastaría, antes de pulsar. */}
+      {!cambiando && <BarraCuota accion={{ accion: 'plan' }} />}
     </section>
   )
 }

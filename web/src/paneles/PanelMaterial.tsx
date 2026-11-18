@@ -17,6 +17,7 @@ import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Colores from '../componentes/Colores.tsx'
 import { acentoDe, usarColores, variables } from '../componentes/colores.ts'
 import Pensando from '../componentes/Pensando.tsx'
+import BarraCuota from '../componentes/BarraCuota.tsx'
 
 // Lo que sale si no eliges nada: lo de casi siempre.
 const RECOMENDADO: Respuestas = {
@@ -454,6 +455,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
             textoSaltar="Cancelar"
           />
         )}
+        {preguntando && clave && <BarraCuota accion={{ accion: 'material' }} />}
 
         {trabajo && (enCurso || trabajo.estado === 'fallido') && (
           <div className="progreso" role="status">
@@ -544,7 +546,9 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 titulo="Las diapositivas se hacen cuando las pides"
                 texto="Unas doce, con los colores del libro, a partir de los apuntes de esta lección. Tarda un par de minutos."
                 acciones={[{ texto: 'Hacer las diapositivas', principal: true, alPulsar: () => pedirExtra('diapositivas') }]}
-              />
+              >
+                <BarraCuota accion={{ accion: 'diapositivas' }} />
+              </Vacio>
             )}
             {pestana === 'guion' && !guion && !enCurso && (
               <Vacio
@@ -552,7 +556,9 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 titulo="El guion del vídeo se escribe cuando lo pides"
                 texto="Por escenas, para verlo narrado en Vídeo. Sale de los apuntes de esta lección y tarda un par de minutos."
                 acciones={[{ texto: 'Escribir el guion', principal: true, alPulsar: () => pedirExtra('guion') }]}
-              />
+              >
+                <BarraCuota accion={{ accion: 'video', minutos: 6 }} />
+              </Vacio>
             )}
           </>
         )}
@@ -574,6 +580,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 </li>
               ))}
             </ul>
+            <BarraCuota accion={{ accion: 'material' }} />
           </Vacio>
         )}
         {guion && !textos.guion && pestana === 'guion' && <p className="nota">Cargando el guion…</p>}

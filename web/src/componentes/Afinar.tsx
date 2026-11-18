@@ -18,9 +18,9 @@ const GRUPOS: { campo: 'longitud' | 'nivel' | 'estilo'; titulo: string; opciones
 ]
 
 const EXTRAS: { campo: 'diagramas' | 'tests' | 'opciones'; texto: string }[] = [
-  { campo: 'diagramas', texto: 'Diagramas cuando ayuden' },
-  { campo: 'tests', texto: 'Un test al cerrar un concepto' },
-  { campo: 'opciones', texto: 'Preguntas para seguir' },
+  { campo: 'diagramas', texto: 'Diagramas' },
+  { campo: 'tests', texto: 'Test al cerrar un tema' },
+  { campo: 'opciones', texto: 'Sugerencias para seguir' },
 ]
 
 export const avisosActivos = () => {
@@ -98,7 +98,7 @@ export default function Afinar() {
         }}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <Mascota mini />
+        <Mascota mini quieta />
       </button>
       {abierto && (
         <div className="afinar-caja" role="dialog" aria-label="Afina a tu tutor">
@@ -106,7 +106,7 @@ export default function Afinar() {
             <strong>Afina a tu tutor</strong>
             <small className={guardado ? 'visible' : ''}>✓ Guardado</small>
           </div>
-          <p className="nota">Vale desde tu siguiente mensaje, en Estudio libre y en Hablar.</p>
+          <p className="nota">Se aplica desde tu próximo mensaje.</p>
           {!p ? (
             <p className="nota">Cargando…</p>
           ) : (
@@ -149,7 +149,7 @@ export default function Afinar() {
                 </div>
               </div>
               <div className="afinar-grupo">
-                <span>Modo de aprendizaje</span>
+                <span>Modo</span>
                 <select value={p.modo ?? ''} onChange={(e) => cambiar({ modo: e.target.value || null })} aria-label="Modo de aprendizaje">
                   <option value="">Normal</option>
                   {todosLosModos(p).map((m) => (
@@ -160,7 +160,7 @@ export default function Afinar() {
                 </select>
               </div>
               <div className="afinar-grupo">
-                <span>Lo que recuerda de ti</span>
+                <span>Recuerda de ti</span>
                 {p.instrucciones.length ? (
                   <ul className="afinar-recuerda">
                     {p.instrucciones.map((x, i) => (
@@ -173,7 +173,7 @@ export default function Afinar() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="nota">Nada aún. Díselo en el chat («a partir de ahora...») o escríbelo aquí.</p>
+                  <p className="nota">Nada aún.</p>
                 )}
                 <form
                   className="afinar-anadir"
@@ -184,7 +184,7 @@ export default function Afinar() {
                     setNueva('')
                   }}
                 >
-                  <input value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Por ejemplo: ejemplos de código en Python" aria-label="Nueva instrucción" />
+                  <input value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Ej.: código en Python" aria-label="Nueva instrucción" />
                   <button className="boton-mini" disabled={!nueva.trim()}>
                     Añadir
                   </button>
@@ -207,7 +207,7 @@ export default function Afinar() {
                     setAvisos(si)
                   }}
                 />
-                Avisos del navegador: tu sesión de hoy y el pomodoro (el tomate)
+                Avisos (sesión y pomodoro)
               </label>
               <div className="afinar-tema" role="radiogroup" aria-label="Aspecto">
                 <span className="nota">Aspecto</span>

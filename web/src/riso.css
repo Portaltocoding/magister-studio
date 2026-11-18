@@ -1,6 +1,8 @@
-/* ===== Tema «Risografía»: papel crema, tinta azul noche y una tinta de imprenta por sección =====
-   Colores planos de verdad (los de las tintas Riso), sin degradados ni brillos: bordes de tinta, sombras duras
-   desplazadas como un mal registro de imprenta y el amarillo para subrayar. Solo se aplica con <html data-tema="riso">. */
+/* ===== Tema «Parchís» (data-tema="riso") =====
+   Como el tablero: fondo blanco, líneas negras y los cuatro colores plenos (rojo, azul, amarillo y verde). Cada
+   sección lleva el suyo (barra de arriba, títulos, botones) y las listas rotan los cuatro como las casillas, así que
+   cada pantalla tiene muchos colores. Planos de verdad: bordes negros gruesos y sombras duras, sin degradados ni
+   brillos. Solo se aplica con <html data-tema="riso">. */
 
 /* El selector de aspecto, en «Afina a tu tutor» (vale para los dos temas). */
 .afinar-tema { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
@@ -8,112 +10,154 @@
 
 html[data-tema="riso"] {
   color-scheme: light;
-  --fondo: #f3ecdc;
-  --panel: #ebe2cb;
-  --tarjeta: #fffcf3;
-  --borde: #d3c5a5;
-  --texto: #1d1b3a;
-  --suave: #5a566f;
-  --activo: #e4d8bb;
-  --ok: #00a95c;
-  --deber: #3255a4;
-  --examen: #f15060;
-  --clase: #00a95c;
-  --notac: #a8650a;
-  --amarillo: #ffe800;
-  --sombra: 0 0 0 1px var(--borde);
-  --sombra-suave: 3px 3px 0 rgb(29 27 58 / 0.13);
+  /* Los cuatro colores del parchís, y la línea negra del tablero. */
+  /* Tonos de tablero impreso: reconocibles pero sin chillar. Las líneas, gris oscuro cálido (el negro puro sobre
+     blanco puro cansa la vista). */
+  --rojo: #c95a50; --azul: #3f6cb1; --amarillo: #e3b64e; --verde: #448f63;
+  --linea: #3d3833;
+  --fondo: #fbf8f2;
+  --panel: #fbf8f2;
+  --tarjeta: #fffdf9;
+  --borde: #3d3833;
+  --texto: #2d2925;
+  --suave: #6a645c;
+  --activo: #fff3b8;
+  --ok: var(--verde);
+  --deber: var(--azul);
+  --examen: var(--rojo);
+  --clase: var(--verde);
+  --notac: #a16a00;
+  --sombra: 4px 4px 0 var(--linea);
+  --sombra-suave: 4px 4px 0 var(--linea);
   background: var(--fondo);
-  accent-color: #3255a4;
+  accent-color: var(--azul);
 }
 html[data-tema="riso"] body { background: var(--fondo); color: var(--texto); }
-html[data-tema="riso"] ::selection { background: var(--amarillo); color: var(--texto); }
+html[data-tema="riso"] ::selection { background: var(--amarillo); color: var(--linea); }
 
-/* La tinta de cada sección (y el color del texto que va encima de ella). */
-html[data-tema="riso"] .marco { --tinta: #3255a4; --tinta-texto: #ffffff; }
-html[data-tema="riso"] .marco[data-seccion="hoy"] { --tinta: #ff6c2f; --tinta-texto: var(--texto); }
-html[data-tema="riso"] .marco[data-seccion="lecciones"] { --tinta: #ff48b0; --tinta-texto: var(--texto); }
-html[data-tema="riso"] .marco[data-seccion="practicar"] { --tinta: #00a95c; --tinta-texto: var(--texto); }
-html[data-tema="riso"] .marco[data-seccion="proyectos"] { --tinta: #765ba7; --tinta-texto: #ffffff; }
-html[data-tema="riso"] .marco[data-seccion="plan"] { --tinta: #f15060; --tinta-texto: var(--texto); }
-html[data-tema="riso"] .marco[data-seccion="biblioteca"] { --tinta: #00838a; --tinta-texto: #ffffff; }
+/* El color de cada sección, el del texto que va encima y el de su sombra de título. */
+html[data-tema="riso"] .marco { --tinta: var(--verde); --tinta-texto: #fff; --tinta-2: var(--amarillo); }
+html[data-tema="riso"] .marco[data-seccion="hoy"] { --tinta: var(--rojo); --tinta-texto: #fff; --tinta-2: var(--amarillo); }
+html[data-tema="riso"] .marco[data-seccion="lecciones"] { --tinta: var(--azul); --tinta-texto: #fff; --tinta-2: var(--amarillo); }
+html[data-tema="riso"] .marco[data-seccion="practicar"] { --tinta: var(--verde); --tinta-texto: #fff; --tinta-2: var(--rojo); }
+html[data-tema="riso"] .marco[data-seccion="proyectos"] { --tinta: var(--amarillo); --tinta-texto: var(--linea); --tinta-2: var(--azul); }
+html[data-tema="riso"] .marco[data-seccion="plan"] { --tinta: var(--rojo); --tinta-texto: #fff; --tinta-2: var(--verde); }
+html[data-tema="riso"] .marco[data-seccion="biblioteca"] { --tinta: var(--azul); --tinta-texto: #fff; --tinta-2: var(--rojo); }
 
-/* Todo lo que ya usa el acento pasa a usar la tinta de la sección (el acento por lección se respeta en el modo
-   clásico; aquí manda la sección). */
 html[data-tema="riso"] .marco {
   --acento: var(--tinta);
-  --acento-suave: color-mix(in srgb, var(--tinta) 16%, #fffcf3);
+  --acento-suave: color-mix(in srgb, var(--tinta) 18%, #fff);
   --t-acento: var(--tinta) !important;
-  --t-resalte: color-mix(in srgb, var(--tinta) 22%, #fffcf3) !important;
-  --t-acento-tinta: color-mix(in srgb, var(--tinta) 55%, #1d1b3a) !important;
-  --t-oscuro: #1d1b3a;
-  --t-papel: #fffcf3;
+  --t-resalte: color-mix(in srgb, var(--amarillo) 45%, #fff) !important;
+  --t-acento-tinta: color-mix(in srgb, var(--tinta) 65%, var(--linea)) !important;
+  --t-oscuro: var(--linea);
+  --t-papel: #ffffff;
   accent-color: var(--tinta);
 }
 
-/* Papel con un grano muy suave, como el de una risografía. */
-html[data-tema="riso"] body::before {
-  content: ''; position: fixed; inset: 0; z-index: 1000; pointer-events: none; opacity: 0.06; mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.11 0 0 0 0 0.1 0 0 0 0 0.23 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+/* ---- La barra de arriba: blanca, con una franja gruesa del color de la sección ---- */
+html[data-tema="riso"] .sesion { background: var(--tarjeta); color: var(--linea); border-bottom: 5px solid var(--tinta); box-shadow: 0 2px 0 var(--linea); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-tema="riso"] .sesion :is(input, .boton-mini, button:not(.afinar-boton)) { background: var(--tarjeta); color: var(--linea); border: 1.5px solid var(--linea); }
+
+/* ---- La columna de iconos: negra, el icono de la sección en su color ---- */
+html[data-tema="riso"] .riel { background: var(--linea); color: #fff; border-right: 3px solid var(--linea); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-tema="riso"] .riel button { color: #fff; }
+html[data-tema="riso"] .riel-boton.actual { background: var(--tinta); color: var(--tinta-texto); border-radius: 10px; box-shadow: 3px 3px 0 #fff; }
+
+/* ---- La barra lateral: blanca como el tablero, cada sección como una casilla de su color ---- */
+html[data-tema="riso"] .marco .lateral { background: var(--tarjeta); border-right: 3px solid var(--linea); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-tema="riso"] .lateral .marca { color: var(--linea); text-shadow: 2px 2px 0 var(--amarillo); }
+html[data-tema="riso"] .grupo-entrada { --tinta-grupo: var(--verde); --tinta-grupo-texto: #fff; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="hoy"] { --tinta-grupo: var(--rojo); --tinta-grupo-texto: #fff; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="lecciones"] { --tinta-grupo: var(--azul); --tinta-grupo-texto: #fff; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="practicar"] { --tinta-grupo: var(--verde); --tinta-grupo-texto: #fff; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="proyectos"] { --tinta-grupo: var(--amarillo); --tinta-grupo-texto: var(--linea); }
+html[data-tema="riso"] .grupo-entrada[data-seccion="plan"] { --tinta-grupo: var(--rojo); --tinta-grupo-texto: #fff; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="biblioteca"] { --tinta-grupo: var(--azul); --tinta-grupo-texto: #fff; }
+/* Cada sección con su cuadradito de color; solo la que está abierta va rellena. */
+html[data-tema="riso"] .grupo-entrada .entrada { color: var(--linea); border: 2px solid transparent; border-radius: 10px; padding: 4px 10px; font-weight: 750; }
+html[data-tema="riso"] .grupo-entrada .entrada::before {
+  content: ''; display: inline-block; width: 11px; height: 11px; margin-right: 9px; border-radius: 3px;
+  background: var(--tinta-grupo); border: 1.5px solid var(--linea); vertical-align: -1px;
+}
+html[data-tema="riso"] .grupo-entrada .entrada:hover { border-color: var(--linea); }
+html[data-tema="riso"] .grupo-entrada.dentro .entrada { background: color-mix(in srgb, var(--tinta-grupo) 20%, var(--tarjeta)); color: var(--texto); border-color: color-mix(in srgb, var(--tinta-grupo) 70%, var(--linea)); }
+html[data-tema="riso"] .grupo-entrada .modo { color: var(--linea); }
+html[data-tema="riso"] .grupo-entrada .modo[aria-current="page"] {
+  background: var(--tarjeta); color: var(--linea); font-weight: 700; border: 1.5px solid var(--linea); box-shadow: 3px 3px 0 var(--tinta-grupo);
+}
+html[data-tema="riso"] .grupo-inicio .modo { background: var(--tarjeta); color: var(--linea); border: 1.5px solid var(--linea); box-shadow: 3px 3px 0 var(--verde); font-weight: 750; }
+html[data-tema="riso"] .enlace-taller, html[data-tema="riso"] .lateral h2 { color: var(--linea); }
+
+/* ---- Títulos: con una sombra de otro color desplazada y subrayado del color de la sección ---- */
+html[data-tema="riso"] .central :is(.panel h1, .tutor-hoy h1, .proyecto-cabeza h1, .hoy-cabecera h1, .libre h1) {
+  color: var(--linea);
+  text-decoration: underline; text-decoration-color: var(--tinta); text-decoration-thickness: 0.14em;
+  text-underline-offset: 0.16em; text-decoration-skip-ink: none;
+}
+/* Los subtítulos de sección, con una raya corta del color de la sección debajo. */
+html[data-tema="riso"] .central :is(.panel > h2, .panel section > h2, .proyecto-diario h2, .proyecto-retomar h2, .proyecto-priming h2) {
+  display: inline-block; align-self: flex-start; width: fit-content; color: var(--linea);
+  padding-bottom: 2px; border-bottom: 4px solid var(--tinta); text-transform: none; letter-spacing: 0;
 }
 
-/* Barras: crema sólida en lugar de cristal esmerilado. */
-html[data-tema="riso"] .sesion { background: color-mix(in srgb, var(--fondo) 92%, transparent); border-bottom: 1.5px solid var(--texto); }
-html[data-tema="riso"] :is(.riel, .marco .lateral) { background: var(--panel); border-color: var(--texto); }
-
-/* Títulos: tinta de la sección como subrayado grueso, como un paso de imprenta. */
-html[data-tema="riso"] .central :is(.panel h1, .tutor-hoy h1, .proyecto-cabeza h1, .hoy-cabecera h1) {
-  text-decoration: underline; text-decoration-color: var(--tinta); text-decoration-thickness: 0.22em;
-  text-underline-offset: 0.12em; text-decoration-skip-ink: none;
-}
-
-/* Botones: el principal, tinta plena con borde y sombra dura; los demás, papel con borde de tinta. */
+/* ---- Botones ---- */
 html[data-tema="riso"] .boton-principal {
-  background: var(--tinta); color: var(--tinta-texto); border: 2px solid var(--texto); box-shadow: 3px 3px 0 var(--texto);
+  background: var(--tinta); color: var(--tinta-texto); border: 1.5px solid var(--linea); box-shadow: 2px 2px 0 color-mix(in srgb, var(--linea) 45%, transparent); font-weight: 700;
   transition: transform 140ms ease, box-shadow 140ms ease;
 }
-html[data-tema="riso"] .boton-principal:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--texto); border-color: var(--texto); }
-html[data-tema="riso"] .boton-principal:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--texto); }
-html[data-tema="riso"] :is(.boton, .boton-mini):not(.boton-principal) { background: var(--tarjeta); color: var(--texto); border: 1.5px solid color-mix(in srgb, var(--texto) 40%, transparent); }
-html[data-tema="riso"] :is(.boton, .boton-mini):not(.boton-principal):hover:not(:disabled) { border-color: var(--tinta); }
+html[data-tema="riso"] .boton-principal:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--linea); border-color: var(--linea); }
+html[data-tema="riso"] .boton-principal:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--linea); }
+html[data-tema="riso"] :is(.boton, .boton-mini):not(.boton-principal) { background: var(--tarjeta); color: var(--linea); border: 1.5px solid var(--linea); font-weight: 600; }
+html[data-tema="riso"] :is(.boton, .boton-mini):not(.boton-principal):hover:not(:disabled) { background: var(--amarillo); border-color: var(--linea); }
 
-/* Pestañas de arriba y chips elegidos: tinta plena. */
-html[data-tema="riso"] .pestanas-modo { background: var(--panel); border: 1.5px solid var(--texto); }
-html[data-tema="riso"] .pestanas-modo button.actual { background: var(--tinta); color: var(--tinta-texto); box-shadow: none; }
-html[data-tema="riso"] :is(.opcion.elegida, .opcion-chip.elegida, .opcion[aria-checked="true"]) { background: var(--tinta); color: var(--tinta-texto); border-color: var(--texto); }
+/* ---- Pestañas, chips y campos ---- */
+html[data-tema="riso"] .pestanas-modo { background: var(--tarjeta); border: 1.5px solid var(--linea); box-shadow: 2px 2px 0 color-mix(in srgb, var(--linea) 45%, transparent); }
+html[data-tema="riso"] .pestanas-modo button { color: var(--linea); font-weight: 650; }
+html[data-tema="riso"] .pestanas-modo button.actual { background: var(--tinta); color: var(--tinta-texto); border: 1.5px solid var(--linea); box-shadow: none; }
+html[data-tema="riso"] :is(.opcion.elegida, .opcion-chip.elegida, .opcion[aria-checked="true"]) { background: var(--tinta); color: var(--tinta-texto); border: 1.5px solid var(--linea); }
+html[data-tema="riso"] :is(.opcion, .opcion-chip):not(.elegida) { border: 1.5px solid var(--linea); background: var(--tarjeta); color: var(--linea); }
+html[data-tema="riso"] .central :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) { border: 1.5px solid var(--linea); background: var(--tarjeta); color: var(--linea); }
+html[data-tema="riso"] .central :is(input, textarea, select):focus-visible { outline: 3px solid var(--tinta); outline-offset: 1px; }
+html[data-tema="riso"] .central a { color: var(--linea); text-decoration-color: var(--tinta); text-decoration-thickness: 2px; }
 
-/* Barra lateral: cada sección con su punto de tinta; la que está abierta, marcada con su color. */
-html[data-tema="riso"] .grupo-entrada { --tinta-grupo: #3255a4; }
-html[data-tema="riso"] .grupo-entrada[data-seccion="hoy"] { --tinta-grupo: #ff6c2f; }
-html[data-tema="riso"] .grupo-entrada[data-seccion="lecciones"] { --tinta-grupo: #ff48b0; }
-html[data-tema="riso"] .grupo-entrada[data-seccion="practicar"] { --tinta-grupo: #00a95c; }
-html[data-tema="riso"] .grupo-entrada[data-seccion="proyectos"] { --tinta-grupo: #765ba7; }
-html[data-tema="riso"] .grupo-entrada[data-seccion="plan"] { --tinta-grupo: #f15060; }
-html[data-tema="riso"] .grupo-entrada[data-seccion="biblioteca"] { --tinta-grupo: #00838a; }
-html[data-tema="riso"] .grupo-entrada .entrada::before {
-  content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 9px; border-radius: 50%;
-  background: var(--tinta-grupo); border: 1.5px solid var(--texto); vertical-align: -1px;
-}
-html[data-tema="riso"] .grupo-entrada.dentro .entrada { color: var(--texto); }
-html[data-tema="riso"] .grupo-entrada .modo[aria-current="page"] {
-  background: color-mix(in srgb, var(--tinta-grupo) 24%, var(--tarjeta)); color: var(--texto); box-shadow: inset 3px 0 0 var(--tinta-grupo);
-}
-html[data-tema="riso"] .riel-boton.actual { background: var(--tinta); color: var(--tinta-texto); }
-
-/* Tarjetas: papel claro, borde de tinta suave y la sombra dura del mal registro. */
+/* ---- Tarjetas: borde negro y sombra dura; en las listas, cada una de un color ---- */
 html[data-tema="riso"] :is(.proyecto-tarjeta, .proyecto-nivel:not(.esbozado), .proyecto-retomar, .guia-paso, .guia-bocadillo, .lecciones > li,
-  .tu-dia, .repaso-tema, .tarjeta, .nuevo-video, .llamada-pizarra, .asesor-chat, .proyecto-nuevo, .proyecto-explicacion details) {
-  background: var(--tarjeta); border: 1.5px solid color-mix(in srgb, var(--texto) 22%, transparent); box-shadow: var(--sombra-suave);
+  .tu-dia, .repaso-tema, .tarjeta, .nuevo-video, .llamada-pizarra, .asesor-chat, .proyecto-nuevo, .proyecto-explicacion details,
+  .proyecto-paso, .proyecto-decisiones li, .vacio, .afinar-caja, .llamada-notas dl > div) {
+  background: var(--tarjeta); border: 1.5px solid var(--linea); box-shadow: 3px 3px 0 color-mix(in srgb, var(--rot, var(--tinta)) 55%, transparent);
 }
-html[data-tema="riso"] .guia-paso.ahora, html[data-tema="riso"] .proyecto-retomar { border-color: var(--texto); box-shadow: 4px 4px 0 var(--tinta); }
-html[data-tema="riso"] .guia-paso.abierto { box-shadow: 5px 5px 0 var(--tinta); border-color: var(--texto); }
-html[data-tema="riso"] .guia-paso.ahora .guia-num { background: var(--tinta); color: var(--tinta-texto); border-color: var(--texto); }
+html[data-tema="riso"] .proyecto-nivel.esbozado { border: 2px dashed var(--linea); background: color-mix(in srgb, var(--rot, var(--tinta)) 6%, #fff); }
+/* Los cuatro colores rotando, como las casillas del tablero. */
+html[data-tema="riso"] :is(.guia-pasos, .proyectos-lista, .lecciones, .proyecto-pasos, .proyecto-decisiones, .proyecto-explicacion, .llamada-notas dl, .proyecto-glosario, .retomar-frescos dl, .bloques-tema ol) > :nth-child(4n + 1) { --rot: var(--rojo); --rot-texto: #fff; }
+html[data-tema="riso"] :is(.guia-pasos, .proyectos-lista, .lecciones, .proyecto-pasos, .proyecto-decisiones, .proyecto-explicacion, .llamada-notas dl, .proyecto-glosario, .retomar-frescos dl, .bloques-tema ol) > :nth-child(4n + 2) { --rot: var(--azul); --rot-texto: #fff; }
+html[data-tema="riso"] :is(.guia-pasos, .proyectos-lista, .lecciones, .proyecto-pasos, .proyecto-decisiones, .proyecto-explicacion, .llamada-notas dl, .proyecto-glosario, .retomar-frescos dl, .bloques-tema ol) > :nth-child(4n + 3) { --rot: var(--amarillo); --rot-texto: var(--linea); }
+html[data-tema="riso"] :is(.guia-pasos, .proyectos-lista, .lecciones, .proyecto-pasos, .proyecto-decisiones, .proyecto-explicacion, .llamada-notas dl, .proyecto-glosario, .retomar-frescos dl, .bloques-tema ol) > :nth-child(4n + 4) { --rot: var(--verde); --rot-texto: #fff; }
+html[data-tema="riso"] .proyecto-nivel:nth-of-type(4n + 1) { --rot: var(--rojo); }
+html[data-tema="riso"] .proyecto-nivel:nth-of-type(4n + 2) { --rot: var(--azul); }
+html[data-tema="riso"] .proyecto-nivel:nth-of-type(4n + 3) { --rot: var(--amarillo); }
+html[data-tema="riso"] .proyecto-nivel:nth-of-type(4n + 4) { --rot: var(--verde); }
+/* Los números y las fichas de cada elemento, de su color. */
+/* Números e insignias: un tinte de su color con el color pleno en el borde (no un bloque saturado). */
+html[data-tema="riso"] :is(.guia-num, .proyecto-nivel-num, .bloques-clave) {
+  background: color-mix(in srgb, var(--rot, var(--tinta)) 22%, var(--tarjeta)); color: var(--texto); border: 1.5px solid var(--rot, var(--tinta));
+}
+html[data-tema="riso"] .proyecto-nivel-num { padding: 1px 8px; border-radius: 6px; }
+html[data-tema="riso"] .bloques-tema ol > li > button.activa { border: 1.5px solid var(--linea); box-shadow: 4px 4px 0 var(--rot, var(--tinta)); background: var(--tarjeta); }
+html[data-tema="riso"] .bloque-num { color: var(--tinta); }
+html[data-tema="riso"] .guia-paso.ahora .guia-num { background: var(--tinta); color: var(--tinta-texto); }
+html[data-tema="riso"] :is(.guia-paso.abierto, .guia-paso.ahora) { box-shadow: 4px 4px 0 color-mix(in srgb, var(--tinta) 60%, transparent); }
+html[data-tema="riso"] .proyecto-paso.hecho { background: color-mix(in srgb, var(--verde) 12%, #fff); opacity: 0.85; }
+html[data-tema="riso"] .proyecto-glosario > div, html[data-tema="riso"] .retomar-frescos dl > div { border-left: 6px solid var(--rot, var(--tinta)); padding-left: 8px; }
 
-/* El amarillo, para resaltar: el MVP, las etiquetas pequeñas y la priming. */
-html[data-tema="riso"] .proyecto-mvp { background: var(--amarillo); color: var(--texto); border: 1.5px solid var(--texto); }
-html[data-tema="riso"] .proyecto-priming { background: color-mix(in srgb, var(--amarillo) 32%, var(--tarjeta)); border-left-color: var(--texto); }
-html[data-tema="riso"] :is(.retomar-etq, .proyecto-etiqueta, .proyecto-nivel-num, .asesor-etq) { color: color-mix(in srgb, var(--tinta) 70%, var(--texto)); }
-html[data-tema="riso"] .proyecto-barra { background: color-mix(in srgb, var(--texto) 12%, transparent); border: 1px solid var(--texto); }
+/* ---- El amarillo, para resaltar ---- */
+html[data-tema="riso"] .proyecto-mvp { background: var(--amarillo); color: var(--linea); border: 1.5px solid var(--linea); }
+html[data-tema="riso"] .proyecto-priming { background: color-mix(in srgb, var(--amarillo) 22%, #fff); border: 1.5px solid var(--linea); border-left: 8px solid var(--amarillo); box-shadow: none; border-radius: 12px; }
+html[data-tema="riso"] :is(.retomar-etq, .proyecto-etiqueta, .asesor-etq, .vacio-etq) { background: var(--amarillo); color: var(--linea); padding: 1px 6px; border-radius: 4px; display: inline-block; }
+html[data-tema="riso"] :is(.proyecto-barra, .cuota-barra) { background: var(--tarjeta); border: 1.5px solid var(--linea); height: 10px; }
+html[data-tema="riso"] :is(.proyecto-barra span, .cuota-usado) { background: var(--tinta); }
 
-/* La mascota de la barra, en un círculo de papel con borde de tinta. */
-html[data-tema="riso"] .afinar-boton { background: var(--tarjeta); border: 1.5px solid var(--texto); }
+/* ---- La mascota de la barra y el asesor ---- */
+html[data-tema="riso"] .afinar-boton { background: var(--tarjeta); border: 1.5px solid var(--linea); box-shadow: 2px 2px 0 var(--linea); }
+html[data-tema="riso"] .asesor-tu { background: var(--tinta); color: var(--tinta-texto); border: 1.5px solid var(--linea); }
+html[data-tema="riso"] .asesor-acciones button { background: var(--amarillo); border: 1.5px solid var(--linea); }

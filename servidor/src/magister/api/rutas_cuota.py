@@ -15,5 +15,5 @@ async def estado() -> dict:
 
 
 @rutas.get("/estimar")
-async def estimar(accion: Literal["video", "diapositivas", "material", "mensaje"], minutos: int | None = Query(None, ge=1, le=60)) -> dict:
+async def estimar(accion: Literal["video", "diapositivas", "material", "mensaje", "proyecto", "nivel", "plan"], minutos: int | None = Query(None, ge=1, le=60)) -> dict:
     return await cuota.estimar(accion, minutos)

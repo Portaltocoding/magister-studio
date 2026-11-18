@@ -122,6 +122,15 @@ async def coste_de(accion: str, minutos: int | None = None) -> float:
         return await _coste_material_por_leccion()
     if accion == "mensaje":
         return await _coste_medio(("conversar", "responder"))
+    # Proyectos: el roadmap entero (más el dibujo de la arquitectura) y detallar un nivel. Mientras no haya llamadas
+    # tuyas de esos prompts, un valor prudente (sobrestimar es lo seguro al avisar).
+    if accion == "proyecto":
+        return (await _coste_medio(("proyecto_roadmap",)) or 0.12) + (await _coste_medio(("proyecto_arquitectura",)) or 0.05)
+    if accion == "nivel":
+        return await _coste_medio(("proyecto_nivel",)) or 0.06
+    # Un plan nuevo: el diagnóstico y el planificador.
+    if accion == "plan":
+        return (await _coste_medio(("planificar",)) or 0.05) + (await _coste_medio(("diagnostico",)) or 0.01) * 4
     raise ValueError(f"acción desconocida: {accion}")
 
 

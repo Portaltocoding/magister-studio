@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
+import BarraCuota from '../componentes/BarraCuota.tsx'
 
 // Automatizar: reglas que enciendes y Magister cumple solo, cada pocos minutos, de una en una.
 
@@ -57,6 +58,8 @@ export default function PanelAutomatizar() {
     <div className="panel automatizar">
       <h1>Automatizar</h1>
       <p className="nota">Enciende lo que quieras que Magister haga solo. Lo revisa cada 10 minutos y pone en cola una tarea cada vez, nunca si ya hay otra en marcha.</p>
+      {/* Lo que te queda, y lo que se come preparar una lección (lo más habitual de lo automático). */}
+      <BarraCuota accion={{ accion: 'material' }} />
 
       <ul className="reglas">
         <li className="regla">

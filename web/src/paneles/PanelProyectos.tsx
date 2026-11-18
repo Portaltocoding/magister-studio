@@ -3,6 +3,7 @@ import { crearConversacion, enviarJson, pedir } from '../api.ts'
 import Diagrama from '../componentes/Diagrama.tsx'
 import Pensando from '../componentes/Pensando.tsx'
 import { celebrar } from '../componentes/animo.ts'
+import BarraCuota from '../componentes/BarraCuota.tsx'
 
 // Proyectos: le cuentas lo que quieres construir y saca el roadmap de construcción. Arriba, la explicación del
 // proyecto (qué es, por qué, arquitectura, glosario, riesgos); debajo, los niveles con sus bloques y pasos. Encima de
@@ -339,6 +340,7 @@ function NuevoProyecto({ alCrear, alCancelar }: { alCrear: (id: number) => void;
         <input type="checkbox" checked={f.investigar} onChange={(e) => setF({ ...f, investigar: e.target.checked })} /> Buscar antes en la web
         proyectos y documentación parecidos (unos céntimos)
       </label>
+      <BarraCuota accion={{ accion: 'proyecto' }} />
       <div className="botones">
         <button className="boton boton-principal" disabled={!listo || enviando}>
           {enviando ? 'Creando…' : 'Hacer el roadmap'}
@@ -563,6 +565,7 @@ function NivelVista({ n, hechos, proyecto, alMarcar, alDetallar, ocupado }: {
       {!n.detallado && (
         <div className="proyecto-detallar">
           <p className="nota">Este nivel está esbozado. Sus pasos se preparan cuando llegues, con lo que hayas hecho y decidido hasta entonces.</p>
+          <BarraCuota accion={{ accion: 'nivel' }} />
           <button className="boton" onClick={alDetallar} disabled={ocupado}>
             Detallar este nivel
           </button>
