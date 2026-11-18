@@ -5,6 +5,7 @@ import ControlVoz from '../componentes/ControlVoz.tsx'
 import { avisosActivos, EXTRAS, GRUPOS } from '../componentes/Afinar.tsx'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from '../componentes/preferencias.ts'
 import { elegirTema, temaGuardado, TEMAS, type Tema } from '../componentes/tema.ts'
+import { aplicarTamano, tamanoGuardado, TAMANOS, type IdTamano } from '../componentes/escala.ts'
 import Mascota, { elegirForma, FORMAS, usarForma } from '../Mascota.tsx'
 import Cargando from '../componentes/Cargando.tsx'
 
@@ -21,6 +22,7 @@ export default function PanelAjustes() {
   const p = usarPreferencias()
   const forma = usarForma()
   const [tema, setTema] = useState<Tema>(temaGuardado)
+  const [tamano, setTamano] = useState<IdTamano>(tamanoGuardado)
   const [nueva, setNueva] = useState('')
   const [guardado, setGuardado] = useState(false)
   const [avisos, setAvisos] = useState(() => 'Notification' in window && Notification.permission === 'granted' && avisosActivos())
@@ -159,6 +161,25 @@ export default function PanelAjustes() {
               </button>
             )
           })}
+        </div>
+        <div className="afinar-grupo">
+          <span>Tamaño de la interfaz</span>
+          <div className="afinar-segmentos" role="radiogroup" aria-label="Tamaño de la interfaz">
+            {TAMANOS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={tamano === t.id}
+                onClick={() => {
+                  aplicarTamano(t.id)
+                  setTamano(t.id)
+                }}
+              >
+                {t.nombre}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="afinar-grupo">
           <span>Mascota</span>
