@@ -43,6 +43,8 @@ class Puntuacion(Base):
     nombre: Mapped[str] = mapped_column(String(40))
     valor: Mapped[float] = mapped_column(Float)
     comentario: Mapped[str | None] = mapped_column(Text)
+    # La versión de la rúbrica con la que juzgó el juez (las demás puntuaciones no la llevan).
+    version: Mapped[str | None] = mapped_column(String(16))
     creada: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
 
 

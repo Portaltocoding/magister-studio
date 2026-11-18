@@ -35,9 +35,10 @@ async def guardar_llamada(ll: Llamada) -> None:
         ))
 
 
-async def puntuar(traza_id: str, nombre: str, valor: float, comentario: str | None = None, sobrescribir: bool = False) -> None:
+async def puntuar(traza_id: str, nombre: str, valor: float, comentario: str | None = None, sobrescribir: bool = False,
+                  version: str | None = None) -> None:
     async with nueva_sesion() as s, s.begin():
-        q = insert(Puntuacion).values(traza_id=traza_id, nombre=nombre, valor=valor, comentario=comentario)
+        q = insert(Puntuacion).values(traza_id=traza_id, nombre=nombre, valor=valor, comentario=comentario, version=version)
         q = (q.on_conflict_do_update(constraint="uq_puntuaciones_traza_nombre", set_={"valor": valor, "comentario": comentario})
              if sobrescribir else q.on_conflict_do_nothing(constraint="uq_puntuaciones_traza_nombre"))
         await s.execute(q)

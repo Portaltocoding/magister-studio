@@ -5,9 +5,9 @@
 | Alerta | Salta si (últimas 24 h) | Runbook |
 |---|---|---|
 | errores | más del 5 % de llamadas con error (mínimo 10) | docs/runbooks/errores.md |
-| latencia | p95 del primer trozo de las conversaciones > 15 s | docs/runbooks/latencia.md |
+| latencia | p95 de lo que tardas en ver la primera palabra del tutor > 20 s (mínimo 10 respuestas) | docs/runbooks/latencia.md |
 | negativas | más del 2 % de respuestas con negativa | docs/runbooks/negativas.md |
-| tono | menos del 70 % de aprobados del juez online (mínimo 10) | docs/runbooks/tono.md |
+| tono | menos del 70 % de aprobados del juez online en 7 días con la rúbrica actual (mínimo 10) | docs/runbooks/tono.md |
 """
 
 import asyncio
@@ -16,8 +16,11 @@ import sys
 from sqlalchemy import text
 
 from magister.datos.sesion import nueva_sesion
+from magister.tono.juez import rubrica
 
-UMBRALES = {"errores": 0.05, "latencia_ms": 15000, "negativas": 0.02, "tono": 0.70}
+# La latencia mide lo que ves tú (desde que envías hasta la primera palabra), no solo lo que piensa el modelo: avisa
+# cuando algo nuestro se atasca, no de cada respuesta en la que el modelo piensa un rato.
+UMBRALES = {"errores": 0.05, "latencia_ms": 20000, "latencia_min": 10, "negativas": 0.02, "tono": 0.70}
 
 
 async def evaluar() -> list[tuple[str, str]]:
@@ -27,17 +30,19 @@ async def evaluar() -> list[tuple[str, str]]:
             "select count(*), count(*) filter (where error is not null) from llamadas where creada > now() - interval '24 hours'"))).one()
         if n >= 10 and err / n > UMBRALES["errores"]:
             saltan.append(("errores", f"{err} de {n} llamadas con error en 24 h"))
-        p95 = await s.scalar(text(
-            "select percentile_cont(0.95) within group (order by ttft_ms) from llamadas "
-            "where creada > now() - interval '24 hours' and funcion in ('conversar', 'responder') and ttft_ms is not null"))
-        if p95 and p95 > UMBRALES["latencia_ms"]:
-            saltan.append(("latencia", f"p95 del primer trozo {p95 / 1000:.1f} s en 24 h"))
+        n, p95 = (await s.execute(text(
+            "select count(*), percentile_cont(0.95) within group (order by ms_primer_token) from mensajes "
+            "where creado_en > now() - interval '24 hours' and rol = 'tutor' and ms_primer_token is not null"))).one()
+        if n >= UMBRALES["latencia_min"] and p95 and p95 > UMBRALES["latencia_ms"]:
+            saltan.append(("latencia", f"la primera palabra tarda {p95 / 1000:.1f} s (p95 de {n} respuestas en 24 h)"))
         n, neg = (await s.execute(text(
             "select count(*), coalesce(sum(valor), 0) from puntuaciones where nombre = 'negativa' and creada > now() - interval '24 hours'"))).one()
         if n >= 20 and neg / n > UMBRALES["negativas"]:
             saltan.append(("negativas", f"{int(neg)} negativas de {n} respuestas"))
+        # Solo las notas puestas con la rúbrica de ahora: al cambiarla, las de antes ya no dicen nada.
         n, ok = (await s.execute(text(
-            "select count(*), coalesce(sum(valor), 0) from puntuaciones where nombre = 'tono_juez' and creada > now() - interval '7 days'"))).one()
+            "select count(*), coalesce(sum(valor), 0) from puntuaciones where nombre = 'tono_juez' "
+            "and creada > now() - interval '7 days' and version = :v"), {"v": rubrica()[1]})).one()
         if n >= 10 and ok / n < UMBRALES["tono"]:
             saltan.append(("tono", f"el juez aprueba {ok / n:.0%} de {n} explicaciones en 7 días"))
     return saltan

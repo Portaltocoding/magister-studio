@@ -33,6 +33,6 @@ async def juzgar(carga: dict) -> None:
     await afinado.registrar_juicio({d: getattr(r.veredicto, d).aprueba for d in DIMENSIONES})
     aprueba = all(getattr(r.veredicto, d).aprueba for d in DIMENSIONES)
     critica = "; ".join(f"{d}: {getattr(r.veredicto, d).razon}" for d in DIMENSIONES if not getattr(r.veredicto, d).aprueba)
-    await puntuar(traza, "tono_juez", 1.0 if aprueba else 0.0, critica or None)
+    await puntuar(traza, "tono_juez", 1.0 if aprueba else 0.0, critica or None, version=r.version_rubrica)
     if not aprueba:
         await candidato(traza, "juez", carga.get("sistema", ""), carga["salida"], critica)
