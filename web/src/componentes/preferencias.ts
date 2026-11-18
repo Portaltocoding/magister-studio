@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
+import { EVENTO_CONECTADO } from './Cargando.tsx'
 
 // Las preferencias del tutor, compartidas entre la mascota, el selector de modo y las tarjetas del chat.
 // Un cambio en un sitio se ve al momento en los demás.
@@ -43,10 +44,18 @@ export async function cambiarPreferencias(cambio: Partial<PreferenciasTutor>): P
 export function usarPreferencias(): PreferenciasTutor | null {
   const [p, setP] = useState<PreferenciasTutor | null>(cache)
   useEffect(() => {
-    if (!cache) cargarPreferencias().then(setP).catch(() => undefined)
+    // Si falla (el servidor se está reiniciando), se vuelve a pedir cuando la barra avisa de que ha vuelto.
+    const cargar = () => {
+      if (!cache) cargarPreferencias().then(setP).catch(() => undefined)
+    }
+    cargar()
     const al = (e: Event) => setP((e as CustomEvent<PreferenciasTutor>).detail)
     window.addEventListener(EVENTO, al)
-    return () => window.removeEventListener(EVENTO, al)
+    window.addEventListener(EVENTO_CONECTADO, cargar)
+    return () => {
+      window.removeEventListener(EVENTO, al)
+      window.removeEventListener(EVENTO_CONECTADO, cargar)
+    }
   }, [])
   return p
 }

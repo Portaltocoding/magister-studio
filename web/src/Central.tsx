@@ -25,6 +25,7 @@ const PanelLlamada = lazy(() => import('./paneles/PanelLlamada.tsx'))
 const PanelBiblioteca = lazy(() => import('./paneles/PanelBiblioteca.tsx'))
 const PanelNotas = lazy(() => import('./paneles/PanelNotas.tsx'))
 const PanelProyectos = lazy(() => import('./paneles/PanelProyectos.tsx'))
+const PanelAjustes = lazy(() => import('./paneles/PanelAjustes.tsx'))
 
 interface Props {
   modo: IdModo
@@ -147,6 +148,8 @@ function Panel({
       return <PanelLlamada alCambiar={alCambiarConversaciones} />
     case 'automatizar':
       return <PanelAutomatizar />
+    case 'ajustes':
+      return <PanelAjustes />
     case 'hablar':
       return <PanelHablar alCambiar={alCambiarConversaciones} />
   }

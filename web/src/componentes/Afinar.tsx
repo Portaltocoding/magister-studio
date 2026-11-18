@@ -1,23 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import Aprendido from './Aprendido.tsx'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from './preferencias.ts'
-import Mascota, { elegirForma, FORMAS, usarForma } from '../Mascota.tsx'
-import Colores from './Colores.tsx'
+import Mascota from '../Mascota.tsx'
 import { asesorActivo, EVENTO_COGER, EVENTO_ESTADO } from './Asesor.tsx'
-import { elegirTema, temaGuardado, TEMAS, type Tema } from './tema.ts'
 
-// La mascota de la barra de arriba: siempre a la vista; al pulsarla, «Afina a tu tutor».
+// La mascota de la barra de arriba: siempre a la vista; al pulsarla, los ajustes rápidos del tutor (cómo te explica).
+// Todo lo demás (lo que recuerda de ti, aspecto, voz, avisos) está en la sección Ajustes.
 // Lo que eliges se guarda en el servidor y el tutor lo tiene en cuenta desde el siguiente mensaje.
 
 type Preferencias = PreferenciasTutor
 
-const GRUPOS: { campo: 'longitud' | 'nivel' | 'estilo'; titulo: string; opciones: [string, string][] }[] = [
+export const GRUPOS: { campo: 'longitud' | 'nivel' | 'estilo'; titulo: string; opciones: [string, string][] }[] = [
   { campo: 'longitud', titulo: 'Respuestas', opciones: [['breve', 'Breves'], ['normal', 'Normales'], ['detallada', 'Detalladas']] },
   { campo: 'nivel', titulo: 'Tu nivel', opciones: [['cero', 'Desde cero'], ['normal', 'Normal'], ['experto', 'Avanzado']] },
   { campo: 'estilo', titulo: 'Cómo explicar', opciones: [['directo', 'Directo'], ['analogias', 'Con analogías'], ['codigo', 'Con código']] },
 ]
 
-const EXTRAS: { campo: 'diagramas' | 'tests' | 'opciones'; texto: string }[] = [
+export const EXTRAS: { campo: 'diagramas' | 'tests' | 'opciones'; texto: string }[] = [
   { campo: 'diagramas', texto: 'Diagramas' },
   { campo: 'tests', texto: 'Test al cerrar un tema' },
   { campo: 'opciones', texto: 'Sugerencias para seguir' },
@@ -34,12 +32,8 @@ export const avisosActivos = () => {
 export default function Afinar() {
   const [abierto, setAbierto] = useState(false)
   const p = usarPreferencias()
-  const forma = usarForma()
-  const [nueva, setNueva] = useState('')
   const [guardado, setGuardado] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
-  const [avisos, setAvisos] = useState(() => 'Notification' in window && Notification.permission === 'granted' && avisosActivos())
-  const [tema, setTema] = useState<Tema>(temaGuardado)
   // Si la mascota está fuera como asesor, en la barra queda su hueco.
   const [fuera, setFuera] = useState(asesorActivo)
   const ultimo = useRef({ x: 0, y: 0 })
@@ -138,17 +132,6 @@ export default function Afinar() {
                 ))}
               </div>
               <div className="afinar-grupo">
-                <span>Mascota</span>
-                <div className="afinar-mascotas" role="radiogroup" aria-label="Mascota">
-                  {FORMAS.map((f) => (
-                    <button key={f.id} type="button" role="radio" aria-checked={forma === f.id} onClick={() => elegirForma(f.id)}>
-                      <Mascota forma={f.id} mini />
-                      {f.nombre}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="afinar-grupo">
                 <span>Modo</span>
                 <select value={p.modo ?? ''} onChange={(e) => cambiar({ modo: e.target.value || null })} aria-label="Modo de aprendizaje">
                   <option value="">Normal</option>
@@ -159,83 +142,20 @@ export default function Afinar() {
                   ))}
                 </select>
               </div>
-              <div className="afinar-grupo">
-                <span>Recuerda de ti</span>
-                {p.instrucciones.length ? (
-                  <ul className="afinar-recuerda">
-                    {p.instrucciones.map((x, i) => (
-                      <li key={i}>
-                        <span>{x}</span>
-                        <button className="borrar" aria-label="Olvidar esto" onClick={() => cambiar({ instrucciones: p.instrucciones.filter((_, k) => k !== i) })}>
-                          ×
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="nota">Nada aún.</p>
-                )}
-                <form
-                  className="afinar-anadir"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    if (!nueva.trim()) return
-                    cambiar({ instrucciones: [...p.instrucciones, nueva.trim()] })
-                    setNueva('')
-                  }}
-                >
-                  <input value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Ej.: código en Python" aria-label="Nueva instrucción" />
-                  <button className="boton-mini" disabled={!nueva.trim()}>
-                    Añadir
-                  </button>
-                </form>
-              </div>
-              <Aprendido />
-              <label className="afinar-avisos">
-                <input
-                  type="checkbox"
-                  checked={avisos}
-                  onChange={async (e) => {
-                    if (!('Notification' in window)) return
-                    if (e.target.checked && Notification.permission !== 'granted') await Notification.requestPermission()
-                    const si = e.target.checked && Notification.permission === 'granted'
-                    try {
-                      localStorage.setItem('magister-avisos', si ? 'si' : 'no')
-                    } catch {
-                      /* sin almacenamiento */
-                    }
-                    setAvisos(si)
-                  }}
-                />
-                Avisos (sesión y pomodoro)
-              </label>
-              <div className="afinar-tema" role="radiogroup" aria-label="Aspecto">
-                <span className="nota">Aspecto</span>
-                {TEMAS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={tema === t.id}
-                    className={`opcion opcion-chip ${tema === t.id ? 'elegida' : ''}`}
-                    title={t.descripcion}
-                    onClick={() => {
-                      elegirTema(t.id)
-                      setTema(t.id)
-                    }}
-                  >
-                    {t.nombre}
-                  </button>
-                ))}
-              </div>
-              <div className="afinar-pie">
-                <Colores clase="boton-mini" />
-                <button type="button" className="boton-mini" onClick={() => (window.location.hash = '#/animaciones')}>
-                  Animaciones
-                </button>
-              </div>
             </>
           )}
+          <div className="afinar-pie">
+            <button
+              type="button"
+              className="boton-mini"
+              onClick={() => {
+                setAbierto(false)
+                window.location.hash = '#/ajustes'
+              }}
+            >
+              Todos los ajustes →
+            </button>
+          </div>
         </div>
       )}
     </div>

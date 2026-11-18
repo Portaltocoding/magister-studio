@@ -28,6 +28,7 @@ export type IdModo =
   | 'pronunciacion'
   | 'automatizar'
   | 'llamada'
+  | 'ajustes'
 
 export interface Modo {
   id: IdModo
@@ -106,6 +107,11 @@ export const GRUPOS: Grupo[] = [
       { id: 'buscar', nombre: 'Buscar fuentes', encendido: true, ayuda: 'Rastrea la web en busca de buenas fuentes para un tema o una lección' },
       { id: 'web', nombre: 'Guardar de la web', encendido: true, ayuda: 'Pega enlaces (páginas o PDF) y se guardan con su texto' },
     ],
+  },
+  {
+    nombre: 'Ajustes',
+    ayuda: 'Cómo te explica el tutor, lo que recuerda de ti, el aspecto, la voz y los avisos',
+    modos: [{ id: 'ajustes', nombre: 'Ajustes', encendido: true, ayuda: 'Todos los ajustes de Magister' }],
   },
 ]
 

@@ -31,8 +31,11 @@ html[data-tema="riso"] {
   --examen: var(--rojo);
   --clase: var(--verde);
   --notac: #b07a00;
-  --sombra: 0 4px 0 var(--borde);
-  --sombra-suave: 0 4px 0 var(--borde);
+  --sombra: var(--sombra-caja);
+  --sombra-suave: var(--sombra-caja);
+  /* Las cajas flotan con una sombra suave y pareja (sin borde gordo abajo); la elegida lleva un halo de su color. */
+  --sombra-caja: 0 1px 2px rgb(58 51 48 / 0.05), 0 8px 22px rgb(58 51 48 / 0.06);
+  --sombra-alta: 0 2px 4px rgb(58 51 48 / 0.06), 0 14px 30px rgb(58 51 48 / 0.1);
   --radio-grande: 22px;
   --titular: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
   /* Fuera del marco (asesor, ventanas flotantes) también hay color: el verde por defecto. */
@@ -111,7 +114,7 @@ html[data-tema="riso"] .grupo-entrada .modo:hover { color: var(--linea); }
 html[data-tema="riso"] .grupo-entrada .modo[aria-current="page"] {
   background: none; color: var(--linea); font-weight: 800; border: 0; box-shadow: inset 4px 0 0 var(--tinta-grupo); border-radius: 0 999px 999px 0;
 }
-html[data-tema="riso"] .grupo-inicio .modo { background: var(--tarjeta); color: var(--linea); border: 2px solid var(--borde); border-radius: 999px; box-shadow: 0 3px 0 var(--borde); font-weight: 800; }
+html[data-tema="riso"] .grupo-inicio .modo { background: var(--tarjeta); color: var(--linea); border: 2px solid var(--borde); border-radius: 999px; box-shadow: none; font-weight: 800; }
 html[data-tema="riso"] .grupo-inicio .modo:hover { border-color: var(--borde-fuerte); }
 html[data-tema="riso"] .enlace-taller, html[data-tema="riso"] .lateral h2 { color: var(--suave); }
 
@@ -131,7 +134,7 @@ html[data-tema="riso"] :is(.boton, .boton-mini):not(.boton-principal):hover:not(
 html[data-tema="riso"] :is(.boton, .boton-mini):not(.boton-principal):active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--borde); }
 
 /* ---- Pestañas, chips y campos ---- */
-html[data-tema="riso"] .pestanas-modo { background: var(--tarjeta); border: 2px solid var(--borde); box-shadow: 0 3px 0 var(--borde); }
+html[data-tema="riso"] .pestanas-modo { background: var(--tarjeta); border: 2px solid var(--borde); box-shadow: var(--sombra-caja); }
 html[data-tema="riso"] .pestanas-modo button { color: var(--suave); font-weight: 750; border-radius: 999px; }
 html[data-tema="riso"] .pestanas-modo button:hover { color: var(--linea); }
 html[data-tema="riso"] .pestanas-modo button.actual { background: var(--tinta); color: var(--tinta-texto); border: 0; box-shadow: 0 3px 0 var(--relieve); }
@@ -147,16 +150,16 @@ html[data-tema="riso"] .central a { color: var(--tinta-letra); text-decoration-c
 html[data-tema="riso"] :is(.proyecto-tarjeta, .proyecto-nivel:not(.esbozado), .proyecto-retomar, .guia-paso, .guia-bocadillo, .lecciones > li,
   .tu-dia, .repaso-tema, .tarjeta, .nuevo-video, .llamada-pizarra, .proyecto-nuevo, .proyecto-explicacion details,
   .proyecto-paso, .proyecto-decisiones li, .vacio, .llamada-notas dl > div, .pg-cifra, .pg-leccion, .tutor-hoy) {
-  background: var(--tarjeta); border: 2px solid var(--borde); border-radius: 22px; box-shadow: 0 4px 0 var(--borde);
+  background: var(--tarjeta); border: 2px solid var(--borde); border-radius: 22px; box-shadow: var(--sombra-caja);
 }
-html[data-tema="riso"] :is(.asesor-chat, .afinar-caja) { background: var(--tarjeta); border: 2px solid var(--borde); border-radius: 22px; box-shadow: 0 6px 0 var(--borde), 0 16px 34px rgb(58 51 48 / 0.12); }
+html[data-tema="riso"] :is(.asesor-chat, .afinar-caja) { background: var(--tarjeta); border: 2px solid var(--borde); border-radius: 22px; box-shadow: 0 18px 40px rgb(58 51 48 / 0.16); }
 html[data-tema="riso"] :is(.proyecto-tarjeta, .lecciones > li, .tarjeta, .proyecto-paso) { transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
-html[data-tema="riso"] :is(.proyecto-tarjeta, .tarjeta):hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--borde); }
+html[data-tema="riso"] :is(.proyecto-tarjeta, .tarjeta):hover { transform: translateY(-2px); box-shadow: var(--sombra-alta); }
 /* La ficha elegida o la que toca ahora. */
 html[data-tema="riso"] :is(.guia-paso.ahora, .guia-paso.abierto, .tarjeta[aria-pressed="true"], .lecciones > li:has([aria-current], [aria-pressed="true"], .elegida, .actual), .pg-leccion.abierta) {
-  border-color: var(--tinta); box-shadow: 0 4px 0 var(--tinta);
+  border-color: var(--tinta); box-shadow: 0 0 0 4px var(--pastel), var(--sombra-caja);
 }
-html[data-tema="riso"] .guia-paso.hecho { background: var(--verde-pastel); border-color: color-mix(in srgb, var(--verde) 30%, #fff); box-shadow: 0 4px 0 color-mix(in srgb, var(--verde) 30%, #fff); }
+html[data-tema="riso"] .guia-paso.hecho { background: var(--verde-pastel); border-color: color-mix(in srgb, var(--verde) 30%, #fff); box-shadow: none; }
 html[data-tema="riso"] .proyecto-nivel.esbozado { border: 2px dashed var(--borde-fuerte); border-radius: 22px; background: transparent; }
 
 /* Números de las listas: fichas redondas en pastel, rotando los cuatro colores como las casillas. */
@@ -170,7 +173,7 @@ html[data-tema="riso"] :is(.guia-num, .proyecto-nivel-num, .bloques-clave) {
 html[data-tema="riso"] .proyecto-nivel-num { padding: 2px 10px; border-radius: 999px; }
 html[data-tema="riso"] .guia-paso.ahora .guia-num { background: var(--tinta); color: var(--tinta-texto); box-shadow: inset 0 -3px 0 var(--relieve); }
 html[data-tema="riso"] .guia-paso.hecho .guia-num { background: var(--verde); color: #fff; }
-html[data-tema="riso"] .bloques-tema ol > li > button.activa { border: 2px solid var(--tinta); box-shadow: 0 4px 0 var(--tinta); background: var(--tarjeta); border-radius: 18px; }
+html[data-tema="riso"] .bloques-tema ol > li > button.activa { border: 2px solid var(--tinta); box-shadow: 0 0 0 4px var(--pastel); background: var(--tarjeta); border-radius: 18px; }
 html[data-tema="riso"] .proyecto-paso.hecho { background: var(--verde-pastel); }
 html[data-tema="riso"] .proyecto-glosario > div, html[data-tema="riso"] .retomar-frescos dl > div { border-left: 4px solid var(--tinta); border-radius: 0; padding-left: 10px; }
 
@@ -179,16 +182,16 @@ html[data-tema="riso"] :is(.retomar-etq, .proyecto-etiqueta, .asesor-etq, .vacio
   background: none; color: var(--tinta-letra); padding: 0; border-radius: 0; display: inline-block; letter-spacing: 0.07em; font-weight: 800;
 }
 html[data-tema="riso"] .proyecto-mvp { background: var(--amarillo-pastel); color: var(--linea); border: 2px solid color-mix(in srgb, var(--amarillo) 55%, #fff); border-radius: 18px; }
-html[data-tema="riso"] .proyecto-priming { background: var(--tarjeta); border: 2px solid var(--borde); box-shadow: 0 4px 0 var(--borde); border-radius: 22px; }
+html[data-tema="riso"] .proyecto-priming { background: var(--tarjeta); border: 2px solid var(--borde); box-shadow: var(--sombra-caja); border-radius: 22px; }
 html[data-tema="riso"] :is(.proyecto-barra, .cuota-barra) { background: var(--borde); border: 0; height: 10px; border-radius: 999px; }
 html[data-tema="riso"] :is(.proyecto-barra span, .cuota-usado) { background: var(--tinta); border-radius: 999px; }
 
 /* ---- Bloques que eran oscuros: ahora pastel del color de la sección ---- */
 html[data-tema="riso"] :is(.bloque-cabecera, .pg-hero, .lb-capitulo) {
-  background: var(--pastel); color: var(--texto); border: 2px solid color-mix(in srgb, var(--tinta) 25%, #fff); border-radius: 26px; box-shadow: 0 5px 0 color-mix(in srgb, var(--tinta) 25%, #fff);
+  background: var(--pastel); color: var(--texto); border: 2px solid color-mix(in srgb, var(--tinta) 25%, #fff); border-radius: 26px; box-shadow: none;
 }
 html[data-tema="riso"] :is(.bloque-cabecera, .pg-hero, .lb-capitulo) :is(h1, h2, strong) { color: var(--linea); }
-html[data-tema="riso"] .bloque-num { color: var(--tinta); opacity: 1; text-shadow: 0 4px 0 color-mix(in srgb, var(--tinta) 30%, #fff); }
+html[data-tema="riso"] .bloque-num { color: var(--tinta); opacity: 1; text-shadow: none; }
 html[data-tema="riso"] :is(.bloque-cabecera, .pg-hero) :is(.lb-etq, .pg-etq, .nota, .pg-hero-cifra span) { color: var(--tinta-letra); }
 html[data-tema="riso"] :is(.bloque-objetivos, .lb-capitulo blockquote) { background: var(--tarjeta); color: var(--texto); border: 0; border-left: 4px solid var(--tinta); border-radius: 0 14px 14px 0; }
 html[data-tema="riso"] .bloque-cabecera .peligro { color: #c8463c; }
@@ -196,10 +199,10 @@ html[data-tema="riso"] :is(.estilo-pdf) { color: var(--suave); }
 html[data-tema="riso"] .estilo-pdf select { background: var(--tarjeta); color: var(--texto); border: 2px solid var(--borde); border-radius: 12px; }
 html[data-tema="riso"] :is(.lb-caja, .lector-texto pre) { background: #fbf6ec; color: var(--texto); border: 2px solid var(--borde); border-radius: 14px; }
 /* Los recuadros de los apuntes (definiciones, frases clave, cajas): borde crema y redondos, no raya negra. */
-html[data-tema="riso"] :is(.lb-marco, .lb-box) { border: 2px solid var(--borde); border-radius: 18px; box-shadow: 0 3px 0 var(--borde); }
+html[data-tema="riso"] :is(.lb-marco, .lb-box) { border: 2px solid var(--borde); border-radius: 18px; box-shadow: none; }
 html[data-tema="riso"] .lb-frase { border: 2px solid color-mix(in srgb, var(--azul) 35%, #fff); background: var(--azul-pastel); border-radius: 18px; }
 html[data-tema="riso"] :is(.ficha .chip, .fichas-lista .chip, .vacio-num) { background: var(--pastel); color: var(--tinta-letra); }
-html[data-tema="riso"] .ficha { border-radius: 24px; box-shadow: 0 5px 0 var(--borde); border: 2px solid var(--borde); border-top: 8px solid var(--tinta); }
+html[data-tema="riso"] .ficha { border-radius: 24px; box-shadow: var(--sombra-caja); border: 2px solid var(--borde); border-top: 8px solid var(--tinta); }
 html[data-tema="riso"] .fichas-lista li { border-radius: 18px; border: 2px solid var(--borde); border-left: 6px solid var(--tinta); }
 html[data-tema="riso"] .pg-hero-cifra strong { color: var(--tinta-letra); }
 html[data-tema="riso"] .pg-tramo { background: var(--tarjeta); border: 2px solid var(--borde); }
@@ -225,7 +228,7 @@ html[data-tema="riso"] .foco-aviso .boton:not(.boton-principal) { color: var(--l
 html[data-tema="riso"] .foco .boton:not(.boton-principal), html[data-tema="riso"] .foco .boton-mini { color: var(--linea); border-color: var(--borde); background: var(--tarjeta); }
 html[data-tema="riso"] :is(.foco-idea h1, .foco-pregunta, .foco-cierre h1) { color: var(--linea); }
 html[data-tema="riso"] .foco-etq { color: var(--tinta-letra); }
-html[data-tema="riso"] :is(.foco-comprobar, .foco-cifras div) { background: var(--tarjeta); border: 2px solid var(--borde); border-radius: 22px; box-shadow: 0 4px 0 var(--borde); }
+html[data-tema="riso"] :is(.foco-comprobar, .foco-cifras div) { background: var(--tarjeta); border: 2px solid var(--borde); border-radius: 22px; box-shadow: var(--sombra-caja); }
 html[data-tema="riso"] .foco-comprobar textarea { background: var(--fondo); color: var(--texto); border: 2px solid var(--borde); border-radius: 16px; }
 html[data-tema="riso"] .foco-confianza .opcion { color: var(--linea); border-color: var(--borde); }
 html[data-tema="riso"] .foco .correccion { background: var(--fondo); color: var(--texto); border: 2px solid var(--borde); }
@@ -234,10 +237,18 @@ html[data-tema="riso"] .foco-hecho.nota-fallo { color: #c8463c; }
 html[data-tema="riso"] .foco-hecho.nota-parcial { color: #b0700a; }
 html[data-tema="riso"] :is(.foco-descanso strong, .foco-cifras strong) { color: var(--tinta-letra); }
 html[data-tema="riso"] .foco-glosario { background: var(--tarjeta); border-left: 2px solid var(--borde); box-shadow: -8px 0 24px rgb(58 51 48 / 0.1); }
-html[data-tema="riso"] :is(.foco-ritmo-caja, .foco-ritmo-ajustes) { background: var(--tarjeta); color: var(--texto); border: 2px solid var(--borde); box-shadow: 0 4px 0 var(--borde); }
+html[data-tema="riso"] :is(.foco-ritmo-caja, .foco-ritmo-ajustes) { background: var(--tarjeta); color: var(--texto); border: 2px solid var(--borde); box-shadow: var(--sombra-caja); }
 html[data-tema="riso"] :is(.foco-ritmo-caja, .foco-ritmo-ajustes) select { background: var(--fondo); color: var(--texto); border: 2px solid var(--borde); }
 
 /* ---- La mascota de la barra y el asesor ---- */
-html[data-tema="riso"] .afinar-boton { background: var(--tarjeta); border: 2px solid var(--borde); box-shadow: 0 3px 0 var(--borde); }
+html[data-tema="riso"] .afinar-boton { background: var(--tarjeta); border: 2px solid var(--borde); box-shadow: none; }
 html[data-tema="riso"] .asesor-tu { background: var(--tinta); color: var(--tinta-texto); border: 0; border-radius: 18px 18px 6px 18px; }
 html[data-tema="riso"] .asesor-acciones button { background: var(--pastel); border: 2px solid var(--tinta); border-radius: 999px; }
+
+/* ---- Ajustes ---- */
+html[data-tema="riso"] .ajustes-seccion { border: 2px solid var(--borde); border-radius: 22px; box-shadow: var(--sombra-caja); }
+html[data-tema="riso"] .ajustes-tema { border-radius: 18px; }
+html[data-tema="riso"] .ajustes-tema.elegida { border-color: var(--tinta); box-shadow: 0 0 0 4px var(--pastel); }
+html[data-tema="riso"] .afinar-segmentos { border: 2px solid var(--borde); border-radius: 999px; }
+html[data-tema="riso"] .afinar-segmentos button[aria-checked="true"] { background: var(--tinta); color: var(--tinta-texto); border-radius: 999px; }
+html[data-tema="riso"] .afinar-segmentos button + button { border-left: 0; }

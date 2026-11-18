@@ -4,7 +4,7 @@
 export type Tema = 'clasico' | 'riso'
 export const TEMAS: { id: Tema; nombre: string; descripcion: string }[] = [
   { id: 'clasico', nombre: 'Clásico', descripcion: 'Sobrio, claro u oscuro según tu equipo' },
-  { id: 'riso', nombre: 'Parchís', descripcion: 'Blanco, líneas negras y rojo, azul, amarillo y verde' },
+  { id: 'riso', nombre: 'Parchís', descripcion: 'Alegre: blanco, rojo, azul, amarillo y verde, todo redondo' },
 ]
 const CLAVE = 'magister-tema'
 export const EVENTO_TEMA = 'magister-tema'
