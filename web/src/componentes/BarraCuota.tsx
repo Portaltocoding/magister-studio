@@ -6,7 +6,8 @@ import { pedir } from '../api.ts'
 
 interface Ventana {
   uso: number
-  reinicia: number
+  // null: la ventana ya se renovó y aún no se sabe cuándo vuelve a hacerlo (llega con la próxima respuesta).
+  reinicia: number | null
 }
 interface Estado {
   sesion: Ventana | null
@@ -28,7 +29,8 @@ export type Accion =
 
 const pct = (x: number) => Math.round(x * 100)
 
-function cuando(epoch: number, semana: boolean): string {
+function cuando(epoch: number | null, semana: boolean): string {
+  if (epoch == null) return ''
   const d = new Date(epoch * 1000)
   const hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
   const hoy = new Date().toDateString() === d.toDateString()
@@ -40,7 +42,8 @@ function Fila({ nombre, v, extra, semana, compacta }: { nombre: string; v: Venta
   const usado = Math.min(1, v.uso)
   const mas = extra ? Math.min(1 - usado, extra) : 0
   const pasa = extra != null && v.uso + extra > 1
-  const texto = `${nombre}: ${pct(v.uso)} % usado · se renueva ${cuando(v.reinicia, semana)}`
+  const renovacion = v.reinicia == null ? 'recién renovada' : `se renueva ${cuando(v.reinicia, semana)}`
+  const texto = `${nombre}: ${pct(v.uso)} % usado · ${renovacion}`
   return (
     <div className={`cuota-fila ${pasa ? 'cuota-pasa' : ''}`} title={texto}>
       {!compacta && <span className="cuota-nombre">{nombre}</span>}
@@ -51,7 +54,7 @@ function Fila({ nombre, v, extra, semana, compacta }: { nombre: string; v: Venta
       {!compacta && (
         <span className="cuota-dato">
           {pct(v.uso)} %{extra != null && <strong> +{extra < 0.005 ? '<1' : pct(extra)} %</strong>}
-          <small> · se renueva {cuando(v.reinicia, semana)}</small>
+          <small> · {renovacion}</small>
         </span>
       )}
     </div>
@@ -104,7 +107,9 @@ export default function BarraCuota({ accion, compacta = false }: { accion?: Acci
         <p className="nota cuota-nota">
           {pasa
             ? 'No cabe en lo que queda de tu sesión: se cortaría a medias. Mejor cuando se renueve.'
-            : 'Lo rayado es lo que gastaría esta generación si la aceptas.'}
+            : estimacion.sesion.extra == null && estimacion.semana.extra == null
+              ? 'Aún no sé cuánto gasta esto: lo sabré cuando lo hayas hecho una vez.'
+              : 'Lo rayado es lo que gastaría esta generación si la aceptas.'}
           {estimacion.sesion.calibrada ? '' : ' Estimación aproximada: se afina con tu uso.'}
         </p>
       )}

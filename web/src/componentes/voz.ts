@@ -2,7 +2,7 @@
 // - Locutor: habla frase a frase mientras la respuesta llega (no espera al final) y se puede cortar al instante.
 // - Oido: escucha continuo, con resultados provisionales, y se reinicia solo si el navegador lo corta.
 // - esEco: distingue tu voz de la del propio tutor que el micro recoge por los altavoces.
-import { aplicarGlosario } from './pronunciacion.ts'
+import { paraLaVoz } from './pronunciacion.ts'
 
 export interface Reconocimiento {
   lang: string
@@ -65,23 +65,13 @@ const PRONUNCIACION: [RegExp, string][] = [
 ]
 // Los términos sueltos (siglas, SQL, HTTP, unidades...) van en el glosario de pronunciación: componentes/pronunciacion.ts.
 
-const NOMBRE_LETRA: Record<string, string> = {
-  A: 'á', B: 'be', C: 'ce', D: 'de', E: 'é', F: 'efe', G: 'ge', H: 'hache', I: 'í', J: 'jota', K: 'ka', L: 'ele', M: 'eme',
-  N: 'ene', O: 'ó', P: 'pe', Q: 'cu', R: 'erre', S: 'ese', T: 'te', U: 'ú', V: 'uve', W: 'uve doble', X: 'equis',
-  Y: 'i griega', Z: 'zeta',
-}
-
 export function pronunciar(frase: string): string {
   let t = frase
   for (const [patron, por] of PRONUNCIACION) {
     t = por === ' $&' ? t.replace(patron, (m) => ' ' + m.replace(/[/?=&{}%]+/g, ' ').trim()) : t.replace(patron, por)
   }
-  // El glosario, y después los nombres con guion bajo (idx_pedidos_cliente) palabra a palabra, sin «guion bajo».
-  t = aplicarGlosario(t).replace(/([\p{L}\d])_(?=[\p{L}\d])/gu, '$1 ')
-  // Una letra mayúscula suelta que nombra algo («el punto A», «de A a C», «la X») se dice por su nombre; si no, «el
-  // punto A» suena «el puntoa». Solo tras una palabra en minúscula: la «A» que abre una frase es la preposición.
-  t = t.replace(/(?<=\p{Ll}[ \t]+)([A-Z])(?![\p{L}\d])/gu, (_, l: string) => NOMBRE_LETRA[l] ?? l)
-  return t.replace(/\s+/g, ' ').trim()
+  // El glosario, los nombres con guion bajo y las letras sueltas (pronunciacion.ts, con sus pruebas en web/pruebas).
+  return paraLaVoz(t).replace(/\s+/g, ' ').trim()
 }
 
 // Velocidad y voz, compartidas por la llamada, Hablar y el vídeo, y recordadas en el navegador.

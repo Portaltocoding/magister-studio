@@ -195,10 +195,13 @@ export function buscarFaq(texto: string): Faq | null {
   if (!q.size) return null
   let mejor: { faq: Faq; nota: number } | null = null
   for (const faq of FAQS) {
-    const suyas = new Set([...faq.claves.map(raiz), ...palabras(faq.pregunta)])
+    // Las claves pasan por la misma normalización que la pregunta (tildes, mayúsculas, raíz).
+    const suyas = new Set([...palabras(faq.claves.join(' ')), ...palabras(faq.pregunta)])
     const comunes = [...q].filter((p) => suyas.has(p)).length
     const nota = comunes / q.size
-    if (comunes >= Math.min(2, q.size) && nota >= 0.6 && (!mejor || nota > mejor.nota)) mejor = { faq, nota }
+    // Una sola palabra solo vale si es una de sus dos claves principales («barra», «video»), no una genérica («nuevo»).
+    const basta = q.size === 1 ? palabras(faq.claves.slice(0, 2).join(' ')).includes([...q][0]) : comunes >= 2
+    if (basta && nota >= 0.6 && (!mejor || nota > mejor.nota)) mejor = { faq, nota }
   }
   return mejor?.faq ?? null
 }

@@ -146,6 +146,7 @@ export default function Asesor() {
     })
   }, [])
   const [piensa, setPiensa] = useState(false)
+  const [abrioAhora, setAbrioAhora] = useState(false)
   const aviso = usarAvisoAtasco(sitio.activo && !abierto)
   const [textoInicial, setTextoInicial] = useState('')
   const sitioRef = useRef(sitio)
@@ -242,6 +243,7 @@ export default function Asesor() {
     if (!p) return
     window.clearTimeout(p.t)
     pulsar.current = null
+    setAbrioAhora(true)
     setAbierto((a) => !a)
   }
   const devolver = () => {
@@ -265,7 +267,13 @@ export default function Asesor() {
         onPointerMove={alMover}
         onPointerUp={alSubir}
         onDoubleClick={devolver}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setAbierto((a) => !a)}
+        aria-expanded={abierto}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault() // Espacio no desplaza la página
+          setAbrioAhora(true)
+          setAbierto((a) => !a)
+        }}
         onContextMenu={(e) => e.preventDefault()}
       >
         <Mascota gesto={piensa ? 'pensando' : abierto ? 'escuchando' : aviso.texto ? 'escuchando' : 'normal'} />
@@ -279,6 +287,7 @@ export default function Asesor() {
               onClick={() => {
                 setTextoInicial(aviso.paso ? `Me he atascado en «${aviso.paso}»: ` : 'Me he atascado: ')
                 aviso.cerrar()
+                setAbrioAhora(true)
                 setAbierto(true)
               }}
             >
@@ -298,6 +307,7 @@ export default function Asesor() {
           alDevolver={devolver}
           alPensar={setPiensa}
           textoInicial={textoInicial}
+          enfocar={abrioAhora}
         />
       )}
     </div>
@@ -396,13 +406,15 @@ function RespuestaAsesor({ texto }: { texto: string }) {
   )
 }
 
-function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInicial = '' }: {
+function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInicial = '', enfocar = false }: {
   lado: 'izquierda' | 'derecha'
   vertical: 'arriba' | 'abajo'
   alCerrar: () => void
   alDevolver: () => void
   alPensar: (s: boolean) => void
   textoInicial?: string
+  // Solo coge el foco si lo acabas de abrir tú (no cuando se restaura al cargar la página).
+  enfocar?: boolean
 }) {
   const [aqui, setAqui] = useState(seccionActual)
   const [hilos, setHilos] = useState<Record<string, Hilo>>(() => leer<Record<string, Hilo>>(CLAVE_HILOS, {}))
@@ -427,16 +439,20 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
     return () => window.removeEventListener('hashchange', al)
   }, [])
 
-  // La conversación de la sección que miras.
+  // La conversación de la sección que miras. Depende solo de qué conversación es (no de toda la lista de hilos, que cambia
+  // con cada pregunta): si no, cada pregunta vaciaba el chat y la respuesta que llegaba pisaba lo recargado. Y la que
+  // acaba de nacer con la pregunta en marcha no se recarga encima de ella.
+  const cid = hilos[viendo]?.cid
+  const recien = useRef<number | null>(null)
   useEffect(() => {
-    const h = hilos[viendo]
-    setMensajes([])
     setError(null)
-    if (!h) return
-    listarMensajes(h.cid)
+    if (cid != null && cid === recien.current) return
+    setMensajes([])
+    if (cid == null) return
+    listarMensajes(cid)
       .then((ms) => setMensajes(ms.filter((m) => m.contenido).map((m) => ({ rol: m.rol, texto: m.contenido }))))
       .catch(() => undefined)
-  }, [viendo, hilos])
+  }, [viendo, cid])
 
   useEffect(() => {
     fondo.current?.scrollTo({ top: fondo.current.scrollHeight, behavior: 'smooth' })
@@ -467,6 +483,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
       let h = hilos[s.clave]
       if (!h) {
         const c = await crearConversacion(`Asesor · ${s.nombre}`.slice(0, 200), null, 'asesor')
+        recien.current = c.id
         h = { cid: c.id, nombre: s.nombre, usado: Date.now() }
       }
       const nuevos = { ...hilos, [s.clave]: { ...h, nombre: s.nombre, usado: Date.now() } }
@@ -514,7 +531,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
           <span className="asesor-etq">Tu asesor</span>
           <strong>{pestanas.find((p) => p.clave === viendo)?.nombre ?? aqui.nombre}</strong>
         </div>
-        <button type="button" className="asesor-x" onClick={alDevolver} title="Devolver la mascota a la barra">
+        <button type="button" className="asesor-x" onClick={alDevolver} title="Devolver la mascota a la barra" aria-label="Devolver la mascota a la barra">
           ⤴
         </button>
         <button type="button" className="asesor-x" onClick={alCerrar} title="Cerrar" aria-label="Cerrar">
@@ -530,7 +547,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
           ))}
         </nav>
       )}
-      <div className="asesor-hilo" ref={fondo}>
+      <div className="asesor-hilo" ref={fondo} role="log" aria-live="polite">
         {!mensajes.length && !enOtra && (
           <div className="asesor-vacio">
             <p>Estoy aquí para lo que tienes delante. ¿En qué te ayudo?</p>
@@ -589,7 +606,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
             void preguntar(texto)
           }}
         >
-          <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Pregúntame sobre esta pantalla" aria-label="Tu pregunta" autoFocus />
+          <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Pregúntame sobre esta pantalla" aria-label="Tu pregunta" autoFocus={enfocar} />
           <button className="boton-mini" disabled={!texto.trim() || pensando}>
             {pensando ? '…' : 'Enviar'}
           </button>

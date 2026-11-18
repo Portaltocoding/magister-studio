@@ -2,15 +2,9 @@
 // y la voz de Magister diciendo cada tramo cuando empieza. Con el vídeo parado, la escena se puede tocar.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Player, type PlayerRef } from '@remotion/player'
-import { Locutor } from '../componentes/voz.ts'
+import { leerAjustesVoz, Locutor } from '../componentes/voz.ts'
 import { Composicion, type PropsComposicion } from './Composicion.tsx'
-import { ALTO, ANCHO, FPS, duracionTotal, frases, inicios, type GuionGrafico } from './tipos.ts'
-
-// Una frase en tramos para respirar: corta tras «,», «;» o «:» seguidos de espacio (la coma decimal de «121,353» no
-// lleva espacio y no corta). Cada tramo se dice aparte, con su pausa: «mil, dos mil» suena como dos coordenadas.
-function respiros(frase: string): string[] {
-  return frase.split(/(?<=[,;:])\s+/).filter(Boolean)
-}
+import { ALTO, ANCHO, FPS, duracionTotal, frases, inicios, respiros, type GuionGrafico } from './tipos.ts'
 
 function tramoEn(desde: number[], frame: number): number {
   let i = 0
@@ -20,9 +14,13 @@ function tramoEn(desde: number[], frame: number): number {
 
 export default function ReproductorEscena({ guion, segundo = 0 }: { guion: GuionGrafico; segundo?: number }) {
   const player = useRef<PlayerRef>(null)
-  const locutor = useRef(new Locutor())
-  const desde = useMemo(() => inicios(guion), [guion])
-  const total = useMemo(() => duracionTotal(guion), [guion])
+  // Un solo locutor para todo el vídeo (no uno nuevo en cada pintado).
+  const [locutorUnico] = useState(() => new Locutor())
+  const locutor = useRef(locutorUnico)
+  // La velocidad de voz elegida fija el ritmo de los tramos: la narración y la animación van a la par.
+  const [ritmo] = useState(() => leerAjustesVoz().velocidad)
+  const desde = useMemo(() => inicios(guion, ritmo), [guion, ritmo])
+  const total = useMemo(() => duracionTotal(guion, ritmo), [guion, ritmo])
   const inicial = Math.min(total - 1, Math.max(0, Math.round(segundo * FPS)))
   const [actual, setActual] = useState(() => tramoEn(desde, inicial))
   const [voz, setVoz] = useState(true)
@@ -70,7 +68,7 @@ export default function ReproductorEscena({ guion, segundo = 0 }: { guion: Guion
     }
   }, [desde, guion])
 
-  const props: PropsComposicion = useMemo(() => ({ guion, subtitulos }), [guion, subtitulos])
+  const props: PropsComposicion = useMemo(() => ({ guion, subtitulos, ritmo }), [guion, subtitulos, ritmo])
 
   return (
     <div className="escena">

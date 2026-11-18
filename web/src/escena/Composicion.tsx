@@ -11,6 +11,8 @@ import { duracionTramo, frases, inicios, type GuionGrafico, type Tramo } from '.
 export interface PropsComposicion {
   guion: GuionGrafico
   subtitulos: boolean
+  // La velocidad de voz (1 = normal): alarga o acorta los tramos para que vayan con la narración.
+  ritmo?: number
   // Remotion pide que las props de una composición sean un objeto indexable.
   [clave: string]: unknown
 }
@@ -31,14 +33,14 @@ function FondoCartesiano() {
   )
 }
 
-export function Composicion({ guion, subtitulos }: PropsComposicion) {
-  const desde = inicios(guion)
+export function Composicion({ guion, subtitulos, ritmo = 1 }: PropsComposicion) {
+  const desde = inicios(guion, ritmo)
   return (
     <AbsoluteFill style={{ background: C.fondo }}>
       {guion.fondo === 'cartesiano' && <FondoCartesiano />}
       {guion.tramos.map((t, i) => (
-        <Sequence key={i} from={desde[i]} durationInFrames={duracionTramo(t)} name={`${t.concepto} · ${t.tesis}`}>
-          <VistaTramo tramo={t} subtitulos={subtitulos} />
+        <Sequence key={i} from={desde[i]} durationInFrames={duracionTramo(t, ritmo)} name={`${t.concepto} · ${t.tesis}`}>
+          <VistaTramo tramo={t} subtitulos={subtitulos} ritmo={ritmo} />
         </Sequence>
       ))}
     </AbsoluteFill>
@@ -58,9 +60,9 @@ function fraseEn(narracion: string, frame: number, dur: number): string {
   return lista[lista.length - 1] ?? ''
 }
 
-function VistaTramo({ tramo, subtitulos }: { tramo: Tramo; subtitulos: boolean }) {
+function VistaTramo({ tramo, subtitulos, ritmo }: { tramo: Tramo; subtitulos: boolean; ritmo: number }) {
   const frame = useCurrentFrame()
-  const dur = duracionTramo(tramo)
+  const dur = duracionTramo(tramo, ritmo)
   // Sin cortes duros: cada tramo nace y se va con un fundido corto.
   const opacidad = interpolate(frame, [0, 8, dur - 8, dur], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
   const e = tramo.escena

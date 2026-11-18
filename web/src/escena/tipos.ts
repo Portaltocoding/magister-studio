@@ -167,18 +167,19 @@ export const ANCHO = 1280
 export const ALTO = 720
 const PALABRAS_MINUTO = 150
 
-// Cada tramo dura lo que se tarda en decir su narración, con un respiro; nunca menos de 5 s.
-export function duracionTramo(t: Tramo): number {
+// Cada tramo dura lo que se tarda en decir su narración, con un respiro; nunca menos de 5 s. `ritmo` es la velocidad
+// de voz elegida (0,8× a 2×): a voz lenta, tramos más largos, para que la narración no se corte al pasar al siguiente.
+export function duracionTramo(t: Tramo, ritmo = 1): number {
   const palabras = t.narracion.split(/\s+/).filter(Boolean).length
-  return Math.round(Math.max(5, (palabras / PALABRAS_MINUTO) * 60 + 1.2) * FPS)
+  return Math.round(Math.max(5, (palabras / (PALABRAS_MINUTO * ritmo)) * 60 + 1.2) * FPS)
 }
 
-export function inicios(g: GuionGrafico): number[] {
+export function inicios(g: GuionGrafico, ritmo = 1): number[] {
   const salida: number[] = []
   let n = 0
   for (const t of g.tramos) {
     salida.push(n)
-    n += duracionTramo(t)
+    n += duracionTramo(t, ritmo)
   }
   return salida
 }
@@ -188,4 +189,10 @@ export function frases(narracion: string): string[] {
   return narracion.split(/(?<=[.!?…])\s+(?=[A-ZÁÉÍÓÚÑ¿¡0-9«])/).filter(Boolean)
 }
 
-export const duracionTotal = (g: GuionGrafico) => g.tramos.reduce((n, t) => n + duracionTramo(t), 0)
+// Una frase en tramos para respirar: corta tras «,», «;» o «:» seguidos de espacio (la coma decimal de «121,353» no
+// lleva espacio y no corta). Cada tramo se dice aparte, con su pausa: «mil, dos mil» suena como dos coordenadas.
+export function respiros(frase: string): string[] {
+  return frase.split(/(?<=[,;:])\s+/).filter(Boolean)
+}
+
+export const duracionTotal = (g: GuionGrafico, ritmo = 1) => g.tramos.reduce((n, t) => n + duracionTramo(t, ritmo), 0)

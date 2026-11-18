@@ -33,12 +33,11 @@
 }
 
 /* Al cambiar de pantalla, la nueva entra con un fundido y un pequeño desplazamiento. */
-/* Sin «both»: si el desplazamiento se quedara aplicado al terminar, la pantalla haría de caja contenedora de todo lo que
-   va con position: fixed dentro (el modo foco, el panel de citas) y lo encerraría en su altura, que es 0. Y las
-   pantallas que abren una capa a pantalla completa no se animan: el fundido la encerraría mientras dura. */
+/* Solo opacidad: un desplazamiento (translate, transform) convierte la pantalla en la caja contenedora de todo lo que va
+   con position: fixed dentro (el modo foco, el panel de citas, los avisos) y lo encierra en su altura, que puede ser 0.
+   La opacidad no. Y sin «both»: al terminar no queda nada aplicado. */
 .pantalla { animation: pantalla-entra 420ms cubic-bezier(0.22, 1, 0.36, 1); }
-.pantalla:has(> .foco) { animation: none; }
-@keyframes pantalla-entra { from { opacity: 0; translate: 0 10px; } }
+@keyframes pantalla-entra { from { opacity: 0; } }
 
 /* Marcar un paso de un proyecto: la casilla da un pequeño salto y la fila se asienta. */
 .proyecto-paso.recien { animation: paso-hecho 520ms cubic-bezier(0.34, 1.5, 0.64, 1); }

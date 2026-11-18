@@ -75,7 +75,7 @@ Nombres de funciones, variables, tablas y columnas en castellano sin tildes. Men
 ## Cómo se prueba
 
 - Servidor: `uv run pytest` en `servidor/`.
-- Frontend: `npm run build` en `web/`.
+- Frontend: `npm run build` en `web/`, y `npm test` en `web/` para la lógica pura (voz, preguntas frecuentes, vídeo), con el corredor de Node y sin dependencias.
 - Motor falso: `MAGISTER_MOTOR=eco`.
 
 `eco` es un motor de pruebas que devuelve texto sin llamar a `claude -p`; el motor real es `claude -p`.

@@ -26,9 +26,22 @@ export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
   const [comentario, setComentario] = useState('')
   const [motivos, setMotivos] = useState<string[]>([])
   const [hecho, setHecho] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const [fallo, setFallo] = useState(false)
 
+  // Un voto cada vez: mientras se envía, los botones esperan; si falla, se dice y se puede repetir.
   const votar = async (bien: boolean, otra = false) => {
-    await pedir(`/api/trazas/${traza}/feedback`, enviarJson({ bien, comentario: comentario.trim() || null, otra, motivos: bien ? [] : motivos }))
+    if (enviando) return
+    setEnviando(true)
+    setFallo(false)
+    try {
+      await pedir(`/api/trazas/${traza}/feedback`, enviarJson({ bien, comentario: comentario.trim() || null, otra, motivos: bien ? [] : motivos }))
+    } catch {
+      setFallo(true)
+      return
+    } finally {
+      setEnviando(false)
+    }
     setVoto(bien)
     setAbierto(false)
     setHecho(true)
@@ -40,7 +53,7 @@ export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
 
   return (
     <div className="valorar">
-      <button className={`voto voto-bien ${voto === true ? 'votado' : ''}`} aria-pressed={voto === true} onClick={() => votar(true)}>
+      <button className={`voto voto-bien ${voto === true ? 'votado' : ''}`} aria-pressed={voto === true} disabled={enviando || voto === true} onClick={() => votar(true)}>
         ✓ Me sirve
       </button>
       <button
@@ -50,7 +63,16 @@ export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
       >
         ✗ No me sirve
       </button>
-      {hecho && !abierto && <span className="nota">Anotado, gracias.</span>}
+      {hecho && !abierto && !fallo && (
+        <span className="nota" role="status">
+          Anotado, gracias.
+        </span>
+      )}
+      {fallo && (
+        <span className="nota" role="alert">
+          No se ha podido guardar. Prueba otra vez.
+        </span>
+      )}
       {abierto && (
         <div className="valorar-caja">
           <div className="valorar-motivos" role="group" aria-label="Qué ha fallado">

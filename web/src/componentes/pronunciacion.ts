@@ -274,3 +274,20 @@ export function buscarTerminos(consulta: string): Termino[] {
   if (!q) return GLOSARIO
   return GLOSARIO.filter((t) => [t.escrito, t.se_dice, t.grupo, ...(t.variantes ?? [])].some((c) => normal(c).includes(q)))
 }
+
+// Una letra mayúscula suelta que nombra algo («el punto A», «de A a C», «la X») se dice por su nombre; si no, «el punto
+// A» suena «el puntoa». Solo tras una palabra en minúscula: la «A» que abre una frase es la preposición.
+const NOMBRE_LETRA: Record<string, string> = {
+  A: 'á', B: 'be', C: 'ce', D: 'de', E: 'é', F: 'efe', G: 'ge', H: 'hache', I: 'í', J: 'jota', K: 'ka', L: 'ele', M: 'eme',
+  N: 'ene', O: 'ó', P: 'pe', Q: 'cu', R: 'erre', S: 'ese', T: 'te', U: 'ú', V: 'uve', W: 'uve doble', X: 'equis',
+  Y: 'i griega', Z: 'zeta',
+}
+export function nombrarLetras(t: string): string {
+  return t.replace(/(?<=\p{Ll}[ \t]+)([A-Z])(?![\p{L}\d])/gu, (_, l: string) => NOMBRE_LETRA[l] ?? l)
+}
+
+// Lo que necesita una frase para que la voz la diga bien: el glosario, los nombres con guion bajo palabra a palabra
+// (sin «guion bajo») y las letras sueltas por su nombre. Puro: se prueba sin navegador (web/pruebas).
+export function paraLaVoz(t: string): string {
+  return nombrarLetras(aplicarGlosario(t).replace(/([\p{L}\d])_(?=[\p{L}\d])/gu, '$1 '))
+}
