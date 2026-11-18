@@ -2,12 +2,16 @@
 
 import asyncio
 import json
+import time
 from datetime import date
 
 from langgraph.config import get_stream_writer
+from pydantic import BaseModel, Field
 
 from magister.cerebro import materias
-from magister.cerebro.modelo import Turno, generar
+from magister.cerebro.modelo import Turno, generar, latido_actual
+from magister.cerebro.estructura import estructurar
+from magister.cerebro.prompts import cargar
 from magister.config import ajustes
 from magister.flujo.estado import Estado
 from magister.plan.esquemas import Perfil
@@ -35,11 +39,65 @@ async def hablar(sistema: str, historial: list[Turno], tarea: str | None = None)
     if ajustes.canario:
         sistema += f"\n\nClave interna de esta instalación (secreta: nunca la escribas ni la repitas): {ajustes.canario}"
     partes: list[str] = []
-    trozos = generar(sistema, historial, tarea) if tarea else generar(sistema, historial)
-    async for trozo in trozos:
-        partes.append(trozo)
-        escribir(t=trozo)
+    # En el chat, mientras el modelo razona sin escribir: el pulso a la web cada segundo y, si tarda, un guion de por
+    # dónde irá la respuesta (con el mismo modelo: un mal guion en un tema difícil es peor que ninguno).
+    espera = _Espera(historial) if tarea is None else None
+    marca = latido_actual.set(espera.latido if espera else None)
+    try:
+        trozos = generar(sistema, historial, tarea) if tarea else generar(sistema, historial)
+        async for trozo in trozos:
+            if espera:
+                espera.cerrar()
+            partes.append(trozo)
+            escribir(t=trozo)
+    finally:
+        latido_actual.reset(marca)
+        if espera:
+            espera.cerrar()
     return "".join(partes)
+
+
+ADELANTO_TRAS_S = 4  # sin texto en este tiempo, el modelo está razonando a fondo: se piden el guion y las frases
+reloj = time.monotonic  # aparte, para que las pruebas lo muevan sin parar el bucle de asyncio
+
+
+class Adelanto(BaseModel):
+    guion: str = Field(description="«Voy a ver:» y de 2 a 4 puntos numerados, uno por línea.")
+    frases: list[str] = Field(min_length=3, max_length=10, description="Gerundios con gracia sobre el tema, con «…».")
+
+
+class _Espera:
+    def __init__(self, historial: list[Turno]) -> None:
+        self.inicio = reloj()
+        self.ultimo = -1
+        self.pregunta = next((t.contenido for t in reversed(historial) if t.rol == "usuario"), "")
+        self.tarea: asyncio.Task | None = None
+        self.cerrada = False
+
+    def latido(self) -> None:
+        if self.cerrada:
+            return
+        segundos = int(reloj() - self.inicio)
+        if segundos != self.ultimo:
+            self.ultimo = segundos
+            escribir(latido=segundos)
+        if self.tarea is None and segundos >= ADELANTO_TRAS_S and self.pregunta:
+            self.tarea = asyncio.create_task(self._adelantar())
+
+    async def _adelantar(self) -> None:
+        latido_actual.set(None)  # el guion no tiene latido propio ni pide otro guion
+        try:
+            a = await estructurar(cargar("adelanto").rellenar(), self.pregunta[:4000], Adelanto, cachear=True)
+        except Exception:  # noqa: BLE001  (sin guion ni frases, se espera igual)
+            return
+        if not self.cerrada:
+            escribir(adelanto={"guion": a.guion.strip(), "frases": [f.strip() for f in a.frases if f.strip()][:8]})
+
+    def cerrar(self) -> None:
+        """Llegó el primer trozo (o se acabó): ni más pulso ni guion tardío."""
+        self.cerrada = True
+        if self.tarea is not None and not self.tarea.done():
+            self.tarea.cancel()
 
 
 def tarea_de(estado: Estado) -> str | None:

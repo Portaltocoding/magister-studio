@@ -30,6 +30,7 @@ prompts:
   diagnostico: conversar
   negociar: conversar
   explicar_fallo: conversar
+  adelanto: conversar
   materia_elegir: extraer
   extraer_perfil: extraer
   reescribir: extraer

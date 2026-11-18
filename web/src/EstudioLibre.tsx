@@ -52,7 +52,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     },
     [conversacionId, noCuenta],
   )
-  const { burbujas, setBurbujas, escribiendo, fase, opciones, enviar: mandar, correr, parar } = usarConversacion(
+  const { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar: mandar, correr, parar } = usarConversacion(
     abrir,
     setPropuesta,
     alGuardado,
@@ -219,7 +219,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   return (
     <div className="vista-hilo">
       {error && <p role="alert">{error}</p>}
-      <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} fase={fase} guardable={tipo === 'libre'} {...conAdjuntos} />
+      <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} fase={fase} espera={espera} guardable={tipo === 'libre'} {...conAdjuntos} />
     </div>
   )
 }

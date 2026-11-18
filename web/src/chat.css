@@ -410,3 +410,20 @@ button.grupo-titulo:hover { color: var(--texto); }
 .avisos-caja li p { margin: 0; font-size: 0.9rem; line-height: 1.4; }
 .avisos-caja li small { grid-column: 1; color: var(--suave); font-size: 0.75rem; overflow-wrap: anywhere; }
 .avisos-caja li .boton-mini { grid-column: 2; grid-row: 1 / span 2; }
+
+/* La espera mientras el modelo razona (Hilo.tsx, Esperando) */
+.espera { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+.espera-pasos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.92rem; }
+.espera-pasos li.hecho { opacity: 0.6; }
+.espera-pasos li.hecho::before { content: '✓ '; color: var(--ok, #3faa66); }
+.espera-pasos li.actual { display: flex; align-items: center; gap: 8px; }
+.espera-pasos li.actual small { opacity: 0.6; }
+.espera-pulso { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: 0.35; flex: none; }
+.espera-pulso.late { animation: espera-latido 900ms ease-out; }
+@keyframes espera-latido { 0% { transform: scale(1.7); opacity: 1; } 100% { transform: scale(1); opacity: 0.35; } }
+.espera-frase { font-style: italic; }
+.espera-guion { border-left: 3px solid var(--borde); padding: 2px 0 2px 12px; font-size: 0.9rem; opacity: 0.9; }
+.espera-guion small { display: block; opacity: 0.65; margin-bottom: 2px; }
+.espera-guion p, .espera-guion ol { margin: 2px 0; }
+.espera-colgada { margin: 0; font-size: 0.88rem; }
+@media (prefers-reduced-motion: reduce) { .espera-pulso.late { animation: none; opacity: 0.8; } }

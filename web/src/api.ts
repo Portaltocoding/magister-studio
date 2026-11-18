@@ -52,6 +52,9 @@ export type EventoTutor =
     }
   | { tipo: 'error'; detalle: string }
   | { tipo: 'fase'; nodo: string }
+  // Mientras el modelo razona sin escribir: el pulso (segundos) y, si tarda, el guion y frases para la espera.
+  | { tipo: 'latido'; segundos: number }
+  | { tipo: 'adelanto'; guion: string; frases: string[] }
   | ({ tipo: 'plan' } & Propuesta)
   | { tipo: 'guardado'; plan_id: number; tema_id: number }
   // «Guárdalo» en el chat: la respuesta anterior ya está en Mis notas.

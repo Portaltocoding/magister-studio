@@ -49,6 +49,10 @@ async def _correr(entrada: dict | Command, cid: int) -> AsyncIterator[dict]:
                 yield {"tipo": "guardado", **datos["guardado"]}
             elif "acciones" in datos:
                 yield {"tipo": "acciones", "acciones": datos["acciones"]}
+            elif "latido" in datos:  # el modelo sigue razonando: segundos desde que empezó
+                yield {"tipo": "latido", "segundos": datos["latido"]}
+            elif "adelanto" in datos:  # mientras razona: por dónde irá la respuesta y frases para la espera
+                yield {"tipo": "adelanto", **datos["adelanto"]}
         elif modo == "updates" and "__interrupt__" in datos:
             for interrupcion in datos["__interrupt__"]:
                 yield {"tipo": "plan", **interrupcion.value}

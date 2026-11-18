@@ -207,6 +207,9 @@ async def _proceso_claude(args: list[str], entrada: str) -> AsyncIterator[dict]:
 
 traza_actual: contextvars.ContextVar[str | None] = contextvars.ContextVar("traza_actual", default=None)
 prompt_actual: contextvars.ContextVar[tuple[str, str] | None] = contextvars.ContextVar("prompt_actual", default=None)
+# Mientras el modelo razona antes de escribir (puede ser más de un minuto), manda señales sin texto. Quien quiera saber
+# que sigue vivo (el chat, para enseñar el pulso) pone aquí una función; se llama con cada señal hasta el primer trozo.
+latido_actual: contextvars.ContextVar[Callable[[], None] | None] = contextvars.ContextVar("latido_actual", default=None)
 
 
 @dataclass
@@ -325,6 +328,9 @@ async def _claude_texto(sistema: str, historial: list[Turno], modelo: str, llama
                 continue
             if evento.get("type") != "stream_event":
                 continue
+            if primero and (latido := latido_actual.get()) is not None:
+                with contextlib.suppress(Exception):  # la instrumentación nunca rompe una petición
+                    latido()
             delta = evento.get("event", {}).get("delta", {})
             if delta.get("type") == "text_delta" and delta.get("text"):
                 primero = False

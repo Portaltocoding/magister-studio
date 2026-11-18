@@ -35,6 +35,18 @@ export const NOMBRE_FASE: Record<string, string> = {
   corregir: 'Corrigiendo',
 }
 
+// Lo que se ve mientras llega la respuesta: los pasos hechos, el pulso del modelo (cada señal mientras razona) y, si
+// tarda, el guion de por dónde irá y frases con gracia sobre el tema.
+export interface Espera {
+  pasos: string[]
+  segundos: number | null
+  pulsos: number
+  ultimo: number | null
+  guion: string | null
+  frases: string[]
+}
+export const ESPERA_VACIA: Espera = { pasos: [], segundos: null, pulsos: 0, ultimo: null, guion: null, frases: [] }
+
 type AbrirFlujo = (texto: string, signal: AbortSignal) => AsyncIterable<EventoTutor>
 
 // Estado de un hilo que se alimenta de un flujo SSE del tutor.
@@ -47,6 +59,7 @@ export function usarConversacion(
   const [escribiendo, setEscribiendo] = useState(false)
   const [fase, setFase] = useState<string | null>(null)
   const [opciones, setOpciones] = useState<{ valor: string; etiqueta: string }[]>([])
+  const [espera, setEspera] = useState<Espera>(ESPERA_VACIA)
   const control = useRef<AbortController | null>(null)
 
   const actualizarUltima = (cambio: (b: Burbuja) => Burbuja) =>
@@ -61,6 +74,7 @@ export function usarConversacion(
       setBurbujas((previas) => [...previas, ...nuevas])
       setEscribiendo(true)
       setOpciones([])
+      setEspera(ESPERA_VACIA)
       const c = new AbortController()
       control.current = c
       let empezo = false
@@ -72,8 +86,17 @@ export function usarConversacion(
               setFase(null)
               actualizarUltima((b) => ({ ...b, contenido: b.contenido + ev.t }))
               break
-            case 'fase':
-              setFase(NOMBRE_FASE[ev.nodo] ?? ev.nodo)
+            case 'fase': {
+              const nombre = NOMBRE_FASE[ev.nodo] ?? ev.nodo
+              setFase(nombre)
+              setEspera((e) => (e.pasos[e.pasos.length - 1] === nombre ? e : { ...e, pasos: [...e.pasos, nombre] }))
+              break
+            }
+            case 'latido':
+              setEspera((e) => ({ ...e, segundos: ev.segundos, pulsos: e.pulsos + 1, ultimo: Date.now() }))
+              break
+            case 'adelanto':
+              setEspera((e) => ({ ...e, guion: ev.guion, frases: ev.frases }))
               break
             case 'plan':
               alPlan?.(ev)
@@ -142,5 +165,5 @@ export function usarConversacion(
 
   const parar = useCallback(() => control.current?.abort(), [])
 
-  return { burbujas, setBurbujas, escribiendo, fase, opciones, enviar, correr, parar }
+  return { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar, correr, parar }
 }
