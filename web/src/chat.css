@@ -127,7 +127,12 @@
 /* ===== La mascota de la barra y «Afina a tu tutor» ===== */
 .sesion { align-items: center; gap: 12px; }
 .afinar { position: relative; display: inline-flex; }
-.afinar-boton { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; display: inline-grid; place-items: center; transition: transform 150ms; }
+/* La mascota de la barra: pequeña y centrada en su círculo. */
+.afinar-boton {
+  width: 34px; height: 34px; padding: 0; cursor: pointer; border-radius: 50%; display: inline-grid; place-items: center; transition: transform 150ms;
+  border: 1px solid var(--borde); background: color-mix(in srgb, var(--texto) 6%, transparent);
+}
+.afinar-boton .mascota.mascota-mini { width: 24px; height: 24px; margin: 0; }
 .afinar-boton:hover { transform: scale(1.08) rotate(-4deg); }
 .afinar-boton:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 .mascota.mascota-mini { width: 30px; height: 30px; margin: 0; }
