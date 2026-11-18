@@ -41,7 +41,7 @@ h2 {
   grid-template-areas:
     "lateral sesion"
     "lateral central";
-  min-height: 100vh;
+  min-height: calc(100vh / var(--zoom-ui, 1));
 }
 
 .lateral {
@@ -105,7 +105,7 @@ h2 {
 .estado-no::before { color: var(--suave); }
 
 .central { grid-area: central; padding: 40px; }
-.libre { max-width: 640px; margin: 8vh auto 0; text-align: center; }
+.libre { max-width: 640px; margin: calc(8vh / var(--zoom-ui, 1)) auto 0; text-align: center; }
 .libre .entrada { text-align: left; }
 
 .mascota { display: block; width: 120px; height: 120px; margin: 0 auto 8px; }
@@ -153,9 +153,9 @@ h2 {
 .recorte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .borrar { border: 0; background: transparent; color: var(--suave); cursor: pointer; font-size: 1rem; visibility: hidden; }
 .fila-conversacion:hover .borrar, .borrar:focus { visibility: visible; }
-.lateral { max-height: 100vh; position: sticky; top: 0; }
+.lateral { max-height: calc(100vh / var(--zoom-ui, 1)); position: sticky; top: 0; }
 
-.vista-hilo { max-width: 760px; margin: 0 auto; height: calc(100vh - 120px); display: flex; flex-direction: column; }
+.vista-hilo { max-width: 760px; margin: 0 auto; height: calc(calc(100vh / var(--zoom-ui, 1)) - 120px); display: flex; flex-direction: column; }
 .hilo { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 .libre .hilo { flex: none; }
 .mensajes { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
@@ -180,7 +180,7 @@ h2 {
 /* v0.2: fases, propuesta y paneles del plan */
 .fase { color: var(--suave); font-size: 0.85rem; margin: 0; animation: latido 1.6s infinite; }
 .propuesta, .panel section { text-align: left; }
-.propuesta { border: 1px solid var(--borde); border-radius: 10px; padding: 12px 16px; background: var(--panel); max-height: 55vh; overflow-y: auto; }
+.propuesta { border: 1px solid var(--borde); border-radius: 10px; padding: 12px 16px; background: var(--panel); max-height: calc(55vh / var(--zoom-ui, 1)); overflow-y: auto; }
 .razonamiento { font-style: italic; color: var(--suave); }
 .lecciones { padding-left: 20px; }
 .lecciones > li { margin-bottom: 10px; }
@@ -211,7 +211,7 @@ h2 {
 /* v0.3: citas y fuentes */
 .marca-cita { font: inherit; font-size: 0.72rem; vertical-align: super; padding: 0 4px; margin: 0 1px; border: 1px solid var(--borde); border-radius: 4px; background: var(--fondo); color: var(--texto); cursor: pointer; }
 .cita-dudosa { border-color: #c08a2e; color: #c08a2e; }
-.panel-cita { position: fixed; right: 0; top: 0; bottom: 0; width: min(440px, 92vw); background: var(--fondo); border-left: 1px solid var(--borde); padding: 16px; overflow-y: auto; z-index: 10; box-shadow: -6px 0 18px rgba(0, 0, 0, 0.12); text-align: left; }
+.panel-cita { position: fixed; right: 0; top: 0; bottom: 0; width: min(440px, calc(92vw / var(--zoom-ui, 1))); background: var(--fondo); border-left: 1px solid var(--borde); padding: 16px; overflow-y: auto; z-index: 10; box-shadow: -6px 0 18px rgba(0, 0, 0, 0.12); text-align: left; }
 .texto-fragmento { white-space: pre-wrap; line-height: 1.55; font-size: 0.92rem; }
 .contexto { color: var(--suave); }
 .fragmento-citado { background: var(--panel); }
@@ -377,7 +377,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   white-space: nowrap; background: var(--acento-suave); color: var(--acento); opacity: 0.55; border: 1px dashed var(--acento);
 }
 .fondo-repaso { background: transparent; color: var(--ok); border-color: var(--ok); }
-.dia-detalle { padding: 16px 18px; position: sticky; top: 16px; max-height: calc(100vh - 120px); overflow-y: auto; }
+.dia-detalle { padding: 16px 18px; position: sticky; top: 16px; max-height: calc(calc(100vh / var(--zoom-ui, 1)) - 120px); overflow-y: auto; }
 .dia-detalle h2 { margin-top: 0; text-transform: none; letter-spacing: 0; font-size: 1.05rem; color: var(--texto); }
 .dia-detalle h2::first-letter { text-transform: uppercase; }
 .dia-detalle h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--suave); margin: 16px 0 6px; }
@@ -407,7 +407,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
 *::-webkit-scrollbar-thumb:hover { background: var(--suave); }
 * { scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
 
-.vista-hilo { height: auto; min-height: calc(100vh - 140px); }
+.vista-hilo { height: auto; min-height: calc(calc(100vh / var(--zoom-ui, 1)) - 140px); }
 .hilo { min-height: auto; }
 .mensajes { overflow: visible; flex: none; padding-bottom: 12px; }
 /* La caja de escribir, fija abajo mientras lees. */
@@ -429,9 +429,9 @@ html { scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
 /* ===== La ventana fija; solo se desplaza la zona central (y la barra lateral si no cabe) ===== */
 html, body, #root { height: 100%; }
 body { overflow: hidden; }
-.marco { height: 100vh; min-height: 0; }
+.marco { height: calc(100vh / var(--zoom-ui, 1)); min-height: 0; }
 .central { overflow-y: auto; min-height: 0; scrollbar-gutter: stable; }
-.lateral { position: static; max-height: none; height: 100vh; overflow-y: auto; }
+.lateral { position: static; max-height: none; height: calc(100vh / var(--zoom-ui, 1)); overflow-y: auto; }
 .vista-hilo { min-height: 100%; }
 
 /* ===== Un poco más ancho ===== */

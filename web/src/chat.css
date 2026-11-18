@@ -65,7 +65,7 @@
 .sin-fuentes { display: inline-block; margin: 8px 8px 0 0; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--borde); color: var(--suave); }
 
 /* ===== Hablar ===== */
-.hablar { max-width: 720px; margin: 4vh auto 0; text-align: center; }
+.hablar { max-width: 720px; margin: calc(4vh / var(--zoom-ui, 1)) auto 0; text-align: center; }
 .hablar .mascota { width: 84px; height: 84px; }
 .hablar-micro { width: 116px; height: 116px; border-radius: 50%; border: 0; margin: 22px auto 10px; display: grid; place-items: center; font-size: 2.6rem; cursor: pointer; background: var(--acento); color: #fff; box-shadow: var(--sombra); transition: transform 120ms; }
 .hablar-micro:hover { transform: scale(1.04); }
@@ -141,7 +141,7 @@
 .afinar-caja {
   position: absolute; z-index: 150; top: calc(100% + 10px); right: 0; width: 320px; padding: 14px 16px; border-radius: 14px;
   background: var(--tarjeta); border: 1px solid var(--borde); box-shadow: 0 16px 40px rgb(0 0 0 / 0.35); text-align: left;
-  max-height: calc(100vh - 90px); overflow-y: auto; overscroll-behavior: contain;
+  max-height: calc(calc(100vh / var(--zoom-ui, 1)) - 90px); overflow-y: auto; overscroll-behavior: contain;
   scrollbar-width: auto; scrollbar-color: var(--suave) transparent;
 }
 .afinar-cabecera { display: flex; justify-content: space-between; align-items: center; }
@@ -198,7 +198,7 @@ button.grupo-titulo:hover { color: var(--texto); }
 }
 .riel {
   grid-area: lateral; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0;
-  background: var(--panel); border-right: 1px solid var(--borde); height: 100vh; box-sizing: border-box;
+  background: var(--panel); border-right: 1px solid var(--borde); height: calc(100vh / var(--zoom-ui, 1)); box-sizing: border-box;
 }
 .riel-boton {
   position: relative; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 10px;
@@ -217,7 +217,7 @@ button.grupo-titulo:hover { color: var(--texto); }
 @keyframes riel-latir { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 
 .marco .lateral {
-  grid-area: auto; position: fixed; top: 0; left: 0; bottom: 0; width: 272px; height: 100vh; z-index: 80;
+  grid-area: auto; position: fixed; top: 0; left: 0; bottom: 0; width: 272px; height: calc(100vh / var(--zoom-ui, 1)); z-index: 80;
   transform: translateX(-104%); opacity: 1; box-shadow: none;
   transition: transform 460ms var(--suave-curva), box-shadow 460ms var(--suave-curva);
 }
@@ -269,13 +269,13 @@ button.grupo-titulo:hover { color: var(--texto); }
 .boton-buscar:hover { color: var(--texto); }
 .boton-buscar kbd { font: inherit; font-size: 0.72rem; border: 1px solid var(--borde); border-radius: 5px; padding: 0 5px; }
 .alerta + .boton-buscar { margin-left: 12px; }
-.paleta-velo { position: fixed; inset: 0; z-index: 300; background: rgb(0 0 0 / 0.35); display: flex; justify-content: center; align-items: flex-start; padding-top: 14vh; animation: dg-aparecer 220ms var(--suave-curva); }
+.paleta-velo { position: fixed; inset: 0; z-index: 300; background: rgb(0 0 0 / 0.35); display: flex; justify-content: center; align-items: flex-start; padding-top: calc(14vh / var(--zoom-ui, 1)); animation: dg-aparecer 220ms var(--suave-curva); }
 .paleta {
-  width: min(620px, 92vw); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px; overflow: hidden;
+  width: min(620px, calc(92vw / var(--zoom-ui, 1))); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px; overflow: hidden;
   box-shadow: 0 24px 60px rgb(0 0 0 / 0.45);
 }
 .paleta input { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid var(--borde); background: transparent; color: var(--texto); font: inherit; font-size: 1.05rem; padding: 16px 18px; outline: none; }
-.paleta ul { list-style: none; margin: 0; padding: 6px; max-height: 52vh; overflow-y: auto; }
+.paleta ul { list-style: none; margin: 0; padding: 6px; max-height: calc(52vh / var(--zoom-ui, 1)); overflow-y: auto; }
 .paleta li button {
   width: 100%; display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; text-align: left;
   border: 0; background: none; color: var(--texto); font: inherit; padding: 9px 12px; border-radius: 9px; cursor: pointer;

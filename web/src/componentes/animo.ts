@@ -1,6 +1,7 @@
 // El ánimo de Magister: la mascota reacciona a lo que pasa (asiente si aciertas, ladea la cabeza si fallas, salta
 // cuando terminas algo), se duerme si llevas un rato sin tocar nada y lo que terminas se celebra con un estallido
 // pequeño de confeti. Todo es decorativo: con «reducir movimiento» no hay confeti y la mascota se queda quieta.
+import { aCss } from './escala.ts'
 
 export type Reaccion = 'acierto' | 'fallo' | 'celebrar'
 export const EVENTO_REACCION = 'magister-reaccion'
@@ -30,8 +31,8 @@ export function celebrar(origen?: Origen, fuerte = false) {
   const capa = document.createElement('div')
   capa.className = 'confeti'
   capa.setAttribute('aria-hidden', 'true')
-  capa.style.left = `${x}px`
-  capa.style.top = `${y}px`
+  capa.style.left = `${aCss(x)}px`
+  capa.style.top = `${aCss(y)}px`
   const piezas = fuerte ? 26 : 14
   for (let i = 0; i < piezas; i++) {
     const p = document.createElement('span')

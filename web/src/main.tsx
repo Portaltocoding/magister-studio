@@ -14,9 +14,12 @@ import './asesor.css'
 import './animo.css'
 import './riso.css'
 import { aplicarTema } from './componentes/tema.ts'
+import { aplicarTamano } from './componentes/escala.ts'
 
 // El aspecto elegido, antes de pintar nada (sin destello del otro tema al abrir).
 aplicarTema()
+// El tamaño de la interfaz (zoom), también antes de pintar.
+aplicarTamano()
 
 // Si se reconstruye la web con la pestaña abierta, los trozos de las pantallas cambian de nombre y abrir una
 // pantalla nueva fallaría: se recarga la página (una vez por minuto como mucho, para no entrar en bucle).

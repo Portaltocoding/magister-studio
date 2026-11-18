@@ -16,7 +16,7 @@
 .asesor.abierto .asesor-mascota { animation: none; }
 
 .asesor-chat {
-  position: absolute; width: min(360px, calc(100vw - 96px)); max-height: min(520px, 72vh); display: flex; flex-direction: column;
+  position: absolute; width: min(360px, calc(calc(100vw / var(--zoom-ui, 1)) - 96px)); max-height: min(520px, calc(72vh / var(--zoom-ui, 1))); display: flex; flex-direction: column;
   background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); border-radius: 18px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.28);
   overflow: hidden; animation: asesor-abrir 320ms var(--asesor-curva) both;
 }
@@ -87,7 +87,7 @@
 @keyframes asesor-mensaje { from { opacity: 0; transform: translateY(4px); } }
 @keyframes asesor-puntos { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @media (max-width: 640px) {
-  .asesor-chat { position: fixed; left: 12px !important; right: 12px !important; bottom: 12px !important; top: auto !important; width: auto; max-height: 70vh; transform-origin: bottom center; }
+  .asesor-chat { position: fixed; left: 12px !important; right: 12px !important; bottom: 12px !important; top: auto !important; width: auto; max-height: calc(70vh / var(--zoom-ui, 1)); transform-origin: bottom center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .asesor-mascota, .asesor-chat, .asesor-tu, .asesor-tutor, .asesor-escribiendo { animation: none; }

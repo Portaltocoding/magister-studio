@@ -1,4 +1,5 @@
 import { useCallback, useState, type FocusEvent, type PointerEvent } from 'react'
+import { aCss } from './escala.ts'
 
 // El aviso de los gráficos: al pasar el ratón o con el foco del teclado, el valor delante y la etiqueta detrás.
 // Nunca es la única forma de leer un dato: cada gráfico lleva también su tabla.
@@ -32,7 +33,7 @@ export function usarAviso() {
   )
 
   const nodo = aviso && (
-    <div className="viz-aviso" role="tooltip" style={{ left: aviso.x, top: aviso.y }}>
+    <div className="viz-aviso" role="tooltip" style={{ left: aCss(aviso.x), top: aCss(aviso.y) }}>
       <strong>{aviso.valor}</strong>
       <span>{aviso.etiqueta}</span>
     </div>

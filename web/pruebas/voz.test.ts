@@ -5,7 +5,8 @@ import { buscarTerminos, GLOSARIO, paraLaVoz } from '../src/componentes/pronunci
 
 const casos: [string, string][] = [
   ['si las dos peticiones son idénticas', 'si las dos peticiones son idénticas'],
-  // «id»: pendiente de decidir entre «íd» y «i de» (las dos sesiones lo dejaron distinto).
+  // «id», letra a letra: «i de» (decidido el 18-11-2026).
+  ['Cada pedido tiene su id, el cliente', 'Cada pedido tiene su i de, el cliente'],
   ['Bitmap Index Scan sobre idx_pedidos_cliente', 'bítmap índex scan sobre índex pedidos cliente'],
   ['Bitmap Heap Scan e Index Scan', 'bítmap jip scan e índex scan'],
   ['EXPLAIN ANALYZE y luego EXPLAIN', 'explein análaiz y luego explein'],

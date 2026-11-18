@@ -12,6 +12,7 @@ import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Mascota from '../Mascota.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import type { IdModo } from '../modos.ts'
+import { aCss } from '../componentes/escala.ts'
 
 export interface Hoy {
   estado: 'propuesta' | 'adelantar' | 'sin_preparar' | 'sin_plan' | 'solo_repaso'
@@ -732,7 +733,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             {seleccion && (
               <button
                 className="al-mapa"
-                style={{ left: seleccion.x, top: seleccion.y }}
+                style={{ left: aCss(seleccion.x), top: aCss(seleccion.y) }}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   anadirAlMapa([seleccion.texto])

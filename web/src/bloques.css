@@ -1,6 +1,6 @@
 /* ===== Bloques de aprendizaje (Fichas y Vídeo) ===== */
 .bloques { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 28px; max-width: 1400px; margin: 0 auto; align-items: start; }
-.bloques-lista { position: sticky; top: 0; max-height: calc(100vh - 110px); overflow-y: auto; padding-right: 4px; }
+.bloques-lista { position: sticky; top: 0; max-height: calc(calc(100vh / var(--zoom-ui, 1)) - 110px); overflow-y: auto; padding-right: 4px; }
 .bloques-plan { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.65; margin: 4px 0 12px; font-weight: 700; }
 .bloques-lista select { width: 100%; margin-bottom: 12px; }
 .bloques-lista ol { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }

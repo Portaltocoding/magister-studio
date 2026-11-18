@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react'
 import { EVENTO_NOTAS, guardarNota, listarNotas } from '../api.ts'
+import { aCss } from './escala.ts'
 
 // Guardar lo que te interesa de Estudio libre en «Mis notas»: la respuesta entera (botón bajo cada una)
 // o solo el trozo que marques con el ratón o el teclado.
@@ -113,7 +114,7 @@ export function GuardarMarcado({ zona }: { zona: RefObject<HTMLElement | null> }
     <button
       type="button"
       className={`guardar-marcado ${hecho ? 'hecho' : ''} ${marcado.debajo ? 'debajo' : ''}`}
-      style={{ left: marcado.x, top: marcado.y }}
+      style={{ left: aCss(marcado.x), top: aCss(marcado.y) }}
       // Sin esto, pulsar el botón quitaría la selección antes del clic.
       onMouseDown={(e) => e.preventDefault()}
       onClick={async () => {

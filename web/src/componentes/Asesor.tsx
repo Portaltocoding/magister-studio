@@ -5,6 +5,7 @@ import Mascota from '../Mascota.tsx'
 import { MODOS } from '../modos.ts'
 import { EVENTO_SUENO } from './animo.ts'
 import { buscarFaq, faqsDe, type Faq } from './faqs.ts'
+import { aCss } from './escala.ts'
 
 // El asesor: la mascota de la barra de arriba, cogida y dejada donde quieras. Se queda flotando sobre la pantalla y,
 // al pulsarla, abre una ventanita de chat que sabe dónde estás: lo que pone la pantalla le llega con cada pregunta.
@@ -256,7 +257,7 @@ export default function Asesor() {
   const aLaIzquierda = sitio.x > window.innerWidth / 2
   const haciaArriba = sitio.y > window.innerHeight / 2
   return (
-    <div ref={caja} className={`asesor ${cogida ? 'cogida' : ''} ${iman ? 'iman' : ''} ${abierto ? 'abierto' : ''}`} style={{ left: sitio.x, top: sitio.y }}>
+    <div ref={caja} className={`asesor ${cogida ? 'cogida' : ''} ${iman ? 'iman' : ''} ${abierto ? 'abierto' : ''}`} style={{ left: aCss(sitio.x), top: aCss(sitio.y) }}>
       <div
         className="asesor-mascota"
         role="button"
