@@ -171,6 +171,8 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
         try:
             if estado.get("modo"):
                 p = {**p, "modo": None if estado["modo"] == "normal" else estado["modo"]}
+            if estado.get("voz") or estado.get("llamada") or estado.get("asesor"):
+                p = {**p, "idioma": "es"}  # las voces son españolas y el asesor habla de la app
             preferencias = texto_preferencias(p)
         except Exception:  # noqa: BLE001
             preferencias = ""
@@ -366,6 +368,8 @@ async def acciones_de_estudio(estado: dict, sin_fuentes: bool) -> None:
 # Lo que el alumno ajusta desde la mascota («Afina a tu tutor»).
 PREFERENCIAS_POR_DEFECTO = {"longitud": "normal", "nivel": "normal", "estilo": "directo",
                             "diagramas": True, "tests": True, "opciones": True,
+                            # En qué idioma contesta el chat escrito (la voz y el material siguen en español).
+                            "idioma": "es",
                             # Lo que le has dicho que recuerde («a partir de ahora...») y tus modos de aprendizaje.
                             "instrucciones": [], "modos": [], "modo": None}
 
@@ -425,6 +429,11 @@ async def preferencias_tutor() -> dict:
     return {**PREFERENCIAS_POR_DEFECTO, **(fila.valor if fila else {}), "aprendido": aprendido}
 
 
+IDIOMA_INGLES = ("Responde siempre en inglés (lo ha elegido el alumno para practicar), aunque te escriba en español y aunque "
+                 "las fuentes estén en español: tradúcelas al citarlas y deja en su idioma solo los títulos y las citas literales. "
+                 "Las mismas reglas de forma valen en inglés.")
+
+
 def texto_preferencias(p: dict) -> str:
     lineas = {
         "longitud": {"breve": "Prefiere respuestas breves: como mucho unas 150 palabras, salvo que pida más.",
@@ -435,6 +444,8 @@ def texto_preferencias(p: dict) -> str:
                    "codigo": "Cuando el tema lo permita, explica con ejemplos de código cortos."},
     }
     salida = [lineas[k][p[k]] for k in lineas if p.get(k) in lineas[k]]
+    if p.get("idioma") == "en":
+        salida.insert(0, IDIOMA_INGLES)
     if not p.get("diagramas", True):
         salida.append("No dibujes diagramas.")
     if not p.get("tests", True):
@@ -458,7 +469,8 @@ async def para_explicar() -> str:
         p = await preferencias_tutor()
     except Exception:  # noqa: BLE001
         return ""
-    return texto_preferencias({**p, "modo": None, "longitud": "normal", "diagramas": True, "tests": True, "opciones": True})
+    return texto_preferencias({**p, "modo": None, "longitud": "normal", "diagramas": True, "tests": True, "opciones": True,
+                               "idioma": "es"})
 
 
 

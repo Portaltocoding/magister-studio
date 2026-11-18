@@ -19,6 +19,7 @@ export interface PreferenciasTutor {
   diagramas: boolean
   tests: boolean
   opciones: boolean
+  idioma: 'es' | 'en'
   instrucciones: string[]
   modos: ModoAprendizaje[]
   modo: string | null

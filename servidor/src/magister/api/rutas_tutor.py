@@ -217,6 +217,7 @@ class PreferenciasTutor(BaseModel):
     diagramas: bool = True
     tests: bool = True
     opciones: bool = True
+    idioma: Literal["es", "en"] = "es"
     instrucciones: list[str] = Field(default_factory=list, max_length=30)
     modos: list[ModoPropio] = Field(default_factory=list, max_length=20)
     modo: str | None = None

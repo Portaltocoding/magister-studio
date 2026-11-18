@@ -9,10 +9,11 @@ import { abrirAsesor, asesorActivo, EVENTO_COGER, EVENTO_ESTADO } from './Asesor
 
 type Preferencias = PreferenciasTutor
 
-export const GRUPOS: { campo: 'longitud' | 'nivel' | 'estilo'; titulo: string; opciones: [string, string][] }[] = [
+export const GRUPOS: { campo: 'longitud' | 'nivel' | 'estilo' | 'idioma'; titulo: string; opciones: [string, string][] }[] = [
   { campo: 'longitud', titulo: 'Respuestas', opciones: [['breve', 'Breves'], ['normal', 'Normales'], ['detallada', 'Detalladas']] },
   { campo: 'nivel', titulo: 'Tu nivel', opciones: [['cero', 'Desde cero'], ['normal', 'Normal'], ['experto', 'Avanzado']] },
   { campo: 'estilo', titulo: 'Cómo explicar', opciones: [['directo', 'Directo'], ['analogias', 'Con analogías'], ['codigo', 'Con código']] },
+  { campo: 'idioma', titulo: 'Idioma del chat', opciones: [['es', 'Español'], ['en', 'English']] },
 ]
 
 export const EXTRAS: { campo: 'diagramas' | 'tests' | 'opciones'; texto: string }[] = [

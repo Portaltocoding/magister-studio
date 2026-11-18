@@ -335,6 +335,9 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 /* ===== Modos de aprendizaje y lo que el tutor recuerda ===== */
 .pie-chat { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .selector-modo { position: relative; }
+.selector-idioma { display: inline-flex; border: 1px solid var(--borde); border-radius: 999px; overflow: hidden; }
+.selector-idioma button { font: inherit; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; padding: 3px 9px; border: 0; background: transparent; color: var(--suave); cursor: pointer; }
+.selector-idioma button[aria-checked='true'] { background: var(--texto); color: var(--fondo); }
 .selector-modo > .boton-mini.activo { background: var(--texto); color: var(--fondo); border-color: transparent; }
 .selector-modo-lista {
   position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 40; width: 320px; max-height: calc(60vh / var(--zoom-ui, 1)); overflow-y: auto; padding: 6px;

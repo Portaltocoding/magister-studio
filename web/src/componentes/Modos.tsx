@@ -90,6 +90,27 @@ export function ModoTarjeta({ texto, completo }: { texto: string; completo: bool
   )
 }
 
+// En qué idioma contesta el tutor en el chat escrito; la voz, la llamada y el material siguen en español.
+export function SelectorIdioma() {
+  const p = usarPreferencias()
+  if (!p) return null
+  const actual = p.idioma ?? 'es'
+  return (
+    <div className="selector-idioma" role="radiogroup" aria-label="Idioma de las respuestas" title="En qué idioma te contesta el tutor">
+      {(
+        [
+          ['es', 'ES', 'Respuestas en español'],
+          ['en', 'EN', 'Respuestas en inglés'],
+        ] as const
+      ).map(([valor, texto, ayuda]) => (
+        <button key={valor} type="button" role="radio" aria-checked={actual === valor} title={ayuda} onClick={() => actual !== valor && cambiarPreferencias({ idioma: valor })}>
+          {texto}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // El selector de modo, junto al cuadro del chat: Normal, los de serie y los tuyos.
 export function SelectorModo() {
   const p = usarPreferencias()

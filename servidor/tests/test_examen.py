@@ -239,3 +239,16 @@ async def test_tu_mapa_se_guarda(cliente):
     assert (await cliente.get("/api/estudio/77/mapa")).json()["flechas"] == [
         {"de": "a", "a": "b", "etiqueta": ""}, {"de": "b", "a": "a", "etiqueta": "ordena"}]
     assert (await cliente.get("/api/estudio/78/mapa")).json() == {"nodos": [], "flechas": []}
+
+
+@pytest.mark.anyio
+async def test_idioma_de_las_respuestas(cliente):
+    from magister.flujo.comun import IDIOMA_INGLES, para_explicar, texto_preferencias
+
+    assert (await cliente.get("/api/preferencias")).json()["idioma"] == "es"
+    assert IDIOMA_INGLES not in texto_preferencias((await cliente.get("/api/preferencias")).json())
+    assert (await cliente.put("/api/preferencias", json={"idioma": "fr"})).status_code == 422
+    p = (await cliente.put("/api/preferencias", json={"idioma": "en"})).json()
+    assert p["idioma"] == "en" and texto_preferencias(p).startswith("- " + IDIOMA_INGLES)
+    # El material y las correcciones siguen en español.
+    assert IDIOMA_INGLES not in await para_explicar()
