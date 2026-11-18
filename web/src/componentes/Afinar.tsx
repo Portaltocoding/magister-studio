@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from './preferencias.ts'
 import Mascota, { elegirForma, FORMAS, usarForma } from '../Mascota.tsx'
 import Colores from './Colores.tsx'
+import { asesorActivo, EVENTO_COGER, EVENTO_ESTADO } from './Asesor.tsx'
 
 // La mascota de la barra de arriba: siempre a la vista; al pulsarla, «Afina a tu tutor».
 // Lo que eliges se guarda en el servidor y el tutor lo tiene en cuenta desde el siguiente mensaje.
@@ -36,6 +37,14 @@ export default function Afinar() {
   const [guardado, setGuardado] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
   const [avisos, setAvisos] = useState(() => 'Notification' in window && Notification.permission === 'granted' && avisosActivos())
+  // Si la mascota está fuera como asesor, en la barra queda su hueco.
+  const [fuera, setFuera] = useState(asesorActivo)
+  const ultimo = useRef({ x: 0, y: 0 })
+  useEffect(() => {
+    const al = (e: Event) => setFuera((e as CustomEvent<boolean>).detail)
+    window.addEventListener(EVENTO_ESTADO, al)
+    return () => window.removeEventListener(EVENTO_ESTADO, al)
+  }, [])
 
   useEffect(() => {
     if (!abierto) return
@@ -62,11 +71,29 @@ export default function Afinar() {
     <div className="afinar" ref={caja}>
       <button
         type="button"
-        className="afinar-boton"
+        className={`afinar-boton ${fuera ? 'fuera' : ''}`}
         aria-expanded={abierto}
         aria-label="Afina a tu tutor"
-        title="Afina a tu tutor"
+        title="Afina a tu tutor · mantén pulsada la mascota para sacarla como asesor"
         onClick={() => setAbierto(!abierto)}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return
+          // Mantenerla pulsada la saca de la barra: se convierte en tu asesor y te sigue hasta que la sueltas.
+          ultimo.current = { x: e.clientX, y: e.clientY }
+          const t = window.setTimeout(() => {
+            setAbierto(false)
+            window.dispatchEvent(new CustomEvent(EVENTO_COGER, { detail: ultimo.current }))
+          }, 350)
+          const cancelar = () => {
+            window.clearTimeout(t)
+            window.removeEventListener('pointerup', cancelar)
+            window.removeEventListener('pointermove', seguir)
+          }
+          const seguir = (ev: PointerEvent) => (ultimo.current = { x: ev.clientX, y: ev.clientY })
+          window.addEventListener('pointerup', cancelar)
+          window.addEventListener('pointermove', seguir)
+        }}
+        onContextMenu={(e) => e.preventDefault()}
       >
         <Mascota mini />
       </button>

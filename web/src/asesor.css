@@ -1,0 +1,74 @@
+/* ===== El asesor: la mascota flotante y su ventanita de chat ===== */
+.asesor { --asesor-curva: cubic-bezier(0.22, 1, 0.36, 1); position: fixed; z-index: 300; width: 64px; height: 64px; }
+.asesor-mascota {
+  width: 64px; height: 64px; display: grid; place-items: center; cursor: grab; touch-action: none; user-select: none; -webkit-touch-callout: none;
+  border-radius: 50%; animation: asesor-llegar 460ms var(--asesor-curva) both, asesor-flotar 4.5s ease-in-out 600ms infinite;
+  transition: scale 260ms var(--asesor-curva);
+}
+.asesor-mascota .mascota { width: 60px; height: 60px; margin: 0; }
+.asesor-mascota:hover { scale: 1.06; }
+.asesor-mascota:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+/* Cogida: se agranda, deja de flotar y cierra los ojos mientras la llevas. */
+.asesor.cogida .asesor-mascota { cursor: grabbing; scale: 1.14; animation: none; }
+.asesor.cogida .mascota-ojo, .asesor.cogida .mascota-ojo + .mascota-ojo { animation: none; transform: scaleY(0.1); }
+.asesor.abierto .asesor-mascota { animation: none; }
+
+.asesor-chat {
+  position: absolute; width: min(360px, calc(100vw - 96px)); max-height: min(520px, 72vh); display: flex; flex-direction: column;
+  background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); border-radius: 18px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.28);
+  overflow: hidden; animation: asesor-abrir 320ms var(--asesor-curva) both;
+}
+.asesor-chat.derecha { left: 74px; }
+.asesor-chat.izquierda { right: 74px; }
+.asesor-chat.abajo { top: 0; }
+.asesor-chat.arriba { bottom: 0; }
+.asesor-chat.derecha.abajo { transform-origin: top left; }
+.asesor-chat.derecha.arriba { transform-origin: bottom left; }
+.asesor-chat.izquierda.abajo { transform-origin: top right; }
+.asesor-chat.izquierda.arriba { transform-origin: bottom right; }
+
+.asesor-cabeza { display: flex; align-items: center; gap: 6px; padding: 12px 12px 10px 16px; border-bottom: 1px solid var(--borde); }
+.asesor-cabeza > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.asesor-cabeza strong { font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asesor-etq { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
+.asesor-x { flex: none; width: 28px; height: 28px; border-radius: 8px; border: 0; background: none; color: var(--suave); font-size: 1.05rem; cursor: pointer; }
+.asesor-x:hover { background: color-mix(in srgb, var(--texto) 8%, transparent); color: var(--texto); }
+
+.asesor-pestanas { display: flex; gap: 6px; padding: 8px 12px; overflow-x: auto; border-bottom: 1px solid var(--borde); scrollbar-width: none; }
+.asesor-pestanas button {
+  flex: none; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: inherit; font-size: 0.78rem;
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--borde); background: none; color: var(--suave); cursor: pointer;
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+.asesor-pestanas button.actual { background: var(--texto); color: var(--fondo); border-color: transparent; }
+
+.asesor-hilo { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-height: 120px; }
+.asesor-vacio p { margin: 0 0 10px; color: var(--suave); }
+.asesor-sugerencias { display: flex; flex-wrap: wrap; gap: 6px; }
+.asesor-sugerencias button { font: inherit; font-size: 0.85rem; padding: 6px 10px; border-radius: 12px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); cursor: pointer; }
+.asesor-sugerencias button:hover { border-color: var(--acento); }
+.asesor-tu, .asesor-tutor { animation: asesor-mensaje 260ms var(--asesor-curva) both; }
+.asesor-tu { align-self: flex-end; max-width: 85%; margin: 0; padding: 8px 12px; border-radius: 14px 14px 4px 14px; background: var(--texto); color: var(--fondo); font-size: 0.92rem; }
+.asesor-tutor { font-size: 0.93rem; line-height: 1.5; }
+.asesor-tutor p { margin: 0 0 6px; }
+.asesor-tutor :is(ul, ol) { margin: 4px 0; padding-left: 20px; }
+.asesor-tutor pre { font-size: 0.8rem; overflow-x: auto; background: var(--fondo); padding: 8px; border-radius: 8px; }
+.asesor-escribiendo { display: inline-block; width: 30px; height: 10px; background: radial-gradient(circle, currentColor 2.5px, transparent 3px) 0 50% / 10px 10px repeat-x; opacity: 0.5; animation: asesor-puntos 1s steps(3) infinite; }
+.asesor-otra { margin: 0; padding: 10px 14px; border-top: 1px solid var(--borde); }
+.asesor-escribir { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--borde); }
+.asesor-escribir input { flex: 1; min-width: 0; font: inherit; font-size: 0.92rem; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 999px; padding: 8px 12px; }
+
+/* En la barra, mientras está fuera, queda su hueco. */
+.afinar-boton.fuera { opacity: 0.28; outline: 1.5px dashed color-mix(in srgb, var(--texto) 40%, transparent); outline-offset: 2px; }
+
+@keyframes asesor-llegar { from { opacity: 0; scale: 0.6; } }
+@keyframes asesor-flotar { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+@keyframes asesor-abrir { from { opacity: 0; transform: scale(0.92) translateY(6px); } }
+@keyframes asesor-mensaje { from { opacity: 0; transform: translateY(4px); } }
+@keyframes asesor-puntos { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (max-width: 640px) {
+  .asesor-chat { position: fixed; left: 12px !important; right: 12px !important; bottom: 12px !important; top: auto !important; width: auto; max-height: 70vh; transform-origin: bottom center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .asesor-mascota, .asesor-chat, .asesor-tu, .asesor-tutor, .asesor-escribiendo { animation: none; }
+}

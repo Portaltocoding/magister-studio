@@ -171,7 +171,7 @@ export async function* flujo<E extends { tipo: string }>(
 export const listarTemas = () => pedir<Tema[]>('/api/temas')
 export const crearTema = (nombre: string) => pedir<Tema>('/api/temas', enviarJson({ nombre }))
 export const listarConversaciones = () => pedir<Conversacion[]>('/api/conversaciones')
-export const crearConversacion = (titulo: string, tema_id: number | null = null, tipo: 'libre' | 'plan' = 'libre') =>
+export const crearConversacion = (titulo: string, tema_id: number | null = null, tipo: 'libre' | 'plan' | 'asesor' = 'libre') =>
   pedir<Conversacion>('/api/conversaciones', enviarJson({ titulo, tema_id, tipo }))
 export const borrarConversacion = (id: number) => pedir<void>(`/api/conversaciones/${id}`, { method: 'DELETE' })
 export const listarMensajes = (cid: number) => pedir<Mensaje[]>(`/api/conversaciones/${cid}/mensajes`)
@@ -185,6 +185,8 @@ export interface ExtraMensaje {
   contexto?: string | null
   // El alumno responde a algo que el tutor ha preguntado: lo corrige el modelo grande.
   corregir?: boolean
+  // El asesor (la mascota flotante): contesta corto sobre la pantalla que tienes abierta.
+  asesor?: boolean
 }
 
 export function enviar(cid: number, contenido: string, signal: AbortSignal, cuenta = true, voz = false, extra: ExtraMensaje = {}) {

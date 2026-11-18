@@ -44,7 +44,9 @@ async def crear_conversacion(
 
 
 async def listar_conversaciones(s: AsyncSession) -> list[Conversacion]:
-    consulta = select(Conversacion).order_by(Conversacion.actualizada_en.desc(), Conversacion.id.desc())
+    # Las del asesor (la mascota flotante) viven en su ventanita, no en el historial.
+    consulta = (select(Conversacion).where(Conversacion.tipo != "asesor")
+                .order_by(Conversacion.actualizada_en.desc(), Conversacion.id.desc()))
     return list((await s.scalars(consulta.limit(LIMITE_CONVERSACIONES))).all())
 
 

@@ -22,8 +22,8 @@ class TemaSalida(Salida):
 class ConversacionEntrada(BaseModel):
     titulo: str = Field(min_length=1, max_length=200)
     tema_id: int | None = None
-    # libre: Estudio libre; plan: conversación de diagnóstico que acaba en un plan
-    tipo: Literal["libre", "plan"] = "libre"
+    # libre: Estudio libre; plan: conversación de diagnóstico que acaba en un plan; asesor: la mascota flotante
+    tipo: Literal["libre", "plan", "asesor"] = "libre"
 
 
 class ConversacionSalida(Salida):
@@ -51,6 +51,8 @@ class MensajeEntrada(BaseModel):
     # Dónde está la llamada (por ejemplo, la parte de la clase en la que le interrumpes). No se guarda en el hilo.
     # En la llamada, el alumno responde a una pregunta del tutor: la corrige el modelo grande (tarea «corregir»).
     corregir: bool = False
+    # El asesor: la mascota flotante que contesta sobre la pantalla que tienes abierta (en `contexto` va lo que ves).
+    asesor: bool = False
     # Cabe el banco entero del examen oral (unas 20 preguntas pasan de 3000 caracteres).
     contexto: str | None = Field(None, max_length=12_000)
 

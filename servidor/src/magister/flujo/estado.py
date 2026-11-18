@@ -21,6 +21,7 @@ class Estado(TypedDict, total=False):
     leccion_clave: str | None
     contexto: str | None  # dónde está la llamada
     corregir: bool  # en la llamada, el alumno responde a una pregunta del tutor: la corrige el modelo grande
+    asesor: bool  # la mascota flotante: contesta corto sobre la pantalla que tiene abierta (va en `contexto`)
     nota_guardada: bool  # la app acaba de guardar en Mis notas la respuesta anterior
     turnos: list[Turno]  # historial completo de la conversación (lo pasa la API)
     perfil: dict

@@ -51,7 +51,7 @@ async def reescribir(estado: Estado) -> dict:
     turnos = estado.get("turnos", [])
     # En una llamada no se reescribe: «¿y eso?» es constante por voz y la reescritura añade una llamada al modelo
     # (unos 5 s de silencio); el historial ya da el contexto a la respuesta.
-    if estado.get("llamada") or not necesita_reescritura(mensaje, len(turnos) > 1):
+    if estado.get("llamada") or estado.get("asesor") or not necesita_reescritura(mensaje, len(turnos) > 1):
         return {"consulta": mensaje, "aclaracion": None}
     fase("reescribir")
     sistema = cargar("reescribir").rellenar(turnos=turnos_recientes(estado, 6), mensaje=mensaje)
@@ -77,7 +77,8 @@ async def aclarar(estado: Estado) -> dict:
 def hacer_recuperar(buscador: Buscador):
     async def recuperar(estado: Estado) -> dict:
         # En una llamada sobre una lección, sus apuntes ya van en el prompt: buscar en las fuentes solo añade texto.
-        if estado.get("llamada") and estado.get("leccion_clave"):
+        # El asesor tampoco busca: lo que necesita es la pantalla, que ya le llega.
+        if (estado.get("llamada") and estado.get("leccion_clave")) or estado.get("asesor"):
             return {"recuperados": [], "busqueda_id": None}
         fase("recuperar")
         consulta = estado.get("consulta") or estado.get("mensaje", "")

@@ -5,6 +5,7 @@ import BarraSesion from './BarraSesion.tsx'
 import Riel, { pendienteDeHoy, usarHoy } from './Riel.tsx'
 import Paleta from './componentes/Paleta.tsx'
 import { avisosActivos } from './componentes/Afinar.tsx'
+import Asesor from './componentes/Asesor.tsx'
 import { avisar } from './componentes/pomodoro.ts'
 import { acentoDe, sincronizarAcento, usarColores, variables } from './componentes/colores.ts'
 import Central from './Central.tsx'
@@ -174,6 +175,7 @@ export default function Marco() {
           }}
         />
       </main>
+      <Asesor />
     </div>
   )
 }

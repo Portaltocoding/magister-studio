@@ -17,6 +17,25 @@ async def test_en_la_llamada_mandan_sus_reglas_y_no_las_de_voz() -> None:
     assert VOZ in await sistema_de_estudio("BASE", {"voz": True})
 
 
+async def test_el_asesor_contesta_corto_sobre_la_pantalla_y_sus_conversaciones_no_salen_en_el_historial(cliente, monkeypatch) -> None:
+    from magister.flujo import comun as rc
+    from magister.flujo.comun import ASESOR
+
+    sistemas = []
+
+    async def falso(sistema, historial, tarea=None):
+        sistemas.append(sistema)
+        yield "Pulsa «Detallar este nivel»."
+
+    monkeypatch.setattr(rc, "generar", falso)
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "Asesor · Proyectos", "tipo": "asesor"})).json()["id"]
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={
+        "contenido": "¿qué hago ahora?", "asesor": True, "contexto": "Sección: Proyectos\n<pantalla>Nivel 2 esbozado</pantalla>"})
+    assert ASESOR in sistemas[-1] and "Lo que tiene en pantalla ahora" in sistemas[-1] and "Nivel 2 esbozado" in sistemas[-1]
+    assert cid not in [c["id"] for c in (await cliente.get("/api/conversaciones")).json()]
+    assert (await cliente.get(f"/api/conversaciones/{cid}/mensajes")).json()[-1]["contenido"] == "Pulsa «Detallar este nivel»."
+
+
 async def test_en_la_llamada_no_se_reescribe_ni_se_busca_en_una_leccion() -> None:
     estado = {"mensaje": "¿y eso?", "turnos": [{"rol": "usuario", "contenido": "a"}, {"rol": "tutor", "contenido": "b"}], "llamada": True}
     assert await reescribir(estado) == {"consulta": "¿y eso?", "aclaracion": None}

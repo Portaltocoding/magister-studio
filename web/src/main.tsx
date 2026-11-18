@@ -10,6 +10,7 @@ import './viz.css'
 import './video.css'
 import './itunes.css'
 import './proyectos.css'
+import './asesor.css'
 import Marco from './Marco.tsx'
 
 createRoot(document.getElementById('root')!).render(

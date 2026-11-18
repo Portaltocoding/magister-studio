@@ -204,6 +204,7 @@ async def enviar_mensaje(
                                     extra={"llamada": cuerpo.llamada, "modo": cuerpo.modo, "plan_id_leccion": cuerpo.plan_id,
                                            "leccion_clave": cuerpo.leccion_clave, "contexto": cuerpo.contexto,
                                            "corregir": cuerpo.corregir and cuerpo.llamada,
+                                           "asesor": cuerpo.asesor,
                                            "nota_guardada": p.nota is not None})
         if p.nota is not None:
             eventos = _con_nota(p.nota, eventos)
