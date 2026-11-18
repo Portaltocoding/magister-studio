@@ -49,12 +49,16 @@ COMUN = CARPETA / "comun"
 INCLUIR = re.compile(r"^@incluir ([a-z_]+)[ \t]*$", re.M)
 
 
-def _expandir(texto: str) -> str:
+def _expandir(texto: str, profundidad: int = 0) -> str:
+    """Los trozos comunes pueden incluir otros (respuesta incluye explicar); un ciclo se corta con un error."""
+    if profundidad > 5:
+        raise ErrorPlantilla("los trozos comunes se incluyen en círculo")
+
     def trozo(m: re.Match[str]) -> str:
         ruta = COMUN / f"{m.group(1)}.md"
         if not ruta.is_file():
             raise ErrorPlantilla(f"no existe el trozo común {m.group(1)}")
-        return ruta.read_text(encoding="utf-8").strip()
+        return _expandir(ruta.read_text(encoding="utf-8").strip(), profundidad + 1)
 
     return INCLUIR.sub(trozo, texto)
 

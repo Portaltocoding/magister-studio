@@ -20,6 +20,20 @@ def test_incluir_solo_cuenta_en_su_propia_linea(tmp_path, monkeypatch):
     assert prompts._expandir("di «@incluir x» tal cual") == "di «@incluir x» tal cual"
 
 
+def test_un_trozo_puede_incluir_otro(tmp_path, monkeypatch):
+    (tmp_path / "dentro.md").write_text("núcleo", encoding="utf-8")
+    (tmp_path / "fuera.md").write_text("antes\n@incluir dentro\ndespués", encoding="utf-8")
+    monkeypatch.setattr(prompts, "COMUN", tmp_path)
+    assert prompts._expandir("@incluir fuera") == "antes\nnúcleo\ndespués"
+
+
+def test_un_trozo_que_se_incluye_a_si_mismo_falla(tmp_path, monkeypatch):
+    (tmp_path / "bucle.md").write_text("@incluir bucle", encoding="utf-8")
+    monkeypatch.setattr(prompts, "COMUN", tmp_path)
+    with pytest.raises(prompts.ErrorPlantilla):
+        prompts._expandir("@incluir bucle")
+
+
 def test_los_prompts_que_explican_llevan_el_nucleo_expandido():
     for nombre in ("responder", "conversar", "apuntes_bloque", "guion"):
         p = prompts._del_fichero(nombre)

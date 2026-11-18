@@ -8,8 +8,8 @@ Gravedad: **veto** bloquea el material; **aviso** va al informe; **sospecha** la
 |---|---|---|---|---|---|
 | raya | Nunca el carácter de la raya larga | Buscar el carácter | veto | todos | `—` |
 | unicode | Sin emojis ni símbolos fuera del Unicode básico | Rango de caracteres | veto | todos | (código) |
-| metatexto | Sin metatexto: el texto no habla de sí mismo | Lista de giros | aviso | todos | `\b(en estos apuntes\|como veremos\|a continuacion\|en esta seccion\|en este bloque\|como hemos visto\|vamos a ver)\b` |
-| condescendencia | Sin condescendencia | Lista de giros; el juez confirma | sospecha | todos | `\b(simplemente\|obviamente\|evidentemente\|es muy facil\|es trivial\|cualquiera sabe\|como todo el mundo sabe)\b` |
+| metatexto | Sin metatexto: el texto no habla de sí mismo | Lista de giros | aviso | todos | `\b(en estos apuntes\|como veremos\|lo veremos en\|te lo cuento en\|a continuacion\|en esta seccion\|en este bloque\|como hemos visto\|vamos a ver)\b` |
+| condescendencia | Sin condescendencia | Lista de giros; el juez confirma | sospecha | todos | `\b(simplemente\|obviamente\|evidentemente\|es muy facil\|es facil ver\|lo ves enseguida\|como puedes ver\|es trivial\|cualquiera sabe\|como todo el mundo sabe)\b` |
 | ingles | Término inglés con traducción la primera vez | Glosario y primera aparición | aviso | todos | (código) |
 | frase_larga | Frases de más de 40 palabras | Contar palabras | aviso | todos | (código) |
 | vinetas | Prosa convertida en listas | Más de la mitad de las líneas son viñetas | sospecha | apuntes | (código) |
