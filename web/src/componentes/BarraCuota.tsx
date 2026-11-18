@@ -28,6 +28,7 @@ export type Accion =
   | { accion: 'plan' }
 
 const pct = (x: number) => Math.round(x * 100)
+const POCO = 0.05 // menos del 5 % de la sesión: una línea en vez de las barras
 
 function cuando(epoch: number | null, semana: boolean): string {
   if (epoch == null) return ''
@@ -99,6 +100,14 @@ export default function BarraCuota({ accion, compacta = false }: { accion?: Acci
     return <p className="nota cuota-vacia">Tu uso aparecerá aquí después de la primera respuesta del tutor.</p>
   }
   const pasa = estimacion && estado.sesion && estimacion.sesion.extra != null && estado.sesion.uso + estimacion.sesion.extra > 1
+  // Si gasta poco y te sobra sesión, basta una línea: las barras, para lo que de verdad pesa.
+  const extra = estimacion?.sesion.extra
+  if (!compacta && estado.sesion && extra != null && extra < POCO && estado.sesion.uso < 0.8)
+    return (
+      <p className="nota cuota-poco" title={`Semana: ${estado.semana ? pct(estado.semana.uso) : '—'} % usado`}>
+        Gasta poco: {extra < 0.005 ? 'menos del 1' : `un ${pct(extra)}`} % de tu sesión (llevas un {pct(estado.sesion.uso)} %).
+      </p>
+    )
   return (
     <div className={`cuota ${compacta ? 'cuota-compacta' : ''}`}>
       {estado.sesion && <Fila nombre="Sesión" v={estado.sesion} extra={estimacion?.sesion.extra ?? null} semana={false} compacta={compacta} />}

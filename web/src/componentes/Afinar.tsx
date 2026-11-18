@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from './preferencias.ts'
 import Mascota from '../Mascota.tsx'
-import { asesorActivo, EVENTO_COGER, EVENTO_ESTADO } from './Asesor.tsx'
+import { abrirAsesor, asesorActivo, EVENTO_COGER, EVENTO_ESTADO } from './Asesor.tsx'
 
 // La mascota de la barra de arriba: siempre a la vista; al pulsarla, los ajustes rápidos del tutor (cómo te explica).
 // Todo lo demás (lo que recuerda de ti, aspecto, voz, avisos) está en la sección Ajustes.
@@ -145,6 +145,16 @@ export default function Afinar() {
             </>
           )}
           <div className="afinar-pie">
+            <button
+              type="button"
+              className="boton-mini"
+              onClick={() => {
+                setAbierto(false)
+                abrirAsesor()
+              }}
+            >
+              Pregúntame sobre esta pantalla
+            </button>
             <button
               type="button"
               className="boton-mini"

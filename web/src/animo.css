@@ -50,3 +50,11 @@
   .pantalla, .proyecto-paso.recien, .proyecto-paso-titulo input:checked { animation: none; }
   .confeti { display: none; }
 }
+
+/* La pista de la primera visita a una pantalla (PistaPantalla.tsx) */
+.pista-pantalla { display: flex; align-items: center; gap: 12px; max-width: 980px; margin: 0 auto 16px; padding: 10px 14px; border: 1px solid var(--borde); border-radius: 12px; background: var(--tarjeta); }
+.pista-pantalla p { margin: 0; flex: 1; font-size: 0.92rem; line-height: 1.4; }
+.pista-mascota { flex: none; display: inline-flex; }
+.pista-botones { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pista-apagar { background: none; border: 0; padding: 2px 4px; color: var(--suave); font-size: 0.78rem; text-decoration: underline; cursor: pointer; }
+@media (max-width: 640px) { .pista-pantalla { flex-wrap: wrap; } .pista-botones { width: 100%; } }

@@ -16,6 +16,10 @@ import { aCss } from './escala.ts'
 
 export const EVENTO_COGER = 'magister-asesor-coger'
 export const EVENTO_ESTADO = 'magister-asesor-estado'
+// Abrir el asesor desde cualquier sitio (las pistas de cada pantalla, el menú de la mascota): si está en la barra, sale
+// a la esquina de abajo a la derecha y abre su chat.
+export const EVENTO_ABRIR = 'magister-asesor-abrir'
+export const abrirAsesor = () => window.dispatchEvent(new CustomEvent(EVENTO_ABRIR))
 const CLAVE = 'magister-asesor'
 const CLAVE_HILOS = 'magister-asesor-hilos'
 const TAM = 64 // lo que mide la mascota flotante
@@ -208,6 +212,16 @@ export default function Asesor() {
     window.addEventListener(EVENTO_COGER, al)
     return () => window.removeEventListener(EVENTO_COGER, al)
   }, [arrastrar])
+
+  useEffect(() => {
+    const al = () => {
+      if (!sitioRef.current.activo) fijar({ activo: true, ...dentro(window.innerWidth, window.innerHeight) })
+      setAbrioAhora(true)
+      setAbierto(true)
+    }
+    window.addEventListener(EVENTO_ABRIR, al)
+    return () => window.removeEventListener(EVENTO_ABRIR, al)
+  }, [fijar, setAbierto])
 
   // Si la ventana encoge, que no se quede fuera.
   useEffect(() => {

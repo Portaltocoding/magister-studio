@@ -6,6 +6,7 @@ import { familiaDe, type IdModo } from './modos.ts'
 import PanelPractica from './paneles/PanelPractica.tsx'
 import PanelTutor from './paneles/PanelTutor.tsx'
 import PanelGuia from './paneles/PanelGuia.tsx'
+import PistaPantalla from './componentes/PistaPantalla.tsx'
 
 // Las pantallas menos usadas se cargan al abrirlas (Hoy, Tutor, Repaso y Estudio libre van con la app).
 const PanelCalendario = lazy(() => import('./paneles/PanelCalendario.tsx'))
@@ -59,6 +60,7 @@ export default function Central(props: Props) {
       <Pestanas modo={props.modo} irA={props.irA} />
       {/* La clave hace que cada pantalla nueva entre con su fundido (animo.css). */}
       <div key={props.modo} className="pantalla">
+        <PistaPantalla modo={props.modo} />
         <FalloPantalla>
           {/* Las pantallas menos usadas se cargan al abrirlas: la app arranca con menos código. */}
           <Suspense fallback={<p className="vacio">Cargando…</p>}>
