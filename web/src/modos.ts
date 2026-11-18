@@ -132,5 +132,7 @@ export const FAMILIAS: [IdModo, string][][] = [
 ]
 
 export const familiaDe = (m: IdModo) => FAMILIAS.find((f) => f.some(([id]) => id === m)) ?? null
+// La entrada de la barra a la que pertenece un modo («Lecciones» para Vídeos): el tema de risografía le da su tinta.
+export const grupoDe = (m: IdModo): string => GRUPOS.find((g) => g.modos.some((x) => x.id === m))?.nombre ?? (TALLER.some((x) => x.id === m) ? 'Taller' : '')
 // La primera subsección de la entrada en la que estás (en Examen, Repaso): sirve para iluminar la tira de iconos.
 export const padreDe = (m: IdModo): IdModo => familiaDe(m)?.[0][0] ?? m

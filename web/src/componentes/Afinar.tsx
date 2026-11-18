@@ -4,6 +4,7 @@ import { cambiarPreferencias, todosLosModos, usarPreferencias, type Preferencias
 import Mascota, { elegirForma, FORMAS, usarForma } from '../Mascota.tsx'
 import Colores from './Colores.tsx'
 import { asesorActivo, EVENTO_COGER, EVENTO_ESTADO } from './Asesor.tsx'
+import { elegirTema, temaGuardado, TEMAS, type Tema } from './tema.ts'
 
 // La mascota de la barra de arriba: siempre a la vista; al pulsarla, «Afina a tu tutor».
 // Lo que eliges se guarda en el servidor y el tutor lo tiene en cuenta desde el siguiente mensaje.
@@ -38,6 +39,7 @@ export default function Afinar() {
   const [guardado, setGuardado] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
   const [avisos, setAvisos] = useState(() => 'Notification' in window && Notification.permission === 'granted' && avisosActivos())
+  const [tema, setTema] = useState<Tema>(temaGuardado)
   // Si la mascota está fuera como asesor, en la barra queda su hueco.
   const [fuera, setFuera] = useState(asesorActivo)
   const ultimo = useRef({ x: 0, y: 0 })
@@ -207,6 +209,25 @@ export default function Afinar() {
                 />
                 Avisos del navegador: tu sesión de hoy y el pomodoro (el tomate)
               </label>
+              <div className="afinar-tema" role="radiogroup" aria-label="Aspecto">
+                <span className="nota">Aspecto</span>
+                {TEMAS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={tema === t.id}
+                    className={`opcion opcion-chip ${tema === t.id ? 'elegida' : ''}`}
+                    title={t.descripcion}
+                    onClick={() => {
+                      elegirTema(t.id)
+                      setTema(t.id)
+                    }}
+                  >
+                    {t.nombre}
+                  </button>
+                ))}
+              </div>
               <div className="afinar-pie">
                 <Colores clase="boton-mini" />
                 <button type="button" className="boton-mini" onClick={() => (window.location.hash = '#/animaciones')}>

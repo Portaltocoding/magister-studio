@@ -12,6 +12,11 @@ import './itunes.css'
 import './proyectos.css'
 import './asesor.css'
 import './animo.css'
+import './riso.css'
+import { aplicarTema } from './componentes/tema.ts'
+
+// El aspecto elegido, antes de pintar nada (sin destello del otro tema al abrir).
+aplicarTema()
 import Marco from './Marco.tsx'
 
 createRoot(document.getElementById('root')!).render(

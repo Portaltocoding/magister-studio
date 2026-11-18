@@ -1,0 +1,119 @@
+/* ===== Tema «Risografía»: papel crema, tinta azul noche y una tinta de imprenta por sección =====
+   Colores planos de verdad (los de las tintas Riso), sin degradados ni brillos: bordes de tinta, sombras duras
+   desplazadas como un mal registro de imprenta y el amarillo para subrayar. Solo se aplica con <html data-tema="riso">. */
+
+/* El selector de aspecto, en «Afina a tu tutor» (vale para los dos temas). */
+.afinar-tema { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.afinar-tema .nota { margin-right: 4px; }
+
+html[data-tema="riso"] {
+  color-scheme: light;
+  --fondo: #f3ecdc;
+  --panel: #ebe2cb;
+  --tarjeta: #fffcf3;
+  --borde: #d3c5a5;
+  --texto: #1d1b3a;
+  --suave: #5a566f;
+  --activo: #e4d8bb;
+  --ok: #00a95c;
+  --deber: #3255a4;
+  --examen: #f15060;
+  --clase: #00a95c;
+  --notac: #a8650a;
+  --amarillo: #ffe800;
+  --sombra: 0 0 0 1px var(--borde);
+  --sombra-suave: 3px 3px 0 rgb(29 27 58 / 0.13);
+  background: var(--fondo);
+  accent-color: #3255a4;
+}
+html[data-tema="riso"] body { background: var(--fondo); color: var(--texto); }
+html[data-tema="riso"] ::selection { background: var(--amarillo); color: var(--texto); }
+
+/* La tinta de cada sección (y el color del texto que va encima de ella). */
+html[data-tema="riso"] .marco { --tinta: #3255a4; --tinta-texto: #ffffff; }
+html[data-tema="riso"] .marco[data-seccion="hoy"] { --tinta: #ff6c2f; --tinta-texto: var(--texto); }
+html[data-tema="riso"] .marco[data-seccion="lecciones"] { --tinta: #ff48b0; --tinta-texto: var(--texto); }
+html[data-tema="riso"] .marco[data-seccion="practicar"] { --tinta: #00a95c; --tinta-texto: var(--texto); }
+html[data-tema="riso"] .marco[data-seccion="proyectos"] { --tinta: #765ba7; --tinta-texto: #ffffff; }
+html[data-tema="riso"] .marco[data-seccion="plan"] { --tinta: #f15060; --tinta-texto: var(--texto); }
+html[data-tema="riso"] .marco[data-seccion="biblioteca"] { --tinta: #00838a; --tinta-texto: #ffffff; }
+
+/* Todo lo que ya usa el acento pasa a usar la tinta de la sección (el acento por lección se respeta en el modo
+   clásico; aquí manda la sección). */
+html[data-tema="riso"] .marco {
+  --acento: var(--tinta);
+  --acento-suave: color-mix(in srgb, var(--tinta) 16%, #fffcf3);
+  --t-acento: var(--tinta) !important;
+  --t-resalte: color-mix(in srgb, var(--tinta) 22%, #fffcf3) !important;
+  --t-acento-tinta: color-mix(in srgb, var(--tinta) 55%, #1d1b3a) !important;
+  --t-oscuro: #1d1b3a;
+  --t-papel: #fffcf3;
+  accent-color: var(--tinta);
+}
+
+/* Papel con un grano muy suave, como el de una risografía. */
+html[data-tema="riso"] body::before {
+  content: ''; position: fixed; inset: 0; z-index: 1000; pointer-events: none; opacity: 0.06; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.11 0 0 0 0 0.1 0 0 0 0 0.23 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+/* Barras: crema sólida en lugar de cristal esmerilado. */
+html[data-tema="riso"] .sesion { background: color-mix(in srgb, var(--fondo) 92%, transparent); border-bottom: 1.5px solid var(--texto); }
+html[data-tema="riso"] :is(.riel, .marco .lateral) { background: var(--panel); border-color: var(--texto); }
+
+/* Títulos: tinta de la sección como subrayado grueso, como un paso de imprenta. */
+html[data-tema="riso"] .central :is(.panel h1, .tutor-hoy h1, .proyecto-cabeza h1, .hoy-cabecera h1) {
+  text-decoration: underline; text-decoration-color: var(--tinta); text-decoration-thickness: 0.22em;
+  text-underline-offset: 0.12em; text-decoration-skip-ink: none;
+}
+
+/* Botones: el principal, tinta plena con borde y sombra dura; los demás, papel con borde de tinta. */
+html[data-tema="riso"] .boton-principal {
+  background: var(--tinta); color: var(--tinta-texto); border: 2px solid var(--texto); box-shadow: 3px 3px 0 var(--texto);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+html[data-tema="riso"] .boton-principal:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--texto); border-color: var(--texto); }
+html[data-tema="riso"] .boton-principal:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--texto); }
+html[data-tema="riso"] :is(.boton, .boton-mini):not(.boton-principal) { background: var(--tarjeta); color: var(--texto); border: 1.5px solid color-mix(in srgb, var(--texto) 40%, transparent); }
+html[data-tema="riso"] :is(.boton, .boton-mini):not(.boton-principal):hover:not(:disabled) { border-color: var(--tinta); }
+
+/* Pestañas de arriba y chips elegidos: tinta plena. */
+html[data-tema="riso"] .pestanas-modo { background: var(--panel); border: 1.5px solid var(--texto); }
+html[data-tema="riso"] .pestanas-modo button.actual { background: var(--tinta); color: var(--tinta-texto); box-shadow: none; }
+html[data-tema="riso"] :is(.opcion.elegida, .opcion-chip.elegida, .opcion[aria-checked="true"]) { background: var(--tinta); color: var(--tinta-texto); border-color: var(--texto); }
+
+/* Barra lateral: cada sección con su punto de tinta; la que está abierta, marcada con su color. */
+html[data-tema="riso"] .grupo-entrada { --tinta-grupo: #3255a4; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="hoy"] { --tinta-grupo: #ff6c2f; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="lecciones"] { --tinta-grupo: #ff48b0; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="practicar"] { --tinta-grupo: #00a95c; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="proyectos"] { --tinta-grupo: #765ba7; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="plan"] { --tinta-grupo: #f15060; }
+html[data-tema="riso"] .grupo-entrada[data-seccion="biblioteca"] { --tinta-grupo: #00838a; }
+html[data-tema="riso"] .grupo-entrada .entrada::before {
+  content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 9px; border-radius: 50%;
+  background: var(--tinta-grupo); border: 1.5px solid var(--texto); vertical-align: -1px;
+}
+html[data-tema="riso"] .grupo-entrada.dentro .entrada { color: var(--texto); }
+html[data-tema="riso"] .grupo-entrada .modo[aria-current="page"] {
+  background: color-mix(in srgb, var(--tinta-grupo) 24%, var(--tarjeta)); color: var(--texto); box-shadow: inset 3px 0 0 var(--tinta-grupo);
+}
+html[data-tema="riso"] .riel-boton.actual { background: var(--tinta); color: var(--tinta-texto); }
+
+/* Tarjetas: papel claro, borde de tinta suave y la sombra dura del mal registro. */
+html[data-tema="riso"] :is(.proyecto-tarjeta, .proyecto-nivel:not(.esbozado), .proyecto-retomar, .guia-paso, .guia-bocadillo, .lecciones > li,
+  .tu-dia, .repaso-tema, .tarjeta, .nuevo-video, .llamada-pizarra, .asesor-chat, .proyecto-nuevo, .proyecto-explicacion details) {
+  background: var(--tarjeta); border: 1.5px solid color-mix(in srgb, var(--texto) 22%, transparent); box-shadow: var(--sombra-suave);
+}
+html[data-tema="riso"] .guia-paso.ahora, html[data-tema="riso"] .proyecto-retomar { border-color: var(--texto); box-shadow: 4px 4px 0 var(--tinta); }
+html[data-tema="riso"] .guia-paso.abierto { box-shadow: 5px 5px 0 var(--tinta); border-color: var(--texto); }
+html[data-tema="riso"] .guia-paso.ahora .guia-num { background: var(--tinta); color: var(--tinta-texto); border-color: var(--texto); }
+
+/* El amarillo, para resaltar: el MVP, las etiquetas pequeñas y la priming. */
+html[data-tema="riso"] .proyecto-mvp { background: var(--amarillo); color: var(--texto); border: 1.5px solid var(--texto); }
+html[data-tema="riso"] .proyecto-priming { background: color-mix(in srgb, var(--amarillo) 32%, var(--tarjeta)); border-left-color: var(--texto); }
+html[data-tema="riso"] :is(.retomar-etq, .proyecto-etiqueta, .proyecto-nivel-num, .asesor-etq) { color: color-mix(in srgb, var(--tinta) 70%, var(--texto)); }
+html[data-tema="riso"] .proyecto-barra { background: color-mix(in srgb, var(--texto) 12%, transparent); border: 1px solid var(--texto); }
+
+/* La mascota de la barra, en un círculo de papel con borde de tinta. */
+html[data-tema="riso"] .afinar-boton { background: var(--tarjeta); border: 1.5px solid var(--texto); }

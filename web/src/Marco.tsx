@@ -9,7 +9,8 @@ import Asesor from './componentes/Asesor.tsx'
 import { avisar } from './componentes/pomodoro.ts'
 import { acentoDe, sincronizarAcento, usarColores, variables } from './componentes/colores.ts'
 import Central from './Central.tsx'
-import { MODOS, type IdModo } from './modos.ts'
+import { grupoDe, MODOS, type IdModo } from './modos.ts'
+import { claveSeccion } from './componentes/tema.ts'
 
 // El modo y la conversación viajan en la URL (#/roadmap, #/conversacion/6):
 // recargar no te saca de donde estabas y se puede enlazar una vista.
@@ -128,7 +129,11 @@ export default function Marco() {
   const tipo: 'libre' | 'plan' = actual ? (actual.tipo === 'plan' ? 'plan' : 'libre') : tipoNueva
 
   return (
-    <div className={`marco ${menu ? 'menu-abierto' : ''} ${fija ? 'lateral-fija' : ''}`} style={variables(acentoDe(colores, null))}>
+    <div
+      className={`marco ${menu ? 'menu-abierto' : ''} ${fija ? 'lateral-fija' : ''}`}
+      data-seccion={claveSeccion(grupoDe(modo))}
+      style={variables(acentoDe(colores, null))}
+    >
       <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />
       <Riel modo={modo} hoy={hoy} alAbrir={() => setMenu(true)} alIr={(m) => setModo(m)} />
       <BarraLateral

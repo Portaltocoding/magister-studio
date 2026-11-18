@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { borrarConversacion, type Conversacion } from './api.ts'
 import { GRUPOS, TALLER, type IdModo } from './modos.ts'
+import { claveSeccion } from './componentes/tema.ts'
 
 interface Props {
   modoActivo: IdModo
@@ -118,7 +119,12 @@ export default function BarraLateral({
           const plegada = plegadas.includes(g.nombre)
           const idLista = `seccion-${ig}`
           return (
-            <div key={g.nombre} className={`grupo-modos grupo-entrada ${dentro ? 'dentro' : ''} ${plegada ? 'plegada' : ''}`} data-orden={ig}>
+            <div
+              key={g.nombre}
+              className={`grupo-modos grupo-entrada ${dentro ? 'dentro' : ''} ${plegada ? 'plegada' : ''}`}
+              data-orden={ig}
+              data-seccion={claveSeccion(g.nombre)}
+            >
               <div className="entrada-fila">
                 <button
                   type="button"
