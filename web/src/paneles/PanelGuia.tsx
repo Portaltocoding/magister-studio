@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { pedir, rutaExamen } from '../api.ts'
 import Mascota from '../Mascota.tsx'
 import type { IdModo } from '../modos.ts'
@@ -145,6 +145,8 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
   const [enCurso, setEnCurso] = useState<EnCurso | null>(null)
   const [comentario, setComentario] = useState<string | null>(null)
   const [abriendo, setAbriendo] = useState(false)
+  // El paso ampliado en la lista: un clic lo amplía y otro entra. Sin elegir, el que toca ahora.
+  const [elegido, setElegido] = useState<string | null>(null)
   const indice = usarIndice(hoy?.plan_id)
 
   const cargar = useCallback(() => {
@@ -230,34 +232,38 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
     return 'Ir al repaso del tema'
   }
 
+  const entrar = (p: Paso) => (p.tipo === 'leccion' && !p.material_id ? irARuta(`#/fichas/${hoy.tema_id}/${p.clave}`) : empezar(p))
+  const ampliado = pasos.find((p) => p.id === (elegido ?? actual?.id)) ?? null
+  // Un clic amplía; otro clic en el ampliado entra (si hay algo en lo que entrar).
+  const pulsar = (p: Paso) => {
+    if (ampliado?.id !== p.id) return setElegido(p.id)
+    if (!p.hecho || p.tipo === 'leccion') void entrar(p)
+  }
+  const mover = (d: number) => {
+    if (!pasos.length) return
+    const i = ampliado ? pasos.indexOf(ampliado) : -1
+    setElegido(pasos[Math.max(0, Math.min(pasos.length - 1, i + d))].id)
+  }
+  // Lo que dice el tutor sobre el paso ampliado, si no es el que toca ahora.
+  const sobre = (p: Paso): string => {
+    const av = p.tipo === 'leccion' && p.material_id ? leerAvance(p.material_id) : null
+    if (p.hecho) return `«${p.titulo}» ya está hecho.${p.tipo === 'leccion' ? ' Si quieres repasarlo, otro clic y entramos.' : ''}`
+    if (dia.saltados.includes(p.id)) return `«${p.titulo}» lo dejamos para otro día. Si te apetece, lo retomamos.`
+    if (p.tipo === 'leccion' && !p.material_id) return `«${p.titulo}» aún no tiene apuntes: otro clic y la preparamos.`
+    return `${p.titulo} (${p.detalle})${av ? `: la dejaste en la idea ${av.i + 1}` : ''}. Otro clic y entramos.`
+  }
+  const dice = ampliado && actual && ampliado.id !== actual.id ? sobre(ampliado) : frase(pasos, actual, hoy, comentario)
+
   return (
     <div className="guia">
-      <div className="guia-cabeza">
-        <div className="guia-mascota">
+      <aside className="guia-lado">
+        <div className={`guia-mascota ${abriendo ? 'pensando' : ''}`}>
           <Mascota gesto={abriendo ? 'pensando' : 'hablando'} />
         </div>
         <div className="guia-bocadillo" role="status">
           <span className="vacio-etq">Tu tutor</span>
-          <p>{frase(pasos, actual, hoy, comentario)}</p>
-          {actual && (
-            <div className="vacio-acciones">
-              <button
-                className="boton boton-principal"
-                disabled={abriendo}
-                onClick={() => (actual.tipo === 'leccion' && !actual.material_id ? irARuta(`#/fichas/${hoy.tema_id}/${actual.clave}`) : empezar(actual))}
-              >
-                {abriendo ? 'Abriendo…' : boton(actual)}
-              </button>
-              {actual.tipo === 'leccion' && actual.material_id && (
-                <button className="boton" onClick={() => irARuta(`#/llamada/clase/${actual.clave}`)} title="Te la explica en voz y le interrumpes con tus dudas">
-                  Mejor por llamada
-                </button>
-              )}
-              <button className="boton boton-suave" onClick={() => saltar(actual)}>
-                Hoy no
-              </button>
-            </div>
-          )}
+          {/* La clave hace que cada frase nueva entre con un fundido suave. */}
+          <p key={dice}>{dice}</p>
           {!actual && hoy.estado === 'sin_plan' && (
             <div className="vacio-acciones">
               <button className="boton boton-principal" onClick={() => irARuta('#/nuevo-plan')}>
@@ -284,33 +290,77 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
       {pasos.length > 0 && (
-        <ol className="guia-pasos" aria-label="La sesión de hoy">
+        <ol
+          className="guia-pasos"
+          aria-label="Lo que toca hoy"
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault()
+              mover(e.key === 'ArrowDown' ? 1 : -1)
+            }
+          }}
+        >
           {pasos.map((p, i) => {
             const estado = p.hecho ? 'hecho' : dia.saltados.includes(p.id) ? 'saltado' : p === actual ? 'ahora' : 'luego'
+            const abierto = ampliado?.id === p.id
             return (
-              <li key={p.id} className={`guia-paso ${estado}`}>
-                <span className="guia-num">{p.hecho ? '✓' : i + 1}</span>
-                <span className="guia-texto">
-                  <strong>{p.titulo}</strong>
-                  <small>{p.detalle}</small>
-                </span>
-                <small className="guia-estado">
-                  {estado === 'ahora' ? `paso ${n} de ${pasos.length}` : estado === 'saltado' ? 'hoy no' : estado === 'hecho' ? 'hecho' : ''}
-                </small>
-                {estado === 'saltado' && (
-                  <button className="boton-mini" onClick={() => cambiarDia({ ...dia, saltados: dia.saltados.filter((x) => x !== p.id) })}>
-                    Retomar
-                  </button>
-                )}
+              <li key={p.id} className={`guia-paso ${estado} ${abierto ? 'abierto' : ''}`} style={{ '--i': i } as CSSProperties}>
+                <button
+                  type="button"
+                  className="guia-paso-cabeza"
+                  aria-expanded={abierto}
+                  onClick={() => pulsar(p)}
+                  ref={(el) => {
+                    if (el && abierto && document.activeElement?.closest('.guia-pasos')) el.focus()
+                  }}
+                >
+                  <span className="guia-num">{p.hecho ? '✓' : i + 1}</span>
+                  <span className="guia-texto">
+                    <strong>{p.titulo}</strong>
+                    <small>{p.detalle}</small>
+                  </span>
+                  <small className="guia-estado">
+                    {estado === 'ahora' ? `paso ${n} de ${pasos.length}` : estado === 'saltado' ? 'hoy no' : estado === 'hecho' ? 'hecho' : ''}
+                  </small>
+                  <span className="guia-flecha" aria-hidden>
+                    {abierto ? '→' : '›'}
+                  </span>
+                </button>
+                <div className="guia-paso-mas" aria-hidden={!abierto}>
+                  <div>
+                    <div className="vacio-acciones">
+                      {(!p.hecho || p.tipo === 'leccion') && estado !== 'saltado' && (
+                        <button className="boton boton-principal" disabled={abriendo} tabIndex={abierto ? 0 : -1} onClick={() => void entrar(p)}>
+                          {abriendo ? 'Abriendo…' : p.hecho ? 'Repasarla' : boton(p)}
+                        </button>
+                      )}
+                      {p.tipo === 'leccion' && p.material_id && !p.hecho && estado !== 'saltado' && (
+                        <button className="boton" tabIndex={abierto ? 0 : -1} onClick={() => irARuta(`#/llamada/clase/${p.clave}`)} title="Te la explica en voz y le interrumpes con tus dudas">
+                          Mejor por llamada
+                        </button>
+                      )}
+                      {estado === 'saltado' ? (
+                        <button className="boton" tabIndex={abierto ? 0 : -1} onClick={() => cambiarDia({ ...dia, saltados: dia.saltados.filter((x) => x !== p.id) })}>
+                          Retomar
+                        </button>
+                      ) : (
+                        !p.hecho && (
+                          <button className="boton boton-suave" tabIndex={abierto ? 0 : -1} onClick={() => saltar(p)}>
+                            Hoy no
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
               </li>
             )
           })}
         </ol>
       )}
-
     </div>
   )
 }

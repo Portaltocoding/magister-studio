@@ -149,6 +149,9 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 .mascota-ojo + .mascota-ojo { animation-delay: 0.02s; }
 @keyframes parpadeo { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
 @media (prefers-reduced-motion: reduce) { .mascota-ojo { animation: none; } .mascota .mascota-pupila, .mascota .mascota-brillo { transition: none; } }
+/* Al pasarle el cursor por encima, cierra los ojos (como si le hicieras una caricia) y los abre al irte. */
+.mascota-ojo { transition: transform 180ms ease-out; }
+.mascota:hover .mascota-ojo, .mascota:hover .mascota-ojo + .mascota-ojo { animation: none; transform: scaleY(0.1); }
 /* Elegir mascota en «Afina a tu tutor» */
 .afinar-mascotas { display: flex; gap: 8px; }
 .afinar-mascotas button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 8px; font: inherit; font-size: 0.75rem; color: var(--texto); background: transparent; border: 1px solid transparent; border-radius: 12px; cursor: pointer; }
