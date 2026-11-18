@@ -55,7 +55,8 @@ def _salida(p: Proyecto, completo: bool = True) -> dict:
     if not completo:
         return base
     return {**base, "idea": p.idea, "objetivo": p.objetivo, "sabes": p.sabes, "ritmo": p.ritmo, "roadmap": p.roadmap,
-            "referencias": p.referencias or [], "arquitectura_svg": p.arquitectura_svg, "hechos": p.hechos or []}
+            "referencias": p.referencias or [], "arquitectura_svg": p.arquitectura_svg, "hechos": p.hechos or [],
+            "hechos_en": p.hechos_en or {}}
 
 
 async def _proyecto(pid: int) -> Proyecto:
@@ -136,6 +137,12 @@ async def marcar(pid: int, paso_id: str, cuerpo: Hecho) -> dict:
             raise HTTPException(404, "ese paso no existe")
         hechos = [x for x in (p.hechos or []) if x != paso_id]
         p.hechos = [*hechos, paso_id] if cuerpo.hecho else hechos
+        fechas = {k: v for k, v in (p.hechos_en or {}).items() if k != paso_id}
+        if cuerpo.hecho:
+            from datetime import datetime, timezone
+
+            fechas[paso_id] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        p.hechos_en = fechas
     return _salida(await _proyecto(pid), completo=False)
 
 

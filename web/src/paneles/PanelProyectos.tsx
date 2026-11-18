@@ -65,6 +65,7 @@ interface Proyecto extends ProyectoResumen {
   referencias: { url: string; titulo: string; motivo: string }[]
   arquitectura_svg: string | null
   hechos: string[]
+  hechos_en?: Record<string, string>
   trabajo?: { estado: string; nodo: string | null } | null
 }
 interface Decision {
@@ -75,6 +76,137 @@ interface Decision {
   consecuencias: string | null
   paso_id: string | null
   creada_en: string
+}
+
+// ---- Retomar: por dónde íbamos y a qué vamos (sin modelo, de tus datos) ----
+
+const normal = (t: string) =>
+  ` ${t
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9ñ]+/g, ' ')} `
+
+export function haceCuanto(iso: string, ahora = new Date()): string {
+  const dias = Math.floor((new Date(ahora.toDateString()).getTime() - new Date(new Date(iso).toDateString()).getTime()) / 86400000)
+  if (dias <= 0) return 'hoy'
+  if (dias === 1) return 'ayer'
+  if (dias < 14) return `hace ${dias} días`
+  return `hace ${Math.round(dias / 7)} semanas`
+}
+
+interface HojaDeRuta {
+  ultimoEn: string | null
+  ultimos: Paso[]
+  siguiente: { paso: Paso; bloque: Bloque; nivel: Nivel } | null
+  frescos: { termino: string; definicion: string }[]
+  restoBloque: Paso[]
+  siguienteNivel: Nivel | null
+  sinDetallar: Nivel | null
+}
+
+// Todo sale del roadmap y de lo marcado: el siguiente paso es el primero sin hacer en orden; lo que conviene tener
+// fresco, los términos del glosario que salen en los dos pasos siguientes (o en su bloque).
+export function hojaDeRuta(r: Roadmap, hechos: string[], hechosEn: Record<string, string>): HojaDeRuta {
+  const hechosSet = new Set(hechos)
+  const todos = r.niveles.flatMap((n) => n.bloques.flatMap((b) => b.pasos.map((paso) => ({ paso, bloque: b, nivel: n }))))
+  const siguiente = todos.find((x) => !hechosSet.has(x.paso.id)) ?? null
+  // Lo último que marcaste primero; con la misma fecha, el que va después en el roadmap.
+  const orden = new Map(todos.map((x, i) => [x.paso.id, i]))
+  const fechas = Object.entries(hechosEn).sort((a, b) => b[1].localeCompare(a[1]) || (orden.get(b[0]) ?? 0) - (orden.get(a[0]) ?? 0))
+  const porId = new Map(todos.map((x) => [x.paso.id, x.paso]))
+  const ultimos = fechas.map(([id]) => porId.get(id)).filter((x): x is Paso => !!x).slice(0, 3)
+  let frescos: HojaDeRuta['frescos'] = []
+  if (siguiente) {
+    const i = todos.indexOf(siguiente)
+    const proximos = todos.slice(i, i + 2).filter((x) => x.bloque.id === siguiente.bloque.id)
+    const texto = normal([siguiente.bloque.titulo, ...proximos.map((x) => `${x.paso.titulo} ${x.paso.que_haces} ${x.paso.antes} ${x.paso.hecho_si}`)].join(' '))
+    frescos = r.glosario
+      .filter((g) => {
+        const t = normal(g.termino.replace(/\(.*?\)/g, '')).trim()
+        return t.length > 1 && texto.includes(` ${t} `)
+      })
+      .slice(0, 4)
+  }
+  const restoBloque = siguiente ? siguiente.bloque.pasos.filter((x) => !hechosSet.has(x.id) && x.id !== siguiente.paso.id) : []
+  const nivelActual = siguiente?.nivel ?? null
+  const siguienteNivel = nivelActual ? (r.niveles.find((n) => n.numero === nivelActual.numero + 1) ?? null) : null
+  const sinDetallar = siguiente ? null : (r.niveles.find((n) => !n.detallado) ?? null)
+  return { ultimoEn: fechas[0]?.[1] ?? null, ultimos, siguiente, frescos, restoBloque, siguienteNivel, sinDetallar }
+}
+
+function Retomar({ p, ultimaDecision, alDetallar, ocupado }: { p: Proyecto; ultimaDecision: Decision | null; alDetallar: (n: number) => void; ocupado: boolean }) {
+  const r = p.roadmap!
+  const h = hojaDeRuta(r, p.hechos, p.hechos_en ?? {})
+  const empezado = p.hechos.length > 0
+  const ir = (id: string) => {
+    const el = document.getElementById(`paso-${id}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('destacado')
+    window.setTimeout(() => el.classList.remove('destacado'), 1800)
+  }
+  const tituloNivel = (n: Nivel) => n.titulo.replace(/^\s*nivel\s*\d+\s*[:·.\-–]\s*/i, '').replace(/^./, (c) => c.toUpperCase())
+  return (
+    <section className="proyecto-retomar" aria-label={empezado ? 'Por dónde íbamos' : 'Por dónde empezar'}>
+      <h2>{empezado ? 'Por dónde íbamos' : 'Por dónde empezar'}</h2>
+      {empezado && h.ultimoEn && (
+        <p className="retomar-donde">
+          Lo dejaste <strong>{haceCuanto(h.ultimoEn)}</strong>
+          {h.ultimos[0] ? ` tras «${h.ultimos[0].titulo}»` : ''}
+          {h.ultimos.length > 1 ? ` (antes, ${h.ultimos.slice(1).map((x) => `«${x.titulo}»`).join(' y ')})` : ''}.
+          {ultimaDecision ? ` Última decisión: ${ultimaDecision.titulo}.` : ''}
+        </p>
+      )}
+      {h.siguiente ? (
+        <div className="retomar-ahora">
+          <span className="retomar-etq">Ahora toca</span>
+          <button type="button" className="retomar-paso" onClick={() => ir(h.siguiente!.paso.id)}>
+            <strong>{h.siguiente.paso.titulo}</strong>
+            <span className="nota">
+              Nivel {h.siguiente.nivel.numero} · {h.siguiente.bloque.titulo} · {horas(h.siguiente.paso.minutos)} →
+            </span>
+          </button>
+          <p className="retomar-antes">{h.siguiente.paso.antes.split(/(?<=[.!?])\s/)[0]}</p>
+        </div>
+      ) : h.sinDetallar ? (
+        <div className="retomar-ahora">
+          <span className="retomar-etq">Ahora toca</span>
+          <p>
+            Lo detallado está hecho. El siguiente nivel, «{tituloNivel(h.sinDetallar)}», aún está esbozado.
+          </p>
+          <button className="boton boton-principal" disabled={ocupado} onClick={() => alDetallar(h.sinDetallar!.numero)}>
+            Detallar el nivel {h.sinDetallar.numero}
+          </button>
+        </div>
+      ) : (
+        <p>Todo hecho. Proyecto terminado.</p>
+      )}
+      {h.frescos.length > 0 && (
+        <div className="retomar-frescos">
+          <span className="retomar-etq">Ten fresco</span>
+          <dl>
+            {h.frescos.map((g) => (
+              <div key={g.termino}>
+                <dt>{g.termino}</dt>
+                <dd>{g.definicion}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+      {h.siguiente && (
+        <p className="retomar-vamos nota">
+          <span className="retomar-etq">A dónde vamos</span>{' '}
+          {h.restoBloque.length > 0
+            ? `Después, ${h.restoBloque.length === 1 ? 'un paso más' : `${h.restoBloque.length} pasos más`} para cerrar «${h.siguiente.bloque.titulo}». `
+            : `Con este cierras «${h.siguiente.bloque.titulo}». `}
+          Al acabar el nivel {h.siguiente.nivel.numero}: {h.siguiente.nivel.objetivo}
+          {h.siguienteNivel && ` Luego, el nivel ${h.siguienteNivel.numero}: «${tituloNivel(h.siguienteNivel)}».`}
+        </p>
+      )}
+    </section>
+  )
 }
 
 const FASES: Record<string, string> = {
@@ -229,6 +361,11 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   useEffect(() => {
     void cargar()
   }, [cargar])
+  // La última decisión del diario, para «por dónde íbamos».
+  const [ultimaDecision, setUltimaDecision] = useState<Decision | null>(null)
+  useEffect(() => {
+    pedir<Decision[]>(`/api/proyectos/${id}/decisiones`).then((l) => setUltimaDecision(l[0] ?? null)).catch(() => undefined)
+  }, [id])
   // Mientras se genera, se mira cada pocos segundos en qué va.
   useEffect(() => {
     if (p?.estado !== 'generando') return
@@ -242,7 +379,10 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   const hechos = new Set(p.hechos)
   const marcar = async (paso: string, hecho: boolean, donde?: Element | null) => {
     const nuevos = hecho ? [...p.hechos, paso] : p.hechos.filter((x) => x !== paso)
-    setP({ ...p, hechos: nuevos })
+    const fechas = { ...(p.hechos_en ?? {}) }
+    if (hecho) fechas[paso] = new Date().toISOString()
+    else delete fechas[paso]
+    setP({ ...p, hechos: nuevos, hechos_en: fechas })
     if (hecho && r) {
       // Un paso, un estallido pequeño; si cierra su bloque (o su nivel), uno grande.
       const hechosSet = new Set(nuevos)
@@ -293,6 +433,7 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
 
       {r && (
         <>
+          <Retomar p={p} ultimaDecision={ultimaDecision} alDetallar={(n) => void detallar(n)} ocupado={p.estado === 'generando'} />
           <section className="proyecto-priming">
             <h2>Antes de empezar</h2>
             <p>{r.resumen}</p>
@@ -361,7 +502,7 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
             <NivelVista key={n.id} n={n} hechos={hechos} proyecto={p} alMarcar={marcar} alDetallar={() => detallar(n.numero)} ocupado={p.estado === 'generando'} />
           ))}
 
-          <Diario id={id} pasos={r.niveles.flatMap((n) => n.bloques.flatMap((b) => b.pasos))} />
+          <Diario id={id} pasos={r.niveles.flatMap((n) => n.bloques.flatMap((b) => b.pasos))} alCambiar={setUltimaDecision} />
         </>
       )}
 
@@ -460,7 +601,7 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
     window.location.hash = `#/conversacion/${c.id}`
   }
   return (
-    <li className={`proyecto-paso ${hecho ? 'hecho' : ''} ${recien ? 'recien' : ''}`}>
+    <li id={`paso-${x.id}`} className={`proyecto-paso ${hecho ? 'hecho' : ''} ${recien ? 'recien' : ''}`}>
       <label className="proyecto-paso-titulo">
         <input
           type="checkbox"
@@ -504,7 +645,7 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
   )
 }
 
-function Diario({ id, pasos }: { id: number; pasos: Paso[] }) {
+function Diario({ id, pasos, alCambiar }: { id: number; pasos: Paso[]; alCambiar?: (ultima: Decision | null) => void }) {
   const [lista, setLista] = useState<Decision[]>([])
   const [f, setF] = useState({ titulo: '', contexto: '', decision: '', consecuencias: '', paso_id: '' })
   const [abierto, setAbierto] = useState(false)
@@ -530,6 +671,7 @@ function Diario({ id, pasos }: { id: number; pasos: Paso[] }) {
             e.preventDefault()
             const d = await pedir<Decision>(`/api/proyectos/${id}/decisiones`, enviarJson({ ...f, paso_id: f.paso_id || null }))
             setLista([d, ...lista])
+            alCambiar?.(d)
             setF({ titulo: '', contexto: '', decision: '', consecuencias: '', paso_id: '' })
             setAbierto(false)
           }}
@@ -573,7 +715,9 @@ function Diario({ id, pasos }: { id: number; pasos: Paso[] }) {
                 className="boton-mini"
                 onClick={async () => {
                   await pedir(`/api/proyectos/${id}/decisiones/${d.id}`, { method: 'DELETE' })
-                  setLista(lista.filter((x) => x.id !== d.id))
+                  const resto = lista.filter((x) => x.id !== d.id)
+                  setLista(resto)
+                  alCambiar?.(resto[0] ?? null)
                 }}
               >
                 Quitar

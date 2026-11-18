@@ -85,6 +85,9 @@ async def test_un_proyecto_de_punta_a_punta_por_la_api(cliente, monkeypatch) -> 
     await trabajo.ejecutar(0, "proyecto_nivel", {"proyecto_id": pid, "numero": 2})
     p = (await cliente.get(f"/api/proyectos/{pid}")).json()
     assert p["hechos"] == ["n1-b1-p1"] and p["progreso"]["pasos"] == 4
+    assert list(p["hechos_en"]) == ["n1-b1-p1"]  # cuándo se marcó, para retomar
+    await cliente.put(f"/api/proyectos/{pid}/pasos/n1-b1-p1", json={"hecho": False})
+    assert (await cliente.get(f"/api/proyectos/{pid}")).json()["hechos_en"] == {}
     assert [x["nombre"] for x in (await cliente.get("/api/proyectos")).json()][0] == "Copiloto"
     assert (await cliente.delete(f"/api/proyectos/{pid}")).status_code == 204
     assert (await cliente.get(f"/api/proyectos/{pid}")).status_code == 404

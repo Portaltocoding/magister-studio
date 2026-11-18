@@ -29,6 +29,8 @@ class Proyecto(Base):
     arquitectura_svg: Mapped[str | None] = mapped_column(Text)
     # Los ids de los pasos que has marcado como hechos (aparte del roadmap: detallar un nivel no los borra).
     hechos: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    # Cuándo marcaste cada paso ({id: fecha ISO}): para retomar («lo dejaste hace 3 días en…»).
+    hechos_en: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     creado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
     actualizado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now(), onupdate=func.now())
 
