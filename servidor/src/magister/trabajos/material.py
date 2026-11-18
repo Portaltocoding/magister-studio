@@ -3,13 +3,16 @@
 Cada paso es idempotente (upsert): si el trabajo se reanuda, sigue por lo que falte.
 """
 
+import json
+
 from magister.config import ajustes
 from magister.material import almacen
 from magister.material.conceptos import enriquecer
 from magister.material.diapositivas import auditar_diapositivas, generar_diapositivas, montar_marp, pintar_marp
 from magister.material.entrada import entrada_de_leccion
 from magister.material.generador import Cancelado, generar_apuntes
-from magister.material.guion import auditar_guion, generar_guion
+from magister.material.guion import ESTILOS_VIDEO, auditar_guion, generar_guion
+from magister.material.guion_grafico import generar_guion_grafico, por_escenas
 from magister.material.preguntas import auditar, generar_preguntas, guardar_preguntas
 from magister.material.render import pintar
 from magister.tono import lint
@@ -129,13 +132,27 @@ async def _extras(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], e
         materiales.append(gid)
         video = (entrada.preferencias or {}).get("video") or {}
         minutos = int(video.get("minutos") or ajustes.duracion_guion_min)
-        texto = await generar_guion(entrada, texto_apuntes, minutos, video.get("estilo", "clase"), video.get("concepto"))
+        estilo = video.get("estilo", "clase")
+        rutas: dict = {}
+        texto = None
+        # El vídeo animado (guion gráfico): si el modelo no da uno válido, sale el guion de siempre, por escenas.
+        if video.get("animado", True):
+            grafico = await generar_guion_grafico(entrada, texto_apuntes, minutos,
+                                                  ESTILOS_VIDEO.get(estilo, ESTILOS_VIDEO["clase"]), video.get("concepto"))
+            if grafico is not None:
+                destino = almacen.carpeta_salidas(plan_id, clave) / f"guion_grafico-{gid}.json"
+                destino.write_text(json.dumps(grafico, ensure_ascii=False), encoding="utf-8")
+                rutas["grafico"] = str(destino)
+                texto = por_escenas(grafico)
+        if texto is None:
+            texto = await generar_guion(entrada, texto_apuntes, minutos, estilo, video.get("concepto"))
         hallazgos = auditar_guion(texto, minutos) + lint.revisar(texto, "guion")
         ruta = almacen.carpeta_salidas(plan_id, clave) / "guion.md"
         ruta.write_text(texto, encoding="utf-8")
+        rutas["md"] = str(ruta)
         estado = "bloqueado" if lint.vetos(hallazgos) else "listo"
-        await almacen.actualizar(gid, texto=texto, rutas={"md": str(ruta)}, estado=estado,
+        await almacen.actualizar(gid, texto=texto, rutas=rutas, estado=estado,
                                  informes=[{"nodo": "auditoria", "hallazgos": [h.model_dump() for h in hallazgos]},
-                                           {"nodo": "video", "estilo": video.get("estilo", "clase"),
+                                           {"nodo": "video", "estilo": estilo, "animado": "grafico" in rutas,
                                             "concepto": video.get("concepto"), "minutos": minutos}])
     return materiales

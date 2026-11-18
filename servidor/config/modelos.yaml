@@ -43,6 +43,7 @@ prompts:
   preguntas_test: generar
   diapositivas: generar
   guion: generar
+  guion_grafico: generar
   diagrama_apartado: generar
   mapa: generar
   proyecto_roadmap: generar

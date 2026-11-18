@@ -121,7 +121,7 @@ async def _coste_en_ventana(ventana: str, reinicia: int) -> float:
 async def coste_de(accion: str, minutos: int | None = None) -> float:
     """Coste equivalente medio de una acción, sacado de tus llamadas."""
     if accion == "video":
-        return coste_de_video(await _coste_medio(("guion",)) or 0.07, minutos or MINUTOS_GUION)
+        return coste_de_video(await _coste_medio(("guion_grafico",)) or await _coste_medio(("guion",)) or 0.07, minutos or MINUTOS_GUION)
     if accion == "diapositivas":
         return await _coste_medio(("diapositivas",))
     if accion == "material":

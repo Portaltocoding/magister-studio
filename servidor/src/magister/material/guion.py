@@ -9,7 +9,7 @@ from magister.material.modelos import EntradaMaterial
 from magister.tono.hallazgo import Hallazgo
 
 PALABRAS_MINUTO = 150
-ESCENAS = ("intuicion", "choque", "nombre", "teoria")
+ESCENAS = ("intuicion", "choque", "nombre", "teoria", "mapa", "repaso")  # mapa y repaso: los del guion gráfico
 MARCADOR = re.compile(r"^\[\[(\w+)\]\]\s*$", re.M)
 EXCESO = 0.15
 

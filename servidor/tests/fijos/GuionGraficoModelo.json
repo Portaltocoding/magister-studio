@@ -1,0 +1,30 @@
+{
+  "titulo": "Coordenadas en un minuto",
+  "fondo": "cartesiano",
+  "partes": [
+    {"nombre": "Medir", "ideas": [{"nombre": "Acimut", "que": "desde el norte"}]},
+    {"nombre": "Calcular", "ideas": [{"nombre": "Problema directo", "que": "de θ y D a un punto"}, {"nombre": "Cierre", "que": "la vuelta no cierra"}]}
+  ],
+  "tramos": [
+    {"concepto": "Coordenadas", "tesis": "tres ideas en dos partes", "momento": "mapa",
+     "narracion": "Esta lección son tres ideas en dos partes: medir un ángulo desde el norte, calcular un punto nuevo y ver por qué la vuelta nunca cierra del todo.",
+     "escena": {"tipo": "tablero", "actual": 0}},
+    {"concepto": "El replanteo", "tesis": "llegar a un punto que no está", "momento": "intuicion",
+     "narracion": "Lucía tiene la estación en el punto A, de coordenadas mil y dos mil. Tiene que marcar el punto B, y desde A solo puede medir una dirección y una distancia.",
+     "escena": {"tipo": "figura", "elementos": [
+       {"tipo": "punto", "id": "A", "x": 1000, "y": 2000, "etiqueta": "A", "coords": null, "lado": "o", "paso": 0, "estado": null},
+       {"tipo": "norte", "en": "A", "paso": 1},
+       {"tipo": "punto", "id": "B", "x": 1121.353, "y": 2088.168, "etiqueta": "B ?", "coords": null, "lado": "e", "paso": 2, "estado": "foco"},
+       {"tipo": "segmento", "de": "A", "a": "B", "etiqueta": "D = 150 m", "discontinuo": true, "flecha": true, "paso": 3, "estado": null}
+     ], "rejilla": null, "ejes": null}},
+    {"concepto": "Problema directo", "tesis": "seno al este, coseno al norte", "momento": "nombre",
+     "narracion": "El este crece con el seno del acimut y el norte con el coseno, los dos por la distancia.",
+     "escena": {"tipo": "formula", "formulas": [{"tex": "X_B = X_A + D \\sin\\theta", "nota": "el este", "estado": null}], "simbolos": [{"simbolo": "\\theta", "significa": "acimut en gon"}]}},
+    {"concepto": "Problema directo", "tesis": "la cuenta, paso a paso", "momento": "teoria",
+     "narracion": "Con un acimut de cuarenta gon y ciento cincuenta metros, el este de B sale en mil ciento veintiuno con tres.",
+     "escena": {"tipo": "calculo", "datos": "\\theta = 40^g", "filas": [{"que": "Este", "sustitucion": "1000 + 150 \\sin 40^g", "resultado": "1121{,}353", "estado": "bien"}], "nota": null}},
+    {"concepto": "Cierre", "tesis": "la vuelta no cierra", "momento": "choque",
+     "narracion": "Si sumas todos los tramos de una poligonal y vuelves a A, no caes en A: te quedas a unos centímetros. Eso es el error de cierre, y hay que repartirlo.",
+     "escena": {"tipo": "contraste", "lados": [{"etiqueta": "Lo que esperas", "lineas": ["vuelves a A"], "estado": "bien", "nota": null}, {"etiqueta": "Lo que pasa", "lineas": ["te quedas a 4 cm"], "estado": "mal", "nota": null}], "veredicto": "se compensa según la distancia"}}
+  ]
+}

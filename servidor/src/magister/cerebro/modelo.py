@@ -13,9 +13,11 @@ import json
 import logging
 import random
 import shutil
+import tempfile
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from magister.config import ajustes
@@ -53,7 +55,13 @@ async def _eco(historial: list[Turno]) -> AsyncIterator[str]:
         yield palabra + " "
 
 
-def argumentos_claude(sistema: str, esquema: dict | None = None, modelo: str | None = None) -> list[str]:
+# Windows no acepta líneas de órdenes de más de 32.767 caracteres: un prompt de sistema largo (apuntes de 20.000
+# caracteres más un esquema grande) va en un fichero temporal, con --system-prompt-file.
+SISTEMA_EN_FICHERO = 8000
+
+
+def argumentos_claude(sistema: str, esquema: dict | None = None, modelo: str | None = None,
+                      fichero_sistema: str | None = None) -> list[str]:
     ruta = shutil.which("claude")
     if not ruta:
         raise ErrorModelo("no encuentro el programa claude en el PATH")
@@ -72,9 +80,8 @@ def argumentos_claude(sistema: str, esquema: dict | None = None, modelo: str | N
         "--no-session-persistence",
         "--model",
         modelo or ajustes.modelo,
-        "--system-prompt",
-        sistema,
     ]
+    args += ["--system-prompt-file", fichero_sistema] if fichero_sistema else ["--system-prompt", sistema]
     if esquema is not None:
         args += ["--json-schema", json.dumps(esquema, ensure_ascii=False)]
     return args
@@ -111,8 +118,25 @@ async def _lanzar_claude(
     sistema: str, entrada: str, esquema: dict | None = None, modelo: str | None = None
 ) -> AsyncIterator[dict]:
     """Lanza claude -p y entrega cada línea JSON. Valida el final (result, código)."""
+    fichero = await asyncio.to_thread(_escribir_sistema, sistema) if len(sistema) > SISTEMA_EN_FICHERO else None
+    try:
+        async with contextlib.aclosing(_proceso_claude(argumentos_claude(sistema, esquema, modelo, fichero), entrada)) as lineas:
+            async for evento in lineas:
+                yield evento
+    finally:
+        if fichero:
+            await asyncio.to_thread(Path(fichero).unlink, True)
+
+
+def _escribir_sistema(sistema: str) -> str:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".txt", prefix="magister-sistema-", delete=False) as f:
+        f.write(sistema)
+        return f.name
+
+
+async def _proceso_claude(args: list[str], entrada: str) -> AsyncIterator[dict]:
     proc = await asyncio.create_subprocess_exec(
-        *argumentos_claude(sistema, esquema, modelo),
+        *args,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

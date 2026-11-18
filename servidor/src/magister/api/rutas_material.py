@@ -102,6 +102,7 @@ async def videos(plan_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -
         meta = next((i for i in (m.informes or []) if i.get("nodo") == "video"), {})
         salida.append({"material_id": m.id, "clave": m.leccion_clave, "titulo": titulos.get(m.leccion_clave, m.leccion_clave),
                        "estilo": meta.get("estilo", "clase"), "concepto": meta.get("concepto"), "minutos": meta.get("minutos"),
+                       "animado": bool((m.rutas or {}).get("grafico")),
                        "creado": m.creado_en.isoformat() if getattr(m, "creado_en", None) else None})
     return salida
 
@@ -311,6 +312,20 @@ async def ver_material(mid: int, s: AsyncSession = Depends(sesion_por_peticion))
     if m is None:
         raise HTTPException(404, "material no encontrado")
     return _material(m, con_texto=True)
+
+
+@rutas.get("/materiales/{mid}/guion_grafico")
+async def guion_grafico(mid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> FileResponse:
+    """El vídeo animado: el guion gráfico que pinta el motor de escena de la web."""
+    m = await s.get(Material, mid)
+    destino = (m.rutas or {}).get("grafico") if m is not None and m.tipo == "guion" else None
+    if not destino:
+        raise HTTPException(404, "este vídeo no tiene versión animada")
+    base = Path(ajustes.salidas).resolve()
+    ruta = Path(destino).resolve()
+    if base not in ruta.parents or not ruta.exists():
+        raise HTTPException(404, "este vídeo no tiene versión animada")
+    return FileResponse(ruta, media_type="application/json")
 
 
 @rutas.get("/materiales/{mid}/fichero/{nombre}")
