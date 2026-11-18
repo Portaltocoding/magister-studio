@@ -5,8 +5,10 @@
   border-radius: 50%; animation: asesor-llegar 460ms var(--asesor-curva) both, asesor-flotar 4.5s ease-in-out 600ms infinite;
   transition: scale 260ms var(--asesor-curva);
 }
+/* En reposo, un poco más pequeña (52 px); al pasarle el cursor, abrir el chat o cogerla vuelve a su tamaño. */
 .asesor-mascota .mascota { width: 60px; height: 60px; margin: 0; }
-.asesor-mascota:hover { scale: 1.06; }
+.asesor-mascota { scale: 0.82; }
+.asesor-mascota:hover, .asesor.abierto .asesor-mascota { scale: 1; }
 .asesor-mascota:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 /* Cogida: se agranda, deja de flotar y cierra los ojos mientras la llevas. */
 .asesor.cogida .asesor-mascota { cursor: grabbing; scale: 1.14; animation: none; }
@@ -61,7 +63,7 @@
 /* En la barra, mientras está fuera, queda su hueco. */
 .afinar-boton.fuera { opacity: 0.28; outline: 1.5px dashed color-mix(in srgb, var(--texto) 40%, transparent); outline-offset: 2px; }
 
-@keyframes asesor-llegar { from { opacity: 0; scale: 0.6; } }
+@keyframes asesor-llegar { from { opacity: 0; scale: 0.5; } }
 @keyframes asesor-flotar { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
 @keyframes asesor-abrir { from { opacity: 0; transform: scale(0.92) translateY(6px); } }
 @keyframes asesor-mensaje { from { opacity: 0; transform: translateY(4px); } }
