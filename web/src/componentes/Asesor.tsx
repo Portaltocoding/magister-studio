@@ -10,6 +10,7 @@ import { EVENTO_SUENO } from './animo.ts'
 // Una conversación por sección (este proyecto, esta lección, Repaso…), con pestañas para saltar entre ellas.
 // - Coger: mantener pulsada la mascota de la barra (o la flotante) y arrastrar; cierra los ojos mientras la llevas.
 // - Un clic en la flotante: abre o cierra el chat. Doble clic: vuelve a la barra.
+// - Imán: si la acercas a su sitio de la barra, se pega; soltada ahí, vuelve a la barra.
 
 export const EVENTO_COGER = 'magister-asesor-coger'
 export const EVENTO_ESTADO = 'magister-asesor-estado'
@@ -18,6 +19,19 @@ const CLAVE_HILOS = 'magister-asesor-hilos'
 const TAM = 64 // lo que mide la mascota flotante
 const ESPERA_COGER = 350
 const HOLGURA = 8
+const IMAN = 90 // a cuántos píxeles de su sitio en la barra la atrae el imán
+
+// El centro de su sitio en la barra de arriba (el botón de la mascota), si está a la vista.
+function casa(): { x: number; y: number } | null {
+  const r = document.querySelector('.afinar-boton')?.getBoundingClientRect()
+  return r && r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null
+}
+// Si la mascota (su esquina en x, y) está al alcance del imán, dónde se pega.
+function alIman(x: number, y: number): { x: number; y: number } | null {
+  const c = casa()
+  if (!c || Math.hypot(x + TAM / 2 - c.x, y + TAM / 2 - c.y) > IMAN) return null
+  return { x: Math.round(c.x - TAM / 2), y: Math.round(c.y - TAM / 2) }
+}
 
 interface Sitio {
   activo: boolean
@@ -118,6 +132,7 @@ function textoPantalla(): string {
 export default function Asesor() {
   const [sitio, setSitio] = useState<Sitio>(() => leer<Sitio>(CLAVE, { activo: false, x: 0, y: 0 }))
   const [cogida, setCogida] = useState(false)
+  const [iman, setIman] = useState(false)
   // Si lo dejaste abierto, sigue abierto al volver.
   const [abierto, setAbiertoVista] = useState(() => leer<{ abierto: boolean }>(`${CLAVE}-abierto`, { abierto: false }).abierto)
   const setAbierto = useCallback((f: boolean | ((a: boolean) => boolean)) => {
@@ -144,13 +159,27 @@ export default function Asesor() {
   const arrastrar = useCallback(
     (desde: { x: number; y: number }, delta: { x: number; y: number }) => {
       setCogida(true)
-      const mover = (e: PointerEvent) => setSitio({ activo: true, ...dentro(e.clientX - delta.x, e.clientY - delta.y) })
+      // Cerca de su sitio en la barra, el imán la atrae y se queda pegada allí hasta que la alejes.
+      const mover = (e: PointerEvent) => {
+        const p = dentro(e.clientX - delta.x, e.clientY - delta.y)
+        const pegada = alIman(p.x, p.y)
+        setIman(!!pegada)
+        setSitio({ activo: true, ...(pegada ?? p) })
+      }
       const soltar = (e: PointerEvent) => {
         window.removeEventListener('pointermove', mover)
         window.removeEventListener('pointerup', soltar)
         window.removeEventListener('pointercancel', soltar)
         setCogida(false)
-        fijar({ activo: true, ...dentro(e.clientX - delta.x, e.clientY - delta.y) })
+        setIman(false)
+        const p = dentro(e.clientX - delta.x, e.clientY - delta.y)
+        // Soltada al alcance del imán: vuelve a la barra.
+        if (alIman(p.x, p.y)) {
+          setAbierto(false)
+          fijar({ activo: false, ...p })
+        } else {
+          fijar({ activo: true, ...p })
+        }
         // El clic que llega al soltar no abre nada.
         const tragar = (ev: Event) => {
           ev.stopPropagation()
@@ -164,7 +193,7 @@ export default function Asesor() {
       window.addEventListener('pointerup', soltar)
       window.addEventListener('pointercancel', soltar)
     },
-    [fijar],
+    [fijar, setAbierto],
   )
 
   // La mascota de la barra avisa de que la has cogido: aparece bajo el dedo y te sigue.
@@ -222,7 +251,7 @@ export default function Asesor() {
   const aLaIzquierda = sitio.x > window.innerWidth / 2
   const haciaArriba = sitio.y > window.innerHeight / 2
   return (
-    <div ref={caja} className={`asesor ${cogida ? 'cogida' : ''} ${abierto ? 'abierto' : ''}`} style={{ left: sitio.x, top: sitio.y }}>
+    <div ref={caja} className={`asesor ${cogida ? 'cogida' : ''} ${iman ? 'iman' : ''} ${abierto ? 'abierto' : ''}`} style={{ left: sitio.x, top: sitio.y }}>
       <div
         className="asesor-mascota"
         role="button"
