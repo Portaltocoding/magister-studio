@@ -634,9 +634,8 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
   display: grid; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr); gap: 40px; align-items: start;
 }
 .guia-lado { position: sticky; top: 28px; display: flex; flex-direction: column; align-items: center; gap: 14px; animation: guia-aparecer 600ms var(--guia-curva) both; }
-.guia-mascota { width: 150px; height: 150px; display: grid; place-items: center; animation: guia-flotar 5s ease-in-out infinite; }
+.guia-mascota { width: 150px; height: 150px; display: grid; place-items: center; }
 .guia-mascota .mascota { width: 140px; height: 140px; margin: 0; }
-.guia-mascota.pensando { animation-duration: 2.4s; }
 .guia-bocadillo {
   position: relative; width: 100%; box-sizing: border-box; padding: 16px 20px; border-radius: 20px; background: var(--tarjeta); border: 1px solid var(--borde);
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.1);
@@ -687,7 +686,6 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .boton-suave { opacity: 0.75; }
 @keyframes guia-aparecer { from { opacity: 0; transform: translateY(10px); } }
 @keyframes guia-frase { from { opacity: 0; transform: translateY(4px); } }
-@keyframes guia-flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @media (max-width: 820px) {
   .guia { grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 26px 16px 40px; }
   .guia-lado { position: static; flex-direction: row; align-items: flex-start; }

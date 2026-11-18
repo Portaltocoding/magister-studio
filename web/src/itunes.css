@@ -175,6 +175,8 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 .mascota .mascota-mejilla { fill: color-mix(in srgb, var(--m-claro) 16%, var(--m-cuerpo)); }
 .mascota-figura { transform-box: view-box; transform-origin: 60px 112px; animation: respirar 4.5s ease-in-out infinite; }
 @keyframes respirar { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.025); } }
+/* En reposo, quieta: ni respira ni flota (solo parpadea). Los gestos de hablar, pensar o escuchar siguen. */
+.mascota.gesto-normal .mascota-figura { animation: none; }
 .mascota-ojo, .mascota-ojo + .mascota-ojo { animation: parpadeo 5.5s infinite; animation-delay: 0s; }
 .gesto-escuchando .mascota-figura { animation: escuchar 2.8s ease-in-out infinite; }
 @keyframes escuchar { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(-4deg) scale(1.01); } }

@@ -11,10 +11,8 @@
   70% { transform: translateY(0) scale(1.05, 0.95); } 100% { transform: none; }
 }
 
-/* Dormida: cierra los ojos despacio y respira más lento; al volver, despierta. */
+/* Dormida: cierra los ojos despacio, sin moverse; al volver, despierta. */
 .mascota.dormida .mascota-ojo, .mascota.dormida .mascota-ojo + .mascota-ojo { animation: none; transform: scaleY(0.1); transition: transform 1200ms ease-in-out; }
-.mascota.dormida .mascota-figura { animation: m-dormir 5s ease-in-out infinite; }
-@keyframes m-dormir { 0%, 100% { transform: none; } 50% { transform: translateY(2px) scale(1.02, 0.98); } }
 
 /* Confeti: un estallido pequeño desde lo que acabas de terminar. */
 .confeti { position: fixed; z-index: 500; width: 0; height: 0; pointer-events: none; }
@@ -46,6 +44,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mascota.reacciona-acierto .mascota-figura, .mascota.reacciona-fallo .mascota-figura, .mascota.reacciona-celebrar .mascota-figura,
-  .mascota.dormida .mascota-figura, .pantalla, .proyecto-paso.recien, .proyecto-paso-titulo input:checked { animation: none; }
+  .pantalla, .proyecto-paso.recien, .proyecto-paso-titulo input:checked { animation: none; }
   .confeti { display: none; }
 }
