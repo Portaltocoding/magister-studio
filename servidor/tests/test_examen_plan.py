@@ -32,5 +32,5 @@ def test_lo_demas_no(frase: str) -> None:
 
 def test_el_planificador_ajusta_el_tamano_y_sabe_de_examenes() -> None:
     texto = cargar("planificar").texto
-    assert "no el presupuesto" in texto and "1 a 3 lecciones" in texto and "simulacro" in texto
+    assert "no el presupuesto" in texto and "nunca lo que tiene libre" in texto and "simulacro" in texto
     assert "víspera del examen" in cargar("extraer_perfil").texto

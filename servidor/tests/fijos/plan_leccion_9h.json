@@ -1,5 +1,6 @@
 {
  "razonamiento": "Modelo relacional, consultas, y sobre ellas joins e índices.",
+ "alcance": "asignatura",
  "lecciones": [
   {
    "clave": "L1",

@@ -4,8 +4,8 @@ from magister.config import ajustes
 from magister.flujo import fuentes as fuentes_plan
 from magister.flujo.comun import fase, hoy_de, perfil_de, perfil_json, reglas_plan
 from magister.flujo.estado import Estado
-from magister.plan.esquemas import Plan
-from magister.plan.reglas import es_solo_capacidad, presupuesto
+from magister.plan.esquemas import PlanNuevo
+from magister.plan.reglas import ajustar_a_alcance, es_solo_capacidad, presupuesto, solo_alcance
 from magister.plan.reglas import reglas_plan as construir_reglas
 
 
@@ -33,11 +33,17 @@ async def planificar(estado: Estado, buscador=None) -> dict:
     fallidos: list[Intento] = []
     try:
         plan = await estructurar(
-            sistema, "Devuelve el plan.", Plan, construir_reglas(perfil, hoy, reglas), intentos=fallidos
+            sistema, "Devuelve el plan.", PlanNuevo, construir_reglas(perfil, hoy, reglas), intentos=fallidos
         )
     except ErrorEstructura as e:
         ultimo = e.intentos[-1].errores if e.intentos else []
         salida = e.ultima_salida or {}
+        # Si solo se pasa de horas para lo que pide, se recortan en proporción: mejor un plan ajustado que ninguno.
+        if solo_alcance(ultimo) and salida:
+            plan = ajustar_a_alcance(PlanNuevo.model_validate(salida))
+            return {"plan": plan.model_dump(mode="json"), "errores": [x for i in fallidos for x in i.errores],
+                    "intentos": len(fallidos), "salida": "calendarizar",
+                    "version_prompt": f"{plantilla.etiqueta} {ajustes.modelo}"}
         necesarias = sum(float(lec.get("horas", 0)) for lec in salida.get("lecciones", []))
         return {
             "errores": [x for i in fallidos for x in i.errores],

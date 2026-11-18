@@ -65,12 +65,28 @@ class Leccion(BaseModel):
     depende_de: list[str] = Field(default_factory=list, description="Claves de las lecciones que hay que saber antes.")
 
 
+Alcance = Literal["procedimiento", "concepto", "tema", "tema_amplio", "tema_master", "asignatura"]
+
+
 class Plan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    razonamiento: str = Field(description="Primero: por qué este orden y este reparto de horas.")
+    razonamiento: str = Field(description="Primero: qué alcance tiene lo que pide, y por qué este orden y este reparto de horas.")
+    alcance: Alcance | None = Field(
+        None,
+        description="Qué es lo que pide: procedimiento (despejar x), concepto (una idea concreta, aunque tenga requisitos, "
+        "clases o variantes: la ley de Ohm, la legítima defensa con sus requisitos), tema (varias ideas que forman un bloque "
+        "de una asignatura: las integrales), tema_amplio (redes para una entrevista), tema_master (un debate de máster) o "
+        "asignatura (un temario entero). Marca cuántas horas puede tener el plan.",
+    )
     lecciones: list[Leccion] = Field(min_length=1)
 
     @property
     def total_horas(self) -> float:
         return round(sum(lec.horas for lec in self.lecciones), 2)
+
+
+class PlanNuevo(Plan):
+    """El plan que escribe el modelo: con el alcance obligatorio (los ya guardados pueden no tenerlo)."""
+
+    alcance: Alcance = Field(description=Plan.model_fields["alcance"].description)

@@ -59,7 +59,14 @@ class _Eco:
         self.colas.clear()
 
     def siguiente(self, modelo: type[BaseModel]) -> dict:
-        cola = self.colas[modelo.__name__]
+        # Una subclase (PlanNuevo de Plan) usa los fijos de su clase padre si no tiene los suyos.
+        clases = [c for c in modelo.__mro__ if isinstance(c, type) and issubclass(c, BaseModel) and c is not BaseModel]
+        con_cola = next((c for c in clases if self.colas.get(c.__name__)), None)
+        if con_cola is not None:
+            cola = self.colas[con_cola.__name__]
+        else:
+            cola = self.colas[modelo.__name__]
+            modelo = next((c for c in clases if (self.carpeta / f"{c.__name__}.json").exists()), modelo)
         elegido = cola.popleft() if cola else f"{modelo.__name__}.json"
         if isinstance(elegido, dict):
             return elegido
