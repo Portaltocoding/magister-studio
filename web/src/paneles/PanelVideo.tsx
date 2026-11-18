@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { enviarJson, listarPlanes, pedir, verPlan, type VistaPlan } from '../api.ts'
+import { enviarJson, listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
@@ -594,6 +594,7 @@ export default function PanelVideo() {
   const [plan, setPlan] = useState<VistaPlan | null | undefined>(undefined)
   const [estados, setEstados] = useState<Estados>({})
   const [videos, setVideos] = useState<VideoInfo[]>([])
+  const [planes, setPlanes] = useState<ResumenPlan[]>([])
   const [elegido, setElegido] = useState<number | null>(null)
   const [nuevo, setNuevo] = useState(false)
   const [haciendo, setHaciendo] = useState<string | null>(null)
@@ -619,6 +620,7 @@ export default function PanelVideo() {
   useEffect(() => {
     listarPlanes()
       .then(async (ps) => {
+        setPlanes(ps)
         if (!ps[0]) return setPlan(null)
         const v = await verPlan(ps[0].tema_id)
         setPlan(v)
@@ -703,6 +705,29 @@ export default function PanelVideo() {
     <div className="panel video-panel">
       <div className="cabecera-panel">
         <h1>Vídeo</h1>
+        {planes.length > 1 && plan && (
+          <select
+            className="video-plan"
+            aria-label="Plan"
+            value={plan.tema_id}
+            onChange={(e) =>
+              verPlan(Number(e.target.value))
+                .then(async (v) => {
+                  setPlan(v)
+                  setElegido(null)
+                  setNuevo(false)
+                  await cargar(v)
+                })
+                .catch((err) => setFalloCarga(mensajeDe(err)))
+            }
+          >
+            {planes.map((x) => (
+              <option key={x.plan_id} value={x.tema_id}>
+                {x.tema}
+              </option>
+            ))}
+          </select>
+        )}
         {!nuevo && (
           <span style={{ display: 'flex', gap: 8 }}>
             <button

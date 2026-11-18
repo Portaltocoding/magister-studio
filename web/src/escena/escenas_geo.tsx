@@ -271,7 +271,7 @@ export function EscenaCalculo({ e, dur }: { e: Calculo; dur: number }) {
         return (
           <div key={i} style={{ position: 'absolute', left: 76, right: 76, top: y, height: alto - 10, display: 'grid', gridTemplateColumns: '1.1fr 1.6fr 1fr', alignItems: 'center', gap: 18, color: C.texto, fontSize: 25 }}>
             <span style={{ opacity: aparecer(frame, t0, 10) }}>
-              <Tex tex={f.que} />
+              {/[\\^_{}=]/.test(f.que) ? <Tex tex={f.que} /> : <span style={{ fontFamily: F.serif, fontSize: 23 }}>{f.que}</span>}
             </span>
             <span style={{ opacity: aparecer(frame, t0 + 12, 10), color: C.gris }}>{f.sustitucion && <Tex tex={f.sustitucion} />}</span>
             <span
