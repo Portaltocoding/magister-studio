@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { pedir } from './api.ts'
 import Afinar from './componentes/Afinar.tsx'
 import Tomate from './componentes/Tomate.tsx'
@@ -18,6 +18,19 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
   const [alertas, setAlertas] = useState<Alerta[]>([])
   // La alerta que no se pudo marcar como resuelta: el botón lo dice en vez de no hacer nada.
   const [sinResolver, setSinResolver] = useState<number | null>(null)
+  const [verAvisos, setVerAvisos] = useState(false)
+  const cajaAvisos = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!verAvisos) return
+    const fuera = (e: MouseEvent) => cajaAvisos.current && !cajaAvisos.current.contains(e.target as Node) && setVerAvisos(false)
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setVerAvisos(false)
+    document.addEventListener('mousedown', fuera)
+    window.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      window.removeEventListener('keydown', esc)
+    }
+  }, [verAvisos])
   const resolver = (id: number) => {
     setSinResolver(null)
     pedir(`/api/alertas/${id}/resolver`, { method: 'POST' })
@@ -64,21 +77,50 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
           ☰ Menú
         </button>
       )}
-      {alertas.map((a) => (
-        <span key={a.id} className="alerta" role="alert" title={`Qué hacer: ${a.runbook}`}>
-          ⚠ {a.detalle}{' '}
-          <button
-            className="boton-mini"
-            onClick={() => resolver(a.id)}
-            title={sinResolver === a.id ? 'No se pudo marcar: pulsa para reintentar' : undefined}
-          >
-            {sinResolver === a.id ? 'No se pudo, reintentar' : 'Resuelta'}
-          </button>
-        </span>
-      ))}
       <button type="button" className="boton-buscar" onClick={() => window.dispatchEvent(new Event('magister-paleta'))} title="Ir a o hacer (Ctrl+K)">
         <span className="buscar-texto">Buscar</span> <kbd>Ctrl K</kbd>
       </button>
+      {/* Los avisos, recogidos: un botón con cuántos hay que despliega la lista (antes ocupaban media barra). */}
+      <div className="avisos" ref={cajaAvisos}>
+        {alertas.length > 0 && (
+          <button
+            type="button"
+            className="avisos-boton"
+            aria-expanded={verAvisos}
+            aria-label={`${alertas.length} ${alertas.length === 1 ? 'aviso' : 'avisos'}`}
+            title="Avisos de Magister"
+            onClick={() => setVerAvisos(!verAvisos)}
+          >
+            ⚠ <span>{alertas.length}</span>
+          </button>
+        )}
+        {verAvisos && alertas.length > 0 && (
+          <div className="avisos-caja" role="dialog" aria-label="Avisos">
+            <div className="avisos-cabeza">
+              <strong>Avisos</strong>
+              <button type="button" className="boton-mini" onClick={() => alertas.forEach((a) => resolver(a.id))}>
+                Marcar todos como resueltos
+              </button>
+            </div>
+            <ul>
+              {alertas.map((a) => (
+                <li key={a.id}>
+                  <p>{a.detalle}</p>
+                  <small title="La guía con qué hacer, en el repositorio">Qué hacer: {a.runbook}</small>
+                  <button
+                    type="button"
+                    className="boton-mini"
+                    onClick={() => resolver(a.id)}
+                    title={sinResolver === a.id ? 'No se pudo marcar: pulsa para reintentar' : undefined}
+                  >
+                    {sinResolver === a.id ? 'No se pudo, reintentar' : 'Resuelta'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
       <span className={estado === 'conectado' ? 'estado estado-si' : 'estado estado-no'} title={estado}>
         <span className="estado-texto">{estado}</span>
       </span>

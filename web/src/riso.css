@@ -252,3 +252,5 @@ html[data-tema="riso"] .ajustes-tema.elegida { border-color: var(--tinta); box-s
 html[data-tema="riso"] .afinar-segmentos { border: 2px solid var(--borde); border-radius: 999px; }
 html[data-tema="riso"] .afinar-segmentos button[aria-checked="true"] { background: var(--tinta); color: var(--tinta-texto); border-radius: 999px; }
 html[data-tema="riso"] .afinar-segmentos button + button { border-left: 0; }
+html[data-tema="riso"] .avisos-boton { border: 2px solid color-mix(in srgb, var(--rojo) 40%, #fff); background: var(--rojo-pastel); color: color-mix(in srgb, var(--rojo) 75%, var(--linea)); }
+html[data-tema="riso"] .avisos-caja { border: 2px solid var(--borde); border-radius: 22px; }

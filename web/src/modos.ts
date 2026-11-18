@@ -20,7 +20,6 @@ export type IdModo =
   | 'repaso'
   | 'examen'
   | 'progreso'
-  | 'construccion'
   | 'etiquetar'
   | 'triaje'
   | 'hablar'
@@ -126,7 +125,6 @@ export const TALLER: Modo[] = [
 // Sin sitio en la barra: se llega por Ctrl+K (o aún no existen).
 const OTROS: Modo[] = [
   { id: 'hablar', nombre: 'Pregunta rápida', encendido: true, ayuda: 'Pregunta en voz alta y escucha la respuesta' },
-  { id: 'construccion', nombre: 'Construcción', encendido: false, ayuda: 'Un libro a tu medida, por bloques' },
 ]
 
 export const MODOS: Modo[] = [...GRUPOS.flatMap((g) => g.modos), ...TALLER, ...OTROS]

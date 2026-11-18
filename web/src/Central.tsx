@@ -1,5 +1,4 @@
 import { lazy, Suspense } from 'react'
-import Vacio from './componentes/Vacio.tsx'
 import Pensando from './componentes/Pensando.tsx'
 import FalloPantalla from './componentes/FalloPantalla.tsx'
 import EstudioLibre from './EstudioLibre.tsx'
@@ -142,8 +141,6 @@ function Panel({
           </div>
         </div>
       )
-    case 'construccion':
-      return <Pendiente texto="El método de este libro aplicado a otro tema." />
     case 'llamada':
       return <PanelLlamada alCambiar={alCambiarConversaciones} />
     case 'automatizar':
@@ -153,12 +150,4 @@ function Panel({
     case 'hablar':
       return <PanelHablar alCambiar={alCambiarConversaciones} />
   }
-}
-
-function Pendiente({ texto }: { texto: string }) {
-  return (
-    <div className="panel">
-      <Vacio etiqueta="Próximamente" titulo="Esta parte aún no está hecha" texto={texto} />
-    </div>
-  )
 }
