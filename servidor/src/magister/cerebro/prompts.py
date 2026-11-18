@@ -63,6 +63,19 @@ def _expandir(texto: str, profundidad: int = 0) -> str:
     return INCLUIR.sub(trozo, texto)
 
 
+MATERIAS = COMUN / "materias"
+
+
+@cache
+def materia(perfil: str) -> Plantilla:
+    """El perfil de explicación de un tipo de materia (`comun/materias/<perfil>.md`). Entra en la petición solo cuando
+    toca, a diferencia de lo común, que va en todas; su versión es el hash de su texto."""
+    if not re.fullmatch(r"[a-z_]+", perfil) or not (MATERIAS / f"{perfil}.md").is_file():
+        raise ErrorPlantilla(f"no existe el perfil de materia {perfil}")
+    texto = (MATERIAS / f"{perfil}.md").read_bytes().decode("utf-8").replace("\r\n", "\n").strip()
+    return Plantilla(f"materia_{perfil}", hashlib.sha256(texto.encode("utf-8")).hexdigest()[:12], texto)
+
+
 @cache
 def _del_fichero(nombre: str) -> Plantilla:
     if not re.fullmatch(r"[a-z_]+", nombre):

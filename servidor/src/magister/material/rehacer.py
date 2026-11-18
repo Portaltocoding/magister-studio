@@ -49,7 +49,7 @@ async def rehacer_bloque(material_id: int, clave: str, como: str, preferencias_t
     b = lista[i]
     nombres = {x.id: x.nombre for x in entrada.conceptos}
     anteriores = "\n\n".join(f"## {lista[j]['titulo']}\n{textos.get(lista[j]['clave'], '')}" for j in range(i))
-    pref = {"nivel": (entrada.perfil or {}).get("nivel"), **(preferencias_tutor or {})}
+    pref = {"nivel": (entrada.perfil or {}).get("nivel"), "materia": entrada.materia, **(preferencias_tutor or {})}
     pedido = COMO.get(como, como)
     sistema = cargar("apuntes_bloque").rellenar(
         titulo=entrada.titulo, objetivos="; ".join(entrada.objetivos),

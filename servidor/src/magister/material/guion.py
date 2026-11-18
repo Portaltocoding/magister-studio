@@ -3,6 +3,7 @@ una línea `[[marcador]]` abre cada escena y nada va antes del primer marcador."
 
 import re
 
+from magister.cerebro import materias
 from magister.cerebro.modelo import Turno, generar
 from magister.cerebro.prompts import cargar
 from magister.material.modelos import EntradaMaterial
@@ -36,6 +37,8 @@ async def generar_guion(entrada: EntradaMaterial, apuntes: str, minutos: int, es
     sistema = cargar("guion").rellenar(palabras=minutos * PALABRAS_MINUTO, minutos=minutos, conceptos=", ".join(nucleo),
                                        apuntes=apuntes.split("\n# Repaso")[0][:20000],
                                        estilo=ESTILOS_VIDEO.get(estilo, ESTILOS_VIDEO["clase"]))
+    if entrada.materia:
+        sistema += "\n\n" + materias.texto(entrada.materia)
     texto = "".join([t async for t in generar(sistema, [Turno("usuario", "Escribe el guion.")])]).strip()
     primera = MARCADOR.search(texto)
     return texto[primera.start():] if primera else texto

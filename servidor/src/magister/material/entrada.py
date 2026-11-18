@@ -2,6 +2,8 @@
 
 from sqlalchemy import select, text
 
+from magister.cerebro import materias
+from magister.datos import materias as dm
 from magister.datos import plan as dp
 from magister.datos.modelos import Tema
 from magister.datos.plan import ConceptoFila, LeccionFila
@@ -28,6 +30,10 @@ async def entrada_de_leccion(plan_id: int, leccion_clave: str) -> EntradaMateria
             "join documentos d on d.id = v.documento_id join fuentes fu on fu.id = d.fuente_id "
             "where lf.plan_id = :p and lf.leccion_clave = :c order by lf.rango"
         ), {"p": plan_id, "c": leccion_clave})).all()
+    try:
+        materia = await dm.asegurar(plan.tema_id, materias.elegir)
+    except Exception:  # noqa: BLE001  (si no se puede elegir, los apuntes salen sin perfil, como siempre)
+        materia = None
     return EntradaMaterial(
         plan_id=plan_id,
         leccion_clave=leccion_clave,
@@ -41,6 +47,7 @@ async def entrada_de_leccion(plan_id: int, leccion_clave: str) -> EntradaMateria
         previos=[c.id for c in conceptos if c.leccion_clave in anteriores],
         fragmentos=[FragmentoFuente(id=i, texto=t, titulo=d, tipo=ti) for i, t, d, ti in filas],
         perfil=plan.perfil or {},
+        materia=materia,
     )
 
 

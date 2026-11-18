@@ -31,6 +31,7 @@ class EntradaMaterial(BaseModel):
     fragmentos: list[FragmentoFuente] = []
     perfil: dict = {}
     preferencias: dict = {}
+    materia: str | None = Field(None, description="Perfil de explicación del tema (derecho, exactas...); None si no se ha elegido")
 
 
 class Definicion(BaseModel):

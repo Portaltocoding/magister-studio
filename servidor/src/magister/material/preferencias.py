@@ -1,5 +1,7 @@
 """Lo que contestas antes de generar el material, convertido en instrucciones para los prompts."""
 
+from magister.cerebro import materias
+
 PROFUNDIDAD = {
     "intro": "Introducción: lo esencial, con intuición y un ejemplo; sin entrar en casos raros. Bloques cortos.",
     "estandar": "Nivel estándar de ficha general: intuición, lo formal y una cuenta o ejemplo trabajado.",
@@ -35,7 +37,10 @@ def texto(preferencias: dict | None) -> str:
         lineas.append(f"Aprendido de sus valoraciones: {x}")
     if p.get("enfoque"):
         lineas.append(f"Enfoque que pide el alumno: {p['enfoque']}")
-    return "\n".join(f"- {x}" for x in lineas)
+    salida = "\n".join(f"- {x}" for x in lineas)
+    if p.get("materia"):  # el perfil de explicación del tema, solo el que toca (apuntes y diapositivas, no las preguntas)
+        salida += "\n\n" + materias.texto(p["materia"])
+    return salida
 
 
 def texto_preguntas(preferencias: dict | None) -> str:

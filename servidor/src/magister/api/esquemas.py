@@ -17,6 +17,11 @@ class TemaEntrada(BaseModel):
 class TemaSalida(Salida):
     id: int
     nombre: str
+    materia: str | None = None  # perfil de explicación (derecho, exactas...); None hasta que hace falta
+
+
+class MateriaEntrada(BaseModel):
+    materia: str | None = Field(None, max_length=20, description="Un perfil de GET /api/materias, o null para que se vuelva a elegir solo")
 
 
 class ConversacionEntrada(BaseModel):

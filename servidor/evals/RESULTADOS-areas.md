@@ -49,3 +49,29 @@ no tocan. Casi todas las cuentas y datos son correctos. Los fallos que se repet�
 
 Pendiente de medir con más preguntas: que las longitudes nuevas no recorten de más en «Explícame» y que la regla de
 figuras no dibuje donde no aporta.
+
+## Perfiles de explicación por materia (18-11-2026)
+
+Qué es: en vez de llevar en todas las respuestas los bloques «Ciencia y matemáticas» e «Historia, derecho...» (unas 380
+palabras), cada tema tiene un perfil (`cerebro/prompts/comun/materias/<perfil>.md`: general, derecho, filosofia, exactas,
+experimentales, historia, programacion) que se elige una vez por tema y es lo único de materia que entra en la petición.
+Pesan de 84 a 269 palabras: la respuesta de un tema de derecho lleva unas 160 palabras menos que antes, y una de exactas
+unas 110 menos. Harness: `uv run python -m evals.areas preguntas.json salida.json --perfil derecho` (o un campo `perfil`
+en cada pregunta). Medida a mano, una sola pasada, cuatro preguntas:
+
+- sin perfil: `conversar@0e64d5a95cff` (respuesta.md con los dos bloques de materia);
+- con perfil: `conversar@56a710cec883` (respuesta.md sin ellos) más `materia_derecho@b48ed4a8802b` o
+  `materia_filosofia@0d65431681bb`.
+
+| id | palabras sin → con | Lo que cambia (juzgado leyendo las dos respuestas) |
+|---|---|---|
+| der-1 usucapión | 806 → 810 | Abre situando el ordenamiento (CC común, forales aparte) y marca «Nivel: ley». Mismos artículos (1930, 1941, 1942, 1959). Sin pérdida de contenido, algo más mecánico |
+| der-2 caso práctico | 429 → 554 | Con perfil sigue **Hechos, Cuestión, Norma, Aplicación, Conclusión**, requisito por requisito, con la otra salida razonable. Sin perfil faltaba la cuestión. Corrige un error de fondo: antes decía que «ausente» es residente en el extranjero (no lo es: el art. 1958 lo define de otra forma); con perfil remite al art. 1958 y avisa de comprobarlo. Pero escribe «no dejes de ser reclamante inactivo», frase confusa, y añade un test que no se había pedido |
+| fil-1 cogito | 732 → 718 | Con perfil reconstruye el argumento en **P1, P2, C**, dice que la reconstrucción es suya, lo clasifica (deductivo o reducción al absurdo), señala qué premisa lleva el peso y separa exégesis de evaluación. Cada objeción lleva su réplica y su valoración («repite P2 en vez de demostrarla»). Antes eran tres críticas bien atribuidas, pero sin la reconstrucción |
+| fil-2 imperativo categórico | 376 → 379 | Con perfil usa P1, P2, C con el caso de Marta y contrasta con la regla de oro. Sin él era una explicación narrativa igual de correcta; mejora menor |
+
+Lo que no arregla: la atribución segura. En fil-1 el test con perfil pone en boca de Descartes (*Principios*, 1644) la
+réplica a la objeción de «camino, luego existo» de Gassendi; esa objeción y su réplica están en las objeciones y
+respuestas quintas, no en los *Principios*. Es el mismo tipo de error que ya se vio sin perfil. Con cuatro respuestas y una
+pasada es una muestra pequeña, y las áreas exactas, experimentales e historia no se midieron: falta ver que sus perfiles
+igualan a los bloques que sustituyen.

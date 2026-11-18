@@ -15,6 +15,7 @@ from magister.api.esquemas import (
     ConversacionEntrada,
     ConversacionSalida,
     DecisionEntrada,
+    MateriaEntrada,
     MensajeEntrada,
     MensajeSalida,
     TemaEntrada,
@@ -47,6 +48,30 @@ async def crear_tema(cuerpo: TemaEntrada, s: AsyncSession = Depends(sesion_por_p
 @rutas.get("/temas")
 async def listar_temas(s: AsyncSession = Depends(sesion_por_peticion)) -> list[TemaSalida]:
     return [TemaSalida.model_validate(t) for t in await dc.listar_temas(s)]
+
+
+@rutas.get("/materias")
+async def listar_materias() -> list[dict]:
+    """Los perfiles de explicación que se pueden asignar a un tema."""
+    from magister.cerebro import materias
+
+    return [{"id": k, "descripcion": v, "version": materias.version(k)} for k, v in materias.DESCRIPCIONES.items()]
+
+
+@rutas.put("/temas/{tema_id}/materia")
+async def cambiar_materia(tema_id: int, cuerpo: MateriaEntrada, s: AsyncSession = Depends(sesion_por_peticion)) -> TemaSalida:
+    """Cambia a mano el perfil de explicación del tema; null lo deja sin elegir y se vuelve a elegir al usarlo."""
+    from magister.cerebro import materias
+
+    if cuerpo.materia is not None and cuerpo.materia not in materias.PERFILES:
+        raise HTTPException(422, f"perfil desconocido; los hay: {', '.join(materias.PERFILES)}")
+    tema = await dc.obtener_tema(s, tema_id)
+    if tema is None:
+        raise HTTPException(404, "tema no encontrado")
+    tema.materia = cuerpo.materia
+    await s.commit()
+    await s.refresh(tema)
+    return TemaSalida.model_validate(tema)
 
 
 @rutas.get("/conversaciones")

@@ -5,6 +5,7 @@ from datetime import date
 
 from langgraph.config import get_stream_writer
 
+from magister.cerebro import materias
 from magister.cerebro.modelo import Turno, generar
 from magister.config import ajustes
 from magister.flujo.estado import Estado
@@ -111,6 +112,19 @@ async def lecciones_del_alumno() -> str:
     return "\n".join(lineas)
 
 
+async def perfil_de_materia(estado: dict) -> str | None:
+    """El perfil de explicación del tema de la conversación (o del plan de la lección), si lo hay. Solo en el chat de
+    texto: la llamada y el asesor contestan cortos y el perfil no cabe. Nunca rompe la petición."""
+    if not estado.get("conversacion_id") or estado.get("asesor") or estado.get("llamada") or estado.get("voz"):
+        return None
+    from magister.datos import materias as dm
+
+    try:
+        return await dm.de_conversacion(estado["conversacion_id"], estado.get("plan_id_leccion"), materias.elegir, materias.por_reglas)
+    except Exception:  # noqa: BLE001  (sin base o sin modelo, el tutor sigue sin perfil)
+        return None
+
+
 async def sistema_de_estudio(base: str, estado: dict) -> str:
     """El prompt de estudio con lo que el tutor debe saber del alumno en este turno."""
     partes = [base]
@@ -133,6 +147,9 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
             lecciones = await lecciones_del_alumno()
         except Exception:  # noqa: BLE001  (sin base, el tutor sigue funcionando)
             lecciones = ""
+    perfil = materias.texto(await perfil_de_materia(estado))
+    if perfil:
+        partes.append(perfil)
     if estado.get("conversacion_id"):
         try:
             p = await preferencias_tutor()

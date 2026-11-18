@@ -43,6 +43,8 @@ class Tema(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(200), unique=True)
     creado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
+    # Perfil de explicación (derecho, filosofia, exactas...): nulo hasta que hace falta; se puede cambiar a mano.
+    materia: Mapped[str | None] = mapped_column(String(20))
 
 
 class Conversacion(Base):

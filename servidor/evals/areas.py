@@ -6,7 +6,10 @@ escribe las respuestas con la versión del prompt que las produjo. Juzgarlas es 
 
 Llama a `claude` (gasta cuota): se lanza solo a mano.
 
-    uv run python -m evals.areas preguntas.json respuestas.json [--a-la-vez 3]
+    uv run python -m evals.areas preguntas.json respuestas.json [--a-la-vez 3] [--perfil derecho]
+
+Con `--perfil` (o un campo `perfil` en cada pregunta) la respuesta lleva el perfil de explicación de esa materia
+(`cerebro/prompts/comun/materias/<perfil>.md`), como si el tema ya lo tuviera; sin él, el alumno nuevo de siempre.
 """
 
 import argparse
@@ -15,20 +18,23 @@ import json
 import time
 from pathlib import Path
 
+from magister.cerebro import materias
 from magister.cerebro.modelo import Turno, generar
 from magister.cerebro.prompts import cargar
 from magister.flujo.comun import sistema_de_estudio
 
 
-async def responder(pregunta: str) -> tuple[str, float]:
+async def responder(pregunta: str, perfil: str | None = None) -> tuple[str, float]:
     plantilla = cargar("conversar")
     sistema = await sistema_de_estudio(plantilla.texto, {})
+    if perfil:
+        sistema += "\n\n" + materias.texto(perfil)
     inicio = time.perf_counter()
     texto = "".join([t async for t in generar(sistema, [Turno("usuario", pregunta)])])
     return texto, time.perf_counter() - inicio
 
 
-async def principal(entrada: Path, salida: Path, a_la_vez: int) -> None:
+async def principal(entrada: Path, salida: Path, a_la_vez: int, perfil: str | None = None) -> None:
     preguntas = json.loads(entrada.read_text(encoding="utf-8"))
     version = cargar("conversar").etiqueta
     limite = asyncio.Semaphore(a_la_vez)
@@ -36,8 +42,9 @@ async def principal(entrada: Path, salida: Path, a_la_vez: int) -> None:
     async def una(p: dict) -> dict:
         async with limite:
             try:
-                texto, segundos = await responder(p["pregunta"])
-                return {**p, "respuesta": texto, "segundos": round(segundos, 1), "prompt": version}
+                este = p.get("perfil") or perfil
+                texto, segundos = await responder(p["pregunta"], este)
+                return {**p, "respuesta": texto, "segundos": round(segundos, 1), "prompt": version, "perfil": materias.version(este)}
             except Exception as e:  # noqa: BLE001  (una pregunta que falla no tumba las demás)
                 return {**p, "respuesta": None, "error": f"{type(e).__name__}: {e}", "prompt": version}
 
@@ -52,8 +59,9 @@ def main() -> None:
     ap.add_argument("entrada", type=Path)
     ap.add_argument("salida", type=Path)
     ap.add_argument("--a-la-vez", type=int, default=3)
+    ap.add_argument("--perfil", choices=materias.PERFILES, default=None, help="perfil de explicación para todas las preguntas")
     a = ap.parse_args()
-    asyncio.run(principal(a.entrada, a.salida, a.a_la_vez))
+    asyncio.run(principal(a.entrada, a.salida, a.a_la_vez, a.perfil))
 
 
 if __name__ == "__main__":
