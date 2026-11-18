@@ -16,8 +16,8 @@ function leerRuta(): { modo: IdModo; conversacion: number | null } {
   const partes = window.location.hash.replace(/^#\/?/, '').split('/')
   if (partes[0] === 'conversacion' && Number(partes[1])) return { modo: 'libre', conversacion: Number(partes[1]) }
   const modo = MODOS.find((m) => m.id === partes[0] && m.encendido)?.id
-  // Sin ruta se abre el tutor, que te recibe con lo que toca.
-  return { modo: modo ?? (partes[0] ? 'libre' : 'tutor'), conversacion: null }
+  // Sin ruta se abre Hoy, que te recibe con lo que toca.
+  return { modo: modo ?? (partes[0] ? 'libre' : 'hoy'), conversacion: null }
 }
 
 function escribirRuta(modo: IdModo, conversacion: number | null) {
@@ -113,7 +113,7 @@ export default function Marco() {
   useEffect(() => {
     const alCambiar = () => {
       const r = leerRuta()
-      // «Crear mi plan» (tutor, Tu día, foco, Ctrl+K) llega aquí: abre el cuestionario del plan, no el chat libre.
+      // «Crear mi plan» (Hoy, tutor, foco, Ctrl+K) llega aquí: abre el cuestionario del plan, no el chat libre.
       if (window.location.hash.startsWith('#/nuevo-plan')) setTipoNueva('plan')
       else if (r.modo === 'libre' && r.conversacion == null) setTipoNueva('libre')
       setModo(r.modo)

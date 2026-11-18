@@ -759,7 +759,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
 }
 
 // Si hoy (o antes) tocaba un examen del plan y no lo has aprobado, el tutor te lo propone.
-// «Tu día»: lo que toca, en orden (repasar, las lecciones, el examen al final) y cuánto queda.
+// «Hoy»: lo que toca, en orden (repasar, las lecciones, el examen al final) y cuánto queda.
 function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | null; irA: (m: IdModo) => void }) {
   const dia = hoy.dia ?? []
   const indice = usarIndice(hoy.plan_id)
@@ -953,7 +953,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
         <Mascota mini />
         <div>
           <p className="hoy-saludo">{saludo()}</p>
-          <h1>Tu día</h1>
+          <h1>Hoy</h1>
           <p className="nota hoy-fecha">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
       </header>

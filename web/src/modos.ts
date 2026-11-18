@@ -34,6 +34,8 @@ export interface Modo {
   encendido: boolean
   // Una línea al pasar el ratón: qué haces ahí.
   ayuda: string
+  // No sale en la barra lateral: se llega desde la pantalla de su entrada, con las pestañas de arriba (Tutor, desde Hoy).
+  soloDentro?: boolean
 }
 
 export interface Grupo {
@@ -53,8 +55,10 @@ export const GRUPOS: Grupo[] = [
     nombre: 'Hoy',
     ayuda: 'Lo que toca hoy',
     modos: [
-      { id: 'tutor', nombre: 'Tutor', encendido: true, ayuda: 'Te guía paso a paso: repasos, lección y examen' },
-      { id: 'hoy', nombre: 'Tu día', encendido: true, ayuda: 'Tus cifras, tu semana y lo que toca hoy' },
+      // Hoy es una sola pantalla: la entrada, el icono del riel y la ruta vacía llevan aquí, y Tutor se abre desde ella
+      // con el conmutador de arriba (no tiene sitio propio en la barra).
+      { id: 'hoy', nombre: 'Hoy', encendido: true, ayuda: 'Tus cifras, tu semana y lo que toca hoy' },
+      { id: 'tutor', nombre: 'Tutor', encendido: true, ayuda: 'Te guía paso a paso: repasos, lección y examen', soloDentro: true },
     ],
   },
   {

@@ -82,9 +82,13 @@ export default function BarraLateral({
 
       <nav aria-label="Modos" className="grupos-modos">
         {GRUPOS.map((g, ig) => {
+          // Las que se abren desde dentro de su pantalla (Tutor, desde Hoy) no se listan aquí.
+          const visibles = g.modos.filter((m) => !m.soloDentro)
+          // Una entrada con una sola subsección que se llama igual (Hoy) no la repite debajo.
+          const sola = visibles.length === 1 && visibles[0].nombre === g.nombre
           const lista = (
             <ul className="modos">
-              {g.modos.map((m) => (
+              {visibles.map((m) => (
                 <li key={m.id}>
                   {/* Un botón desactivado no se puede pulsar ni enfocar con el teclado. */}
                   <button
@@ -127,6 +131,7 @@ export default function BarraLateral({
                 >
                   {g.nombre}
                 </button>
+                {!sola && (
                 <button
                   type="button"
                   className="plegar-seccion"
@@ -140,8 +145,9 @@ export default function BarraLateral({
                     <path d="M3 4.5 L6 7.5 L9 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
+                )}
               </div>
-              {!plegada && <div id={idLista}>{lista}</div>}
+              {!plegada && !sola && <div id={idLista}>{lista}</div>}
             </div>
           )
         })}

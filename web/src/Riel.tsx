@@ -130,8 +130,8 @@ export default function Riel({ modo, alAbrir, alIr, hoy }: { modo: IdModo; alAbr
       </button>
       <button
         type="button"
-        className={`riel-boton riel-hoy ${padreDe(modo) === 'tutor' ? 'actual' : ''} ${p.n ? 'con-aviso' : ''}`}
-        onClick={() => alIr('tutor')}
+        className={`riel-boton riel-hoy ${padreDe(modo) === 'hoy' ? 'actual' : ''} ${p.n ? 'con-aviso' : ''}`}
+        onClick={() => alIr('hoy')}
         title={p.texto}
         aria-label={p.texto}
       >
