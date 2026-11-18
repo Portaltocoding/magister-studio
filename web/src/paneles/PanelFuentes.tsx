@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import {
   pedir,
   crearFuente,
@@ -34,21 +35,32 @@ export default function PanelFuentes() {
   const [aviso, setAviso] = useState<string | null>(null)
   const [nueva, setNueva] = useState({ nombre: '', tipo: 'pdf' as Fuente['tipo'], confianza: 3 })
   const [tema, setTema] = useState<number | null>(null)
+  // Hasta que llegan las fuentes no se pinta la lista (si no, un fallo se vería como «Sin fuentes todavía»).
+  const [cargada, setCargada] = useState(false)
+  const [fallo, setFallo] = useState<string | null>(null)
 
   const recargar = useCallback(() => {
-    listarFuentes().then((fs) => {
-      setFuentes(fs)
-      setActiva((a) => a ?? fs[0]?.id ?? null)
-    })
-    listarTemas().then(setTemas)
-    listarPropuestas().then(setPropuestas)
-    estadoIndice().then(setEstado)
+    setFallo(null)
+    Promise.all([listarFuentes(), listarTemas()])
+      .then(([fs, ts]) => {
+        setFuentes(fs)
+        setTemas(ts)
+        setActiva((a) => a ?? fs[0]?.id ?? null)
+        setCargada(true)
+      })
+      .catch((e) => setFallo(mensajeDe(e)))
+    // Lo accesorio no bloquea la pantalla: si falla, se queda como estaba.
+    listarPropuestas().then(setPropuestas).catch(() => undefined)
+    estadoIndice().then(setEstado).catch(() => undefined)
   }, [])
 
   useEffect(recargar, [recargar])
 
   const cargarDocs = useCallback(() => {
-    if (activa != null) listarDocumentos(activa).then(setDocs)
+    if (activa != null)
+      listarDocumentos(activa)
+        .then(setDocs)
+        .catch((e) => setAviso(`No he podido cargar los documentos: ${mensajeDe(e)}`))
   }, [activa])
 
   useEffect(cargarDocs, [cargarDocs])
@@ -58,7 +70,7 @@ export default function PanelFuentes() {
     if (!docs.some((d) => d.version && ['recibida', 'pendiente'].includes(d.version.estado))) return
     const t = setInterval(() => {
       cargarDocs()
-      estadoIndice().then(setEstado)
+      estadoIndice().then(setEstado).catch(() => undefined)
     }, 3000)
     return () => clearInterval(t)
   }, [docs, cargarDocs])
@@ -73,6 +85,14 @@ export default function PanelFuentes() {
       setAviso(String((e as Error).message))
     }
   }
+
+  if (!cargada)
+    return (
+      <div className="panel">
+        <h1>Tus fuentes</h1>
+        <Cargando texto="Cargando tus fuentes…" error={fallo} reintentar={recargar} />
+      </div>
+    )
 
   return (
     <div className="panel">
@@ -122,7 +142,12 @@ export default function PanelFuentes() {
               title="Borrar la fuente y sus documentos"
               onClick={async () => {
                 if (!confirm(`¿Borrar la fuente «${f.nombre}» con todos sus documentos? El tutor dejará de citarla. No se puede deshacer.`)) return
-                await pedir(`/api/fuentes/${f.id}`, { method: 'DELETE' })
+                try {
+                  await pedir(`/api/fuentes/${f.id}`, { method: 'DELETE' })
+                } catch (e) {
+                  setAviso(`No he podido borrar la fuente: ${mensajeDe(e)}`)
+                  return
+                }
                 if (activa === f.id) setActiva(null)
                 recargar()
               }}

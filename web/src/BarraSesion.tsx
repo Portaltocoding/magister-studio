@@ -16,6 +16,14 @@ interface Alerta {
 export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
   const [estado, setEstado] = useState<Estado>('comprobando')
   const [alertas, setAlertas] = useState<Alerta[]>([])
+  // La alerta que no se pudo marcar como resuelta: el botón lo dice en vez de no hacer nada.
+  const [sinResolver, setSinResolver] = useState<number | null>(null)
+  const resolver = (id: number) => {
+    setSinResolver(null)
+    pedir(`/api/alertas/${id}/resolver`, { method: 'POST' })
+      .then(() => setAlertas((as) => as.filter((x) => x.id !== id)))
+      .catch(() => setSinResolver(id))
+  }
 
   useEffect(() => {
     let vigente = true
@@ -61,9 +69,10 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
           ⚠ {a.detalle}{' '}
           <button
             className="boton-mini"
-            onClick={() => pedir(`/api/alertas/${a.id}/resolver`, { method: 'POST' }).then(() => setAlertas(alertas.filter((x) => x.id !== a.id)))}
+            onClick={() => resolver(a.id)}
+            title={sinResolver === a.id ? 'No se pudo marcar: pulsa para reintentar' : undefined}
           >
-            Resuelta
+            {sinResolver === a.id ? 'No se pudo, reintentar' : 'Resuelta'}
           </button>
         </span>
       ))}

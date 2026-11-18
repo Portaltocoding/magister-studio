@@ -23,23 +23,30 @@ export default function PanelEtiquetar() {
   const [aviso, setAviso] = useState<string | null>(null)
 
   const siguiente = useCallback(() => {
-    pedir<Bloque | null>(`/api/etiquetar/siguiente?ronda=${ronda}`).then((b) => {
-      setBloque(b)
-      setVacio(!b)
-      setNotas(Object.fromEntries((b?.dimensiones ?? []).map((d) => [d, true])))
-      setCritica('')
-    })
+    pedir<Bloque | null>(`/api/etiquetar/siguiente?ronda=${ronda}`)
+      .then((b) => {
+        setBloque(b)
+        setVacio(!b)
+        setNotas(Object.fromEntries((b?.dimensiones ?? []).map((d) => [d, true])))
+        setCritica('')
+      })
+      .catch((e) => setAviso(`No he podido traer el siguiente bloque: ${(e as Error).message}`))
   }, [ronda])
 
   useEffect(siguiente, [siguiente])
 
   const guardar = useCallback(async () => {
     if (!bloque) return
-    for (const d of bloque.dimensiones)
-      await pedir(
-        '/api/etiquetas',
-        enviarJson({ material_id: bloque.material_id, clave: bloque.clave, dimension: d, veredicto: notas[d], critica, ronda }),
-      )
+    try {
+      for (const d of bloque.dimensiones)
+        await pedir(
+          '/api/etiquetas',
+          enviarJson({ material_id: bloque.material_id, clave: bloque.clave, dimension: d, veredicto: notas[d], critica, ronda }),
+        )
+    } catch (e) {
+      setAviso(`No he podido guardar: ${(e as Error).message}`)
+      return
+    }
     siguiente()
   }, [bloque, notas, critica, ronda, siguiente])
 

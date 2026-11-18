@@ -106,3 +106,29 @@ async def test_un_proyecto_de_punta_a_punta_por_la_api(cliente, monkeypatch) -> 
     assert [x["nombre"] for x in (await cliente.get("/api/proyectos")).json()][0] == "Copiloto"
     assert (await cliente.delete(f"/api/proyectos/{pid}")).status_code == 204
     assert (await cliente.get(f"/api/proyectos/{pid}")).status_code == 404
+
+
+async def test_un_proyecto_nunca_se_queda_generando_si_su_trabajo_ya_no_va(cliente) -> None:
+    from magister.trabajos import cola
+
+    r = await cliente.post("/api/proyectos", json={"nombre": "Atascado", "idea": "Un proyecto cuyo trabajo va a fallar del todo.", "investigar": False})
+    pid = r.json()["id"]
+    ver = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert ver["estado"] == "generando" and ver["trabajo"]["estado"] == "pendiente" and "trabajador_vivo" in ver["trabajo"]
+    # El trabajo falla del todo: la lista ya lo dice sin tener que abrir el proyecto.
+    await cola.terminar(ver["trabajo"]["id"], "fallido", "el modelo no contestó")
+    lista = {x["id"]: x for x in (await cliente.get("/api/proyectos")).json()}
+    assert lista[pid]["estado"] == "error" and lista[pid]["error"] == "el modelo no contestó"
+    # Reintentar lo vuelve a poner en marcha.
+    assert (await cliente.post(f"/api/proyectos/{pid}/rehacer")).json()["estado"] == "generando"
+    # Si su trabajo desaparece (se borró la cola, una restauración), tampoco se queda colgado.
+    from sqlalchemy import delete
+
+    from magister.datos.material import Trabajo
+    from magister.datos.sesion import nueva_sesion
+
+    tid = (await cliente.get(f"/api/proyectos/{pid}")).json()["trabajo"]["id"]
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(delete(Trabajo).where(Trabajo.id == tid))
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert p["estado"] == "error" and "perdió" in p["error"]

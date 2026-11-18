@@ -40,7 +40,11 @@ export default function RepasoTema({ alPracticar, alExaminar }: { alPracticar: (
     cargar()
   }, [])
   useEffect(() => {
-    if (temas?.[0]) pedir<{ estilo: string }>(`/api/planes/${temas[0].plan_id}/estilo-examen`).then((r) => setEstilo(r.estilo))
+    // El estilo es una preferencia ya elegida: si no llega, se queda el de por defecto.
+    if (temas?.[0])
+      pedir<{ estilo: string }>(`/api/planes/${temas[0].plan_id}/estilo-examen`)
+        .then((r) => setEstilo(r.estilo))
+        .catch(() => undefined)
   }, [temas])
 
   if (!temas?.length) return null

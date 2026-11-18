@@ -1,10 +1,10 @@
 import Pensando from './Pensando.tsx'
 import { Children, isValidElement, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import Markdown, { type Components } from 'react-markdown'
-import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { Diagrama, Opciones, TestRapido } from './Interactivo.tsx'
+import { conKatex, tieneMates, usarKatex } from './katexPerezoso.ts'
 import { AgendarTarjeta, PreguntaTarjeta } from './Preguntas.tsx'
 import { ModoTarjeta, RecordarTarjeta } from './Modos.tsx'
 import Revelar from './Revelar.tsx'
@@ -132,10 +132,11 @@ function CuerpoTutor({
     }),
     [b.citas, completo, escribiendo, alEnviar, alCita],
   )
+  const katex = usarKatex(tieneMates(b.contenido))
   return (
     <Revelar texto={conMarcas(b.contenido)} animar={b.estado === 'llegando'}>
       {(visible) => (
-        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={componentes}>
+        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={conKatex(katex)} components={componentes}>
           {visible}
         </Markdown>
       )}

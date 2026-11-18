@@ -24,17 +24,40 @@ rutas = APIRouter(prefix="/api")
 
 
 async def examen_pendiente(hoy_: date) -> dict | None:
-    """El primer examen del plan que ya toca (hoy o atrasado) y aún no has aprobado."""
+    """El primer examen del plan que ya toca (hoy o atrasado) y aún no has aprobado.
+
+    Cuatro consultas en total, tengas los planes que tengas (antes eran tres por plan): los planes, y las lecciones,
+    las fechas de las sesiones y los exámenes terminados de todos ellos. El cálculo es el de `examenes_del_plan`."""
+    from collections import defaultdict
+
     from magister.datos import plan as dp
-    from magister.flujo.planes import examenes_del_plan
+    from magister.datos.aprender import Examen
+    from magister.plan.examenes import con_estado, hitos
 
     async with nueva_sesion() as s:
-        for fila, nombre in await dp.planes_aceptados(s):
-            lecs = await dp.lecciones(s, fila.id)
-            ses = await dp.sesiones(s, fila.id)
-            for h in await examenes_del_plan(s, fila.id, lecs, ses):
-                if not h["hecho"] and date.fromisoformat(h["fecha"]) <= hoy_:
-                    return {**h, "plan_id": fila.id, "tema": nombre}
+        planes = await dp.planes_aceptados(s)
+        if not planes:
+            return None
+        ids = [fila.id for fila, _ in planes]
+        lecs = (await s.execute(select(dp.LeccionFila.plan_id, dp.LeccionFila.clave).where(dp.LeccionFila.plan_id.in_(ids))
+                                .order_by(dp.LeccionFila.plan_id, dp.LeccionFila.orden))).all()
+        ses = (await s.execute(select(dp.SesionFila.plan_id, dp.SesionFila.leccion_clave, dp.SesionFila.fecha)
+                               .where(dp.SesionFila.plan_id.in_(ids)))).all()
+        exs = (await s.execute(select(Examen.plan_id, Examen.lecciones, Examen.nota)
+                               .where(Examen.plan_id.in_(ids), Examen.terminado.is_not(None)))).all()
+    claves: dict[int, list[str]] = defaultdict(list)
+    for pid, clave in lecs:
+        claves[pid].append(clave)
+    ultima: dict[int, dict] = defaultdict(dict)
+    for pid, clave, fecha in ses:
+        ultima[pid][clave] = max(ultima[pid].get(clave, fecha), fecha)
+    hechos: dict[int, list] = defaultdict(list)
+    for pid, lecciones_examen, nota in exs:
+        hechos[pid].append((set(lecciones_examen or []), nota))
+    for fila, nombre in planes:
+        for h in con_estado(hitos(claves[fila.id], ultima[fila.id]), hechos[fila.id]):
+            if not h["hecho"] and date.fromisoformat(h["fecha"]) <= hoy_:
+                return {**h, "plan_id": fila.id, "tema": nombre}
     return None
 
 

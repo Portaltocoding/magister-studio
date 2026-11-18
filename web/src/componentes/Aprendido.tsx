@@ -31,7 +31,11 @@ export default function Aprendido() {
                   className="borrar"
                   aria-label="Que no lo aplique"
                   title="Que no lo aplique"
-                  onClick={() => pedir<Afinado>(`/api/afinado/reglas/${r.motivo}/quitar`, { method: 'POST' }).then(setA)}
+                  onClick={() =>
+                    pedir<Afinado>(`/api/afinado/reglas/${r.motivo}/quitar`, { method: 'POST' })
+                      .then(setA)
+                      .catch(() => window.alert('No he podido quitarla. Inténtalo de nuevo en un momento.'))
+                  }
                 >
                   ×
                 </button>

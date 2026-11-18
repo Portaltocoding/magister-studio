@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import Markdown from 'react-markdown'
-import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
 import { reaccionar } from './animo.ts'
+import { conKatex, tieneMates, usarKatex } from './katexPerezoso.ts'
 
 // Bloques que el tutor escribe en Markdown y la pantalla convierte en botones:
 // ```test     → una pregunta tipo test que se corrige aquí mismo, sin gastar otra respuesta del modelo.
 // ```opciones → caminos para seguir; pulsarlos envía ese texto.
-
-const mates = { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }
 
 interface Test {
   enunciado: string
@@ -32,6 +30,7 @@ export function leerTest(texto: string): Test {
 export function TestRapido({ texto, completo }: { texto: string; completo: boolean }) {
   const t = leerTest(texto)
   const [elegida, setElegida] = useState<number | null>(null)
+  const mates = { remarkPlugins: [remarkMath], rehypePlugins: conKatex(usarKatex(tieneMates(texto))) }
   const acierto = elegida != null && t.opciones[elegida]?.buena
   return (
     <div className="test-rapido">

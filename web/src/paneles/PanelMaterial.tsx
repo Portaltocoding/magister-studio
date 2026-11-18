@@ -17,6 +17,7 @@ import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Colores from '../componentes/Colores.tsx'
 import { acentoDe, usarColores, variables } from '../componentes/colores.ts'
 import Pensando from '../componentes/Pensando.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import BarraCuota from '../componentes/BarraCuota.tsx'
 
 // Lo que sale si no eliges nada: lo de casi siempre.
@@ -131,14 +132,16 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
       .then((ps) => {
         setPlanes(ps)
         const elegido = ps.find((p) => p.tema_id === Number(temaRuta)) ?? ps[0]
-        if (elegido)
-          Promise.all([verPlan(elegido.tema_id), pedir<{ leccion_clave?: string }>('/api/hoy').catch(() => null)]).then(([v, hoy]) => {
-            setPlan(v)
-            // Sin lección en la URL, abre la que toca hoy (no siempre la primera).
-            const existe = (c?: string | null) => !!c && v.lecciones.some((l) => l.clave === c)
-            setClave(existe(claveRuta) ? claveRuta : existe(hoy?.leccion_clave) ? hoy!.leccion_clave! : (v.lecciones[0]?.clave ?? null))
-          })
         if (temaRuta) window.history.replaceState(null, '', `#/${modoVista === 'video' ? 'video' : 'fichas'}`)
+        if (!elegido) return setPlanes(ps)
+        // La lista se enseña cuando también ha llegado el plan: si este falla, sale «Reintentar» y no una lista vacía.
+        return Promise.all([verPlan(elegido.tema_id), pedir<{ leccion_clave?: string }>('/api/hoy').catch(() => null)]).then(([v, hoy]) => {
+          setPlanes(ps)
+          setPlan(v)
+          // Sin lección en la URL, abre la que toca hoy (no siempre la primera).
+          const existe = (c?: string | null) => !!c && v.lecciones.some((l) => l.clave === c)
+          setClave(existe(claveRuta) ? claveRuta : existe(hoy?.leccion_clave) ? hoy!.leccion_clave! : (v.lecciones[0]?.clave ?? null))
+        })
       })
       .catch(() => setFallo(true))
   }, [modoVista, intento])
@@ -157,31 +160,49 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   }, [])
 
   const cargarEstados = useCallback(() => {
-    if (plan) pedir<Record<string, EstadoLeccion>>(`/api/planes/${plan.plan_id}/materiales`).then(setEstados)
+    // Los estados de la lista son un adorno (listo, sin material): si fallan, se quedan como estaban.
+    if (plan)
+      pedir<Record<string, EstadoLeccion>>(`/api/planes/${plan.plan_id}/materiales`)
+        .then(setEstados)
+        .catch(() => undefined)
   }, [plan])
   useEffect(cargarEstados, [cargarEstados])
 
+  const [falloMaterial, setFalloMaterial] = useState<string | null>(null)
   const cargar = useCallback(() => {
     if (!plan || !clave) return
+    // Al cambiar de lección (o recargar) se deja de seguir el trabajo anterior; si sigue en marcha, se vuelve a seguir.
+    control.current?.abort()
     setTextos({})
-    pedir<MaterialLeccion>(`/api/planes/${plan.plan_id}/lecciones/${clave}/material`).then((d) => {
-      setDatos(d)
-      const t = d.ultimo_trabajo
-      if (t && ['pendiente', 'en_curso'].includes(t.estado)) seguir(t.id)
-      else setTrabajo(t)
-      if (d.materiales.apuntes)
-        pedir<{ texto: string; estilo?: string; contrato?: { bloques?: { clave: string; titulo: string }[] } }>(
-          `/api/materiales/${d.materiales.apuntes.id}`,
-        ).then((m) => {
-          setTextos((x) => ({ ...x, apuntes: m.texto }))
-          setEstilo(m.estilo ?? 'libro')
-          setContrato(Object.fromEntries((m.contrato?.bloques ?? []).map((b) => [b.clave, b.titulo])))
-        })
-      if (d.materiales.guion)
-        pedir<{ texto: string }>(`/api/materiales/${d.materiales.guion.id}`).then((m) =>
-          setTextos((x) => ({ ...x, guion: m.texto })),
-        )
-    })
+    setFalloMaterial(null)
+    const fallo = (e: unknown) => setFalloMaterial(mensajeDe(e))
+    pedir<MaterialLeccion>(`/api/planes/${plan.plan_id}/lecciones/${clave}/material`)
+      .then((d) => {
+        setDatos(d)
+        const t = d.ultimo_trabajo
+        if (t && ['pendiente', 'en_curso'].includes(t.estado)) seguir(t.id)
+        else setTrabajo(t)
+        if (d.materiales.apuntes)
+          pedir<{ texto: string; estilo?: string; contrato?: { bloques?: { clave: string; titulo: string }[] } }>(
+            `/api/materiales/${d.materiales.apuntes.id}`,
+          )
+            .then((m) => {
+              setTextos((x) => ({ ...x, apuntes: m.texto }))
+              setEstilo(m.estilo ?? 'libro')
+              setContrato(Object.fromEntries((m.contrato?.bloques ?? []).map((b) => [b.clave, b.titulo])))
+            })
+            .catch(fallo)
+        if (d.materiales.guion)
+          pedir<{ texto: string }>(`/api/materiales/${d.materiales.guion.id}`)
+            .then((m) => setTextos((x) => ({ ...x, guion: m.texto })))
+            .catch(fallo)
+      })
+      .catch((e) => {
+        // Sin el material de esta lección no se enseña el de otra ni un progreso que ya no se sigue.
+        setDatos(null)
+        setTrabajo(null)
+        fallo(e)
+      })
     // seguir se define abajo; se vuelve a suscribir si recargas con un trabajo en curso
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, clave])
@@ -197,6 +218,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     const c = new AbortController()
     control.current = c
     setTrabajo({ id, estado: 'pendiente', nodo: null, paso: 0, total: 0, avisos: [], error: null })
+    let acabado = false
     try {
       const r = await fetch(`/api/trabajos/${id}/eventos`, { signal: c.signal })
       for await (const ev of leerSSE<EventoTrabajo>(r)) {
@@ -204,16 +226,25 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
           setTrabajo((t) => t && { ...t, estado: ev.estado, nodo: ev.nodo, paso: ev.paso, total: ev.total })
         else if (ev.tipo === 'aviso')
           setTrabajo((t) => t && { ...t, avisos: [...t.avisos, { regla: ev.regla, detalle: ev.detalle }] })
-        else if (ev.tipo === 'error') setTrabajo((t) => t && { ...t, estado: 'fallido', error: ev.detalle })
-        else if (ev.tipo === 'fin') {
+        else if (ev.tipo === 'error') {
+          acabado = true
+          setTrabajo((t) => t && { ...t, estado: 'fallido', error: ev.detalle })
+        } else if (ev.tipo === 'fin') {
+          acabado = true
           setTrabajo((t) => t && { ...t, estado: 'hecho' })
           cargar()
           cargarEstados()
         }
       }
     } catch (e) {
-      if (!(e instanceof DOMException && e.name === 'AbortError')) setError(String(e))
+      if (e instanceof DOMException && e.name === 'AbortError') return
     }
+    // Se cortó sin terminar (el servidor se reinició, la red): en unos segundos se vuelve a leer cómo va y, si sigue
+    // en marcha, se vuelve a seguir. Así el progreso nunca se queda congelado.
+    if (!acabado && !c.signal.aborted)
+      window.setTimeout(() => {
+        if (!c.signal.aborted) cargar()
+      }, 4000)
   }
 
   const generar = async (forzar: boolean, r: Respuestas) => {
@@ -336,10 +367,12 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
             aria-label="Plan"
             value={plan?.tema_id ?? ''}
             onChange={(e) =>
-              verPlan(Number(e.target.value)).then((v) => {
-                setPlan(v)
-                setClave(v.lecciones[0]?.clave ?? null)
-              })
+              verPlan(Number(e.target.value))
+                .then((v) => {
+                  setPlan(v)
+                  setClave(v.lecciones[0]?.clave ?? null)
+                })
+                .catch((err) => setError(`No he podido abrir ese plan: ${mensajeDe(err)}`))
             }
           >
             {planes.map((p) => (
@@ -435,6 +468,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         )}
 
         {error && <p role="alert">{error}</p>}
+        {falloMaterial && <Cargando error={falloMaterial} reintentar={cargar} />}
         {aviso && (
           <p className="nota" role="status">
             {aviso}
@@ -471,7 +505,12 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 <span className="barra">
                   <span style={{ width: `${trabajo.total ? ((trabajo.paso + 1) / trabajo.total) * 100 : 5}%` }} />
                 </span>
-                <button className="boton-mini" onClick={() => pedir(`/api/trabajos/${trabajo.id}/cancelar`, { method: 'POST' })}>
+                <button
+                  className="boton-mini"
+                  onClick={() =>
+                    pedir(`/api/trabajos/${trabajo.id}/cancelar`, { method: 'POST' }).catch((e) => setError(`No he podido cancelar: ${mensajeDe(e)}`))
+                  }
+                >
                   Cancelar
                 </button>
               </>

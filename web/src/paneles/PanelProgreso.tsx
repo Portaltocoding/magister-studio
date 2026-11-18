@@ -295,8 +295,13 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
 
   const elegirPlan = (p: ResumenPlan) => {
     setNombre(p.tema)
-    verPlan(p.tema_id).then(setPlan)
-    pedir<Record<string, EstadoMaterial>>(`/api/planes/${p.plan_id}/materiales`).then(setMateriales)
+    // Si falla, se queda el plan que estaba (y vuelve a poner su nombre) en vez de dejar la pantalla a medias.
+    Promise.all([verPlan(p.tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${p.plan_id}/materiales`)])
+      .then(([v, m]) => {
+        setPlan(v)
+        setMateriales(m)
+      })
+      .catch(() => setNombre((n) => (plan ? (planes?.find((x) => x.plan_id === plan.plan_id)?.tema ?? n) : n)))
   }
 
   const [fallo, setFallo] = useState(false)

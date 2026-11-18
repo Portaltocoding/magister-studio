@@ -2,8 +2,9 @@
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
+from magister.datos.material import Trabajo
 from magister.datos.proyectos import Decision, Proyecto
 from magister.datos.sesion import nueva_sesion
 from magister.proyectos.roadmap import pasos
@@ -32,21 +33,49 @@ def _progreso(p: Proyecto) -> dict:
     return {"pasos": len(todos), "hechos": sum(1 for x in todos if x["id"] in hechos), "nivel": actual, "niveles": len(niveles)}
 
 
+async def _reconciliar(proyectos: list[Proyecto]) -> None:
+    """Ningún proyecto se queda «generando» para siempre: si su trabajo ya no está en marcha (falló, se canceló, se
+    perdió o acabó sin que el proyecto se enterase), pasa a «listo» si tiene roadmap o a «error» si no.
+    Una consulta para todos los proyectos que se están generando."""
+    generando = [p for p in proyectos if p.estado == "generando"]
+    if not generando:
+        return
+    ids = {p.trabajo_id for p in generando if p.trabajo_id is not None}
+    trabajos: dict[int, tuple[str, str | None]] = {}
+    if ids:
+        async with nueva_sesion() as s:
+            trabajos = {i: (e, err) for i, e, err in (await s.execute(
+                select(Trabajo.id, Trabajo.estado, Trabajo.error).where(Trabajo.id.in_(ids)))).all()}
+    for p in generando:
+        t = trabajos.get(p.trabajo_id) if p.trabajo_id is not None else None
+        if t is not None and t[0] in ("pendiente", "en_curso"):
+            continue
+        if t is None:
+            motivo = "se perdió el trabajo que lo preparaba"
+        elif t[0] == "hecho":
+            motivo = "terminó sin roadmap"
+        else:
+            motivo = t[1] or ("cancelado" if t[0] == "cancelado" else "no se pudo generar")
+        estado = "listo" if p.roadmap else "error"
+        async with nueva_sesion() as s, s.begin():
+            # Solo si nadie lo ha cambiado mientras tanto (el trabajador pudo terminarlo justo ahora).
+            r = await s.execute(update(Proyecto).where(
+                Proyecto.id == p.id, Proyecto.estado == "generando", Proyecto.trabajo_id.is_not_distinct_from(p.trabajo_id))
+                .values(estado=estado, error=motivo, trabajo_id=None))
+        if r.rowcount:
+            p.estado, p.error, p.trabajo_id = estado, motivo, None
+
+
 async def _estado_trabajo(p: Proyecto) -> dict | None:
-    """Si se está generando: en qué va; si el trabajo falló del todo, el proyecto pasa a «error»."""
+    """Si se está generando: en qué va, y si hay un trabajador en marcha que lo vaya a hacer."""
+    await _reconciliar([p])
     if p.trabajo_id is None:
         return None
     t = await cola.leer(p.trabajo_id)
     if t is None:
         return None
-    if t.get("estado") in ("fallido", "cancelado") and p.estado == "generando":
-        async with nueva_sesion() as s, s.begin():
-            fila = await s.get(Proyecto, p.id)
-            fila.estado = "error" if fila.roadmap is None else "listo"
-            fila.error = t.get("error") or "no se pudo generar"
-            fila.trabajo_id = None
-        p.estado, p.error = fila.estado, fila.error
-    return {k: t.get(k) for k in ("estado", "nodo", "paso", "total", "error")}
+    return {**{k: t.get(k) for k in ("estado", "nodo", "paso", "total", "error")}, "id": p.trabajo_id,
+            "trabajador_vivo": await cola.trabajador_vivo()}
 
 
 def _salida(p: Proyecto, completo: bool = True) -> dict:
@@ -79,7 +108,9 @@ async def _encolar(pid: int, tipo: str, parametros: dict) -> int:
 @rutas.get("/proyectos")
 async def listar() -> list[dict]:
     async with nueva_sesion() as s:
-        filas = (await s.scalars(select(Proyecto).order_by(Proyecto.actualizado_en.desc()))).all()
+        filas = list((await s.scalars(select(Proyecto).order_by(Proyecto.actualizado_en.desc()))).all())
+    # Si no, un proyecto cuyo trabajo falló seguiría saliendo «Preparando el roadmap…» en la lista hasta abrirlo.
+    await _reconciliar(filas)
     return [_salida(p, completo=False) for p in filas]
 
 

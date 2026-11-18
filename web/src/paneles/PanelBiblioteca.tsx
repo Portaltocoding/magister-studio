@@ -18,6 +18,7 @@ import {
   type Tema,
 } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 
 // La Biblioteca, más allá de tus fuentes: rastrear la web en busca de buenas fuentes y guardar páginas o PDF
 // desde un enlace (se descargan, se limpian y se indexan para que el tutor las cite).
@@ -60,15 +61,14 @@ function Buscar() {
   const cargarPropuestas = useCallback(() => listarPropuestas().then(setPropuestas).catch(() => undefined), [])
   useEffect(() => {
     cargarPropuestas()
-    listarFuentes().then(setFuentes)
-    listarPlanes().then(async (ps) => {
-      const todas: { plan_id: number; clave: string; titulo: string }[] = []
-      for (const p of ps) {
-        const v = await verPlan(p.tema_id)
-        for (const l of v.lecciones) todas.push({ plan_id: p.plan_id, clave: l.clave, titulo: l.titulo })
-      }
-      setLecciones(todas)
-    })
+    listarFuentes()
+      .then(setFuentes)
+      .catch(() => undefined)
+    // Las lecciones de todos los planes, pedidas a la vez. Si fallan, la búsqueda libre sigue funcionando.
+    listarPlanes()
+      .then((ps) => Promise.all(ps.map((p) => verPlan(p.tema_id).then((v) => ({ p, v })))))
+      .then((vs) => setLecciones(vs.flatMap(({ p, v }) => v.lecciones.map((l) => ({ plan_id: p.plan_id, clave: l.clave, titulo: l.titulo })))))
+      .catch((e) => setAviso(`No he podido cargar tus lecciones: ${mensajeDe(e)}`))
   }, [cargarPropuestas])
 
   // Mientras busca para una lección, las propuestas van llegando.
@@ -103,7 +103,9 @@ function Buscar() {
       const fid = await fuenteWeb(fuentes, null)
       await subirUrl(fid, url, null)
       setGuardadas((g) => new Set(g).add(url))
-      listarFuentes().then(setFuentes)
+      listarFuentes()
+        .then(setFuentes)
+        .catch(() => undefined)
     } catch (e) {
       setAviso(`No se pudo guardar: ${(e as Error).message}`)
     }
@@ -244,16 +246,29 @@ function GuardarWeb() {
   const [aviso, setAviso] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
-  useEffect(() => {
-    listarFuentes().then((fs) => {
-      setFuentes(fs)
-      setDestino((d) => d ?? fs.find((f) => f.tipo === 'web')?.id ?? null)
-    })
-    listarTemas().then(setTemas)
+  // Sin la lista de fuentes no se puede guardar: se crearía otra «Webs guardadas» aunque ya existiera.
+  const [fuentesListas, setFuentesListas] = useState(false)
+  const [fallo, setFallo] = useState<string | null>(null)
+  const cargarFuentes = useCallback(() => {
+    setFallo(null)
+    listarFuentes()
+      .then((fs) => {
+        setFuentes(fs)
+        setDestino((d) => d ?? fs.find((f) => f.tipo === 'web')?.id ?? null)
+        setFuentesListas(true)
+      })
+      .catch((e) => setFallo(mensajeDe(e)))
+    listarTemas()
+      .then(setTemas)
+      .catch(() => undefined)
   }, [])
+  useEffect(cargarFuentes, [cargarFuentes])
 
   const cargarDocs = useCallback(() => {
-    if (destino != null) listarDocumentos(destino).then(setDocs)
+    if (destino != null)
+      listarDocumentos(destino)
+        .then(setDocs)
+        .catch(() => undefined)
     else setDocs([])
   }, [destino])
   useEffect(cargarDocs, [cargarDocs])
@@ -269,7 +284,7 @@ function GuardarWeb() {
     .filter((x) => /^https?:\/\/\S+$/i.test(x))
 
   const guardar = async () => {
-    if (!enlaces.length) return
+    if (!enlaces.length || !fuentesListas) return
     setGuardando(true)
     setAviso(null)
     try {
@@ -279,7 +294,9 @@ function GuardarWeb() {
       const mal = r.filter((x) => x.status === 'rejected').length
       setAviso(`${enlaces.length - mal} ${enlaces.length - mal === 1 ? 'enlace en cola' : 'enlaces en cola'}: se descargan, se limpian y se indexan solos.${mal ? ` ${mal} no se pudieron añadir.` : ''}`)
       setTexto('')
-      listarFuentes().then(setFuentes)
+      listarFuentes()
+        .then(setFuentes)
+        .catch(() => undefined)
       cargarDocs()
     } catch (e) {
       setAviso(`No se pudo guardar: ${(e as Error).message}`)
@@ -325,10 +342,11 @@ function GuardarWeb() {
             ))}
           </select>
         </label>
-        <button className="boton boton-principal" disabled={!enlaces.length || guardando} onClick={guardar}>
+        <button className="boton boton-principal" disabled={!enlaces.length || guardando || !fuentesListas} onClick={guardar}>
           {enlaces.length > 1 ? `Guardar ${enlaces.length} enlaces` : 'Guardar'}
         </button>
       </div>
+      {fallo && <Cargando error={fallo} reintentar={cargarFuentes} />}
       {aviso && (
         <p className="nota" role="status">
           {aviso}

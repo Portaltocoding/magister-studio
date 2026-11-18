@@ -5,6 +5,7 @@ import { conPreguntas, narrarApuntes, type FraseClase } from '../componentes/nar
 import { todosLosModos, usarPreferencias } from '../componentes/preferencias.ts'
 import Mascota from '../Mascota.tsx'
 import ControlVoz from '../componentes/ControlVoz.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import Diagrama from '../componentes/Diagrama.tsx'
 import MapaConceptos, { type Mapa } from '../componentes/MapaConceptos.tsx'
 import { TextoLibro } from '../componentes/LectorLibro.tsx'
@@ -203,22 +204,28 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
   }
 
   // Lo que hay para elegir: lecciones con apuntes (y guion, si lo tienen).
-  useEffect(() => {
-    listarPlanes().then(async (ps) => {
-      if (!ps[0]) return
-      const v = await verPlan(ps[0].tema_id)
-      setPlan(v)
-      const [estados, videos] = await Promise.all([
-        pedir<Record<string, { tipos: Record<string, string>; ids?: Record<string, number> }>>(`/api/planes/${v.plan_id}/materiales`),
-        pedir<{ material_id: number; clave: string; concepto: string | null }[]>(`/api/planes/${v.plan_id}/videos`),
-      ])
-      const p: Record<string, { apuntes?: number; guion?: number }> = {}
-      for (const [k, e] of Object.entries(estados)) if (e.ids?.apuntes && ['listo', 'revisar'].includes(e.tipos?.apuntes)) p[k] = { apuntes: e.ids.apuntes }
-      for (const x of videos) if (p[x.clave] && !x.concepto && !p[x.clave].guion) p[x.clave].guion = x.material_id
-      setPreparadas(p)
-      setClave((c) => (c && p[c] ? c : (Object.keys(p)[0] ?? '')))
-    })
+  // Si falla, se dice y se puede reintentar (si no, parecería que no tienes ninguna lección preparada).
+  const [falloLecciones, setFalloLecciones] = useState<string | null>(null)
+  const cargarLecciones = useCallback(() => {
+    setFalloLecciones(null)
+    listarPlanes()
+      .then(async (ps) => {
+        if (!ps[0]) return
+        const v = await verPlan(ps[0].tema_id)
+        setPlan(v)
+        const [estados, videos] = await Promise.all([
+          pedir<Record<string, { tipos: Record<string, string>; ids?: Record<string, number> }>>(`/api/planes/${v.plan_id}/materiales`),
+          pedir<{ material_id: number; clave: string; concepto: string | null }[]>(`/api/planes/${v.plan_id}/videos`),
+        ])
+        const p: Record<string, { apuntes?: number; guion?: number }> = {}
+        for (const [k, e] of Object.entries(estados)) if (e.ids?.apuntes && ['listo', 'revisar'].includes(e.tipos?.apuntes)) p[k] = { apuntes: e.ids.apuntes }
+        for (const x of videos) if (p[x.clave] && !x.concepto && !p[x.clave].guion) p[x.clave].guion = x.material_id
+        setPreparadas(p)
+        setClave((c) => (c && p[c] ? c : (Object.keys(p)[0] ?? '')))
+      })
+      .catch((e) => setFalloLecciones(mensajeDe(e)))
   }, [])
+  useEffect(cargarLecciones, [cargarLecciones])
 
   useEffect(() => {
     if (fase !== 'llamada') return
@@ -956,7 +963,8 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         <button className="boton boton-principal llamada-llamar" onClick={llamar} disabled={(tipo === 'clase' || tipo === 'oral') && !clave}>
           Llamar
         </button>
-        {tipo === 'clase' && !Object.keys(preparadas).length && <p className="nota">Para una clase, primero prepara alguna lección en Lecciones.</p>}
+        {falloLecciones && <Cargando error={falloLecciones} reintentar={cargarLecciones} />}
+        {tipo === 'clase' && !falloLecciones && !Object.keys(preparadas).length && <p className="nota">Para una clase, primero prepara alguna lección en Lecciones.</p>}
         {sinOido && <p className="nota">Este navegador no tiene dictado por voz: podrás escribir y te contestará en voz alta.</p>}
         <p className="nota llamada-aviso">
           Mejor con auriculares: así no se oye a sí mismo. La voz del tutor es la de tu equipo; el dictado es el de tu navegador

@@ -290,7 +290,13 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
           <ol className="examen-historial">
             {historial.map((h) => (
               <li key={h.id}>
-                <button onClick={() => pedir<Resumen>(`/api/examenes/${h.id}`).then(setViendo)}>
+                <button
+                  onClick={() =>
+                    pedir<Resumen>(`/api/examenes/${h.id}`)
+                      .then(setViendo)
+                      .catch((e) => setError(`No he podido abrir ese examen: ${(e as Error).message}`))
+                  }
+                >
                   <strong className={`examen-nota-mini ${color(h.nota ?? 0)}`}>{(h.nota ?? 0).toFixed(1).replace('.', ',')}</strong>
                   <span>
                     {h.modo === 'examen' ? 'Examen' : 'Evaluación'} · {h.lecciones.join(', ')} · {h.preguntas} preguntas
@@ -422,11 +428,17 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
   const comprobarAhora = async () => {
     setCorrigiendoUna(true)
     poner({ explicacion: '' })
-    const c = await corregir(p, r, (t) =>
-      setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], explicacion: (x[p.pregunta_id]?.explicacion ?? '') + t } })),
-    )
-    setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: c.nota, intento_id: c.intento_id, explicacion: c.explicacion } }))
-    setCorrigiendoUna(false)
+    try {
+      const c = await corregir(p, r, (t) =>
+        setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], explicacion: (x[p.pregunta_id]?.explicacion ?? '') + t } })),
+      )
+      setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: c.nota, intento_id: c.intento_id, explicacion: c.explicacion } }))
+    } catch (e) {
+      // Sin esto se quedaba en «Corrigiendo…» para siempre; así se puede volver a comprobar.
+      setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: null, explicacion: `No he podido corregirla: ${(e as Error).message}. Pulsa «Comprobar» otra vez.` } }))
+    } finally {
+      setCorrigiendoUna(false)
+    }
   }
 
   const teclas = useCallback(

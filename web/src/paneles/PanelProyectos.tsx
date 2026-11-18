@@ -68,7 +68,7 @@ interface Proyecto extends ProyectoResumen {
   arquitectura_svg: string | null
   hechos: string[]
   hechos_en?: Record<string, string>
-  trabajo?: { estado: string; nodo: string | null } | null
+  trabajo?: { id: number; estado: string; nodo: string | null; trabajador_vivo?: boolean } | null
 }
 interface Decision {
   id: number
@@ -257,6 +257,17 @@ function ListaProyectos({ alAbrir }: { alAbrir: (id: number) => void }) {
       .catch((e) => setFallo(mensajeDe(e)))
   }, [])
   useEffect(cargar, [cargar])
+  // Si alguno se está preparando, la lista se pone al día sola (si no, seguiría diciendo «Preparando…» hasta recargar).
+  const generando = !!lista?.some((p) => p.estado === 'generando')
+  useEffect(() => {
+    if (!generando) return
+    const t = window.setInterval(() => {
+      pedir<ProyectoResumen[]>('/api/proyectos')
+        .then(setLista)
+        .catch(() => undefined)
+    }, 5000)
+    return () => window.clearInterval(t)
+  }, [generando])
   return (
     <div className="panel proyectos">
       <h1>Proyectos</h1>
@@ -366,6 +377,7 @@ function NuevoProyecto({ alCrear, alCancelar }: { alCrear: (id: number) => void;
 function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   const [p, setP] = useState<Proyecto | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
   // Un fallo suelto mientras se mira cómo va la generación no tapa el proyecto: la siguiente vuelta lo reintenta.
   const cargar = useCallback(
     () =>
@@ -395,7 +407,17 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   if (!p) return <div className="panel">{error ? <Cargando error={error} reintentar={() => void cargar()} /> : <Pensando />}</div>
   const r = p.roadmap
   const hechos = new Set(p.hechos)
+  // Cualquier acción que falle lo dice aquí (antes fallaban en silencio).
+  const accion = async (hacer: () => Promise<unknown>, que: string) => {
+    setAviso(null)
+    try {
+      await hacer()
+    } catch (e) {
+      setAviso(`No he podido ${que}: ${mensajeDe(e)}`)
+    }
+  }
   const marcar = async (paso: string, hecho: boolean, donde?: Element | null) => {
+    const antes = p
     const nuevos = hecho ? [...p.hechos, paso] : p.hechos.filter((x) => x !== paso)
     const fechas = { ...(p.hechos_en ?? {}) }
     if (hecho) fechas[paso] = new Date().toISOString()
@@ -409,13 +431,20 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
       const cierra = !!bloque && bloque.pasos.every((x) => hechosSet.has(x.id))
       celebrar(donde ?? null, cierra)
     }
-    const s = await pedir<ProyectoResumen>(`/api/proyectos/${id}/pasos/${paso}`, enviarJson({ hecho }, 'PUT'))
-    setP((x) => (x ? { ...x, progreso: s.progreso } : x))
+    try {
+      const s = await pedir<ProyectoResumen>(`/api/proyectos/${id}/pasos/${paso}`, enviarJson({ hecho }, 'PUT'))
+      setP((x) => (x ? { ...x, progreso: s.progreso } : x))
+    } catch (e) {
+      // No se guardó: la casilla vuelve a como estaba, para que lo que ves sea lo que hay.
+      setP((x) => (x ? { ...x, hechos: antes.hechos, hechos_en: antes.hechos_en } : x))
+      setAviso(`No he podido guardar el paso: ${mensajeDe(e)}`)
+    }
   }
-  const detallar = async (numero: number) => {
-    await pedir(`/api/proyectos/${id}/niveles/${numero}/detallar`, { method: 'POST' })
-    void cargar()
-  }
+  const detallar = (numero: number) =>
+    accion(async () => {
+      await pedir(`/api/proyectos/${id}/niveles/${numero}/detallar`, { method: 'POST' })
+      await cargar()
+    }, 'detallar el nivel')
 
   return (
     <div className="panel proyecto">
@@ -434,16 +463,51 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
         )}
       </header>
 
+      {aviso && (
+        <p className="nota" role="alert">
+          {aviso}
+        </p>
+      )}
       {p.estado === 'generando' && (
         <div className="proyecto-generando">
           <Pensando texto={FASES[p.trabajo?.nodo ?? ''] ?? (r ? 'Detallando el nivel…' : 'Preparando el roadmap…')} />
-          <p className="nota">Tarda unos minutos. Puedes irte: sigue en segundo plano.</p>
+          {p.trabajo?.trabajador_vivo === false ? (
+            <p className="nota" role="alert">
+              No hay ningún trabajador en marcha, así que esto no avanzará. Arranca Magister con los trabajos activados (o lanza
+              «uv run magister-trabajador») y seguirá solo.
+            </p>
+          ) : (
+            <p className="nota">Tarda unos minutos. Puedes irte: sigue en segundo plano.</p>
+          )}
+          {error && <p className="nota">Sin conexión con el servidor; sigo intentándolo.</p>}
+          {p.trabajo?.id != null && (
+            <button
+              type="button"
+              className="boton-mini"
+              onClick={() =>
+                accion(async () => {
+                  await pedir(`/api/trabajos/${p.trabajo!.id}/cancelar`, { method: 'POST' })
+                  await cargar()
+                }, 'cancelar')
+              }
+            >
+              Cancelar
+            </button>
+          )}
         </div>
       )}
       {p.estado === 'error' && (
         <div className="proyecto-error">
           <p role="alert">No se pudo preparar: {p.error}</p>
-          <button className="boton" onClick={async () => { await pedir(`/api/proyectos/${id}/rehacer`, { method: 'POST' }); void cargar() }}>
+          <button
+            className="boton"
+            onClick={() =>
+              accion(async () => {
+                await pedir(`/api/proyectos/${id}/rehacer`, { method: 'POST' })
+                await cargar()
+              }, 'volver a intentarlo')
+            }
+          >
             Volver a intentarlo
           </button>
         </div>
@@ -529,8 +593,10 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
           className="boton-mini peligro"
           onClick={async () => {
             if (!window.confirm(`¿Borrar «${p.nombre}» con su roadmap y su diario?`)) return
-            await pedir(`/api/proyectos/${id}`, { method: 'DELETE' })
-            alVolver()
+            await accion(async () => {
+              await pedir(`/api/proyectos/${id}`, { method: 'DELETE' })
+              alVolver()
+            }, 'borrar el proyecto')
           }}
         >
           Borrar el proyecto
@@ -603,6 +669,7 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
   // Recién marcado: la fila da un pequeño salto (animo.css).
   const [recien, setRecien] = useState(false)
   const [abriendo, setAbriendo] = useState(false)
+  const [falloAyuda, setFalloAyuda] = useState<string | null>(null)
   // «Me he atascado»: abre una conversación con el tutor que ya sabe en qué proyecto y en qué paso estás.
   const pedirAyuda = async () => {
     if (!atasco?.trim()) return
@@ -611,7 +678,15 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
       `Estoy construyendo «${proyecto.nombre}» (${proyecto.idea.slice(0, 300)}). Voy por el nivel ${nivel.numero} «${nivel.titulo}», ` +
       `bloque «${bloque.titulo}», paso «${x.titulo}».\n\nLo que dice el paso: ${x.que_haces}\nCómo sé que está hecho: ${x.hecho_si}\n\n` +
       `Me he atascado: ${atasco.trim()}`
-    const c = await crearConversacion(`${proyecto.nombre} · ${x.titulo}`.slice(0, 120))
+    let c: { id: number }
+    try {
+      c = await crearConversacion(`${proyecto.nombre} · ${x.titulo}`.slice(0, 120))
+    } catch (e) {
+      // Sin esto el botón se quedaba en «Abriendo…» para siempre.
+      setAbriendo(false)
+      setFalloAyuda(mensajeDe(e))
+      return
+    }
     try {
       sessionStorage.setItem('magister-enviar-al-abrir', JSON.stringify({ cid: c.id, texto }))
     } catch {
@@ -657,6 +732,11 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
             <button type="button" className="boton-mini" onClick={() => setAtasco(null)}>
               Cancelar
             </button>
+            {falloAyuda && (
+              <p className="nota" role="alert">
+                No he podido abrir la conversación: {falloAyuda}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -668,9 +748,14 @@ function Diario({ id, pasos, alCambiar }: { id: number; pasos: Paso[]; alCambiar
   const [lista, setLista] = useState<Decision[]>([])
   const [f, setF] = useState({ titulo: '', contexto: '', decision: '', consecuencias: '', paso_id: '' })
   const [abierto, setAbierto] = useState(false)
-  useEffect(() => {
-    pedir<Decision[]>(`/api/proyectos/${id}/decisiones`).then(setLista).catch(() => undefined)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const cargar = useCallback(() => {
+    setAviso(null)
+    pedir<Decision[]>(`/api/proyectos/${id}/decisiones`)
+      .then(setLista)
+      .catch((e) => setAviso(`No he podido cargar el diario: ${mensajeDe(e)}`))
   }, [id])
+  useEffect(cargar, [cargar])
   const titulo = (pid: string | null) => pasos.find((x) => x.id === pid)?.titulo
   return (
     <section className="proyecto-diario">
@@ -683,12 +768,28 @@ function Diario({ id, pasos, alCambiar }: { id: number; pasos: Paso[]; alCambiar
         )}
       </header>
       <p className="nota">Qué decidiste, por qué y qué implica. Al detallar los siguientes niveles, el roadmap lo tiene en cuenta.</p>
+      {aviso && (
+        <p className="nota" role="alert">
+          {aviso}{' '}
+          <button type="button" className="boton-mini" onClick={cargar}>
+            Reintentar
+          </button>
+        </p>
+      )}
       {abierto && (
         <form
           className="proyecto-decision-nueva"
           onSubmit={async (e) => {
             e.preventDefault()
-            const d = await pedir<Decision>(`/api/proyectos/${id}/decisiones`, enviarJson({ ...f, paso_id: f.paso_id || null }))
+            setAviso(null)
+            let d: Decision
+            try {
+              d = await pedir<Decision>(`/api/proyectos/${id}/decisiones`, enviarJson({ ...f, paso_id: f.paso_id || null }))
+            } catch (err) {
+              // Lo escrito se queda en el formulario para volver a guardarlo.
+              setAviso(`No he podido guardar la decisión: ${mensajeDe(err)}`)
+              return
+            }
             setLista([d, ...lista])
             alCambiar?.(d)
             setF({ titulo: '', contexto: '', decision: '', consecuencias: '', paso_id: '' })
@@ -733,7 +834,12 @@ function Diario({ id, pasos, alCambiar }: { id: number; pasos: Paso[]; alCambiar
               <button
                 className="boton-mini"
                 onClick={async () => {
-                  await pedir(`/api/proyectos/${id}/decisiones/${d.id}`, { method: 'DELETE' })
+                  try {
+                    await pedir(`/api/proyectos/${id}/decisiones/${d.id}`, { method: 'DELETE' })
+                  } catch (err) {
+                    setAviso(`No he podido quitarla: ${mensajeDe(err)}`)
+                    return
+                  }
                   const resto = lista.filter((x) => x.id !== d.id)
                   setLista(resto)
                   alCambiar?.(resto[0] ?? null)

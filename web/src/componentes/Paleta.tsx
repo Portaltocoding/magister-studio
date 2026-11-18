@@ -60,12 +60,15 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
       setLecciones(cacheLecciones)
       return
     }
-    listarPlanes().then(async (ps) => {
-      const vistas = await Promise.all(ps.map((p) => verPlan(p.tema_id)))
-      const todas = vistas.flatMap((v, k) => v.lecciones.map((l) => ({ clave: l.clave, titulo: l.titulo, tema_id: ps[k].tema_id, tema: ps[k].tema })))
-      cacheLecciones = todas
-      setLecciones(todas)
-    })
+    // Si falla, la paleta funciona igual sin las lecciones y lo reintenta la próxima vez que se abra (no se guarda en caché).
+    listarPlanes()
+      .then(async (ps) => {
+        const vistas = await Promise.all(ps.map((p) => verPlan(p.tema_id)))
+        const todas = vistas.flatMap((v, k) => v.lecciones.map((l) => ({ clave: l.clave, titulo: l.titulo, tema_id: ps[k].tema_id, tema: ps[k].tema })))
+        cacheLecciones = todas
+        setLecciones(todas)
+      })
+      .catch(() => undefined)
   }, [abierta])
 
   const ir = (ruta: string) => () => {
