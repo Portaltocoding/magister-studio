@@ -4,6 +4,7 @@ Reglas del contrato: `p_predicha` se escribe al servir; los reintentos no entran
 programador ni en el modelo; el momento entra como argumento (nada de `now()` aquí dentro).
 """
 
+import asyncio
 import statistics
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
@@ -77,14 +78,15 @@ def _prog(c: ConceptoPractica):
 
 async def cola(ahora: datetime, nuevos_max: int | None = None) -> list[dict]:
     conceptos = await conceptos_practicables()
-    estados = await estados_en([c.concepto_id for c in conceptos], ahora)
+    # Lecturas independientes entre sí: van a la vez, cada una con su conexión (antes, una detrás de otra).
+    estados, minutos, empezadas, bloquea, otra_vez = await asyncio.gather(
+        estados_en([c.concepto_id for c in conceptos], ahora), minutos_por_repaso(), lecciones_empezadas(),
+        _cuantos_bloquea(), _a_repetir_hoy(ahora))
     fin = fin_del_dia(ahora)
-    minutos = await minutos_por_repaso()
     vencidos, nuevos = [], []
     # Un concepto nuevo entra en el repaso solo si ya empezaste su lección (una sesión hecha o algo practicado):
     # no tiene sentido repasar lo que aún no has estudiado.
-    empezadas = await lecciones_empezadas()
-    empezadas |= {(c.plan_id, c.leccion_clave) for c in conceptos if estados[c.concepto_id].repasos}
+    empezadas |={(c.plan_id, c.leccion_clave) for c in conceptos if estados[c.concepto_id].repasos}
     for c in conceptos:
         e = estados[c.concepto_id]
         if not e.repasos and (c.plan_id, c.leccion_clave) not in empezadas:
@@ -101,15 +103,13 @@ async def cola(ahora: datetime, nuevos_max: int | None = None) -> list[dict]:
     # Orden (engram docs/13 §2.2): con tiempo limitado, primero lo que aún se salva barato (p alta, cerca del umbral);
     # lo casi olvidado (p < 0,10) al final, como «a reaprender»: esperar no le quita casi nada más. A igualdad,
     # antes lo que bloquea a otros conceptos tuyos (idea de learn-anything: los requisitos primero).
-    bloquea = await _cuantos_bloquea()
     vencidos.sort(key=lambda f: (f["p"] < CASI_OLVIDADO, -f["p"] - 0.02 * bloquea.get((f["plan_id"], f["concepto_id"]), 0)))
     for f in vencidos:
         f["reaprender"] = f["p"] < CASI_OLVIDADO
     nuevos.sort(key=lambda f: (f["plan_id"], f["leccion_clave"]))
     # Reaprendizaje en la misma sesión (Rawson y Dunlosky): lo que fallas hoy vuelve al final de la tanda, con otra
     # pregunta, hasta acertarlo una vez (como mucho 3 intentos al día). Esos reintentos no cuentan para el programador.
-    otra_vez = await _a_repetir_hoy(ahora)
-    ya = {(f["plan_id"], f["concepto_id"]) for f in vencidos}
+    ya ={(f["plan_id"], f["concepto_id"]) for f in vencidos}
     por_id = {(c.plan_id, c.concepto_id): c for c in conceptos}
     repetir = []
     for clave in otra_vez:

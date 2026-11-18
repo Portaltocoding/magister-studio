@@ -110,10 +110,75 @@ async function detalleDe(r: Response): Promise<string> {
   return cuerpo || r.statusText
 }
 
+// Una lectura (GET) nunca se queda colgada: a los 20 s se corta, y si el servidor se está reiniciando
+// (no contesta, o el proxy da 502/503) se reintenta dos veces antes de rendirse. Las escrituras no se
+// reintentan (no son idempotentes) ni se cortan: algunas esperan al modelo.
+const LIMITE_LECTURA_MS = 20_000
+const ESPERAS_REINTENTO_MS = [800, 2000]
+// Dos pantallas que piden lo mismo a la vez (Hoy y la barra de abajo piden /api/hoy) comparten la petición.
+const enVuelo = new Map<string, Promise<unknown>>()
+
+const espera = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+async function leerUnaVez(ruta: string, opciones: RequestInit): Promise<Response> {
+  const corte = new AbortController()
+  const reloj = setTimeout(() => corte.abort(new DOMException('tiempo', 'TimeoutError')), LIMITE_LECTURA_MS)
+  const senal = opciones.signal ? AbortSignal.any([opciones.signal, corte.signal]) : corte.signal
+  try {
+    return await fetch(ruta, { ...opciones, signal: senal })
+  } catch (e) {
+    if (opciones.signal?.aborted) throw e
+    if (corte.signal.aborted) throw new ErrorApi(0, 'El servidor tarda demasiado en contestar.')
+    throw new ErrorApi(0, 'No hay conexión con Magister: ¿está en marcha el servidor?')
+  } finally {
+    clearTimeout(reloj)
+  }
+}
+
+async function leer<T>(ruta: string, opciones: RequestInit): Promise<T> {
+  for (let intento = 0; ; intento++) {
+    let r: Response
+    try {
+      r = await leerUnaVez(ruta, opciones)
+    } catch (e) {
+      // Sin conexión: el servidor puede estar arrancando. Un corte por tiempo no se repite (volvería a tardar).
+      const reintentable = e instanceof ErrorApi && e.message.startsWith('No hay conexión')
+      if (!reintentable || intento >= ESPERAS_REINTENTO_MS.length) throw e
+      await espera(ESPERAS_REINTENTO_MS[intento])
+      continue
+    }
+    if ((r.status === 502 || r.status === 503) && intento < ESPERAS_REINTENTO_MS.length) {
+      await espera(ESPERAS_REINTENTO_MS[intento])
+      continue
+    }
+    if (!r.ok) throw new ErrorApi(r.status, await detalleDe(r))
+    if (r.status === 204) return undefined as T
+    return (await r.json()) as T
+  }
+}
+
 export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
   const cabeceras: Record<string, string> = { ...(opciones.headers as Record<string, string>) }
   if (opciones.body && !(opciones.body instanceof FormData)) cabeceras['Content-Type'] = 'application/json'
-  const r = await fetch(ruta, { ...opciones, headers: cabeceras })
+  const metodo = (opciones.method ?? 'GET').toUpperCase()
+  if (metodo === 'GET') {
+    const comparte = !opciones.signal
+    const previa = comparte ? enVuelo.get(ruta) : undefined
+    if (previa) return previa as Promise<T>
+    const p = leer<T>(ruta, { ...opciones, headers: cabeceras })
+    if (comparte) {
+      enVuelo.set(ruta, p)
+      p.finally(() => enVuelo.delete(ruta)).catch(() => undefined)
+    }
+    return p
+  }
+  let r: Response
+  try {
+    r = await fetch(ruta, { ...opciones, headers: cabeceras })
+  } catch (e) {
+    if (opciones.signal?.aborted) throw e
+    throw new ErrorApi(0, 'No hay conexión con Magister: ¿está en marcha el servidor?')
+  }
   if (!r.ok) throw new ErrorApi(r.status, await detalleDe(r))
   if (r.status === 204) return undefined as T
   return (await r.json()) as T

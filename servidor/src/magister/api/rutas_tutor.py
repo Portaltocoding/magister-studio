@@ -4,6 +4,7 @@
 pendiente), los repasos vencidos y si la lección tiene material preparado.
 """
 
+import asyncio
 from datetime import date, datetime, timezone
 
 from typing import Literal
@@ -37,43 +38,57 @@ async def examen_pendiente(hoy_: date) -> dict | None:
     return None
 
 
-@rutas.get("/hoy")
-async def hoy(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
-    fila = (await s.execute(text(
-        "select s.id, s.plan_id, s.leccion_clave, l.titulo, s.fecha, s.horas, t.nombre, t.id, s.inicio from sesiones s "
-        "join planes p on p.id = s.plan_id join lecciones l on l.plan_id = s.plan_id and l.clave = s.leccion_clave "
-        "join temas t on t.id = p.tema_id where p.estado = 'aceptado' and s.estado = 'pendiente' "
-        "order by (s.fecha < :hoy) desc, s.fecha, s.inicio nulls last, s.id limit 1"), {"hoy": date.today()})).first()
-    await s.close()
-    repasos = await practica.cola(datetime.now(timezone.utc))
-    examen = await examen_pendiente(date.today())
-    from magister.material.estudio import repasos_de_tema
+async def _sesion_que_toca(hoy_: date):
+    """La sesión que toca (o la primera pendiente) con sus últimos apuntes, en una sola consulta."""
+    async with nueva_sesion() as s:
+        return (await s.execute(text(
+            "select s.id, s.plan_id, s.leccion_clave, l.titulo, s.fecha, s.horas, t.nombre, t.id, s.inicio, m.id, m.estado from sesiones s "
+            "join planes p on p.id = s.plan_id join lecciones l on l.plan_id = s.plan_id and l.clave = s.leccion_clave "
+            "join temas t on t.id = p.tema_id "
+            "left join lateral (select m.id, m.estado from materiales m where m.plan_id = s.plan_id and m.leccion_clave = s.leccion_clave "
+            "and m.tipo = 'apuntes' order by m.id desc limit 1) m on true "
+            "where p.estado = 'aceptado' and s.estado = 'pendiente' "
+            "order by (s.fecha < :hoy) desc, s.fecha, s.inicio nulls last, s.id limit 1"), {"hoy": hoy_})).first()
 
-    temas = [t for t in await repasos_de_tema() if t["vencido"]]
-    async with nueva_sesion() as s3:
-        # Cada sesión del día con lo necesario para estudiarla desde el tutor: su id y sus apuntes (si ya están).
-        dia = [{"clave": c, "titulo": t, "horas": h, "estado": e, "sesion_id": sid_, "plan_id": pid_, "material_id": mid_}
-               for c, t, h, e, sid_, pid_, mid_ in (await s3.execute(text(
+
+async def _sesiones_del_dia(hoy_: date) -> list[dict]:
+    """Cada sesión del día con lo necesario para estudiarla desde el tutor: su id y sus apuntes (si ya están)."""
+    async with nueva_sesion() as s:
+        filas = (await s.execute(text(
             "select s.leccion_clave, l.titulo, s.horas, s.estado, s.id, s.plan_id, "
             "(select m.id from materiales m where m.plan_id = s.plan_id and m.leccion_clave = s.leccion_clave and m.tipo = 'apuntes' "
             "and m.estado <> 'generando' order by m.id desc limit 1) "
             "from sesiones s join planes p on p.id = s.plan_id and p.estado = 'aceptado' "
             "join lecciones l on l.plan_id = s.plan_id and l.clave = s.leccion_clave where s.fecha = :hoy order by s.inicio nulls last, s.id"),
-            {"hoy": date.today()})).all()]
+            {"hoy": hoy_})).all()
+    return [{"clave": c, "titulo": t, "horas": h, "estado": e, "sesion_id": sid_, "plan_id": pid_, "material_id": mid_}
+            for c, t, h, e, sid_, pid_, mid_ in filas]
+
+
+async def _temas_vencidos() -> list[dict]:
+    from magister.material.estudio import repasos_de_tema
+
+    return [t for t in await repasos_de_tema() if t["vencido"]]
+
+
+@rutas.get("/hoy")
+async def hoy() -> dict:
+    # Las cinco piezas no dependen unas de otras: van a la vez, cada una con su conexión.
+    hoy_ = date.today()
+    fila, repasos, examen, temas, dia = await asyncio.gather(
+        _sesion_que_toca(hoy_), practica.cola(datetime.now(timezone.utc)), examen_pendiente(hoy_), _temas_vencidos(),
+        _sesiones_del_dia(hoy_))
     if fila is None:
         return {"estado": "sin_plan" if not repasos and not examen else "solo_repaso", "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia, "temas": temas}
-    sid, plan_id, clave, titulo, fecha, horas, tema, tema_id, inicio = fila
-    async with nueva_sesion() as s2:
-        material = await s2.scalar(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave,
-                                                          Material.tipo == "apuntes").order_by(Material.id.desc()).limit(1))
-    estado = "propuesta" if fecha <= date.today() else "adelantar"
-    if material is None or material.estado == "generando":
+    sid, plan_id, clave, titulo, fecha, horas, tema, tema_id, inicio, material_id, material_estado = fila
+    estado = "propuesta" if fecha <= hoy_ else "adelantar"
+    if material_id is None or material_estado == "generando":
         estado = "sin_preparar"
     return {"estado": estado, "sesion_id": sid, "plan_id": plan_id, "tema_id": tema_id, "tema": tema, "leccion_clave": clave,
-            "titulo": titulo, "fecha": fecha.isoformat(), "inicio": inicio.strftime("%H:%M") if inicio else None, "horas": horas, "material_id": material.id if material else None,
+            "titulo": titulo, "fecha": fecha.isoformat(), "inicio": inicio.strftime("%H:%M") if inicio else None, "horas": horas, "material_id": material_id,
             "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia, "temas": temas,
-            "razon": ("Toca hoy según tu calendario." if fecha == date.today() else
-                      "Vas con retraso: es la primera sesión pendiente." if fecha < date.today() else
+            "razon": ("Toca hoy según tu calendario." if fecha == hoy_ else
+                      "Vas con retraso: es la primera sesión pendiente." if fecha < hoy_ else
                       f"Lo siguiente de tu calendario es el {fecha:%d-%m}.")}
 
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { enviarJson, flujo, pedir } from '../api.ts'
 import Vacio from '../componentes/Vacio.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import MarcoFoco from '../componentes/MarcoFoco.tsx'
 import RepasoTema from '../componentes/RepasoTema.tsx'
 import type { IdModo } from '../modos.ts'
@@ -86,8 +87,12 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
     }
   }
 
+  const [falloCola, setFalloCola] = useState<string | null>(null)
   const cargar = useCallback(() => {
-    pedir<EnCola[]>('/api/practica/cola').then(setCola)
+    setFalloCola(null)
+    pedir<EnCola[]>('/api/practica/cola')
+      .then(setCola)
+      .catch((e) => setFalloCola(mensajeDe(e)))
   }, [])
 
   useEffect(cargar, [cargar])
@@ -173,6 +178,7 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
   return (
     <div className="panel">
       <h1>Repaso</h1>
+      {cola == null && falloCola && <Cargando error={falloCola} reintentar={cargar} />}
       {!pregunta && <RepasoTema alPracticar={siguiente} alExaminar={() => irA('examen')} />}
       {cola && pregunta && (
         <p className="nota">

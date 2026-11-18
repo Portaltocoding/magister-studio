@@ -1,26 +1,30 @@
+import { lazy, Suspense } from 'react'
 import Vacio from './componentes/Vacio.tsx'
 import Pensando from './componentes/Pensando.tsx'
+import FalloPantalla from './componentes/FalloPantalla.tsx'
 import EstudioLibre from './EstudioLibre.tsx'
 import { familiaDe, type IdModo } from './modos.ts'
-import PanelCalendario from './paneles/PanelCalendario.tsx'
-import PanelEtiquetar from './paneles/PanelEtiquetar.tsx'
-import PanelMaterial from './paneles/PanelMaterial.tsx'
 import PanelPractica from './paneles/PanelPractica.tsx'
-import PanelProgreso from './paneles/PanelProgreso.tsx'
-import PanelTriaje from './paneles/PanelTriaje.tsx'
-import PanelPronunciacion from './paneles/PanelPronunciacion.tsx'
 import PanelTutor from './paneles/PanelTutor.tsx'
-import PanelFuentes from './paneles/PanelFuentes.tsx'
-import PanelPlan from './paneles/PanelPlan.tsx'
-import PanelExamen from './paneles/PanelExamen.tsx'
-import PanelVideo from './paneles/PanelVideo.tsx'
-import PanelHablar from './paneles/PanelHablar.tsx'
-import PanelAutomatizar from './paneles/PanelAutomatizar.tsx'
-import PanelLlamada from './paneles/PanelLlamada.tsx'
 import PanelGuia from './paneles/PanelGuia.tsx'
-import PanelBiblioteca from './paneles/PanelBiblioteca.tsx'
-import PanelNotas from './paneles/PanelNotas.tsx'
-import PanelProyectos from './paneles/PanelProyectos.tsx'
+
+// Las pantallas menos usadas se cargan al abrirlas (Hoy, Tutor, Repaso y Estudio libre van con la app).
+const PanelCalendario = lazy(() => import('./paneles/PanelCalendario.tsx'))
+const PanelEtiquetar = lazy(() => import('./paneles/PanelEtiquetar.tsx'))
+const PanelMaterial = lazy(() => import('./paneles/PanelMaterial.tsx'))
+const PanelProgreso = lazy(() => import('./paneles/PanelProgreso.tsx'))
+const PanelTriaje = lazy(() => import('./paneles/PanelTriaje.tsx'))
+const PanelPronunciacion = lazy(() => import('./paneles/PanelPronunciacion.tsx'))
+const PanelFuentes = lazy(() => import('./paneles/PanelFuentes.tsx'))
+const PanelPlan = lazy(() => import('./paneles/PanelPlan.tsx'))
+const PanelExamen = lazy(() => import('./paneles/PanelExamen.tsx'))
+const PanelVideo = lazy(() => import('./paneles/PanelVideo.tsx'))
+const PanelHablar = lazy(() => import('./paneles/PanelHablar.tsx'))
+const PanelAutomatizar = lazy(() => import('./paneles/PanelAutomatizar.tsx'))
+const PanelLlamada = lazy(() => import('./paneles/PanelLlamada.tsx'))
+const PanelBiblioteca = lazy(() => import('./paneles/PanelBiblioteca.tsx'))
+const PanelNotas = lazy(() => import('./paneles/PanelNotas.tsx'))
+const PanelProyectos = lazy(() => import('./paneles/PanelProyectos.tsx'))
 
 interface Props {
   modo: IdModo
@@ -54,7 +58,12 @@ export default function Central(props: Props) {
       <Pestanas modo={props.modo} irA={props.irA} />
       {/* La clave hace que cada pantalla nueva entre con su fundido (animo.css). */}
       <div key={props.modo} className="pantalla">
-        <Panel {...props} />
+        <FalloPantalla>
+          {/* Las pantallas menos usadas se cargan al abrirlas: la app arranca con menos código. */}
+          <Suspense fallback={<p className="vacio">Cargando…</p>}>
+            <Panel {...props} />
+          </Suspense>
+        </FalloPantalla>
       </div>
     </>
   )

@@ -35,9 +35,11 @@ export function elegirForma(f: FormaMascota) {
 type Punto = { x: number; y: number }
 const RECORRIDO = 4 // cuánto se mueven las pupilas como mucho, en unidades del dibujo (mide 120)
 
-function usarMirada(svg: React.RefObject<SVGSVGElement | null>): Punto {
+function usarMirada(svg: React.RefObject<SVGSVGElement | null>, activa = true): Punto {
   const [mirada, setMirada] = useState<Punto>({ x: 0, y: 0 })
   useEffect(() => {
+    // Quieta no sigue el ratón: así no se repinta en cada movimiento.
+    if (!activa) return
     let pendiente = 0
     let ultimo: Punto | null = null
     const mirar = () => {
@@ -60,7 +62,7 @@ function usarMirada(svg: React.RefObject<SVGSVGElement | null>): Punto {
       window.removeEventListener('pointermove', alMover)
       cancelAnimationFrame(pendiente)
     }
-  }, [svg])
+  }, [svg, activa])
   return mirada
 }
 
@@ -246,7 +248,7 @@ export default function Mascota({
   quieta?: boolean
 }) {
   const svg = useRef<SVGSVGElement>(null)
-  const mirada = usarMirada(svg)
+  const mirada = usarMirada(svg, !quieta)
   const elegida = usarForma()
   const forma = fija ?? elegida
   const { sitio, cogida } = usarArrastre(svg, lugar, !!lugar && !mini)

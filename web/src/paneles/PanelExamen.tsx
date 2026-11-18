@@ -5,6 +5,7 @@ import remarkMath from 'remark-math'
 import { enviarJson, flujo, listarPlanes, pedir, type ResumenPlan } from '../api.ts'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Pensando from '../componentes/Pensando.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
 import { barajar } from '../barajar.ts'
@@ -128,29 +129,41 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
     return plan ? { plan: Number(plan), lecciones: (lecs ?? '').split(',').filter(Boolean), n: Number(n), min: Number(min) } : null
   })
 
+  const [falloCarga, setFalloCarga] = useState<string | null>(null)
+  const [intento, setIntento] = useState(0)
+  const reintentar = useCallback(() => {
+    setFalloCarga(null)
+    setIntento((x) => x + 1)
+  }, [])
   useEffect(() => {
-    listarPlanes().then((ps) => {
-      setPlanes(ps)
-      setPlan(ps.find((p) => p.plan_id === desdeRuta?.plan) ?? ps[0] ?? null)
-    })
+    listarPlanes()
+      .then((ps) => {
+        setPlanes(ps)
+        setPlan(ps.find((p) => p.plan_id === desdeRuta?.plan) ?? ps[0] ?? null)
+      })
+      .catch((e) => setFalloCarga(mensajeDe(e)))
     if (desdeRuta?.n) setCantidad(Math.min(20, desdeRuta.n))
     if (desdeRuta?.min) setMinutos(desdeRuta.min)
-  }, [desdeRuta])
+  }, [desdeRuta, intento])
 
   useEffect(() => {
     if (!plan) return
-    pedir<OpcionLeccion[]>(`/api/planes/${plan.plan_id}/examen/opciones`).then((o) => {
-      setOpciones(o)
-      const con = o.filter((x) => x.preguntas > 0).map((x) => x.clave)
-      const pedidas = desdeRuta?.lecciones.filter((c) => con.includes(c)) ?? []
-      setElegidas(pedidas.length ? pedidas : con)
-    })
-    pedir<Resumen[]>(`/api/examenes?plan_id=${plan.plan_id}`).then(setHistorial)
+    pedir<OpcionLeccion[]>(`/api/planes/${plan.plan_id}/examen/opciones`)
+      .then((o) => {
+        setOpciones(o)
+        const con = o.filter((x) => x.preguntas > 0).map((x) => x.clave)
+        const pedidas = desdeRuta?.lecciones.filter((c) => con.includes(c)) ?? []
+        setElegidas(pedidas.length ? pedidas : con)
+      })
+      .catch((e) => setError(mensajeDe(e)))
+    pedir<Resumen[]>(`/api/examenes?plan_id=${plan.plan_id}`)
+      .then(setHistorial)
+      .catch(() => undefined)
   }, [plan, desdeRuta])
 
   const disponibles = opciones.filter((o) => elegidas.includes(o.clave)).reduce((a, o) => a + o.preguntas, 0)
 
-  if (planes == null) return <Pensando texto="Cargando…" />
+  if (planes == null) return falloCarga ? <Cargando error={falloCarga} reintentar={reintentar} /> : <Pensando texto="Cargando…" />
   if (!plan)
     return (
       <div className="panel">

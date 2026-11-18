@@ -13,7 +13,10 @@ _fabrica: async_sessionmaker[AsyncSession] | None = None
 def configurar(url: str | None = None) -> None:
     """Crea el motor. Los tests lo llaman con la base de pruebas."""
     global _motor, _fabrica
-    _motor = create_async_engine(url or (ajustes.db_url_sim if ajustes.simulado else ajustes.db_url), pool_pre_ping=True)
+    # «Hoy» y la cola de repaso hacen sus lecturas a la vez (asyncio.gather, una conexión cada una), y el trabajador
+    # de la cola corre en el mismo proceso: con el tamaño por defecto (5) las de más se abrían y cerraban en cada petición.
+    _motor = create_async_engine(url or (ajustes.db_url_sim if ajustes.simulado else ajustes.db_url), pool_pre_ping=True,
+                                 pool_size=10, max_overflow=20)
     _fabrica = async_sessionmaker(_motor, expire_on_commit=False)
 
 

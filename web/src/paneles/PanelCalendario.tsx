@@ -61,12 +61,14 @@ export default function PanelCalendario() {
   const cargar = useCallback(() => {
     const desde = iso(celdas[0])
     const hasta = iso(celdas[41])
-    pedir<Evento[]>(`/api/eventos?desde=${desde}&hasta=${hasta}`).then(setEventos)
-    pedir<Evento[]>('/api/eventos/pendientes').then(setPendientes)
-    verCalendario(desde, hasta).then((dias) => {
-      setSesiones(Object.fromEntries(dias.map((d) => [d.fecha, d.sesiones])))
-      setExamenes(Object.fromEntries(dias.map((d) => [d.fecha, d.examenes ?? []])))
-    })
+    pedir<Evento[]>(`/api/eventos?desde=${desde}&hasta=${hasta}`).then(setEventos).catch(() => undefined)
+    pedir<Evento[]>('/api/eventos/pendientes').then(setPendientes).catch(() => undefined)
+    verCalendario(desde, hasta)
+      .then((dias) => {
+        setSesiones(Object.fromEntries(dias.map((d) => [d.fecha, d.sesiones])))
+        setExamenes(Object.fromEntries(dias.map((d) => [d.fecha, d.examenes ?? []])))
+      })
+      .catch(() => undefined)
     pedir<Carga[]>('/api/progreso/carga?dias=42')
       .then((c) => setCarga(Object.fromEntries(c.filter((x) => x.repasos > 0).map((x) => [x.fecha, x]))))
       .catch(() => setCarga({}))

@@ -6,6 +6,7 @@ import { irARuta } from '../componentes/Vacio.tsx'
 import { tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import PanelPractica from './PanelPractica.tsx'
 import { celebrar } from '../componentes/animo.ts'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import { cargarLeccion, FocoLeccion, leerAvance, saludo, type Hoy, type Leccion } from './PanelTutor.tsx'
 
 // El tutor que te guía: te recibe, te dice qué toca y te lleva de la mano por los repasos, las lecciones
@@ -150,9 +151,15 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
   const [elegido, setElegido] = useState<string | null>(null)
   const indice = usarIndice(hoy?.plan_id)
 
+  const [fallo, setFallo] = useState<string | null>(null)
   const cargar = useCallback(() => {
-    pedir<Hoy>('/api/hoy').then(setHoy)
-    pedir<{ minutos: number }[]>('/api/practica/cola').then((c) => setMinutos(Math.round(c.reduce((a, x) => a + x.minutos, 0))))
+    setFallo(null)
+    pedir<Hoy>('/api/hoy')
+      .then(setHoy)
+      .catch((e) => setFallo(mensajeDe(e)))
+    pedir<{ minutos: number }[]>('/api/practica/cola')
+      .then((c) => setMinutos(Math.round(c.reduce((a, x) => a + x.minutos, 0))))
+      .catch(() => undefined)
   }, [])
   useEffect(cargar, [cargar])
 
@@ -161,7 +168,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
     guardarDia(d)
   }
 
-  if (!hoy) return <p className="vacio">Preparando…</p>
+  if (!hoy) return <Cargando texto="Preparando…" error={fallo} reintentar={cargar} />
 
   if (enCurso?.tipo === 'repasos')
     return (
@@ -216,6 +223,8 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
       setAbriendo(true)
       try {
         setEnCurso({ tipo: 'leccion', leccion: await cargarLeccion(p.material_id), paso: p })
+      } catch (e) {
+        setComentario(`No he podido abrir la lección. ${mensajeDe(e)}`)
       } finally {
         setAbriendo(false)
       }

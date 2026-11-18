@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BotonLibro, guardarIndice, TituloEditable, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
 import Horario from '../componentes/Horario.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import {
   enviarJson,
@@ -52,14 +53,20 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   }, [vista])
   const [reajuste, setReajuste] = useState<{ cambios: string[]; avisos: string[]; texto: string; sesiones: unknown[] | null } | null>(null)
 
+  const [falloCarga, setFalloCarga] = useState<string | null>(null)
+  const [intento, setIntento] = useState(0)
+  const reintentar = useCallback(() => {
+    setFalloCarga(null)
+    setIntento((x) => x + 1)
+  }, [])
   useEffect(() => {
     listarPlanes()
       .then((ps) => {
         setPlanes(ps)
         if (ps.length && tema == null) setTema(ps[0].tema_id)
       })
-      .catch((e) => setAviso(String(e.message)))
-  }, [tema])
+      .catch((e) => setFalloCarga(mensajeDe(e)))
+  }, [tema, intento])
 
   const cargar = useCallback(() => {
     if (tema == null) return
@@ -101,7 +108,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
     }
   }
 
-  if (planes == null) return <p className="vacio">Cargando…</p>
+  if (planes == null) return <Cargando error={falloCarga} reintentar={reintentar} />
 
   if (!planes.length)
     return (

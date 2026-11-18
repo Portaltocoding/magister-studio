@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
-import Pensando from '../componentes/Pensando.tsx'
 import BarraCuota from '../componentes/BarraCuota.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 
 // Automatizar: reglas que enciendes y Magister cumple solo, cada pocos minutos, de una en una.
 
@@ -35,23 +35,38 @@ function Interruptor({ activo, alCambiar, etiqueta }: { activo: boolean; alCambi
 export default function PanelAutomatizar() {
   const [datos, setDatos] = useState<Respuesta | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [fallo, setFallo] = useState<string | null>(null)
 
-  useEffect(() => {
-    pedir<Respuesta>('/api/automatizaciones').then(setDatos)
+  const cargar = useCallback(() => {
+    setFallo(null)
+    pedir<Respuesta>('/api/automatizaciones')
+      .then(setDatos)
+      .catch((e) => setFallo(mensajeDe(e)))
   }, [])
+  useEffect(cargar, [cargar])
 
-  if (!datos) return <Pensando texto="Cargando…" />
+  if (!datos) return <Cargando error={fallo} reintentar={cargar} />
   const r = datos.reglas
 
   const guardar = async (nuevas: Reglas) => {
+    const antes = datos
     setDatos({ ...datos, reglas: nuevas })
-    setDatos(await pedir<Respuesta>('/api/automatizaciones', { ...enviarJson(nuevas), method: 'PUT' }))
+    try {
+      setDatos(await pedir<Respuesta>('/api/automatizaciones', { ...enviarJson(nuevas), method: 'PUT' }))
+    } catch (e) {
+      setDatos(antes)
+      setAviso(`No se ha guardado. ${mensajeDe(e)}`)
+    }
   }
   const ahora = async () => {
     setAviso('Revisando…')
-    const x = await pedir<{ hecho: string | null }>('/api/automatizaciones/ahora', { method: 'POST' })
-    setAviso(x.hecho ?? (r.solo_de_noche ? 'Nada ahora: está en «solo de noche».' : 'Nada que hacer ahora mismo.'))
-    setDatos(await pedir<Respuesta>('/api/automatizaciones'))
+    try {
+      const x = await pedir<{ hecho: string | null }>('/api/automatizaciones/ahora', { method: 'POST' })
+      setAviso(x.hecho ?? (r.solo_de_noche ? 'Nada ahora: está en «solo de noche».' : 'Nada que hacer ahora mismo.'))
+      setDatos(await pedir<Respuesta>('/api/automatizaciones'))
+    } catch (e) {
+      setAviso(`No he podido revisarlo. ${mensajeDe(e)}`)
+    }
   }
 
   return (

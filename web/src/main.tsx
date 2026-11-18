@@ -17,6 +17,20 @@ import { aplicarTema } from './componentes/tema.ts'
 
 // El aspecto elegido, antes de pintar nada (sin destello del otro tema al abrir).
 aplicarTema()
+
+// Si se reconstruye la web con la pestaña abierta, los trozos de las pantallas cambian de nombre y abrir una
+// pantalla nueva fallaría: se recarga la página (una vez por minuto como mucho, para no entrar en bucle).
+window.addEventListener('vite:preloadError', (e) => {
+  try {
+    const antes = Number(sessionStorage.getItem('magister-recarga') ?? 0)
+    if (Date.now() - antes < 60_000) return
+    sessionStorage.setItem('magister-recarga', String(Date.now()))
+  } catch {
+    /* sin almacenamiento: se recarga igual */
+  }
+  e.preventDefault()
+  window.location.reload()
+})
 import Marco from './Marco.tsx'
 
 createRoot(document.getElementById('root')!).render(

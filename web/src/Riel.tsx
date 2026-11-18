@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { pedir } from './api.ts'
 import { padreDe, type IdModo } from './modos.ts'
+import { EVENTO_CONECTADO } from './componentes/Cargando.tsx'
 
 // La tira fina de la izquierda: siempre a la vista con la barra lateral plegada.
 // El icono del tutor lleva un globito con lo pendiente para que no se te pase.
@@ -92,9 +93,11 @@ export function usarHoy() {
     const t = setInterval(cargar, 120_000)
     const alVolver = () => document.visibilityState === 'visible' && cargar()
     document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener(EVENTO_CONECTADO, cargar)
     return () => {
       clearInterval(t)
       document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener(EVENTO_CONECTADO, cargar)
     }
   }, [])
   return hoy

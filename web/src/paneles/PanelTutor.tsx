@@ -10,6 +10,7 @@ import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Mascota from '../Mascota.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import type { IdModo } from '../modos.ts'
 
 export interface Hoy {
@@ -850,10 +851,20 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
   const [avance, setAvance] = useState<Avance | null>(null)
   const [minutosRepaso, setMinutosRepaso] = useState<number | null>(null)
   const [semana, setSemana] = useState<{ hechas: number; total: number; sesiones: number; hechasN: number } | null>(null)
+  const [fallo, setFallo] = useState<string | null>(null)
+  const [intento, setIntento] = useState(0)
+  const reintentar = useCallback(() => {
+    setFallo(null)
+    setIntento((x) => x + 1)
+  }, [])
 
   const abrir = useCallback(async (mid: number) => {
     setAvance(leerAvance(mid))
-    setLeccion(await cargarLeccion(mid))
+    try {
+      setLeccion(await cargarLeccion(mid))
+    } catch (e) {
+      setFallo(`No he podido abrir la lección. ${mensajeDe(e)}`)
+    }
   }, [])
 
   useEffect(() => {
@@ -864,19 +875,29 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     const foco = vista === 'foco' ? (partes[1] ? 'foco' : null) : partes[1]
     const mid = vista === 'foco' ? (partes[1] === 'hoy' ? '' : partes[1]) : partes[2]
     if (foco === 'foco') window.history.replaceState(null, '', vista === 'foco' ? '#/foco' : '#/hoy')
-    pedir<Hoy>('/api/hoy').then((h) => {
-      setHoy(h)
-      if (h.material_id) setAvance(leerAvance(h.material_id))
-      if (foco === 'foco') {
-        const elegido = Number(mid) || (h.estado !== 'sin_preparar' ? h.material_id : null)
-        if (elegido) abrir(elegido)
-      }
-    })
-    pedir<{ minutos: number }[]>('/api/practica/cola').then((c) => setMinutosRepaso(Math.round(c.reduce((a, x) => a + x.minutos, 0))))
+    pedir<Hoy>('/api/hoy')
+      .then((h) => {
+        setHoy(h)
+        if (h.material_id) setAvance(leerAvance(h.material_id))
+        if (foco === 'foco') {
+          const elegido = Number(mid) || (h.estado !== 'sin_preparar' ? h.material_id : null)
+          if (elegido) abrir(elegido)
+        }
+      })
+      .catch((e) => setFallo(mensajeDe(e)))
+    pedir<{ minutos: number }[]>('/api/practica/cola')
+      .then((c) => setMinutosRepaso(Math.round(c.reduce((a, x) => a + x.minutos, 0))))
+      .catch(() => undefined)
     listarPlanes().then(async (ps) => {
+      // Cada plan con su vista y sus materiales, todos a la vez (antes iban uno tras otro y el primero dos veces).
+      const vistas = await Promise.all(
+        ps.map((p) =>
+          Promise.all([verPlan(p.tema_id), pedir<Record<string, { apuntes_id?: number }>>(`/api/planes/${p.plan_id}/materiales`)]),
+        ),
+      )
       // Esta semana: horas y sesiones hechas frente a las previstas (lunes a domingo).
-      if (ps[0]) {
-        const v = await verPlan(ps[0].tema_id)
+      if (vistas[0]) {
+        const v = vistas[0][0]
         const hoyIso = new Date().toISOString().slice(0, 10)
         const s = v.semanas.find((w) => w.dias.some((d) => d.fecha === hoyIso)) ?? v.semanas[0]
         const ses = s ? s.dias.flatMap((d) => d.sesiones) : []
@@ -888,19 +909,16 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
         })
       }
       const lista: Opcion[] = []
-      for (const p of ps) {
-        const [v, estados] = await Promise.all([
-          verPlan(p.tema_id),
-          pedir<Record<string, { apuntes_id?: number }>>(`/api/planes/${p.plan_id}/materiales`),
-        ])
+      ps.forEach((p, i) => {
+        const [v, estados] = vistas[i]
         for (const l of v.lecciones) {
           lista.push({ clave: l.clave, titulo: l.titulo, material_id: estados[l.clave]?.apuntes_id ?? null, plan_id: p.plan_id, tema_id: p.tema_id })
         }
-      }
+      })
       setOtras(lista)
-    })
+    }).catch(() => undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [abrir])
+  }, [abrir, intento])
 
   const empezar = (mid: number, desdeCero = false) => {
     if (desdeCero) guardarAvance(mid, null)
@@ -908,7 +926,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     abrir(mid)
   }
 
-  if (!hoy) return <p className="vacio">Preparando…</p>
+  if (!hoy) return <Cargando texto="Preparando…" error={fallo} reintentar={reintentar} />
 
   if (leccion)
     return (
@@ -927,7 +945,13 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
       />
     )
 
-  if (vista === 'foco') return <ElegirFoco hoy={hoy} otras={otras} empezar={empezar} />
+  if (vista === 'foco')
+    return (
+      <>
+        {fallo && <Cargando error={fallo} reintentar={reintentar} />}
+        <ElegirFoco hoy={hoy} otras={otras} empezar={empezar} />
+      </>
+    )
 
   if (hoy.estado === 'sin_plan')
     return (
@@ -957,6 +981,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
           <p className="nota hoy-fecha">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
       </header>
+      {fallo && <Cargando error={fallo} reintentar={reintentar} />}
       <div className="hoy-resumen">
         <button className="hoy-cifra" onClick={() => irA('repaso')} disabled={!hoy.repasos}>
           <strong>{hoy.repasos}</strong>

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { enviarJson, listarPlanes, pedir, verPlan, type VistaPlan } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import ControlVoz, { usarAjustesVoz } from '../componentes/ControlVoz.tsx'
 import { vozElegida } from '../componentes/voz.ts'
@@ -80,6 +81,7 @@ type EstadoVoz = 'parado' | 'sonando' | 'pausado'
 
 function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number }) {
   const [lista, setLista] = useState<Escena[] | null>(null)
+  const [falloLista, setFalloLista] = useState<string | null>(null)
   const [paginas, setPaginas] = useState(0)
   const [e, setE] = useState(0)
   const [f, setF] = useState(0)
@@ -92,7 +94,9 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
   const conDiapos = !!diaposId && !video.concepto
 
   useEffect(() => {
-    pedir<{ texto: string }>(`/api/materiales/${video.material_id}`).then((m) => setLista(escenas(m.texto)))
+    pedir<{ texto: string }>(`/api/materiales/${video.material_id}`)
+      .then((m) => setLista(escenas(m.texto)))
+      .catch((e) => setFalloLista(mensajeDe(e)))
     if (conDiapos)
       fetch(`/api/materiales/${diaposId}/fichero/html`)
         .then((r) => r.text())
@@ -214,7 +218,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
     return () => window.removeEventListener('keydown', tecla)
   })
 
-  if (!lista) return <Pensando texto="Cargando el vídeo…" />
+  if (!lista) return falloLista ? <Cargando error={falloLista} /> : <Pensando texto="Cargando el vídeo…" />
   const escena = lista[e]
 
   return (
@@ -390,21 +394,32 @@ export default function PanelVideo() {
     return { e, v }
   }, [])
 
+  const [falloCarga, setFalloCarga] = useState<string | null>(null)
+  const [intento, setIntento] = useState(0)
+  const reintentar = useCallback(() => {
+    setFalloCarga(null)
+    setIntento((x) => x + 1)
+  }, [])
   useEffect(() => {
-    listarPlanes().then(async (ps) => {
-      if (!ps[0]) return setPlan(null)
-      const v = await verPlan(ps[0].tema_id)
-      setPlan(v)
-      cargar(v)
-    })
-  }, [cargar])
+    listarPlanes()
+      .then(async (ps) => {
+        if (!ps[0]) return setPlan(null)
+        const v = await verPlan(ps[0].tema_id)
+        setPlan(v)
+        await cargar(v)
+      })
+      .catch((e) => setFalloCarga(mensajeDe(e)))
+  }, [cargar, intento])
 
   // Mientras se hace un vídeo, se mira cada pocos segundos si ya está.
   useEffect(() => {
     if (!haciendo || !plan) return
     const antes = videos.length
     const t = setInterval(async () => {
-      const { e, v } = await cargar(plan)
+      // Un fallo suelto (el servidor reiniciándose) no rompe la espera: se vuelve a mirar en 5 s.
+      const r = await cargar(plan).catch(() => null)
+      if (!r) return
+      const { e, v } = r
       if (v.length > antes && !e[haciendo]?.en_marcha) {
         setElegido(v[0].material_id)
         setHaciendo(null)
@@ -414,7 +429,7 @@ export default function PanelVideo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [haciendo, plan])
 
-  if (plan === undefined) return <Pensando texto="Cargando…" />
+  if (plan === undefined) return falloCarga ? <Cargando error={falloCarga} reintentar={reintentar} /> : <Pensando texto="Cargando…" />
   if (!plan)
     return (
       <div className="panel">

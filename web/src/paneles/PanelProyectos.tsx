@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { crearConversacion, enviarJson, pedir } from '../api.ts'
 import Diagrama from '../componentes/Diagrama.tsx'
 import Pensando from '../componentes/Pensando.tsx'
+import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import { celebrar } from '../componentes/animo.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
 
@@ -245,12 +246,17 @@ function Barra({ p }: { p: Progreso }) {
 function ListaProyectos({ alAbrir }: { alAbrir: (id: number) => void }) {
   const [lista, setLista] = useState<ProyectoResumen[] | null>(null)
   const [nuevo, setNuevo] = useState(false)
-  useEffect(() => {
-    pedir<ProyectoResumen[]>('/api/proyectos').then((l) => {
-      setLista(l)
-      if (!l.length) setNuevo(true)
-    })
+  const [fallo, setFallo] = useState<string | null>(null)
+  const cargar = useCallback(() => {
+    setFallo(null)
+    pedir<ProyectoResumen[]>('/api/proyectos')
+      .then((l) => {
+        setLista(l)
+        if (!l.length) setNuevo(true)
+      })
+      .catch((e) => setFallo(mensajeDe(e)))
   }, [])
+  useEffect(cargar, [cargar])
   return (
     <div className="panel proyectos">
       <h1>Proyectos</h1>
@@ -258,6 +264,7 @@ function ListaProyectos({ alAbrir }: { alAbrir: (id: number) => void }) {
         Cuéntale lo que quieres construir y te saca el camino: niveles que ya funcionan, bloques que se pueden probar y pasos con lo
         mínimo que tienes que saber para cada uno.
       </p>
+      {lista == null && <Cargando error={fallo} reintentar={cargar} />}
       {lista && lista.length > 0 && (
         <ul className="proyectos-lista">
           {lista.map((p) => (
@@ -359,7 +366,17 @@ function NuevoProyecto({ alCrear, alCancelar }: { alCrear: (id: number) => void;
 function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   const [p, setP] = useState<Proyecto | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const cargar = useCallback(() => pedir<Proyecto>(`/api/proyectos/${id}`).then(setP).catch((e) => setError(String(e.message))), [id])
+  // Un fallo suelto mientras se mira cómo va la generación no tapa el proyecto: la siguiente vuelta lo reintenta.
+  const cargar = useCallback(
+    () =>
+      pedir<Proyecto>(`/api/proyectos/${id}`)
+        .then((x) => {
+          setP(x)
+          setError(null)
+        })
+        .catch((e) => setError(mensajeDe(e))),
+    [id],
+  )
   useEffect(() => {
     void cargar()
   }, [cargar])
@@ -375,8 +392,7 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
     return () => window.clearInterval(t)
   }, [p?.estado, cargar])
 
-  if (error) return <div className="panel"><p role="alert">{error}</p></div>
-  if (!p) return <div className="panel"><Pensando /></div>
+  if (!p) return <div className="panel">{error ? <Cargando error={error} reintentar={() => void cargar()} /> : <Pensando />}</div>
   const r = p.roadmap
   const hechos = new Set(p.hechos)
   const marcar = async (paso: string, hecho: boolean, donde?: Element | null) => {

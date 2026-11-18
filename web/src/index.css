@@ -129,6 +129,9 @@ h2 {
   color: var(--suave);
 }
 .vacio { color: var(--suave); }
+/* Una pantalla que no ha podido cargar: el porqué y «Reintentar» (componentes/Cargando.tsx). */
+.cargando-fallo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 16px; border: 1px solid var(--borde); border-radius: 12px; background: var(--tarjeta); max-width: 640px; }
+.cargando-fallo p { margin: 0; flex: 1 1 260px; }
 
 /* v0.1: hilo de conversación */
 .boton, .boton-mini {
