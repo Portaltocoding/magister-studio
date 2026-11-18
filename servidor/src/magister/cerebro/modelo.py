@@ -107,6 +107,7 @@ async def _lineas_claude(
             await proc.stdin.drain()
             proc.stdin.close()
             resultado: dict | None = None
+            limites: dict | None = None
             async for crudo in proc.stdout:
                 linea = crudo.decode("utf-8", "replace").strip()
                 if not linea:
@@ -115,7 +116,12 @@ async def _lineas_claude(
                     evento = json.loads(linea)
                 except json.JSONDecodeError:
                     continue
+                # Cuánta cuota de la suscripción queda (ventana de 5 h y de 7 días): llega antes del resultado y viaja con él.
+                if evento.get("type") == "rate_limit_event":
+                    limites = (evento.get("rate_limit_info") or {}).get("unifiedWindows") or None
                 if evento.get("type") == "result":
+                    if limites:
+                        evento["_limites"] = limites
                     resultado = evento
                     if evento.get("is_error"):
                         raise ErrorModelo(str(evento.get("result") or evento.get("subtype") or "error del modelo"))
@@ -168,6 +174,9 @@ class Llamada:
     prompt_version: str | None = None
     traza_id: str | None = None
     estructurada: bool = False
+    # La cuota de la suscripción tras esta llamada, tal como la da el CLI: {"five_hour": {"utilization": 0.41, "resetsAt": ...},
+    # "seven_day": {...}}. None si el motor no la da (eco) o no llegó.
+    limites: dict | None = None
 
 
 Observador = Callable[[Llamada], Awaitable[None] | None]
@@ -203,6 +212,7 @@ def llenar_desde_resultado(llamada: Llamada, resultado: dict) -> None:
     llamada.coste_equivalente = float(resultado.get("total_cost_usd") or 0.0)
     modelos = list((resultado.get("modelUsage") or {}).keys())
     llamada.modelo_respondido = modelos[0] if modelos else None
+    llamada.limites = resultado.get("_limites")
 
 
 # Resiliencia: reintentos antes del primer trozo y un cortacircuitos por motor.

@@ -503,3 +503,22 @@ body { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ===== Barra de uso: sesión y semana, con lo que se comería una generación ===== */
+.cuota { display: flex; flex-direction: column; gap: 6px; }
+.cuota-fila { display: grid; grid-template-columns: 64px minmax(120px, 1fr) auto; align-items: center; gap: 10px; font-size: 0.86rem; }
+.cuota-nombre { color: var(--suave); }
+.cuota-barra { position: relative; height: 10px; border-radius: 999px; background: var(--tarjeta); border: 1px solid var(--borde); overflow: hidden; }
+.cuota-usado { position: absolute; inset: 0 auto 0 0; background: var(--acento); border-radius: 999px; transition: width .4s ease; }
+.cuota-extra {
+  position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, #f2b33d 0 5px, rgb(242 179 61 / 0.45) 5px 10px);
+  transition: left .4s ease, width .4s ease;
+}
+.cuota-pasa .cuota-extra { background: repeating-linear-gradient(135deg, #e8615b 0 5px, rgb(232 97 91 / 0.45) 5px 10px); }
+.cuota-dato strong { color: #d08a00; }
+.cuota-pasa .cuota-dato strong { color: #e8615b; }
+.cuota-dato small { color: var(--suave); }
+.cuota-nota { margin: 2px 0 0; }
+.cuota-compacta { flex-direction: row; gap: 4px; width: 70px; }
+.cuota-compacta .cuota-fila { grid-template-columns: 1fr; width: 33px; }
+.cuota-compacta .cuota-barra { height: 6px; }

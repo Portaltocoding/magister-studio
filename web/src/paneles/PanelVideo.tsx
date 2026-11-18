@@ -4,6 +4,7 @@ import Pensando from '../componentes/Pensando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import ControlVoz, { usarAjustesVoz } from '../componentes/ControlVoz.tsx'
 import { vozElegida } from '../componentes/voz.ts'
+import BarraCuota from '../componentes/BarraCuota.tsx'
 import { DEMO_IDEMPOTENCIA } from '../escena/demo.ts'
 import { DEMO_INDICES } from '../escena/indices.ts'
 import { DEMO_TOPOGRAFIA } from '../escena/topografia.ts'
@@ -355,6 +356,7 @@ function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; e
           </button>
         ))}
       </div>
+      <BarraCuota accion={{ accion: 'video', minutos }} />
       {error && <p role="alert">{error}</p>}
       <div className="botones">
         <button className="boton boton-principal" onClick={hacer}>

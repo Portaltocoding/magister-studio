@@ -4,6 +4,7 @@
 2. Calcular las métricas deterministas y guardarlas en `puntuaciones`.
 3. Encolar el juez online con probabilidad `MAGISTER_JUEZ_MUESTRA` (semilla anotada en la carga).
 4. Langfuse, si está instalado y configurado (opcional: si no, no hace nada).
+5. La cuota de la suscripción (sesión y semana) que trae cada llamada, para la barra de uso.
 """
 
 import logging
@@ -15,7 +16,7 @@ from magister.cerebro.modelo import Llamada, registrar_observador
 from magister.config import ajustes
 from magister.datos.produccion import LlamadaFila, Puntuacion
 from magister.datos.sesion import nueva_sesion
-from magister.observar import metricas, trazas
+from magister.observar import cuota, metricas, trazas
 
 registro = logging.getLogger("magister.observar")
 _azar = random.Random()
@@ -72,3 +73,4 @@ def instalar() -> None:
     registrar_observador(guardar_metricas)
     registrar_observador(encolar_juez)
     registrar_observador(trazas.generacion)
+    registrar_observador(cuota.guardar_cuota)

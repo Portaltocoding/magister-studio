@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import BarraCuota from './componentes/BarraCuota.tsx'
 import { pedir } from './api.ts'
 import Afinar from './componentes/Afinar.tsx'
 import Tomate from './componentes/Tomate.tsx'
@@ -58,6 +59,7 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
       <span className={estado === 'conectado' ? 'estado estado-si' : 'estado estado-no'} title={estado}>
         <span className="estado-texto">{estado}</span>
       </span>
+      <BarraCuota compacta />
       <Tomate />
       <Afinar />
     </header>
