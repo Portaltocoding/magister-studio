@@ -88,6 +88,13 @@ class Ajustes(BaseSettings):
     research_llamadas: int = 8
     research_propuestas: int = 5
     research_segundos: int = 180
+    # Researcher (el agente mejorado): novedad, juez, cobertura y coste
+    research_novedad: float = 0.9  # similitud coseno >= esto: la fuente repite una ya propuesta (redundante)
+    research_juez_min: float = 2.0  # media de la rúbrica (0-3) por debajo de la cual no se propone
+    research_dupes_max: int = 2  # redundancias seguidas en un subtema antes de darlo por saturado
+    research_euros: float = 0.05  # tope de coste estimado por tarea; al pasarlo, para
+    research_coste_llamada_eur: float = 0.003  # tarifa estimada por llamada al modelo (decidir, juez, subtemas)
+    research_coste_busqueda_eur: float = 0.001  # tarifa estimada por búsqueda web
 
 
 ajustes = Ajustes()
