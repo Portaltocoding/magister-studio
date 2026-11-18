@@ -1,6 +1,7 @@
 """Material de una lección (Parte IV): trabajos en segundo plano, progreso por SSE,
 materiales y sus ficheros, preguntas y el banco de tono para calibrar el juez."""
 
+import asyncio
 import random
 from collections.abc import AsyncIterator
 from datetime import datetime
@@ -112,8 +113,15 @@ async def borrar_un_material(mid: int, s: AsyncSession = Depends(sesion_por_peti
     m = await s.get(Material, mid)
     if m is None:
         raise HTTPException(404, "material no encontrado")
+    plan_id, clave = m.plan_id, m.leccion_clave
     await s.delete(m)
     await s.commit()
+    # Si era un vídeo descargado en MP4, su fichero y su ficha (.json) se van con él.
+    from magister.trabajos.video import ruta_mp4
+
+    mp4 = ruta_mp4(plan_id, clave, mid)
+    for f in (mp4, mp4.with_suffix(".json")):
+        await asyncio.to_thread(f.unlink, missing_ok=True)
 
 
 class Rehacer(BaseModel):

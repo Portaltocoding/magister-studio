@@ -90,6 +90,10 @@ async def test_pedir_hacer_y_bajar_el_mp4(cliente, monkeypatch, tmp_path) -> Non
     assert (await cliente.post(f"/api/materiales/{mid}/mp4", json=cuerpo)).json() == {"trabajo_id": None, "listo": True}
     meta = json.loads((tmp_path / f"{plan_id}-L1" / f"video-{mid}.json").read_text(encoding="utf-8"))
     assert meta["voz"] == "sharvard-f"
+    # Borrar el vídeo borra también su MP4 y su ficha.
+    assert (await cliente.delete(f"/api/materiales/{mid}")).status_code == 204
+    assert not (tmp_path / f"{plan_id}-L1" / f"video-{mid}.mp4").exists()
+    assert not (tmp_path / f"{plan_id}-L1" / f"video-{mid}.json").exists()
 
 
 @pytest.mark.anyio
