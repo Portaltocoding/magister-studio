@@ -43,8 +43,11 @@ async def test_sin_fuentes_lo_dice() -> None:
     assert extra["sin_fuentes"] is True
 
 
-async def test_mensaje_dependiente_sin_contexto_aclara() -> None:
+async def test_mensaje_dependiente_sin_contexto_aclara(monkeypatch) -> None:
     from magister.cerebro.estructura import eco
+    from magister.config import ajustes
+
+    monkeypatch.setattr(ajustes, "reescribir_con_modelo", True)
     from magister.flujo.nodos.rag import Reescritura
 
     eco.encolar(Reescritura, [{"autonoma": False, "consulta": None, "aclaracion": "¿Qué es «eso»?"}])
@@ -52,8 +55,11 @@ async def test_mensaje_dependiente_sin_contexto_aclara() -> None:
     assert nodos == ["reescribir", "aclarar"] and texto == "¿Qué es «eso»?"
 
 
-async def test_reescritura_con_historial() -> None:
+async def test_reescritura_con_historial(monkeypatch) -> None:
     from magister.cerebro.estructura import eco
+    from magister.config import ajustes
+
+    monkeypatch.setattr(ajustes, "reescribir_con_modelo", True)
     from magister.flujo.nodos.rag import Reescritura
 
     eco.encolar(Reescritura, [{"autonoma": False, "consulta": "índices parciales en Postgres", "aclaracion": None}])
@@ -62,6 +68,15 @@ async def test_reescritura_con_historial() -> None:
               {"rol": "usuario", "contenido": "¿y los parciales?"}]
     nodos, _, _ = await correr(construir_grafo(InMemorySaver(), b), estudio("¿y los parciales?", turnos))
     assert nodos[:2] == ["reescribir", "recuperar"] and b.consultas == ["índices parciales en Postgres"]
+
+
+async def test_sin_modelo_busca_con_la_pregunta_anterior() -> None:
+    # Por defecto no se llama al modelo para reescribir (5-7 s): la búsqueda lleva tu pregunta anterior delante.
+    b = BuscadorFalso()
+    turnos = [{"rol": "usuario", "contenido": "háblame de índices"}, {"rol": "tutor", "contenido": "Vale."},
+              {"rol": "usuario", "contenido": "¿y los parciales?"}]
+    nodos, _, _ = await correr(construir_grafo(InMemorySaver(), b), estudio("¿y los parciales?", turnos))
+    assert nodos[:2] == ["recuperar", "responder"] and b.consultas == ["háblame de índices ¿y los parciales?"]
 
 
 def test_regla_barata_de_reescritura() -> None:

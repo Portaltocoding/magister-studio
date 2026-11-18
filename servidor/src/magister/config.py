@@ -39,6 +39,13 @@ class Ajustes(BaseSettings):
     # Fuentes y RAG (Parte III)
     embeddings: str = "local"  # local = sentence-transformers; falso = vectores por hash (pruebas)
     embeddings_modelo: str = "intfloat/multilingual-e5-small"
+    # Tras arrancar, e5 tarda unos 20 s en cargar: una pregunta espera como mucho esto y, si aún no está, busca solo
+    # por palabras en vez de dejarte 20 s sin respuesta.
+    espera_embeddings_s: float = 5.0
+    # Reescribir con el modelo un mensaje que depende del anterior («¿y eso?») añadía otra llamada a claude (5-7 s antes
+    # de la primera palabra). Por defecto la búsqueda usa tu pregunta anterior más la de ahora, sin modelo; la respuesta
+    # ya ve todo el hilo.
+    reescribir_con_modelo: bool = False
     reranker_modelo: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
     config_indice: str = "v1"
     crudo: str = str(RAIZ_SERVIDOR / "crudo")

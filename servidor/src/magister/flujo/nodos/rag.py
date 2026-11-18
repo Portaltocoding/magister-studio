@@ -53,6 +53,10 @@ async def reescribir(estado: Estado) -> dict:
     # (unos 5 s de silencio); el historial ya da el contexto a la respuesta.
     if estado.get("llamada") or estado.get("asesor") or not necesita_reescritura(mensaje, len(turnos) > 1):
         return {"consulta": mensaje, "aclaracion": None}
+    if not ajustes.reescribir_con_modelo:
+        # Sin modelo (ahorra 5-7 s): se busca con tu pregunta anterior delante, que es lo que da sentido a «¿y eso?».
+        previa = next((t["contenido"] for t in reversed(turnos[:-1]) if t.get("rol") == "usuario"), "")
+        return {"consulta": f"{previa[-300:]} {mensaje}".strip() if previa else mensaje, "aclaracion": None}
     fase("reescribir")
     sistema = cargar("reescribir").rellenar(turnos=turnos_recientes(estado, 6), mensaje=mensaje)
     try:

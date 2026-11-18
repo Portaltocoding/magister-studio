@@ -7,18 +7,33 @@ deterministas por hash de palabras y tokens contados por palabras.
 import hashlib
 import math
 import re
+import threading
 from functools import cache
 
 from magister.config import ajustes
 
 DIMENSION = 384
 
+# Cargar e5 lleva unos 20 s. Con un candado se carga una sola vez aunque lo pidan a la vez el calentamiento del
+# arranque y la primera búsqueda (sin él se cargaba dos veces en paralelo y la búsqueda tardaba hasta 38 s).
+_modelos: dict[str, object] = {}
+_candado_modelo = threading.Lock()
 
-@cache
+
 def _modelo(nombre: str):
-    from sentence_transformers import SentenceTransformer
+    if (m := _modelos.get(nombre)) is not None:
+        return m
+    with _candado_modelo:
+        if nombre not in _modelos:
+            from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(nombre, device="cpu")
+            _modelos[nombre] = SentenceTransformer(nombre, device="cpu")
+        return _modelos[nombre]
+
+
+def modelo_listo(nombre: str | None = None) -> bool:
+    """¿Está ya cargado el modelo de embeddings? (Con embeddings falsos, siempre.)"""
+    return ajustes.embeddings == "falso" or (nombre or ajustes.embeddings_modelo) in _modelos
 
 
 @cache

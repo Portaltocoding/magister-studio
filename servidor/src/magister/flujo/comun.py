@@ -1,5 +1,6 @@
 """Ayudas compartidas por los nodos: avisar de la fase, hablar en flujo y las reglas."""
 
+import asyncio
 import json
 from datetime import date
 
@@ -125,6 +126,16 @@ async def perfil_de_materia(estado: dict) -> str | None:
         return None
 
 
+async def _o_nada(fabrica, defecto, si: bool = True):
+    """Lee algo para el prompt si toca; si no toca o falla, `defecto` (el tutor sigue sin ello)."""
+    if not si:
+        return defecto
+    try:
+        return await fabrica()
+    except Exception:  # noqa: BLE001
+        return defecto
+
+
 async def sistema_de_estudio(base: str, estado: dict) -> str:
     """El prompt de estudio con lo que el tutor debe saber del alumno en este turno."""
     partes = [base]
@@ -141,18 +152,23 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
         d = date.fromisoformat(estado["hoy"])
         dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
         partes.append(f"Hoy es {dias[d.weekday()]} {d.isoformat()}.")
-    lecciones = ""
-    if estado.get("conversacion_id") and not de_leccion:  # solo en conversaciones de verdad (las pruebas del grafo van sin base)
-        try:
-            lecciones = await lecciones_del_alumno()
-        except Exception:  # noqa: BLE001  (sin base, el tutor sigue funcionando)
-            lecciones = ""
-    perfil = materias.texto(await perfil_de_materia(estado))
+    # Lo que se lee de la base no depende una cosa de otra: se lee todo a la vez (antes iba una consulta tras otra, antes
+    # de la primera palabra). Si algo falla, el tutor sigue sin ello (sin base, como en las pruebas del grafo, igual).
+    conversacion = bool(estado.get("conversacion_id"))  # solo en conversaciones de verdad
+    leccion = bool(estado.get("leccion_clave") and estado.get("plan_id_leccion"))
+    lecciones, perfil_materia, p, flojos, dominados, apuntes = await asyncio.gather(
+        _o_nada(lecciones_del_alumno, "", si=conversacion and not de_leccion),
+        _o_nada(lambda: perfil_de_materia(estado), None),
+        _o_nada(preferencias_tutor, None, si=conversacion),
+        _o_nada(conceptos_flojos, [], si=conversacion and not de_leccion),
+        _o_nada(conceptos_dominados, [], si=conversacion and not de_leccion and not llamada),
+        _o_nada(lambda: apuntes_de(estado["plan_id_leccion"], estado["leccion_clave"]), None, si=leccion),
+    )
+    perfil = materias.texto(perfil_materia)
     if perfil:
         partes.append(perfil)
-    if estado.get("conversacion_id"):
+    if p is not None:
         try:
-            p = await preferencias_tutor()
             if estado.get("modo"):
                 p = {**p, "modo": None if estado["modo"] == "normal" else estado["modo"]}
             preferencias = texto_preferencias(p)
@@ -165,28 +181,16 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
             "Lo que el alumno estudia en Magister:\n" + lecciones + "\n"
             "Si lo que pregunta está en una de esas lecciones, nómbrala («lo tienes en L2») para que la abra en Lecciones o en "
             "el modo foco; si ya la hizo, conecta con lo que vio allí. No repitas la lista.")
-    if estado.get("conversacion_id") and not de_leccion:
-        try:
-            flojos = await conceptos_flojos()
-        except Exception:  # noqa: BLE001
-            flojos = []
+    if conversacion and not de_leccion:
         if flojos:
             partes.append("Conceptos que el alumno tiene flojos ahora mismo (falló o casi olvidó): " + ", ".join(flojos) + ". "
                           "Si encaja con lo que pregunta, conéctalo con uno de ellos o hazle una pregunta rápida sobre él; "
                           "no los enumeres ni lo fuerces. Si pregunta por uno de ellos, más andamiaje: un ejemplo resuelto antes de pedirle nada.")
-        try:
-            dominados = [] if llamada else await conceptos_dominados()
-        except Exception:  # noqa: BLE001
-            dominados = []
         if dominados:
             partes.append("Conceptos que ya domina (acertó sus dos últimos repasos): " + ", ".join(dominados) + ". "
                           "Si salen, no los expliques desde lo básico: ve a matices, casos límite y decisiones (con quien ya sabe, "
                           "la ayuda de más estorba).")
-    if estado.get("leccion_clave") and estado.get("plan_id_leccion"):
-        try:
-            apuntes = await apuntes_de(estado["plan_id_leccion"], estado["leccion_clave"])
-        except Exception:  # noqa: BLE001
-            apuntes = None
+    if leccion:
         if apuntes:
             titulo, texto = apuntes
             partes.append(f"Estáis trabajando la lección {estado['leccion_clave']} «{titulo}». Apóyate en sus apuntes (son lo "

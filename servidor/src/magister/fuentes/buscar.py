@@ -14,7 +14,8 @@ from magister.cerebro.contratos import Consulta, Filtros, Recuperado, ResultadoB
 from magister.datos import repositorio_fuentes as rf
 from magister.datos.fuentes import Busqueda
 from magister.datos.sesion import nueva_sesion
-from magister.fuentes.embeber import embeber
+from magister.config import ajustes
+from magister.fuentes.embeber import embeber, modelo_listo
 from magister.fuentes.fusion import rrf
 from magister.fuentes.reranker import reordenar
 
@@ -92,6 +93,16 @@ async def hidratar(pares: list[tuple[int, float]]) -> list[Recuperado]:
     return salida
 
 
+async def _esperar_modelo(nombre: str | None) -> bool:
+    """True si el modelo de embeddings está (o llega en `espera_embeddings_s`); el calentamiento del arranque lo carga."""
+    limite = time.perf_counter() + ajustes.espera_embeddings_s
+    while not modelo_listo(nombre):
+        if time.perf_counter() >= limite:
+            return False
+        await asyncio.sleep(0.25)
+    return True
+
+
 def _como_recuperados(pares: list[tuple[int, float]]) -> list[Recuperado]:
     return [Recuperado(fid, n, p, "", "", "", "", 0) for n, (fid, p) in enumerate(pares, start=1)]
 
@@ -109,15 +120,24 @@ class BuscadorHibrido:
     ) -> ResultadoBusqueda:
         params = params or Consulta()
         t0 = time.perf_counter()
-        config_id, _ = await _config(params.indice)
+        config_id, config_params = await _config(params.indice)
         densa: list[tuple[int, float]] = []
         lexica: list[tuple[int, float]] = []
         n = max(params.n_candidatos, k)
-        if params.via in ("densa", "hibrida"):
+        via = params.via
+        # Recién arrancado, e5 aún se está cargando: la híbrida no espera más de unos segundos y, si no está, va
+        # solo por palabras (la densa sola, la de las evals, sí espera).
+        if via == "hibrida" and not await _esperar_modelo(config_params.get("modelo")):
+            via = "lexica"
+        # Las dos vías no dependen una de otra: a la vez.
+        if via == "hibrida":
+            densa, lexica = await asyncio.gather(buscar_densa(consulta, n, filtros, params.indice),
+                                                 buscar_lexica(consulta, n, filtros, params.indice))
+        elif via == "densa":
             densa = await buscar_densa(consulta, n, filtros, params.indice)
-        if params.via in ("lexica", "hibrida"):
+        else:
             lexica = await buscar_lexica(consulta, n, filtros, params.indice)
-        if params.via == "hibrida":
+        if via == "hibrida":
             fusion = rrf(_como_recuperados(densa), _como_recuperados(lexica))
             pares = [(r.fragmento_id, r.puntuacion) for r in fusion]
         else:
@@ -138,7 +158,7 @@ class BuscadorHibrido:
                 consulta=consulta_original or consulta,
                 consulta_reescrita=consulta if consulta_original and consulta_original != consulta else None,
                 config_id=config_id,
-                via=params.via,
+                via=via,
                 densa=[[i, n + 1] for n, (i, _) in enumerate(densa)],
                 lexica=[[i, n + 1] for n, (i, _) in enumerate(lexica)],
                 fusion=[[i, n + 1] for n, (i, _) in enumerate(pares[:k])],
