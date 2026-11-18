@@ -19,6 +19,7 @@ import PanelLlamada from './paneles/PanelLlamada.tsx'
 import PanelGuia from './paneles/PanelGuia.tsx'
 import PanelBiblioteca from './paneles/PanelBiblioteca.tsx'
 import PanelNotas from './paneles/PanelNotas.tsx'
+import PanelProyectos from './paneles/PanelProyectos.tsx'
 
 interface Props {
   modo: IdModo
@@ -33,7 +34,8 @@ interface Props {
 // Las pestañas de la entrada en la que estás (Practicar: Repaso y Examen…).
 function Pestanas({ modo, irA }: { modo: IdModo; irA: (m: IdModo) => void }) {
   const familia = familiaDe(modo)
-  if (!familia) return null
+  // Una entrada con una sola sección (Proyectos) no necesita conmutador.
+  if (!familia || familia.length < 2) return null
   return (
     <nav className="pestanas-modo" role="tablist" aria-label="Secciones">
       {familia.map(([id, texto]) => (
@@ -94,7 +96,7 @@ function Panel({
     case 'web':
       return <PanelBiblioteca key="web" vista="web" />
     case 'proyectos':
-      return <Pendiente texto="El camino que sale de lo que construyes y su diario de decisiones." />
+      return <PanelProyectos />
     case 'fichas':
       return <PanelMaterial key="fichas" vista="fichas" />
     case 'video':

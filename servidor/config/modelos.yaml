@@ -41,6 +41,9 @@ prompts:
   guion: generar
   diagrama_apartado: generar
   mapa: generar
+  proyecto_roadmap: generar
+  proyecto_nivel: generar
+  proyecto_arquitectura: generar
   juez_tono: juez
   juez_completitud: juez
 

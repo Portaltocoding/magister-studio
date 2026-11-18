@@ -56,6 +56,10 @@ async def ejecutar_uno(quien: str) -> bool:
         elif t.tipo == "material":
             await ejecutar(t.id, t.plan_id, t.leccion_clave, t.parametros.get("tipos", ["apuntes"]),
                            t.parametros.get("preferencias"))
+        elif t.tipo in ("proyecto_roadmap", "proyecto_nivel"):
+            from magister.proyectos.trabajo import ejecutar as ejecutar_proyecto
+
+            await ejecutar_proyecto(t.id, t.tipo, t.parametros)
         else:
             await cola.terminar(t.id, "fallido", f"tipo de trabajo desconocido: {t.tipo}")
             return True
@@ -63,7 +67,7 @@ async def ejecutar_uno(quien: str) -> bool:
             await cola.terminar(t.id, "hecho")
     except Cancelado:
         registro.info("trabajo %s cancelado", t.id)
-    except LeccionNoExiste as e:
+    except (LeccionNoExiste, LookupError) as e:
         await cola.terminar(t.id, "fallido", str(e))
     except TRANSITORIOS as e:
         if t.intentos >= ajustes.trabajos_intentos:

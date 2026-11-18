@@ -1,0 +1,81 @@
+/* ===== Proyectos: la lista y el roadmap de construcción ===== */
+.proyectos, .proyecto { max-width: 860px; }
+.proyectos-lista { list-style: none; padding: 0; margin: 18px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.proyecto-tarjeta {
+  width: 100%; text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; cursor: pointer; font: inherit; color: var(--texto);
+  background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); box-shadow: var(--sombra-suave);
+  transition: transform 220ms var(--suave-curva, ease), border-color 220ms ease;
+}
+.proyecto-tarjeta:hover { transform: translateY(-2px); border-color: var(--acento); }
+.proyecto-barra { height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--texto) 10%, transparent); overflow: hidden; }
+.proyecto-barra span { display: block; height: 100%; background: var(--acento); border-radius: inherit; transition: width 400ms ease; }
+
+.proyecto-nuevo { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; padding: 20px 22px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); }
+.proyecto-nuevo h2 { margin: 0; font-size: 1.1rem; }
+.proyecto-nuevo label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--suave); }
+.proyecto-nuevo :is(input:not([type="checkbox"]), textarea, select),
+.proyecto-diario :is(input, textarea, select), .proyecto-atasco textarea {
+  font: inherit; font-size: 0.95rem; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 10px; padding: 9px 11px;
+}
+.proyecto-nuevo label.proyecto-check { flex-direction: row; align-items: center; gap: 8px; }
+
+.proyecto-cabeza { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 20px; margin: 10px 0 6px; }
+.proyecto-cabeza h1 { margin: 0; }
+.proyecto-cifras { display: flex; flex-direction: column; gap: 6px; min-width: 220px; color: var(--suave); font-size: 0.9rem; }
+.proyecto-generando, .proyecto-error { margin: 18px 0; }
+
+/* El priming: lo que se lee antes de empezar, arriba del todo. */
+.proyecto-priming { margin: 16px 0; padding: 16px 20px; border-left: 4px solid var(--acento); background: color-mix(in srgb, var(--acento) 8%, var(--tarjeta)); border-radius: 0 14px 14px 0; }
+.proyecto-priming h2 { margin: 0 0 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--suave); }
+.proyecto-priming p { margin: 0; white-space: pre-line; line-height: 1.55; }
+
+.proyecto-explicacion { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 22px; }
+.proyecto-explicacion details { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 14px; }
+.proyecto-explicacion summary { cursor: pointer; font-weight: 600; }
+.proyecto-explicacion details[open] summary { margin-bottom: 8px; }
+.proyecto-explicacion p { line-height: 1.55; }
+.proyecto-glosario { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin: 0; }
+.proyecto-glosario dt { font-weight: 650; }
+.proyecto-glosario dd { margin: 2px 0 0; color: var(--suave); font-size: 0.9rem; }
+
+.proyecto-nivel { margin: 18px 0; padding: 18px 20px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); box-shadow: var(--sombra-suave); }
+.proyecto-nivel.esbozado { background: transparent; border-style: dashed; box-shadow: none; }
+.proyecto-nivel > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.proyecto-nivel > header h2 { margin: 0; font-size: 1.2rem; flex: 1; text-transform: none; letter-spacing: 0; color: var(--texto); }
+.proyecto :is(.proyecto-priming, .proyecto-diario) h2 { text-transform: none; letter-spacing: 0; }
+.proyecto-nivel-num { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--acento); }
+.proyecto-mvp { font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--acento); color: #fff; vertical-align: middle; }
+.proyecto-objetivo { font-weight: 600; margin: 6px 0 4px; }
+.proyecto-priming-nivel, .proyecto-priming-bloque { white-space: pre-line; color: var(--suave); line-height: 1.5; margin: 4px 0 10px; }
+.proyecto-bloque { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--borde); }
+.proyecto-bloque h3 { margin: 0 0 2px; font-size: 1rem; }
+.proyecto-priming-bloque { font-size: 0.92rem; }
+
+.proyecto-pasos { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.proyecto-paso { border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; background: var(--fondo); transition: opacity 200ms ease, border-color 200ms ease; }
+.proyecto-paso.hecho { opacity: 0.62; }
+.proyecto-paso.hecho .proyecto-paso-titulo strong { text-decoration: line-through; }
+.proyecto-paso-titulo { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.proyecto-paso-titulo strong { flex: 1; }
+.proyecto-paso-titulo input { width: 18px; height: 18px; accent-color: var(--acento); flex: none; }
+.proyecto-paso-cuerpo { padding-left: 28px; font-size: 0.93rem; line-height: 1.5; }
+.proyecto-paso-cuerpo p { margin: 6px 0; }
+.proyecto-etiqueta { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--acento); margin-right: 4px; }
+.proyecto-atasco { display: flex; flex-wrap: wrap; gap: 6px; align-items: start; margin-top: 6px; }
+.proyecto-atasco textarea { flex: 1 1 100%; }
+.proyecto-detallar { margin-top: 12px; }
+
+.proyecto-diario { margin: 26px 0; }
+.proyecto-diario > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.proyecto-diario h2 { margin: 0; font-size: 1.1rem; }
+.proyecto-decision-nueva { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.proyecto-decisiones { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.proyecto-decisiones li { padding: 12px 14px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; }
+.proyecto-decisiones p { margin: 4px 0; }
+.proyecto-pie { margin-top: 30px; }
+
+@media (max-width: 640px) {
+  .proyecto-nivel { padding: 14px; }
+  .proyecto-paso-cuerpo { padding-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .proyecto-tarjeta, .proyecto-barra span, .proyecto-paso { transition: none; } }

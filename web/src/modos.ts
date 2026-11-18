@@ -80,6 +80,13 @@ export const GRUPOS: Grupo[] = [
     ],
   },
   {
+    nombre: 'Proyectos',
+    ayuda: 'Lo que construyes',
+    modos: [
+      { id: 'proyectos', nombre: 'Proyectos', encendido: true, ayuda: 'El roadmap de construcción de lo que quieres construir, paso a paso, y su diario de decisiones' },
+    ],
+  },
+  {
     nombre: 'Plan',
     ayuda: 'Tu plan y cómo vas',
     modos: [
@@ -111,7 +118,6 @@ export const TALLER: Modo[] = [
 // Sin sitio en la barra: se llega por Ctrl+K (o aún no existen).
 const OTROS: Modo[] = [
   { id: 'hablar', nombre: 'Pregunta rápida', encendido: true, ayuda: 'Pregunta en voz alta y escucha la respuesta' },
-  { id: 'proyectos', nombre: 'Proyectos', encendido: false, ayuda: 'El camino que sale de lo que construyes' },
   { id: 'construccion', nombre: 'Construcción', encendido: false, ayuda: 'Un libro a tu medida, por bloques' },
 ]
 

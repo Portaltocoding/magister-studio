@@ -1,0 +1,172 @@
+"""El roadmap de construcción: lo escribe el modelo con un método fijo y el código lo monta.
+
+Niveles de capacidad (cada uno, un producto que funciona) → bloques (algo que se puede probar) → pasos (qué haces,
+lo mínimo que tienes que saber antes y cómo sabes que está hecho). Encima de todo y de cada nivel y bloque, un
+priming de 5 líneas. Solo el nivel 1 (el MVP) sale con pasos: los demás se detallan al llegar, con lo hecho y lo
+decidido en el diario delante.
+"""
+
+import json
+
+from pydantic import BaseModel, Field
+
+from magister.cerebro.estructura import estructurar
+from magister.cerebro.prompts import cargar
+
+
+class Termino(BaseModel):
+    termino: str
+    definicion: str
+
+
+class PasoGen(BaseModel):
+    titulo: str
+    que_haces: str
+    antes: str
+    hecho_si: str
+    minutos: int = Field(ge=5, le=600)
+
+
+class BloqueGen(BaseModel):
+    titulo: str
+    priming: str
+    pasos: list[PasoGen] = Field(default_factory=list, max_length=8)
+
+
+class NivelGen(BaseModel):
+    titulo: str
+    objetivo: str = Field(description="Qué hace el producto al acabar este nivel, en una frase")
+    priming: str
+    bloques: list[BloqueGen] = Field(min_length=1, max_length=5)
+
+
+class Riesgo(BaseModel):
+    riesgo: str
+    mitigacion: str
+
+
+class RoadmapGen(BaseModel):
+    resumen: str = Field(description="El priming del proyecto entero: como mucho 5 líneas")
+    que_es: str
+    por_que: str = Field(description="Por qué merece la pena y qué demuestra, para su objetivo")
+    glosario: list[Termino] = Field(min_length=3, max_length=20)
+    arquitectura: str
+    niveles: list[NivelGen] = Field(min_length=2, max_length=5)
+    riesgos: list[Riesgo] = Field(min_length=2, max_length=10)
+    fuera_de_alcance: list[str] = Field(default_factory=list, max_length=10)
+
+
+class NivelDetallado(BaseModel):
+    bloques: list[BloqueGen] = Field(min_length=1, max_length=5)
+
+
+def _con_pasos(bloques: list[BloqueGen], donde: str) -> list[str]:
+    errores = []
+    for b in bloques:
+        if len(b.pasos) < 2:
+            errores.append(f"El bloque «{b.titulo}» de {donde} necesita de 2 a 6 pasos.")
+    return errores
+
+
+def reglas_roadmap(r: RoadmapGen) -> list[str]:
+    """Lo que el esquema no puede exigir: el nivel 1 trae sus pasos; los priming son cortos."""
+    errores = _con_pasos(r.niveles[0].bloques, "el nivel 1")
+    for texto, donde in [(r.resumen, "el resumen")] + [(n.priming, f"el nivel «{n.titulo}»") for n in r.niveles]:
+        if len([x for x in texto.splitlines() if x.strip()]) > 6 or len(texto) > 900:
+            errores.append(f"El priming de {donde} pasa de 5 líneas.")
+    return errores
+
+
+def montar(r: RoadmapGen) -> dict:
+    """El roadmap como lo guarda Magister: con ids estables (n1, n1-b2, n1-b2-p3) y el MVP marcado."""
+    import re
+
+    niveles = []
+    for i, n in enumerate(r.niveles, 1):
+        # «Nivel 1: solo lee» -> «solo lee» con mayúscula: la pantalla ya pone «Nivel 1» encima.
+        titulo = re.sub(r"^\s*nivel\s*\d+\s*[:·.\-–]\s*", "", n.titulo, flags=re.IGNORECASE).strip() or n.titulo
+        titulo = titulo[:1].upper() + titulo[1:]
+        niveles.append({
+            "id": f"n{i}", "numero": i, "titulo": titulo, "objetivo": n.objetivo, "priming": n.priming, "mvp": i == 1,
+            "detallado": i == 1 or any(b.pasos for b in n.bloques),
+            "bloques": _bloques(f"n{i}", n.bloques),
+        })
+    return {
+        "resumen": r.resumen, "que_es": r.que_es, "por_que": r.por_que,
+        "glosario": [t.model_dump() for t in r.glosario], "arquitectura": r.arquitectura,
+        "niveles": niveles, "riesgos": [x.model_dump() for x in r.riesgos], "fuera_de_alcance": r.fuera_de_alcance,
+    }
+
+
+def _bloques(prefijo: str, bloques: list[BloqueGen]) -> list[dict]:
+    salida = []
+    for j, b in enumerate(bloques, 1):
+        bid = f"{prefijo}-b{j}"
+        salida.append({
+            "id": bid, "titulo": b.titulo, "priming": b.priming,
+            "pasos": [{"id": f"{bid}-p{k}", **p.model_dump()} for k, p in enumerate(b.pasos, 1)],
+        })
+    return salida
+
+
+def con_nivel_detallado(roadmap: dict, numero: int, detalle: NivelDetallado) -> dict:
+    """El roadmap con los bloques nuevos de ese nivel (los demás niveles, tal cual)."""
+    niveles = []
+    for n in roadmap["niveles"]:
+        if n["numero"] == numero:
+            n = {**n, "detallado": True, "bloques": _bloques(n["id"], detalle.bloques)}
+        niveles.append(n)
+    return {**roadmap, "niveles": niveles}
+
+
+def pasos(roadmap: dict) -> list[dict]:
+    return [p for n in roadmap.get("niveles", []) for b in n["bloques"] for p in b["pasos"]]
+
+
+def texto_referencias(referencias: list[dict]) -> str:
+    return "\n".join(f"- {r['titulo']} ({r['url']}): {r.get('motivo', '')}" for r in referencias) or "(ninguna)"
+
+
+async def generar_roadmap(datos: dict, referencias: list[dict]) -> dict:
+    sistema = cargar("proyecto_roadmap").rellenar(
+        nombre=datos["nombre"], idea=datos["idea"], objetivo=datos.get("objetivo") or "(no lo ha dicho)",
+        sabes=datos.get("sabes") or "(no lo ha dicho)", ritmo=datos.get("ritmo") or "(no lo ha dicho)",
+        referencias=texto_referencias(referencias))
+    r = await estructurar(sistema, "Devuelve el roadmap de construcción.", RoadmapGen, reglas=reglas_roadmap)
+    return montar(r)
+
+
+async def detallar_nivel(roadmap: dict, numero: int, hechos: list[str], decisiones: list[dict], datos: dict) -> dict:
+    nivel = next(n for n in roadmap["niveles"] if n["numero"] == numero)
+    hecho = [f"- {p['titulo']}" for p in pasos(roadmap) if p["id"] in hechos] or ["(todavía nada)"]
+    resumen_proyecto = {
+        "nombre": datos["nombre"], "idea": datos["idea"], "lo_que_sabe": datos.get("sabes"), "ritmo": datos.get("ritmo"),
+        "resumen": roadmap["resumen"], "arquitectura": roadmap["arquitectura"],
+        "niveles": [{"numero": n["numero"], "titulo": n["titulo"], "objetivo": n["objetivo"]} for n in roadmap["niveles"]],
+    }
+    sistema = cargar("proyecto_nivel").rellenar(
+        proyecto=json.dumps(resumen_proyecto, ensure_ascii=False, indent=1),
+        hecho="\n".join(hecho),
+        diario="\n".join(f"- {d['titulo']}: {d['decision']}" for d in decisiones) or "(sin decisiones apuntadas)",
+        nivel=json.dumps({k: nivel[k] for k in ("numero", "titulo", "objetivo", "priming")}
+                         | {"bloques": [{"titulo": b["titulo"], "priming": b["priming"]} for b in nivel["bloques"]]},
+                         ensure_ascii=False, indent=1))
+    d = await estructurar(sistema, "Devuelve los bloques del nivel con sus pasos.", NivelDetallado,
+                          reglas=lambda x: _con_pasos(x.bloques, f"el nivel {numero}"))
+    return con_nivel_detallado(roadmap, numero, d)
+
+
+def extraer_svg(texto: str) -> str | None:
+    import re
+
+    m = re.search(r"<svg\b[\s\S]*?</svg>", texto)
+    return m.group(0) if m else None
+
+
+async def dibujar_arquitectura(datos: dict, roadmap: dict) -> str | None:
+    from magister.cerebro.modelo import Turno, generar
+
+    sistema = cargar("proyecto_arquitectura").rellenar(nombre=datos["nombre"], idea=datos["idea"][:1500],
+                                                       arquitectura=roadmap["arquitectura"])
+    respuesta = "".join([t async for t in generar(sistema, [Turno("usuario", "Dibuja la arquitectura.")])])
+    return extraer_svg(respuesta)

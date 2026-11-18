@@ -71,6 +71,19 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
       return
     }
     if (recienCreada.current === conversacionId) return
+    // Otra pantalla la acaba de crear con su primer mensaje («Me he atascado» de Proyectos): se envía al abrirla.
+    try {
+      const guardado = JSON.parse(sessionStorage.getItem('magister-enviar-al-abrir') ?? 'null') as { cid: number; texto: string } | null
+      if (guardado?.cid === conversacionId) {
+        sessionStorage.removeItem('magister-enviar-al-abrir')
+        recienCreada.current = conversacionId
+        setBurbujas([])
+        setPendiente(guardado.texto)
+        return
+      }
+    } catch {
+      /* sin almacenamiento */
+    }
     listarMensajes(conversacionId)
       .then((ms) => vigente && setBurbujas(ms.map(aBurbuja)))
       .catch((e) => vigente && setError(String(e.message ?? e)))
