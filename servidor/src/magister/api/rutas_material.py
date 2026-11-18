@@ -93,6 +93,19 @@ async def crear_tests(plan_id: int, clave: str, n: int = 5, s: AsyncSession = De
     return {"tests": ids}
 
 
+class EncargoDiagrama(BaseModel):
+    encargo: str = Field(min_length=10, max_length=2000)
+    contexto: str = Field("", max_length=40000)
+
+
+@rutas.post("/diagramas")
+async def diagrama_del_chat(cuerpo: EncargoDiagrama) -> dict:
+    """Un diagrama rico de una respuesta del tutor (bloque ```diagrama), dibujado aparte mientras se lee."""
+    from magister.material.diagramas import dibujar
+
+    return {"svg": await dibujar(cuerpo.encargo, cuerpo.contexto)}
+
+
 class PrefVideos(BaseModel):
     cuantos: Literal["ninguno", "pocos", "normal", "muchos"] | None = None
     hacia: Literal["mas", "menos"] | None = None

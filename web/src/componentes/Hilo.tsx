@@ -8,6 +8,7 @@ import { conKatex, tieneMates, usarKatex } from './katexPerezoso.ts'
 import { AgendarTarjeta, PreguntaTarjeta } from './Preguntas.tsx'
 import { ModoTarjeta, RecordarTarjeta } from './Modos.tsx'
 import Revelar from './Revelar.tsx'
+import DiagramaPedido from './DiagramaPedido.tsx'
 import type { CitaInfo } from '../api.ts'
 import { conMarcas, PanelCita } from '../Cita.tsx'
 import Valorar from './Valorar.tsx'
@@ -71,6 +72,9 @@ function CuerpoTutor({
   alCita: (c: { id: number; info: CitaInfo | undefined }) => void
 }) {
   const completo = b.estado !== 'llegando'
+  // El texto que ha llegado, leído al pintar cada bloque sin rehacer los componentes en cada trozo (reiniciaría dibujos).
+  const contenido = useRef(b.contenido)
+  contenido.current = b.contenido
   const componentes = useMemo<Components>(
     () => ({
       // ```test, ```opciones y ```svg se convierten en botones y dibujos.
@@ -81,6 +85,13 @@ function CuerpoTutor({
           const texto = String(hijo.props.children ?? '')
           if (clase.includes('language-test')) return <TestRapido texto={texto} completo={completo} />
           if (clase.includes('language-svg')) return <Diagrama svg={texto} completo={completo} />
+          if (clase.includes('language-diagrama')) {
+            // El encargo se pide en cuanto su bloque se cierra, aunque el resto de la respuesta siga llegando.
+            const todo = contenido.current
+            const donde = todo.indexOf(texto.trim())
+            const cerrado = completo || (donde >= 0 && todo.slice(donde + texto.trim().length).includes('```'))
+            return <DiagramaPedido encargo={texto} contexto={donde >= 0 ? todo.slice(0, todo.lastIndexOf('```', donde)) : ''} cerrado={cerrado} />
+          }
           if (clase.includes('language-pregunta'))
             return <PreguntaTarjeta texto={texto} completo={completo} alResponder={escribiendo ? undefined : alEnviar} />
           if (clase.includes('language-agendar')) return <AgendarTarjeta texto={texto} completo={completo} />

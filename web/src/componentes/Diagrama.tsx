@@ -24,7 +24,8 @@ function recolorear(valor: string | null): string | null {
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
   const luz = 0.2126 * r + 0.7152 * g + 0.0722 * b
   const saturacion = Math.max(r, g, b) - Math.min(r, g, b)
-  if (saturacion > 0.25) return 'var(--dg-realce)'
+  // Con color: rojo es lo que objeta o falla, verde lo que apoya o responde; cualquier otro, el realce.
+  if (saturacion > 0.25) return g > r && g > b ? 'var(--dg-bien)' : r >= g && g < 0.45 * r ? 'var(--dg-mal)' : 'var(--dg-realce)'
   if (luz < 0.45) return 'currentColor'
   return 'var(--dg-relleno)'
 }
@@ -46,7 +47,7 @@ function limpiar(svg: string): string | null {
       }
       if (hijo.nodeName === 'text' || hijo.nodeName === 'tspan') {
         const f = hijo.getAttribute('fill')
-        hijo.setAttribute('fill', f === 'var(--dg-realce)' ? f : 'currentColor')
+        hijo.setAttribute('fill', f?.startsWith('var(--dg-') && f !== 'var(--dg-relleno)' ? f : 'currentColor')
       }
       recorrer(hijo)
     }

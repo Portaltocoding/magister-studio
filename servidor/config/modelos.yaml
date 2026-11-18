@@ -46,6 +46,7 @@ prompts:
   guion: generar
   guion_grafico: generar
   diagrama_apartado: generar
+  diagrama_chat: explicar
   mapa: generar
   proyecto_roadmap: generar
   proyecto_nivel: generar

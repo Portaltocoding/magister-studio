@@ -108,9 +108,14 @@
   position: relative; margin: 18px 0; padding: 0; background: none; border: 0;
   --dg-relleno: color-mix(in srgb, currentColor 8%, transparent);
   --dg-realce: #e0a23c;
+  --dg-mal: #e8615b;
+  --dg-bien: #62c47c;
 }
-@media (prefers-color-scheme: light) { .diagrama-vivo { --dg-realce: #b9770e; } }
-.lector-texto .diagrama-vivo { --dg-realce: #b9770e; }
+@media (prefers-color-scheme: light) { .diagrama-vivo { --dg-realce: #b9770e; --dg-mal: #c0392b; --dg-bien: #2e8b57; } }
+.lector-texto .diagrama-vivo { --dg-realce: #b9770e; --dg-mal: #c0392b; --dg-bien: #2e8b57; }
+/* Los diagramas ricos (mapas de argumentos, de posiciones, de ideas) son más grandes. */
+.diagrama-rico .diagrama-lienzo svg { max-height: 640px; }
+.diagrama-encargo { margin: 18px 0; padding: 10px 14px; border: 1px dashed var(--borde); border-radius: 12px; font-size: 0.9rem; white-space: pre-wrap; opacity: 0.85; }
 .diagrama-lienzo svg { display: block; width: 100%; height: auto; max-height: 420px; overflow: visible; margin: 0 auto; }
 .diagrama-lienzo :is(path, line, polyline, polygon, rect, circle, ellipse) { stroke-linecap: round; stroke-linejoin: round; }
 .diagrama-lienzo text { font-family: inherit; }
