@@ -13,6 +13,52 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+# Una tanda de tests a la vez sobre la base de pruebas. Cada test la vacía (TRUNCATE): si dos sesiones lanzan pytest
+# a la vez, una borra los datos de la otra a mitad y salen fallos falsos (claves ajenas, interbloqueos). Un candado de
+# Postgres que dura toda la tanda hace que la segunda espere a la primera. Y, ya con el candado, la base de pruebas se
+# pone al día con las migraciones, para que una tabla o columna nueva no rompa los tests hasta migrarla a mano.
+CANDADO_PRUEBAS = 7_311_208_401  # cualquier número fijo: el mismo en todas las tandas
+ESPERA_MAXIMA = "20min"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def una_tanda_a_la_vez(request):
+    import asyncio
+    import time
+    from argparse import Namespace
+    from pathlib import Path
+
+    import asyncpg
+    from alembic import command
+    from alembic.config import Config
+
+    dsn = ajustes.db_url_pruebas.replace("postgresql+asyncpg://", "postgresql://")
+    bucle = asyncio.new_event_loop()
+    conexion = bucle.run_until_complete(asyncpg.connect(dsn))
+    try:
+        if not bucle.run_until_complete(conexion.fetchval("select pg_try_advisory_lock($1)", CANDADO_PRUEBAS)):
+            pantalla = request.config.pluginmanager.get_plugin("terminalreporter")
+            if pantalla:
+                pantalla.write_line("Otra tanda de tests está usando la base de pruebas: espero a que acabe…", yellow=True)
+            inicio = time.monotonic()
+            bucle.run_until_complete(conexion.execute(f"set lock_timeout = '{ESPERA_MAXIMA}'"))
+            bucle.run_until_complete(conexion.execute("select pg_advisory_lock($1)", CANDADO_PRUEBAS))
+            if pantalla:
+                pantalla.write_line(f"Ya está libre (esperé {time.monotonic() - inicio:.0f} s).", green=True)
+        # Sin fichero de configuración: así alembic no reconfigura los registros (logging) de pytest.
+        cfg = Config()
+        cfg.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "migraciones"))
+        cfg.cmd_opts = Namespace(x=["db=pruebas"])
+        command.upgrade(cfg, "head")
+        yield
+    finally:
+        try:
+            bucle.run_until_complete(conexion.execute("select pg_advisory_unlock_all()"))
+        finally:
+            bucle.run_until_complete(conexion.close())
+            bucle.close()
+
+
 @pytest.fixture(autouse=True)
 def sin_token(monkeypatch) -> None:
     # servidor/.env puede traer MAGISTER_TOKEN; los tests llaman a la API sin proxy.
