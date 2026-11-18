@@ -77,3 +77,16 @@
 .escena-concepto { font-family: 'Newsreader', Georgia, serif; font-size: 1.02rem; }
 .escena-tesis { font-family: 'Newsreader', Georgia, serif; font-size: 0.92rem; color: var(--suave); }
 @media (max-width: 900px) { .escena { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== Taller → Pronunciación ===== */
+.pronunciacion { max-width: 980px; }
+.pronunciacion-prueba { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; margin: 14px 0 18px; }
+.pronunciacion-prueba label { font-weight: 600; }
+.pronunciacion-prueba textarea { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); resize: vertical; }
+.pronunciacion-prueba .boton { align-self: flex-start; }
+.pronunciacion-dicho { color: var(--acento); }
+.pronunciacion-buscar { width: 100%; font: inherit; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); }
+.pronunciacion-grupo h2 { font-size: 0.8rem; margin: 18px 0 6px; }
+.pronunciacion-grupo ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 6px; }
+.pronunciacion-grupo li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--borde); }
+.pronunciacion-grupo li .boton-mini { margin-left: auto; }

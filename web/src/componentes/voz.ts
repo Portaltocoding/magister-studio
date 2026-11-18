@@ -2,6 +2,7 @@
 // - Locutor: habla frase a frase mientras la respuesta llega (no espera al final) y se puede cortar al instante.
 // - Oido: escucha continuo, con resultados provisionales, y se reinicia solo si el navegador lo corta.
 // - esEco: distingue tu voz de la del propio tutor que el micro recoge por los altavoces.
+import { aplicarGlosario } from './pronunciacion.ts'
 
 export interface Reconocimiento {
   lang: string
@@ -59,58 +60,18 @@ const PRONUNCIACION: [RegExp, string][] = [
   [/\bO\(\s*log\s*n\s*\)/g, 'O de logaritmo de n'],
   [/\bO\(\s*n\s*(\^\s*2|²)\s*\)/g, 'O de n al cuadrado'],
   [/\bO\(\s*n\s*\)/g, 'O de n'],
-  [/\bHTTPS\b/g, 'hache te te pe ese'],
-  [/\bHTTP\b/g, 'hache te te pe'],
-  [/\bgRPC\b/g, 'ge erre pe ce'],
-  [/\bGraphQL\b/g, 'graf cu ele'],
-  [/\bUUIDs?\b/g, 'u u i de'],
-  [/\bJSON\b/g, 'yeison'],
-  [/\bSQL\b/g, 'ese cu ele'],
-  [/\bURLs?\b/g, 'u erre ele'],
-  [/\bRFC\b/g, 'erre efe ce'],
-  // Términos de bases de datos y de HTTP, como se dicen (en mayúsculas, la voz los deletrea: «i de», «ele i ka e»).
-  // Los largos antes que sus trozos.
-  [/\bBitmap Heap Scan\b/g, 'bítmap jip scan'],
-  [/\bBitmap Index Scan\b/g, 'bítmap índex scan'],
-  [/\bIndex Scan\b/g, 'índex scan'],
-  [/\bSeq Scan\b/g, 'sic scan'],
-  [/\bEXPLAIN ANALYZE\b/g, 'explein análaiz'],
-  [/\bEXPLAIN\b/g, 'explein'],
-  [/\bCREATE INDEX\b/g, 'crieit índex'],
-  [/\bSELECT\b/g, 'select'],
-  [/\bINSERT\b/g, 'insert'],
-  [/\bUPDATE\b/g, 'ápdeit'],
-  [/\bDELETE\b/g, 'dilít'],
-  [/\bWHERE\b/g, 'güer'],
-  [/\bLIKE\b/g, 'laik'],
-  [/\bJOIN\b/g, 'yoin'],
-  [/\bFROM\b/g, 'from'],
-  [/\bGET\b/g, 'guet'],
-  [/\bPOST\b/g, 'post'],
-  [/\bPUT\b/g, 'put'],
-  [/\bPATCH\b/g, 'pach'],
-  [/\bPostgres(QL)?\b/g, 'póstgres'],
-  [/\bIdempotency-Key\b/g, 'idempótensi qui'],
-  [/\bB-?tree\b/gi, 'árbol be'],
-  [/\bpg_trgm\b/g, 'pe ge trigramas'],
-  [/\blower\(/g, 'lóuer('],
-  [/\bidx_/g, 'índex '],
-  // Con límites que entienden las tildes: \b no las ve como letras y cambiaría «idénticas».
-  [/(?<![\p{L}\d])(id|ID|IDs)(?![\p{L}\d])/gu, 'íd'],
-  [/\bREST\b/g, 'rest'],
-  [/(\d)\s?ms\b/g, '$1 milisegundos'],
-  [/(\d)\s?MB\b/g, '$1 megas'],
-  // Nombres con guion bajo (idx_pedidos_cliente): palabra a palabra, sin decir «guion bajo».
-  [/([A-Za-z0-9])_(?=[A-Za-z0-9])/g, '$1 '],
   // Rutas como /pedidos/42?limit=20: se leen sus palabras, sin las barras.
   [/(^|\s)\/[\w\-/{}.?=&%]+/g, (' $&' as string)],
 ]
+// Los términos sueltos (siglas, SQL, HTTP, unidades...) van en el glosario de pronunciación: componentes/pronunciacion.ts.
 
 export function pronunciar(frase: string): string {
   let t = frase
   for (const [patron, por] of PRONUNCIACION) {
     t = por === ' $&' ? t.replace(patron, (m) => ' ' + m.replace(/[/?=&{}%]+/g, ' ').trim()) : t.replace(patron, por)
   }
+  // El glosario, y después los nombres con guion bajo (idx_pedidos_cliente) palabra a palabra, sin «guion bajo».
+  t = aplicarGlosario(t).replace(/([\p{L}\d])_(?=[\p{L}\d])/gu, '$1 ')
   return t.replace(/\s+/g, ' ').trim()
 }
 

@@ -8,6 +8,7 @@ import PanelMaterial from './paneles/PanelMaterial.tsx'
 import PanelPractica from './paneles/PanelPractica.tsx'
 import PanelProgreso from './paneles/PanelProgreso.tsx'
 import PanelTriaje from './paneles/PanelTriaje.tsx'
+import PanelPronunciacion from './paneles/PanelPronunciacion.tsx'
 import PanelTutor from './paneles/PanelTutor.tsx'
 import PanelFuentes from './paneles/PanelFuentes.tsx'
 import PanelPlan from './paneles/PanelPlan.tsx'
@@ -112,6 +113,8 @@ function Panel({
       return <PanelProgreso irA={irA} />
     case 'triaje':
       return <PanelTriaje />
+    case 'pronunciacion':
+      return <PanelPronunciacion />
     case 'etiquetar':
       return <PanelEtiquetar />
     case 'animaciones':
