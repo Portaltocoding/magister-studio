@@ -32,6 +32,12 @@ async def _del_tutor() -> dict:
     nivel = {"cero": "nada", "experto": "avanzado"}.get(v.get("nivel", ""))
     if nivel:
         salida["nivel_tutor"] = nivel
+    # Lo aprendido de sus valoraciones («muy largo», «le falta un ejemplo» repetidos): el texto sale ya a su medida.
+    from magister.datos import afinado
+
+    aprendido = (await afinado.leer()).get("reglas") or []
+    if aprendido:
+        salida["aprendido"] = list(aprendido)
     return salida
 
 

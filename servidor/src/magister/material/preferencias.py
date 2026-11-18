@@ -31,6 +31,8 @@ def texto(preferencias: dict | None) -> str:
         lineas.append(NIVEL[nivel])
     for x in p.get("instrucciones") or []:
         lineas.append(f"El alumno pide: {x}")
+    for x in p.get("aprendido") or []:
+        lineas.append(f"Aprendido de sus valoraciones: {x}")
     if p.get("enfoque"):
         lineas.append(f"Enfoque que pide el alumno: {p['enfoque']}")
     return "\n".join(f"- {x}" for x in lineas)

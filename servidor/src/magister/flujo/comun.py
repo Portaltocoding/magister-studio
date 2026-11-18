@@ -388,9 +388,13 @@ async def preferencias_tutor() -> dict:
     from magister.datos.produccion import Ajuste
     from magister.datos.sesion import nueva_sesion
 
+    from magister.datos import afinado
+
     async with nueva_sesion() as s:
         fila = await s.get(Ajuste, "tutor")
-    return {**PREFERENCIAS_POR_DEFECTO, **(fila.valor if fila else {})}
+    # Lo aprendido de sus valoraciones (observar/afinado lo deja calculado en «reglas»).
+    aprendido = (await afinado.leer()).get("reglas") or []
+    return {**PREFERENCIAS_POR_DEFECTO, **(fila.valor if fila else {}), "aprendido": aprendido}
 
 
 def texto_preferencias(p: dict) -> str:
@@ -410,6 +414,7 @@ def texto_preferencias(p: dict) -> str:
     if not p.get("opciones", True):
         salida.append("No pongas el bloque de opciones para seguir.")
     salida += [str(x) for x in (p.get("instrucciones") or []) if str(x).strip()]
+    salida += [f"Aprendido de sus valoraciones: {x}" for x in (p.get("aprendido") or []) if str(x).strip()]
     modo = modo_activo(p)
     if modo:
         salida.append(f"Modo de aprendizaje activo «{modo['nombre']}» ({modo.get('para', '')}). Sus reglas mandan sobre la forma "

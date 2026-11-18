@@ -2,7 +2,7 @@
 
 1. Guardar cada llamada en `llamadas`.
 2. Calcular las métricas deterministas y guardarlas en `puntuaciones`.
-3. Encolar el juez online con probabilidad `MAGISTER_JUEZ_MUESTRA` (semilla anotada en la carga).
+3. Encolar el juez online cuando la confianza aprendida lo pide (`observar/afinado`; `MAGISTER_JUEZ_MUESTRA=1` lo fuerza siempre).
 4. Langfuse, si está instalado y configurado (opcional: si no, no hace nada).
 5. La cuota de la suscripción (sesión y semana) que trae cada llamada, para la barra de uso.
 """
@@ -58,8 +58,14 @@ async def encolar_juez(ll: Llamada) -> None:
     if ll.funcion == "llamada":
         return
     semilla = _azar.randrange(2**31)
-    if random.Random(semilla).random() >= ajustes.juez_muestra:
-        return
+    # MAGISTER_JUEZ_MUESTRA=1 fuerza juzgarlo todo; si no, decide la confianza aprendida (observar/afinado): al principio
+    # se juzga casi todo y, si tus valoraciones y los juicios van bien, cada vez menos.
+    if ajustes.juez_muestra < 1.0:
+        from magister.observar import afinado
+
+        if not await afinado.toca_juzgar(ll.traza_id):
+            await afinado.anotar_salto()
+            return
     from magister.trabajos import cola
 
     await cola.encolar("juez_online", None, None,

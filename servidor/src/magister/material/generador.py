@@ -34,11 +34,13 @@ from langgraph.graph import END, START, StateGraph
 from magister.cerebro.estructura import estructurar
 from magister.cerebro.modelo import Turno, generar
 from magister.cerebro.prompts import cargar
+from magister.datos import afinado as datos_afinado
 from magister.material import almacen
 from magister.material.completitud import ampliar_si_falta, informe_completitud
 from magister.material.entrada import EntradaMaterial, fuentes_delimitadas
 from magister.material.modelos import Contrato
 from magister.material.preferencias import texto as texto_preferencias
+from magister.tono import confianza
 from magister.tono import juez as juez_tono
 from magister.tono import lint as lint_tono
 from magister.tono.hallazgo import Hallazgo
@@ -177,9 +179,16 @@ def construir(progreso: Progreso | None = None, cancelado: Callable[[], Awaitabl
         await avisar("juez", e)
         clave = e["contrato"]["bloques"][e["i"]]["clave"]
         sospechas = [Hallazgo.model_validate(h) for h in e.get("hallazgos", []) if h["gravedad"] == "sospecha"]
+        # Cuánto se juzga lo decide la confianza aprendida de tus valoraciones (tono.confianza): con sospechas del lint
+        # se juzga siempre; si no, la decisión es determinista por el texto del bloque (repetir el nodo decide lo mismo).
+        estado_afinado = await datos_afinado.leer()
+        if not sospechas and not confianza.toca_juzgar(estado_afinado, f"{clave}:{e['texto_actual']}"):
+            await datos_afinado.actualizar(lambda x: {**x, "saltadas": int(x.get("saltadas", 0)) + 1})
+            return {"hallazgos": graves(e), "informes": [{"nodo": "juez", "bloque": clave, "saltado": "confianza alta"}]}
         r = await juez_tono.juzgar(e["texto_actual"], sospechas)
         if isinstance(r, juez_tono.FalloJuez):
             return {"informes": [{"nodo": "juez", "bloque": clave, "fallo_juez": r.motivo}], "hallazgos": graves(e)}
+        await datos_afinado.actualizar(lambda x: confianza.registrar_juez(x, {d: getattr(r.veredicto, d).aprueba for d in confianza.DIMENSIONES}))
         suspensos = [h.model_dump() for h in r.suspensos(clave)]
         return {"hallazgos": graves(e) + suspensos,
                 "informes": [{"nodo": "juez", "bloque": clave, "veredicto": r.veredicto.model_dump(), "version": r.version_prompt}]}

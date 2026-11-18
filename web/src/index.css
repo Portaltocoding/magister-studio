@@ -522,3 +522,9 @@ body { overflow: hidden; }
 .cuota-compacta { flex-direction: row; gap: 4px; width: 70px; }
 .cuota-compacta .cuota-fila { grid-template-columns: 1fr; width: 33px; }
 .cuota-compacta .cuota-barra { height: 6px; }
+
+/* ===== Valorar: por qué no sirve ===== */
+.valorar-motivos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.valorar-motivos .opcion-chip { font: inherit; font-size: 0.85rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--borde); background: transparent; color: var(--texto); cursor: pointer; }
+.valorar-motivos .opcion-chip.elegida { border-color: var(--acento); background: var(--acento-suave); color: var(--acento); }
+.aprendido-revisa { margin-top: 6px; }

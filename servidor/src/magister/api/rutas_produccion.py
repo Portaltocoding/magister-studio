@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from magister.config import RAIZ_SERVIDOR
 from magister.datos.produccion import Alerta, CandidatoBanco
 from magister.datos.sesion import sesion_por_peticion
-from magister.observar import juez_online, trazas
+from magister.observar import afinado, juez_online, trazas
 from magister.observar.registro import puntuar
 
 rutas = APIRouter(prefix="/api")
@@ -23,6 +23,8 @@ class Feedback(BaseModel):
     bien: bool
     comentario: str | None = Field(None, max_length=2000)
     otra: bool = False  # pidió otra explicación
+    # Qué falló, de la lista de `tono.confianza.MOTIVOS` («largo», «sin_ejemplo»...): afina la confianza y las reglas.
+    motivos: list[str] = Field(default_factory=list, max_length=8)
 
 
 class Triaje(BaseModel):
@@ -35,6 +37,7 @@ class Triaje(BaseModel):
 async def feedback(traza_id: str, cuerpo: Feedback, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     """Votar dos veces la misma traza sobrescribe: una sola puntuación `feedback_usuario`."""
     await puntuar(traza_id, "feedback_usuario", 1.0 if cuerpo.bien else 0.0, cuerpo.comentario, sobrescribir=True)
+    await afinado.registrar_valoracion(cuerpo.bien, cuerpo.motivos)
     if not cuerpo.bien:
         entrada = await s.scalar(text(
             "select contenido from mensajes m where m.rol = 'usuario' and m.creado_en <= now() order by m.id desc limit 1")) or ""
@@ -42,6 +45,18 @@ async def feedback(traza_id: str, cuerpo: Feedback, s: AsyncSession = Depends(se
     if cuerpo.otra:
         await puntuar(traza_id, "otra_explicacion", 1.0, cuerpo.comentario, sobrescribir=True)
     return {"traza_id": traza_id, "id": f"fb-{traza_id}"}
+
+
+@rutas.get("/afinado")
+async def ver_afinado() -> dict:
+    """Lo que Magister ha aprendido de tus valoraciones y cuánto revisa ya el juez."""
+    return await afinado.estado_publico()
+
+
+@rutas.post("/afinado/reglas/{motivo}/quitar")
+async def quitar_regla(motivo: str) -> dict:
+    await afinado.quitar_regla(motivo)
+    return await afinado.estado_publico()
 
 
 @rutas.get("/alertas")

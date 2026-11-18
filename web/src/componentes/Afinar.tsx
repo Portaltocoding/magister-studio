@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Aprendido from './Aprendido.tsx'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from './preferencias.ts'
 import Mascota, { elegirForma, FORMAS, usarForma } from '../Mascota.tsx'
 import Colores from './Colores.tsx'
@@ -187,6 +188,7 @@ export default function Afinar() {
                   </button>
                 </form>
               </div>
+              <Aprendido />
               <label className="afinar-avisos">
                 <input
                   type="checkbox"
