@@ -253,7 +253,7 @@ export default function Hilo({
               </p>
             )}
             {b.rol === 'tutor' && b.estado === 'llegando' && !b.contenido ? (
-              <Pensando texto={fase ? `${fase}…` : 'Pensando…'} />
+              <Esperando fase={fase} />
             ) : b.estado === 'error' ? (
               <p role="alert">{b.contenido}</p>
             ) : b.rol === 'tutor' ? (
@@ -356,5 +356,23 @@ export default function Hilo({
         )}
       </form>
     </div>
+  )
+}
+
+// Mientras llega la respuesta: la fase y, si tarda, cuánto lleva. Una pregunta difícil hace que el modelo razone un
+// minuto o más antes de escribir la primera palabra (medido: 75 s con una de filosofía de máster); sin el contador
+// parece que se ha colgado.
+function Esperando({ fase }: { fase?: string | null }) {
+  const [segundos, setSegundos] = useState(0)
+  useEffect(() => {
+    const inicio = Date.now()
+    const t = window.setInterval(() => setSegundos(Math.floor((Date.now() - inicio) / 1000)), 1000)
+    return () => window.clearInterval(t)
+  }, [])
+  if (segundos < 10) return <Pensando texto={fase ? `${fase}…` : 'Pensando…'} />
+  return (
+    <Pensando
+      texto={`Pensando a fondo · ${segundos} s${segundos >= 20 ? ': las preguntas difíciles tardan hasta un par de minutos' : ''}`}
+    />
   )
 }

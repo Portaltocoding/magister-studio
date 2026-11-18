@@ -58,6 +58,7 @@ async def _eco(historial: list[Turno]) -> AsyncIterator[str]:
 # Windows no acepta líneas de órdenes de más de 32.767 caracteres: un prompt de sistema largo (apuntes de 20.000
 # caracteres más un esquema grande) va en un fichero temporal, con --system-prompt-file.
 SISTEMA_EN_FICHERO = 8000
+TOPE_VECES = 3  # una llamada que no para de mandar señales se corta, como mucho, a 3 veces el plazo
 
 
 def argumentos_claude(sistema: str, esquema: dict | None = None, modelo: str | None = None,
@@ -152,7 +153,12 @@ async def _proceso_claude(args: list[str], entrada: str) -> AsyncIterator[dict]:
     tarea_err = asyncio.create_task(leer_stderr())
     final_err = lambda: b"".join(trozos_err).decode("utf-8", "replace")[-800:].strip()  # noqa: E731
     try:
-        async with asyncio.timeout(ajustes.timeout_s):
+        # El plazo cuenta sin noticias del modelo (MAGISTER_TIMEOUT_S), no en total: una pregunta difícil razona un minuto
+        # o más antes de escribir (medido: 75 s de razonamiento y 111 s en total) y no se corta mientras avanza. Con un
+        # tope absoluto, por si nunca acaba.
+        bucle = asyncio.get_running_loop()
+        tope = bucle.time() + ajustes.timeout_s * TOPE_VECES
+        async with asyncio.timeout(ajustes.timeout_s) as plazo:
             assert proc.stdin is not None and proc.stdout is not None
             proc.stdin.write(entrada.encode("utf-8"))
             await proc.stdin.drain()
@@ -160,6 +166,7 @@ async def _proceso_claude(args: list[str], entrada: str) -> AsyncIterator[dict]:
             resultado: dict | None = None
             limites: dict | None = None
             async for crudo in proc.stdout:
+                plazo.reschedule(min(tope, bucle.time() + ajustes.timeout_s))
                 linea = crudo.decode("utf-8", "replace").strip()
                 if not linea:
                     continue
