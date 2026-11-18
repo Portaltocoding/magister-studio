@@ -8,4 +8,4 @@ La rúbrica:
 
 {rubrica}
 
-{golden}
+@incluir golden_tono

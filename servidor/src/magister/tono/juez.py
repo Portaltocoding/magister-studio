@@ -63,7 +63,8 @@ def rubrica() -> tuple[str, str]:
 
 @cache
 def golden() -> tuple[str, str]:
-    """Los ejemplos ya juzgados que viajan, siempre idénticos, en el prompt de sistema."""
+    """Los ejemplos ya juzgados que viajan, siempre idénticos, en el prompt de sistema (la plantilla los incluye con
+    `@incluir golden_tono`, así su versión cambia si cambian los ejemplos). Aquí, para guardar su versión aparte."""
     texto = GOLDEN.read_text(encoding="utf-8").replace("\r\n", "\n").strip()
     return texto, hashlib.sha256(texto.encode("utf-8")).hexdigest()[:12]
 
@@ -73,7 +74,7 @@ def sistema_juez(plantilla: str = "juez_tono") -> tuple[str, str]:
 
     Nada del bloque que se juzga entra aquí: así el prefijo es idéntico entre llamadas y se lee de caché."""
     p = cargar(plantilla)
-    return p.rellenar(rubrica=rubrica()[0], golden=golden()[0]), p.etiqueta
+    return p.rellenar(rubrica=rubrica()[0]), p.etiqueta
 
 
 def mensaje_juez(bloque: str, sospechas: list[Hallazgo] | None = None) -> str:

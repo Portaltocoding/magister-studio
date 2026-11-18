@@ -48,7 +48,7 @@ async def test_juez_tono_sistema_lleva_rubrica_y_golden() -> None:
     assert juez.rubrica()[0] in sistema
     assert juez.golden()[0] in sistema
     assert etiqueta.startswith("juez_tono@")
-    assert cargar("juez_tono").huecos == {"rubrica", "golden"}
+    assert cargar("juez_tono").huecos == {"rubrica"}
 
 
 def test_golden_tono_carga_y_es_suficiente() -> None:

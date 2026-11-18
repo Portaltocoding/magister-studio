@@ -38,7 +38,7 @@ def golden() -> str:
 
 def sistema_juez() -> str:
     """El prompt de sistema: solo lo fijo (criterio y ejemplos), idéntico entre llamadas para que se lea de caché."""
-    return cargar("juez_completitud").rellenar(golden=golden())
+    return cargar("juez_completitud").rellenar()
 
 
 def mensaje_juez(texto: str, concepto: dict) -> str:
