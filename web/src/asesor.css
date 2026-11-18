@@ -96,3 +96,10 @@
 /* El imán: cerca de su sitio en la barra, la mascota se desliza hasta él y brilla un poco. */
 .asesor.iman { transition: left .14s ease-out, top .14s ease-out; }
 .asesor.iman .asesor-mascota { filter: drop-shadow(0 0 10px var(--acento)); }
+
+/* Preguntas frecuentes del asesor: se contestan al instante, sin llamar al modelo. */
+.asesor-faqs { margin-top: 10px; }
+.asesor-faqs summary { cursor: pointer; font-size: 0.78rem; color: var(--suave); margin-bottom: 6px; }
+.asesor-todas { background: none; border: 0; padding: 4px 0; font: inherit; font-size: 0.8rem; color: var(--acento); cursor: pointer; }
+.asesor-rapida { margin: 4px 0 10px; font-size: 0.75rem; color: var(--suave); }
+.asesor-rapida button { background: none; border: 0; padding: 0; font: inherit; color: var(--acento); cursor: pointer; text-decoration: underline; }

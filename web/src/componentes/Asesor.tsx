@@ -4,6 +4,7 @@ import { crearConversacion, enviar, listarMensajes } from '../api.ts'
 import Mascota from '../Mascota.tsx'
 import { MODOS } from '../modos.ts'
 import { EVENTO_SUENO } from './animo.ts'
+import { buscarFaq, faqsDe, type Faq } from './faqs.ts'
 
 // El asesor: la mascota de la barra de arriba, cogida y dejada donde quieras. Se queda flotando sobre la pantalla y,
 // al pulsarla, abre una ventanita de chat que sabe dónde estás: lo que pone la pantalla le llega con cada pregunta.
@@ -46,6 +47,8 @@ interface Hilo {
 interface Mensaje {
   rol: 'usuario' | 'tutor'
   texto: string
+  // Contestada al instante desde las preguntas frecuentes: la pregunta original, por si hay que pasársela al tutor.
+  rapida?: string
 }
 
 const leer = <T,>(clave: string, defecto: T): T => {
@@ -408,6 +411,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   const [texto, setTexto] = useState(textoInicial)
   const [pensando, setPensando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [verTodas, setVerTodas] = useState(false)
   const control = useRef<AbortController | null>(null)
   const fondo = useRef<HTMLDivElement | null>(null)
 
@@ -440,9 +444,18 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   useEffect(() => alPensar(pensando), [pensando, alPensar])
   useEffect(() => () => control.current?.abort(), [])
 
-  const preguntar = async (pregunta: string) => {
+  // Una pregunta frecuente se contesta al instante, aquí mismo, sin llamar al modelo.
+  const responderFaq = (f: Faq, pregunta: string) => {
+    setTexto('')
+    setError(null)
+    setMensajes((m) => [...m, { rol: 'usuario', texto: pregunta }, { rol: 'tutor', texto: f.respuesta, rapida: pregunta }])
+  }
+
+  const preguntar = async (pregunta: string, alModelo = false) => {
     pregunta = pregunta.trim()
     if (!pregunta || pensando) return
+    const frecuente = alModelo ? null : buscarFaq(pregunta)
+    if (frecuente) return responderFaq(frecuente, pregunta)
     setTexto('')
     setError(null)
     setPensando(true)
@@ -492,7 +505,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
       .map(([k, h]) => ({ clave: k, nombre: h.nombre })),
   ]
   const enOtra = viendo !== aqui.clave
-  const sugerencias = ['¿Qué hago aquí?', 'Explícame esta pantalla', '¿Qué me recomiendas ahora?']
+  const frecuentes = faqsDe(aqui.clave.split('/')[0])
 
   return (
     <section className={`asesor-chat ${lado} ${vertical}`} role="dialog" aria-label={`Tu asesor · ${aqui.nombre}`}>
@@ -522,12 +535,25 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
           <div className="asesor-vacio">
             <p>Estoy aquí para lo que tienes delante. ¿En qué te ayudo?</p>
             <div className="asesor-sugerencias">
-              {sugerencias.map((s) => (
-                <button key={s} type="button" onClick={() => void preguntar(s)}>
-                  {s}
-                </button>
-              ))}
+              <button type="button" onClick={() => void preguntar('Explícame esta pantalla', true)}>
+                Explícame esta pantalla
+              </button>
             </div>
+            <details className="asesor-faqs" open>
+              <summary>Preguntas frecuentes · al instante</summary>
+              <div className="asesor-sugerencias">
+                {(verTodas ? frecuentes : frecuentes.slice(0, 4)).map((f) => (
+                  <button key={f.id} type="button" onClick={() => responderFaq(f, f.pregunta)}>
+                    {f.pregunta}
+                  </button>
+                ))}
+              </div>
+              {!verTodas && frecuentes.length > 4 && (
+                <button type="button" className="asesor-todas" onClick={() => setVerTodas(true)}>
+                  Ver todas ({frecuentes.length})
+                </button>
+              )}
+            </details>
           </div>
         )}
         {mensajes.map((m, i) =>
@@ -536,7 +562,17 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
               {m.texto}
             </p>
           ) : (
-            <RespuestaAsesor key={i} texto={m.texto} />
+            <div key={i}>
+              <RespuestaAsesor texto={m.texto} />
+              {m.rapida && (
+                <p className="asesor-rapida">
+                  Respuesta al instante ·{' '}
+                  <button type="button" onClick={() => void preguntar(m.rapida!, true)}>
+                    No era esto: pregúntaselo al tutor
+                  </button>
+                </p>
+              )}
+            </div>
           ),
         )}
         {error && <p className="nota">{error}</p>}

@@ -43,7 +43,10 @@ async def hablar(sistema: str, historial: list[Turno], tarea: str | None = None)
 def tarea_de(estado: Estado) -> str | None:
     """Qué modelo contesta (por tarea del enrutador, en config/modelos.yaml): en la llamada, el de «llamada»; si corrige
     una respuesta, el de «corregir» (nunca el pequeño, que se liaba al comparar con los apuntes). Fuera de la llamada,
-    el de la plantilla."""
+    el de la plantilla. El asesor (la mascota flotante) contesta con el de «asesor»: el más rápido, porque son preguntas
+    cortas sobre la pantalla."""
+    if estado.get("asesor"):
+        return "asesor"
     if not estado.get("llamada"):
         return None
     return "corregir" if estado.get("corregir") else "llamada"

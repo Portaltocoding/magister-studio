@@ -18,6 +18,10 @@ tareas:
   # claude -p, sea cual sea el modelo) y corregía peor, así que va con el modelo de siempre. La tarea se mantiene
   # para poder cambiarlo aquí y para que el juez de tono no puntúe turnos hablados.
   llamada:   {motor: cli, modelo: defecto, datos_personales: true}
+  # El asesor (la mascota flotante): preguntas cortas sobre la pantalla que tienes abierta. Haiku gasta mucho menos
+  # cuota; el arranque de claude -p es el mismo, así que lo que lo hace instantáneo son las preguntas frecuentes, que se
+  # contestan en la propia pantalla sin llegar aquí (web/src/componentes/faqs.ts).
+  asesor:    {motor: cli, modelo: haiku, datos_personales: true}
 
 # Qué tarea es cada plantilla de prompt.
 prompts:

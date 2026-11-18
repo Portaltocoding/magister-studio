@@ -37,3 +37,16 @@ async def test_valorar_con_motivos_ensena_una_regla_que_llega_a_la_generacion(cl
 async def test_los_motivos_desconocidos_no_rompen_la_valoracion(cliente) -> None:
     r = await cliente.post("/api/trazas/tx/feedback", json={"bien": False, "motivos": ["inventado"]})
     assert r.status_code == 200
+
+
+def test_el_asesor_contesta_con_el_modelo_rapido() -> None:
+    from magister.cerebro.enrutador import ruta, tabla
+    from magister.flujo.comun import tarea_de
+
+    tabla.cache_clear()
+    assert tarea_de({"asesor": True}) == "asesor"
+    assert tarea_de({"asesor": True, "llamada": True}) == "asesor"
+    assert tarea_de({}) is None
+    assert tabla()["tareas"]["asesor"]["modelo"] == "haiku"
+    motor, _ = ruta("asesor")
+    assert motor in ("cli", "eco")
