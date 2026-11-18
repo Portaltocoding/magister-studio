@@ -9,6 +9,8 @@ El nombre del concepto y su definición en una frase.
 [[teoria]]
 Cómo funciona por dentro, con un ejemplo dicho con palabras.
 
+@incluir explicar
+
 Estilo de este vídeo: {estilo}
 
 Reglas de voz:

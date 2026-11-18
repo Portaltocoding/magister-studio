@@ -1,9 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { enviarJson, listarPlanes, pedir, verPlan, type VistaPlan } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import ControlVoz, { usarAjustesVoz } from '../componentes/ControlVoz.tsx'
 import { vozElegida } from '../componentes/voz.ts'
+import { DEMO_IDEMPOTENCIA } from '../escena/demo.ts'
+import { DEMO_INDICES } from '../escena/indices.ts'
+import type { GuionGrafico } from '../escena/tipos.ts'
+
+const DEMOS: Record<string, GuionGrafico> = { indices: DEMO_INDICES, idempotencia: DEMO_IDEMPOTENCIA }
+
+// El vídeo animado (Remotion) se carga solo cuando se abre: no pesa en el resto de la app.
+const ReproductorEscena = lazy(() => import('../escena/ReproductorEscena.tsx'))
+
+// #/video/demo/indices abre ese vídeo animado; ?t=40 empieza en el segundo 40.
+function rutaDemo(): { abierta: boolean; nombre: string; segundo: number } {
+  const [ruta, consulta] = window.location.hash.split('?')
+  const nombre = ruta.replace(/^#\/video\/demo\/?/, '')
+  return {
+    abierta: ruta.startsWith('#/video/demo'),
+    nombre: nombre in DEMOS ? nombre : 'indices',
+    segundo: Number(new URLSearchParams(consulta ?? '').get('t')) || 0,
+  }
+}
 
 // Vídeo: entender una lección (o un concepto) antes de estudiarla. El guion se narra por escenas con la voz
 // del equipo, con subtítulos y las diapositivas a la par. Cada vídeo lo pides tú: qué, con qué estilo y cuánto dura.
@@ -356,6 +375,7 @@ export default function PanelVideo() {
   const [elegido, setElegido] = useState<number | null>(null)
   const [nuevo, setNuevo] = useState(false)
   const [haciendo, setHaciendo] = useState<string | null>(null)
+  const [demo, setDemo] = useState(rutaDemo)
 
   const cargar = useCallback(async (p: VistaPlan) => {
     const [e, v] = await Promise.all([
@@ -407,14 +427,62 @@ export default function PanelVideo() {
 
   const actual = videos.find((v) => v.material_id === elegido) ?? videos[0]
 
+  if (demo.abierta)
+    return (
+      <div className="panel video-panel">
+        <div className="cabecera-panel">
+          <h1>Vídeo animado</h1>
+          <span style={{ display: 'flex', gap: 8 }}>
+            {Object.entries(DEMOS).map(([id, g]) => (
+              <button
+                key={id}
+                className="boton"
+                aria-pressed={demo.nombre === id}
+                onClick={() => {
+                  window.history.replaceState(null, '', `#/video/demo/${id}`)
+                  setDemo({ abierta: true, nombre: id, segundo: 0 })
+                }}
+              >
+                {g.titulo}
+              </button>
+            ))}
+            <button
+              className="boton"
+              onClick={() => {
+                window.history.replaceState(null, '', '#/video')
+                setDemo({ abierta: false, nombre: 'indices', segundo: 0 })
+              }}
+            >
+              Volver a tus vídeos
+            </button>
+          </span>
+        </div>
+        <Suspense fallback={<Pensando texto="Preparando la escena…" />}>
+          <ReproductorEscena key={demo.nombre} guion={DEMOS[demo.nombre]} segundo={demo.segundo} />
+        </Suspense>
+      </div>
+    )
+
   return (
     <div className="panel video-panel">
       <div className="cabecera-panel">
         <h1>Vídeo</h1>
         {!nuevo && (
-          <button className="boton boton-principal" onClick={() => setNuevo(true)} disabled={!!haciendo}>
-            Nuevo vídeo
-          </button>
+          <span style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="boton"
+              onClick={() => {
+                window.history.replaceState(null, '', '#/video/demo/indices')
+                setDemo({ abierta: true, nombre: 'indices', segundo: 0 })
+              }}
+              title="Prototipo del vídeo animado: una lección hecha con el método del núcleo"
+            >
+              Vídeo animado (demo)
+            </button>
+            <button className="boton boton-principal" onClick={() => setNuevo(true)} disabled={!!haciendo}>
+              Nuevo vídeo
+            </button>
+          </span>
         )}
       </div>
       {nuevo && (

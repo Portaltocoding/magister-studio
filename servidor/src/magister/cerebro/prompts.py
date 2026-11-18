@@ -3,6 +3,10 @@
 La versión es el hash del fichero: cambias una coma y cambia la versión, así que
 ninguna medida mezcla dos prompts sin saberlo. Los huecos van como `{nombre}` y
 `rellenar` falla si falta alguno.
+
+Una línea `@incluir <nombre>` mete ahí el texto de `prompts/comun/<nombre>.md` (el núcleo de cómo
+explica Magister, por ejemplo). La versión se calcula sobre el texto ya expandido: si cambia lo
+común, cambia la versión de cada plantilla que lo incluye.
 """
 
 import hashlib
@@ -41,12 +45,26 @@ class Plantilla:
         return self.texto.format(**{k: v for k, v in valores.items() if k in self.huecos})
 
 
+COMUN = CARPETA / "comun"
+INCLUIR = re.compile(r"^@incluir ([a-z_]+)[ \t]*$", re.M)
+
+
+def _expandir(texto: str) -> str:
+    def trozo(m: re.Match[str]) -> str:
+        ruta = COMUN / f"{m.group(1)}.md"
+        if not ruta.is_file():
+            raise ErrorPlantilla(f"no existe el trozo común {m.group(1)}")
+        return ruta.read_text(encoding="utf-8").strip()
+
+    return INCLUIR.sub(trozo, texto)
+
+
 @cache
 def _del_fichero(nombre: str) -> Plantilla:
     if not re.fullmatch(r"[a-z_]+", nombre):
         raise ErrorPlantilla(f"nombre de plantilla no válido: {nombre}")
     ruta = CARPETA / f"{nombre}.md"
-    crudo = ruta.read_bytes()
+    crudo = _expandir(ruta.read_bytes().decode("utf-8")).encode("utf-8")
     return Plantilla(nombre, hashlib.sha256(crudo).hexdigest()[:12], crudo.decode("utf-8").strip())
 
 

@@ -1,0 +1,37 @@
+import pytest
+
+from magister.cerebro import prompts
+
+
+def test_incluir_mete_el_trozo_comun(tmp_path, monkeypatch):
+    (tmp_path / "nucleo.md").write_text("Explica con un ejemplo.\n", encoding="utf-8")
+    monkeypatch.setattr(prompts, "COMUN", tmp_path)
+    assert prompts._expandir("Antes\n@incluir nucleo\nDespués {hueco}") == "Antes\nExplica con un ejemplo.\nDespués {hueco}"
+
+
+def test_incluir_un_trozo_que_no_existe_falla(tmp_path, monkeypatch):
+    monkeypatch.setattr(prompts, "COMUN", tmp_path)
+    with pytest.raises(prompts.ErrorPlantilla):
+        prompts._expandir("@incluir nada")
+
+
+def test_incluir_solo_cuenta_en_su_propia_linea(tmp_path, monkeypatch):
+    monkeypatch.setattr(prompts, "COMUN", tmp_path)
+    assert prompts._expandir("di «@incluir x» tal cual") == "di «@incluir x» tal cual"
+
+
+def test_los_prompts_que_explican_llevan_el_nucleo_expandido():
+    for nombre in ("responder", "conversar", "apuntes_bloque", "guion"):
+        p = prompts._del_fichero(nombre)
+        assert "@incluir" not in p.texto
+        assert "problema, intento ingenuo" in p.texto
+
+
+def test_ningun_trozo_comun_tiene_llaves():
+    # Las llaves sueltas romperían `rellenar` (str.format) en cada plantilla que lo incluya.
+    for f in prompts.COMUN.glob("*.md"):
+        assert "{" not in f.read_text(encoding="utf-8") and "}" not in f.read_text(encoding="utf-8"), f.name
+
+
+def test_todas_las_plantillas_cargan():
+    assert all(p.version and "@incluir" not in p.texto for p in prompts.ficheros())
