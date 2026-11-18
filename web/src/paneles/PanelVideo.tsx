@@ -1,10 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { enviarJson, listarPlanes, pedir, verPlan, type VistaPlan } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import ControlVoz, { usarAjustesVoz } from '../componentes/ControlVoz.tsx'
-import { vozElegida } from '../componentes/voz.ts'
+import { pronunciar, vocesMagister, vocesMagisterListas, vozElegida, vozMagister } from '../componentes/voz.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
 import { DEMO_IDEMPOTENCIA } from '../escena/demo.ts'
 import { DEMO_INDICES } from '../escena/indices.ts'
@@ -13,8 +13,29 @@ import type { GuionGrafico } from '../escena/tipos.ts'
 
 const DEMOS: Record<string, GuionGrafico> = { indices: DEMO_INDICES, topografia: DEMO_TOPOGRAFIA, idempotencia: DEMO_IDEMPOTENCIA }
 
-// El vídeo animado (Remotion) se carga solo cuando se abre: no pesa en el resto de la app.
-const ReproductorEscena = lazy(() => import('../escena/ReproductorEscena.tsx'))
+// El vídeo animado (Remotion) se carga solo cuando se abre: no pesa en el resto de la app. Se crea de nuevo en cada
+// reintento: un `lazy` que falló al cargar se queda fallado para siempre.
+const cargarEscena = () => lazy(() => import('../escena/ReproductorEscena.tsx'))
+
+// Si el reproductor falla (no carga su código o se rompe al pintar), cae solo él, con «Reintentar».
+class FalloReproductor extends Component<{ children: ReactNode; alReintentar: () => void }, { error: Error | null }> {
+  state = { error: null as Error | null }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  render() {
+    if (!this.state.error) return this.props.children
+    return (
+      <Cargando
+        error={`No he podido cargar el vídeo: ${this.state.error.message}`}
+        reintentar={() => {
+          this.setState({ error: null })
+          this.props.alReintentar()
+        }}
+      />
+    )
+  }
+}
 
 // #/video/demo/indices abre ese vídeo animado; ?t=40 empieza en el segundo 40.
 function rutaDemo(): { abierta: boolean; nombre: string; segundo: number } {
@@ -82,6 +103,7 @@ type EstadoVoz = 'parado' | 'sonando' | 'pausado'
 function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number }) {
   const [lista, setLista] = useState<Escena[] | null>(null)
   const [falloLista, setFalloLista] = useState<string | null>(null)
+  const [intento, setIntento] = useState(0)
   const [paginas, setPaginas] = useState(0)
   const [e, setE] = useState(0)
   const [f, setF] = useState(0)
@@ -94,13 +116,16 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
   const conDiapos = !!diaposId && !video.concepto
 
   useEffect(() => {
+    setFalloLista(null)
     pedir<{ texto: string }>(`/api/materiales/${video.material_id}`)
       .then((m) => setLista(escenas(m.texto)))
       .catch((e) => setFalloLista(mensajeDe(e)))
+    // Si no se pueden contar las diapositivas, se queda en la primera (el vídeo se ve igual, con la voz y los subtítulos).
     if (conDiapos)
       fetch(`/api/materiales/${diaposId}/fichero/html`)
-        .then((r) => r.text())
+        .then((r) => (r.ok ? r.text() : ''))
         .then((h) => setPaginas((h.match(/<section[\s>]/g) ?? []).length))
+        .catch(() => undefined)
     const cargarVoz = () => setLaVoz(vozLocal())
     cargarVoz()
     window.speechSynthesis?.addEventListener('voiceschanged', cargarVoz)
@@ -119,7 +144,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
       turno.current++
       window.speechSynthesis?.cancel()
     }
-  }, [video.material_id, diaposId, conDiapos])
+  }, [video.material_id, diaposId, conDiapos, intento])
 
   const pagina = lista && paginas ? 1 + Math.round((e * (paginas - 1)) / Math.max(1, lista.length - 1)) : 1
   useEffect(() => {
@@ -218,7 +243,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
     return () => window.removeEventListener('keydown', tecla)
   })
 
-  if (!lista) return falloLista ? <Cargando error={falloLista} /> : <Pensando texto="Cargando el vídeo…" />
+  if (!lista) return falloLista ? <Cargando error={falloLista} reintentar={() => setIntento((x) => x + 1)} /> : <Pensando texto="Cargando el vídeo…" />
   const escena = lista[e]
 
   return (
@@ -269,6 +294,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
         </span>
         <ControlVoz compacto />
       </div>
+      <DescargarVideo video={video} lista={lista} paginas={conDiapos ? paginas : 0} />
       {!laVoz && <p className="nota">No encuentro una voz en español instalada en tu equipo: se usará la que tenga el navegador.</p>}
       <div className="video-info">
         <h2>
@@ -292,6 +318,150 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
   )
 }
 
+// «Descargar vídeo»: el mismo vídeo en MP4 (diapositivas o tarjetas, la voz de Magister y subtítulos), montado en el
+// servidor. Se pide una vez; mientras se hace se ve por qué escena va, y al acabar se baja solo.
+interface EstadoMp4 {
+  listo: boolean
+  voz: string | null
+  segundos: number | null
+  trabajador: boolean
+  trabajo: { id: number; estado: string; paso: number | null; total: number | null; error: string | null } | null
+}
+
+function bajar(mid: number) {
+  const a = document.createElement('a')
+  a.href = `/api/materiales/${mid}/mp4/fichero`
+  a.download = ''
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Escena[]; paginas: number }) {
+  const [estado, setEstado] = useState<EstadoMp4 | null>(null)
+  const [fallo, setFallo] = useState<string | null>(null)
+  const [voces, setVoces] = useState(vocesMagister)
+  const esperando = useRef(false)
+  const mid = video.material_id
+
+  const mirar = useCallback(async () => {
+    try {
+      const e = await pedir<EstadoMp4>(`/api/materiales/${mid}/mp4`)
+      setEstado(e)
+      setFallo(null)
+      if (esperando.current && e.listo && e.trabajo?.estado === 'hecho') {
+        esperando.current = false
+        bajar(mid)
+      }
+    } catch (e) {
+      setFallo(mensajeDe(e))
+    }
+  }, [mid])
+
+  useEffect(() => {
+    void mirar()
+    vocesMagisterListas.then(setVoces).catch(() => undefined)
+  }, [mirar])
+
+  const enMarcha = estado?.trabajo && ['pendiente', 'en_curso'].includes(estado.trabajo.estado)
+  // Mientras se hace, se mira cada 2 s cómo va (un fallo suelto no corta la espera: se vuelve a mirar).
+  useEffect(() => {
+    if (!enMarcha) return
+    const t = setInterval(() => void mirar(), 2000)
+    return () => clearInterval(t)
+  }, [enMarcha, mirar])
+
+  const voz = vozMagister() ?? voces[0]?.id ?? null
+  const pedirMp4 = async () => {
+    if (!voz) return
+    setFallo(null)
+    const n = lista.length
+    try {
+      const r = await pedir<{ trabajo_id: number | null; listo: boolean }>(
+        `/api/materiales/${mid}/mp4`,
+        enviarJson({
+          voz,
+          titulo: `${video.clave} · ${video.concepto ?? video.titulo}`,
+          escenas: lista.map((x, k) => ({
+            marca: nombreMarca(x.marca),
+            frases: x.frases.map((t) => ({ texto: t.slice(0, 600), dicho: pronunciar(t).slice(0, 600) || t.slice(0, 600) })),
+            pagina: paginas ? 1 + Math.round((k * (paginas - 1)) / Math.max(1, n - 1)) : null,
+          })),
+        }),
+      )
+      if (r.listo) return bajar(mid)
+      esperando.current = true
+      await mirar()
+    } catch (e) {
+      setFallo(mensajeDe(e))
+    }
+  }
+  const cancelar = async () => {
+    if (!estado?.trabajo) return
+    esperando.current = false
+    await pedir(`/api/trabajos/${estado.trabajo.id}/cancelar`, { method: 'POST' }).catch(() => undefined)
+    await mirar()
+  }
+
+  if (!voz)
+    return (
+      <p className="nota video-descargar">
+        Para descargar el vídeo en MP4 hace falta la voz de Magister (Piper) instalada en el servidor.
+      </p>
+    )
+  const t = estado?.trabajo
+  return (
+    <div className="video-descargar">
+      {enMarcha ? (
+        <>
+          <span className="video-descargar-progreso">
+            <Pensando texto={t?.total ? `Montando el MP4: escena ${t.paso ?? 0} de ${t.total}` : 'Montando el MP4…'} />
+          </span>
+          {t?.total ? (
+            <span className="barra video-barra">
+              <span style={{ width: `${((t.paso ?? 0) / t.total) * 100}%` }} />
+            </span>
+          ) : null}
+          <button type="button" className="boton-mini" onClick={() => void cancelar()}>
+            Cancelar
+          </button>
+          {estado && !estado.trabajador && <small className="nota">No hay ningún trabajador en marcha: el MP4 no avanzará hasta que lo haya.</small>}
+        </>
+      ) : estado?.listo ? (
+        <>
+          <a className="boton" href={`/api/materiales/${mid}/mp4/fichero`} download>
+            ⬇ Descargar MP4{estado.segundos ? ` (${Math.floor(estado.segundos / 60)}:${String(Math.round(estado.segundos % 60)).padStart(2, '0')})` : ''}
+          </a>
+          {estado.voz !== voz && (
+            <button type="button" className="boton-mini" onClick={() => void pedirMp4()} title="El MP4 que hay se hizo con otra voz">
+              Rehacer con la voz actual
+            </button>
+          )}
+        </>
+      ) : (
+        <button type="button" className="boton" onClick={() => void pedirMp4()} title="Diapositivas o tarjetas, la voz de Magister y subtítulos">
+          ⬇ Descargar vídeo
+        </button>
+      )}
+      {t?.estado === 'fallido' && !enMarcha && (
+        <span className="nota" role="alert">
+          No se pudo montar: {t.error}{' '}
+          <button type="button" className="boton-mini" onClick={() => void pedirMp4()}>
+            Reintentar
+          </button>
+        </span>
+      )}
+      {fallo && (
+        <span className="nota" role="alert">
+          {fallo}{' '}
+          <button type="button" className="boton-mini" onClick={() => void mirar()}>
+            Reintentar
+          </button>
+        </span>
+      )}
+    </div>
+  )
+}
 // «Nuevo vídeo»: qué lección (o qué concepto), con qué estilo y cuánto dura.
 function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; estados: Estados; alHecho: (clave: string) => void; alCancelar: () => void }) {
   const preparadas = plan.lecciones.filter((l) => estados[l.clave]?.ids?.apuntes)
@@ -383,6 +553,7 @@ export default function PanelVideo() {
   const [nuevo, setNuevo] = useState(false)
   const [haciendo, setHaciendo] = useState<string | null>(null)
   const [demo, setDemo] = useState(rutaDemo)
+  const [ReproductorEscena, setReproductorEscena] = useState(cargarEscena)
 
   const cargar = useCallback(async (p: VistaPlan) => {
     const [e, v] = await Promise.all([
@@ -475,9 +646,11 @@ export default function PanelVideo() {
             </button>
           </span>
         </div>
-        <Suspense fallback={<Pensando texto="Preparando la escena…" />}>
-          <ReproductorEscena key={demo.nombre} guion={DEMOS[demo.nombre]} segundo={demo.segundo} />
-        </Suspense>
+        <FalloReproductor alReintentar={() => setReproductorEscena(cargarEscena)}>
+          <Suspense fallback={<Pensando texto="Preparando la escena…" />}>
+            <ReproductorEscena key={demo.nombre} guion={DEMOS[demo.nombre]} segundo={demo.segundo} />
+          </Suspense>
+        </FalloReproductor>
       </div>
     )
 

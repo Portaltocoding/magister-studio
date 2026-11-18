@@ -293,7 +293,10 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
   const [elegido, setElegido] = useState<Concepto | null>(null)
   const { sobre, nodo: aviso } = usarAviso()
 
+  // El plan que no se pudo abrir, para ofrecer «Reintentar».
+  const [falloPlan, setFalloPlan] = useState<ResumenPlan | null>(null)
   const elegirPlan = (p: ResumenPlan) => {
+    setFalloPlan(null)
     setNombre(p.tema)
     // Si falla, se queda el plan que estaba (y vuelve a poner su nombre) en vez de dejar la pantalla a medias.
     Promise.all([verPlan(p.tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${p.plan_id}/materiales`)])
@@ -301,7 +304,10 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
         setPlan(v)
         setMateriales(m)
       })
-      .catch(() => setNombre((n) => (plan ? (planes?.find((x) => x.plan_id === plan.plan_id)?.tema ?? n) : n)))
+      .catch(() => {
+        setNombre((n) => (plan ? (planes?.find((x) => x.plan_id === plan.plan_id)?.tema ?? n) : n))
+        setFalloPlan(p)
+      })
   }
 
   const [fallo, setFallo] = useState(false)
@@ -399,6 +405,14 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
           </select>
         )}
       </div>
+      {falloPlan && (
+        <p className="nota" role="alert">
+          No he podido abrir «{falloPlan.tema}».{' '}
+          <button type="button" className="boton-mini" onClick={() => elegirPlan(falloPlan)}>
+            Reintentar
+          </button>
+        </p>
+      )}
 
       {plan && (
         <section className="pg-hero">

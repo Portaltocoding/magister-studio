@@ -90,3 +90,13 @@
 .pronunciacion-grupo ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 6px; }
 .pronunciacion-grupo li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--borde); }
 .pronunciacion-grupo li .boton-mini { margin-left: auto; }
+
+/* Descargar el vídeo en MP4: bajo los controles, con su progreso mientras se monta. */
+.video-descargar { grid-column: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.video-descargar .barra { flex: 0 1 220px; }
+.video-descargar-progreso { display: inline-flex; align-items: center; }
+/* El vídeo animado: mientras suena, una capa transparente sobre la imagen (no sobre la barra de controles) lo pausa. */
+.escena-reproductor { position: relative; }
+.escena-pausar { position: absolute; inset: 0 0 56px 0; background: transparent; border: 0; padding: 0; cursor: pointer; }
+.escena-pausar:focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; border-radius: 14px; }
+.video-descargar a.boton { text-decoration: none; }

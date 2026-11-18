@@ -60,6 +60,10 @@ async def ejecutar_uno(quien: str) -> bool:
             from magister.proyectos.trabajo import ejecutar as ejecutar_proyecto
 
             await ejecutar_proyecto(t.id, t.tipo, t.parametros)
+        elif t.tipo == "video_mp4":
+            from magister.trabajos.video import ejecutar as ejecutar_video
+
+            await ejecutar_video(t.id, t.parametros)
         else:
             await cola.terminar(t.id, "fallido", f"tipo de trabajo desconocido: {t.tipo}")
             return True

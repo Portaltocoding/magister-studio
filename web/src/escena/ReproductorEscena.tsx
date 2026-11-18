@@ -68,11 +68,30 @@ export default function ReproductorEscena({ guion, segundo = 0 }: { guion: Guion
     }
   }, [desde, guion])
 
+  // Mientras suena, pulsar en cualquier parte de la imagen lo pausa (una capa encima, que deja libre la barra de
+  // controles). Parado, la capa no está: los botones de la escena se pueden tocar.
+  const [tocando, setTocando] = useState(false)
+  useEffect(() => {
+    const p = player.current
+    if (!p) return
+    const si = () => setTocando(true)
+    const no = () => setTocando(false)
+    p.addEventListener('play', si)
+    p.addEventListener('pause', no)
+    p.addEventListener('ended', no)
+    return () => {
+      p.removeEventListener('play', si)
+      p.removeEventListener('pause', no)
+      p.removeEventListener('ended', no)
+    }
+  }, [])
+
   const props: PropsComposicion = useMemo(() => ({ guion, subtitulos, ritmo }), [guion, subtitulos, ritmo])
 
   return (
     <div className="escena">
       <div className="escena-pantalla">
+        <div className="escena-reproductor">
         <Player
           ref={player}
           component={Composicion}
@@ -88,6 +107,8 @@ export default function ReproductorEscena({ guion, segundo = 0 }: { guion: Guion
           allowFullscreen
           style={{ width: '100%', aspectRatio: `${ANCHO} / ${ALTO}`, borderRadius: 14, overflow: 'hidden' }}
         />
+        {tocando && <button type="button" className="escena-pausar" aria-label="Pausar" onClick={() => player.current?.pause()} />}
+        </div>
         <div className="escena-ajustes">
           <label>
             <input type="checkbox" checked={voz} onChange={(e) => (setVoz(e.target.checked), e.target.checked || locutor.current.parar())} /> Voz

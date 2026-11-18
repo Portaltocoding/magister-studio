@@ -83,6 +83,8 @@ class Ajustes(BaseSettings):
     # Voz local del tutor (Piper) y registro de las llamadas
     voz_piper: str = str(RAIZ_SERVIDOR.parent / "herramientas" / "piper" / "piper" / "piper.exe")
     voz_dir: str = str(RAIZ_SERVIDOR.parent / "herramientas" / "piper" / "voces")
+    # ffmpeg para descargar los vídeos en MP4 (MAGISTER_FFMPEG: el ejecutable, o su ruta si no está en el PATH)
+    ffmpeg: str = "ffmpeg"
     registros: str = str(RAIZ_SERVIDOR / "registros")
 
     # Research (Parte III)
