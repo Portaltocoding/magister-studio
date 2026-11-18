@@ -122,6 +122,25 @@ def bootstrap_pareado(casos: Sequence[tuple[float, float]], n: int = 10000, semi
     return sum(diffs) / len(diffs), lo, hi
 
 
+def media(xs: Sequence[float]) -> float:
+    return sum(xs) / len(xs) if xs else 0.0
+
+
+def precision(utiles: int, propuestas: int) -> float:
+    """Fracción de propuestas que resultaron fuentes útiles. Sin propuestas, 0."""
+    return utiles / propuestas if propuestas else 0.0
+
+
+def cobertura(cubiertos: int, subtemas: int) -> float:
+    """Fracción de subtemas con al menos una fuente buena. Sin subtemas, 0."""
+    return cubiertos / subtemas if subtemas else 0.0
+
+
+def coste_por_util(coste: float, utiles: int) -> float:
+    """Coste por fuente útil. Sin útiles, el coste entero (penaliza no encontrar nada)."""
+    return coste / utiles if utiles else coste
+
+
 def brier(p: Sequence[float], y: Sequence[int]) -> float:
     return sum((pi - yi) ** 2 for pi, yi in zip(p, y, strict=True)) / len(p)
 
