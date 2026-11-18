@@ -5,7 +5,7 @@ Reglas:
 - Si un dato no se ha dicho, déjalo en null. No inventes.
 - `horas_por_dia` son siete números, de lunes a domingo. «Entre semana» son lunes a viernes, con sábado y domingo a 0. «Los fines de semana» son sábado y domingo. «Todos los días» son los siete.
 - `inicio_por_dia` lleva la hora de inicio «HH:MM» en los días con estudio y null en los demás; si no dijo la hora, todo null.
-- `plazo` es una fecha AAAA-MM-DD calculada desde hoy: «dentro de un mes» es hoy más 30 días menos uno; «en dos semanas», hoy más 13 días. Si dice que no tiene fecha, plazo null y `sin_plazo` true.
+- `plazo` es una fecha AAAA-MM-DD calculada desde hoy: «dentro de un mes» es hoy más 30 días menos uno; «en dos semanas», hoy más 13 días. Si dice que no tiene fecha, plazo null y `sin_plazo` true. Si tiene un examen en una fecha, `plazo` es la víspera del examen (ese día ya no se estudia materia nueva) y `objetivo` lo dice con su fecha («aprobar el examen de Estadística del 12-12-2026»).
 - `nivel`: nada (no sabe nada), basico (algo de base), intermedio (lo usa con soltura), avanzado.
 
 <perfil_actual>

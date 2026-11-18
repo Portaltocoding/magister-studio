@@ -27,11 +27,19 @@ def _norm(t: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", t.lower()) if not unicodedata.combining(c) or c == "̃")
 
 
+# «Tengo examen de X el día 12», «me examino en tres semanas», «quiero preparar el examen de…»: un examen con fecha es
+# un plan (el plazo es el examen), aunque no diga «plan». «¿Cómo es el examen tipo test?» no: no hay fecha ni preparación.
+EXAMEN = re.compile(r"\b(tengo|tendre|tenemos|me toca|hay)\s+(un |el |mi )?examen\b|\bme examino\b|"
+                    r"\bprepar\w*\s+(el|un|mi|este|ese)\s+examen\b|\bexamen\b[^.?!]{0,50}\b(el (dia|lunes|martes|miercoles|"
+                    r"jueves|viernes|sabado|domingo|\d)|dentro de|en (\w+ )?(dias?|semanas?|meses?)|la semana que viene|"
+                    r"el mes que viene|(pasado )?ma(?:ñ|ñ)ana)")
+
+
 def pide_plan(mensaje: str) -> bool:
     t = COLOQUIAL.sub(" ", _norm(mensaje))
     if re.search(r"\b(modo|a partir de ahora|de ahora en adelante|desde ahora)\b", t) and not INEQUIVOCO.search(t):
         return False
-    if not PIDE_PLAN.search(t):
+    if not PIDE_PLAN.search(t) and not EXAMEN.search(t):
         return False
     return not (EXPLICAR.search(t) and not INEQUIVOCO.search(t))
 
