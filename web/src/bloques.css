@@ -184,3 +184,10 @@
 .rehacer-menu button { font: inherit; font-size: 0.88rem; font-weight: 500; text-align: left; background: none; border: 0; border-radius: 8px; padding: 7px 10px; cursor: pointer; color: inherit; }
 .rehacer-menu button:hover { background: #f1efea; }
 .rehacer-menu input { width: 100%; box-sizing: border-box; font: inherit; font-size: 0.85rem; margin-top: 4px; padding: 6px 8px; border: 1px solid #e0ddd6; border-radius: 8px; }
+
+/* «Más» en la cabecera de la lección: el acento y borrar, recogidos */
+.bloque-mas { position: relative; }
+.bloque-mas > summary { list-style: none; cursor: pointer; }
+.bloque-mas > summary::-webkit-details-marker { display: none; }
+.bloque-mas > summary::after { content: ' ▾'; font-size: 0.8em; }
+.bloque-mas-menu { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; min-width: 200px; border: 1px solid var(--borde); border-radius: 12px; background: var(--fondo); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }

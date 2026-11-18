@@ -426,17 +426,12 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               <div className="bloque-acciones">
                 {apuntes && (
                   <button className="boton boton-principal" onClick={() => irARuta(`#/foco/${apuntes.id}`)}>
-                    Estudiar en modo foco
+                    Estudiar
                   </button>
                 )}
                 {apuntes && (
                   <button className="boton" disabled={!!enCurso} onClick={() => setPreguntando({ forzar: true })}>
                     Rehacer el material
-                  </button>
-                )}
-                {apuntes && (
-                  <button className="boton peligro" disabled={!!enCurso} onClick={() => borrar('todo')}>
-                    Borrar el material
                   </button>
                 )}
                 {apuntes?.ficheros.includes('pdf') && (
@@ -449,7 +444,6 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                     Diapositivas en PDF
                   </a>
                 )}
-                <Colores leccion={clave} />
                 {apuntes && (
                   <label className="estilo-pdf">
                     Estilo del PDF
@@ -459,6 +453,18 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                     </select>
                   </label>
                 )}
+                {/* Lo que se usa poco (y lo que no tiene vuelta atrás), recogido: a la vista, solo lo de estudiar. */}
+                <details className="bloque-mas">
+                  <summary className="boton">Más</summary>
+                  <div className="bloque-mas-menu">
+                    <Colores leccion={clave} />
+                    {apuntes && (
+                      <button className="boton peligro" disabled={!!enCurso} onClick={() => borrar('todo')}>
+                        Borrar el material
+                      </button>
+                    )}
+                  </div>
+                </details>
               </div>
               {apuntes && apuntes.estado !== 'listo' && apuntes.motivo && (
                 <p className="nota">Por revisar: {apuntes.motivo}</p>
