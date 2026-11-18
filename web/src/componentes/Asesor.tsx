@@ -19,7 +19,7 @@ const CLAVE_HILOS = 'magister-asesor-hilos'
 const TAM = 64 // lo que mide la mascota flotante
 const ESPERA_COGER = 350
 const HOLGURA = 8
-const IMAN = 90 // a cuántos píxeles de su sitio en la barra la atrae el imán
+const IMAN = 180 // a cuántos píxeles de su sitio en la barra la atrae el imán
 
 // El centro de su sitio en la barra de arriba (el botón de la mascota), si está a la vista.
 function casa(): { x: number; y: number } | null {
