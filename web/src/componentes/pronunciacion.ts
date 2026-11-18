@@ -230,6 +230,10 @@ export const GLOSARIO: Termino[] = [
   { escrito: 'framework', se_dice: 'fréimuork', grupo: 'Herramientas', variantes: ['frameworks'], cualquier_caso: true },
   { escrito: 'STAR', se_dice: 'estar', grupo: 'Herramientas' },
 
+  // ===== Ciencias e ingeniería =====
+  { escrito: 'Bowditch', se_dice: 'báudich', grupo: 'Ciencias e ingeniería' },
+  { escrito: 'GRAD', se_dice: 'grad', grupo: 'Ciencias e ingeniería' },
+
   // ===== Unidades =====
   { escrito: 'ms', se_dice: 'milisegundos', grupo: 'Unidades', tras_numero: true },
   { escrito: 'MB', se_dice: 'megas', grupo: 'Unidades', tras_numero: true },

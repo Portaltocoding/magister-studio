@@ -110,7 +110,40 @@ export interface Pasos {
   pasos: { texto: string; detalle?: string }[]
 }
 
-export type Escena = Tablero | PorDentro | Pregunta | Contraste | Opciones | Tabla | Indice | Mitades | Arbol | Barras | Consulta | Pasos
+// Una figura geométrica en un plano (coordenadas del mundo; el norte arriba), dibujada por pasos.
+// Los ángulos van como acimut en gon: 0 = norte, en sentido horario (100 = este, 200 = sur, 300 = oeste).
+export type ElementoFigura = { paso?: number; estado?: Estado } & (
+  | { tipo: 'punto'; id: string; x: number; y: number; etiqueta?: string; coords?: string; lado?: 'n' | 's' | 'e' | 'o' }
+  | { tipo: 'segmento'; de: string; a: string; etiqueta?: string; etiqueta_lado?: 'izquierda' | 'derecha'; discontinuo?: boolean; flecha?: boolean }
+  | { tipo: 'angulo'; vertice: string; desde: number; hasta: number; etiqueta?: string; radio?: number }
+  | { tipo: 'proyeccion'; de: string; a: string; etiqueta_x?: string; etiqueta_y?: string }
+  | { tipo: 'norte'; en: string; largo?: number }
+  | { tipo: 'texto'; x: number; y: number; texto: string; tamano?: number }
+)
+
+export interface Figura {
+  tipo: 'figura'
+  elementos: ElementoFigura[]
+  // Ancho de la zona de dibujo (por defecto, casi toda la pantalla).
+  ancho?: number
+}
+
+// Fórmulas en LaTeX, de una en una, y qué es cada símbolo.
+export interface Formula {
+  tipo: 'formula'
+  formulas: { tex: string; nota?: string; estado?: Estado }[]
+  simbolos?: { simbolo: string; significa: string }[]
+}
+
+// Una cuenta hecha a mano: qué se calcula, con qué números y qué sale (todo en LaTeX).
+export interface Calculo {
+  tipo: 'calculo'
+  datos?: string
+  filas: { que: string; sustitucion?: string; resultado: string; estado?: Estado }[]
+  nota?: string
+}
+
+export type Escena = Tablero | PorDentro | Pregunta | Contraste | Opciones | Tabla | Indice | Mitades | Arbol | Barras | Consulta | Pasos | Figura | Formula | Calculo
 
 export interface Tramo {
   concepto: string

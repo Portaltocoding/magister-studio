@@ -6,9 +6,10 @@ import ControlVoz, { usarAjustesVoz } from '../componentes/ControlVoz.tsx'
 import { vozElegida } from '../componentes/voz.ts'
 import { DEMO_IDEMPOTENCIA } from '../escena/demo.ts'
 import { DEMO_INDICES } from '../escena/indices.ts'
+import { DEMO_TOPOGRAFIA } from '../escena/topografia.ts'
 import type { GuionGrafico } from '../escena/tipos.ts'
 
-const DEMOS: Record<string, GuionGrafico> = { indices: DEMO_INDICES, idempotencia: DEMO_IDEMPOTENCIA }
+const DEMOS: Record<string, GuionGrafico> = { indices: DEMO_INDICES, topografia: DEMO_TOPOGRAFIA, idempotencia: DEMO_IDEMPOTENCIA }
 
 // El vídeo animado (Remotion) se carga solo cuando se abre: no pesa en el resto de la app.
 const ReproductorEscena = lazy(() => import('../escena/ReproductorEscena.tsx'))

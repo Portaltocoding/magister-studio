@@ -4,6 +4,7 @@ import { AbsoluteFill, Sequence, interpolate, useCurrentFrame } from 'remotion'
 import { C } from './estilo.ts'
 import { EscenaContraste, EscenaOpciones, EscenaPorDentro, EscenaPregunta, EscenaTablero } from './escenas.tsx'
 import { EscenaArbol, EscenaBarras, EscenaConsulta, EscenaIndice, EscenaMitades, EscenaPasos, EscenaTabla } from './escenas_datos.tsx'
+import { EscenaCalculo, EscenaFigura, EscenaFormula } from './escenas_geo.tsx'
 import { Subtitulo, Titulo } from './piezas.tsx'
 import { duracionTramo, frases, inicios, type GuionGrafico, type Tramo } from './tipos.ts'
 
@@ -61,6 +62,9 @@ function VistaTramo({ tramo, subtitulos }: { tramo: Tramo; subtitulos: boolean }
       {e.tipo === 'barras' && <EscenaBarras e={e} />}
       {e.tipo === 'consulta' && <EscenaConsulta e={e} dur={dur} />}
       {e.tipo === 'pasos' && <EscenaPasos e={e} dur={dur} />}
+      {e.tipo === 'figura' && <EscenaFigura e={e} dur={dur} />}
+      {e.tipo === 'formula' && <EscenaFormula e={e} dur={dur} />}
+      {e.tipo === 'calculo' && <EscenaCalculo e={e} dur={dur} />}
       {subtitulos && <Subtitulo texto={fraseEn(tramo.narracion, frame, dur)} />}
     </AbsoluteFill>
   )
