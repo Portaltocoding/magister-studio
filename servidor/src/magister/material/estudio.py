@@ -300,7 +300,133 @@ async def ayuda_parrafo(mid: int, clave_bloque: str, parrafo: str, accion: str, 
     return texto
 
 
-# ---- Tu mapa de palabras clave (lo construyes tú mientras estudias) ----
+# ---- La pizarra de la llamada: un diagrama por apartado ----
+
+def extraer_svg(texto: str) -> str | None:
+    """El primer SVG completo de un texto (dentro de un bloque ```svg o suelto), o None."""
+    import re
+
+    m = re.search(r"<svg\b[\s\S]*?</svg>", texto)
+    return m.group(0) if m else None
+
+
+async def diagrama_apartado(mid: int, clave_bloque: str) -> dict:
+    """El diagrama de un apartado para la pizarra de la llamada: el suyo si los apuntes ya lo traen; si no, lo dibuja el
+    modelo una vez y se guarda. `svg` es None cuando un dibujo no aclara nada."""
+    from magister.cerebro.modelo import Turno, generar
+
+    m, bloques = await _material(mid)
+    b = next((x for x in bloques if x.clave == clave_bloque), None)
+    if b is None:
+        raise ValueError("ese apartado no existe")
+    propio = extraer_svg(b.texto)
+    if propio:
+        return {"svg": propio}
+    clave = f"diagrama_{mid}_{clave_bloque}"
+    hecho = await _leer(clave)
+    if hecho and hecho.get("version") == _version(m):
+        return {"svg": hecho.get("svg")}
+    titulos = {x["clave"]: x["titulo"] for x in (m.contrato or {}).get("bloques", [])}
+    sistema = cargar("diagrama_apartado").rellenar(titulo=titulos.get(b.clave, b.titulo), texto=b.texto[:8000])
+    respuesta = "".join([t async for t in generar(sistema, [Turno("usuario", "Dibuja el diagrama o responde NADA.")])])
+    svg = extraer_svg(respuesta)
+    await _guardar(clave, {"svg": svg, "version": _version(m)})
+    return {"svg": svg}
+
+
+# ---- Mapa de conceptos: lo hace el modelo leyendo la lección y luego lo retocas tú ----
+
+# El lienzo del mapa en la web (MapaConceptos.tsx usa las mismas medidas).
+ANCHO_MAPA = 720
+ALTO_MAPA = 540
+
+
+class RelacionMapa(BaseModel):
+    de: str
+    a: str
+    etiqueta: str = ""
+
+
+class MapaAuto(BaseModel):
+    conceptos: list[str] = Field(min_length=3, max_length=14)
+    relaciones: list[RelacionMapa] = Field(min_length=2, max_length=24)
+
+
+def _ancho_nodo(texto: str) -> float:
+    return max(60.0, len(texto) * 7.2 + 20)
+
+
+def colocar_mapa(conceptos: list[str], relaciones: list[RelacionMapa]) -> dict:
+    """Monta el mapa a partir de lo que dice el modelo: quita repetidos y uniones a conceptos que no existen, y
+    coloca los nodos por niveles desde la idea central (el primer concepto), con cada nivel repartido a lo ancho."""
+    textos: list[str] = []
+    for c in conceptos:
+        t = " ".join(c.split())[:40]
+        if t and not any(t.lower() == x.lower() for x in textos):
+            textos.append(t)
+    indice = {t.lower(): k for k, t in enumerate(textos)}
+    flechas: list[dict] = []
+    vecinos: dict[int, list[int]] = {k: [] for k in range(len(textos))}
+    for r in relaciones:
+        de, a = indice.get(" ".join(r.de.split()).lower()), indice.get(" ".join(r.a.split()).lower())
+        if de is None or a is None or de == a or any(f["de"] == f"c{de}" and f["a"] == f"c{a}" for f in flechas):
+            continue
+        flechas.append({"de": f"c{de}", "a": f"c{a}", "etiqueta": " ".join(r.etiqueta.split())[:30]})
+        vecinos[de].append(a)
+        vecinos[a].append(de)
+
+    # Niveles: recorrido en anchura desde la idea central; lo que quede suelto va al final.
+    nivel = {0: 0} if textos else {}
+    cola = [0] if textos else []
+    while cola:
+        k = cola.pop(0)
+        for v in vecinos[k]:
+            if v not in nivel:
+                nivel[v] = nivel[k] + 1
+                cola.append(v)
+    hondo = max(nivel.values(), default=0) + 1
+    por_nivel: dict[int, list[int]] = {}
+    for k in range(len(textos)):
+        por_nivel.setdefault(nivel.get(k, hondo), []).append(k)
+
+    # Cada nivel en tantas filas como haga falta para que quepa a lo ancho.
+    hueco = 24
+    filas: list[list[int]] = []
+    for n in sorted(por_nivel):
+        fila: list[int] = []
+        for k in por_nivel[n]:
+            if fila and sum(_ancho_nodo(textos[j]) + hueco for j in fila) + _ancho_nodo(textos[k]) > ANCHO_MAPA:
+                filas.append(fila)
+                fila = []
+            fila.append(k)
+        filas.append(fila)
+
+    alto_nodo = 32
+    paso = min(110.0, (ALTO_MAPA - 2 * hueco - alto_nodo) / max(1, len(filas) - 1))
+    nodos: dict[int, dict] = {}
+    for r, fila in enumerate(filas):
+        y = hueco + r * paso if len(filas) > 1 else (ALTO_MAPA - alto_nodo) / 2
+        anchos = [_ancho_nodo(textos[k]) for k in fila]
+        # El espacio sobrante se reparte entre los huecos, para que la fila ocupe el ancho y se lea mejor.
+        libre = ANCHO_MAPA - sum(anchos)
+        separacion = max(0.0, libre / (len(fila) + 1))
+        x = separacion
+        for k, ancho in zip(fila, anchos, strict=True):
+            nodos[k] = {"id": f"c{k}", "texto": textos[k], "x": round(max(0.0, min(ANCHO_MAPA - ancho, x)), 1), "y": round(y, 1)}
+            x += ancho + separacion
+    return {"nodos": [nodos[k] for k in range(len(textos))], "flechas": flechas}
+
+
+async def generar_mapa(mid: int) -> dict:
+    """Lee la lección entera, saca los conceptos clave y sus relaciones, y deja el mapa como el tuyo."""
+    m, bloques = await _material(mid)
+    titulos = {b["clave"]: b["titulo"] for b in (m.contrato or {}).get("bloques", [])}
+    sistema = cargar("mapa").rellenar(alumno=await alumno(m.plan_id), apuntes=_texto(bloques, titulos)[:30000])
+    r = await estructurar(sistema, "Devuelve el mapa de conceptos.", MapaAuto)
+    mapa = colocar_mapa(r.conceptos, r.relaciones)
+    await _guardar(f"mapa_{mid}", mapa)
+    return mapa
+
 
 async def ver_mapa(mid: int) -> dict:
     return (await _leer(f"mapa_{mid}")) or {"nodos": [], "flechas": []}

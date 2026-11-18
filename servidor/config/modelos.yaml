@@ -14,6 +14,10 @@ tareas:
   planificar: {motor: cli, modelo: defecto, datos_personales: true}
   extraer:   {motor: cli, modelo: haiku, datos_personales: true}
   juez:      {motor: cli, modelo: haiku, datos_personales: false}
+  # Los turnos de la llamada de voz: respuestas cortas donde manda la rapidez (Haiku arranca en 1 o 2 s). Recibe el
+  # mismo prompt que el resto (apuntes, contexto de la llamada e historial). Los diagramas de la pizarra y el mapa,
+  # que se generan aparte y se guardan, siguen con el modelo grande.
+  llamada:   {motor: cli, modelo: haiku, datos_personales: true}
 
 # Qué tarea es cada plantilla de prompt.
 prompts:
@@ -35,6 +39,8 @@ prompts:
   preguntas_test: generar
   diapositivas: generar
   guion: generar
+  diagrama_apartado: generar
+  mapa: generar
   juez_tono: juez
   juez_completitud: juez
 

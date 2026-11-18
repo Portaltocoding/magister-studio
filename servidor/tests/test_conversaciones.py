@@ -89,9 +89,11 @@ async def test_la_llamada_llega_al_cerebro(cliente, monkeypatch) -> None:
     from magister.flujo import comun as rc
 
     sistemas = []
+    tareas = []
 
-    async def falso(sistema, historial):
+    async def falso(sistema, historial, tarea=None):
         sistemas.append(sistema)
+        tareas.append(tarea)
         yield "vale"
 
     monkeypatch.setattr(rc, "generar", falso)
@@ -99,5 +101,7 @@ async def test_la_llamada_llega_al_cerebro(cliente, monkeypatch) -> None:
     await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={
         "contenido": "Empecemos", "voz": True, "llamada": True, "modo": "entrevista", "contexto": "Entrevista sobre la lección L2."})
     assert "llamada de voz" in sistemas[-1] and "Entrevista sobre la lección L2." in sistemas[-1] and "Entrevista técnica" in sistemas[-1]
+    assert tareas[-1] == "llamada"  # la llamada va por su tarea (Haiku), con el mismo prompt
     await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "otra cosa"})
     assert "llamada de voz" not in sistemas[-1] and "Entrevista sobre" not in sistemas[-1]
+    assert tareas[-1] is None

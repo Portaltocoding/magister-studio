@@ -67,7 +67,8 @@ async def flujo_tutor(
         contenido = "".join(texto)
         if estado == "error" and not contenido:
             contenido = f"[error] {detalle_error}"
-        if contenido or estado != "completo":
+        # Un corte antes de la primera palabra (le interrumpes en una llamada) no deja un mensaje vacío en el hilo.
+        if contenido or estado == "error":
             with anyio.CancelScope(shield=True):
                 mensaje_id = await guardar(contenido, estado, ms_primer, ms_total, extra)
     if estado == "error":

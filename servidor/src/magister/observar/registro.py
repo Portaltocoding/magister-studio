@@ -52,6 +52,10 @@ async def guardar_metricas(ll: Llamada) -> None:
 async def encolar_juez(ll: Llamada) -> None:
     if not ll.traza_id or ll.error or ll.estructurada or (ll.prompt_nombre or ll.funcion) not in EXPLICACIONES:
         return
+    # Los turnos de una llamada de voz (2 a 4 frases habladas) no se juzgan con la rúbrica de una explicación escrita:
+    # la suspendían siempre y hundían la alerta de tono.
+    if ll.funcion == "llamada":
+        return
     semilla = _azar.randrange(2**31)
     if random.Random(semilla).random() >= ajustes.juez_muestra:
         return

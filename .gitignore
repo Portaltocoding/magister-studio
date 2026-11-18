@@ -29,4 +29,7 @@ secretos/
 .env.compose
 copias/
 afinar/datos/
+# Piper y sus voces (binarios y modelos descargados) y los registros de las llamadas
+herramientas/piper/
+servidor/registros/
 afinar/*.gguf

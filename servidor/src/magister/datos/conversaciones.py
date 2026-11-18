@@ -76,6 +76,13 @@ async def guardar_pregunta(s: AsyncSession, cid: int, contenido: str, cuenta: bo
     return m
 
 
+async def borrar_mensaje(s: AsyncSession, mid: int) -> None:
+    from sqlalchemy import delete
+
+    await s.execute(delete(Mensaje).where(Mensaje.id == mid))
+    await s.commit()
+
+
 async def historial_completo(s: AsyncSession, cid: int) -> list[Mensaje]:
     consulta = (
         select(Mensaje)

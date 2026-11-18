@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Salida(BaseModel):
@@ -49,7 +49,17 @@ class MensajeEntrada(BaseModel):
     plan_id: int | None = None
     leccion_clave: str | None = Field(None, max_length=20)
     # Dónde está la llamada (por ejemplo, la parte de la clase en la que le interrumpes). No se guarda en el hilo.
-    contexto: str | None = Field(None, max_length=3000)
+    # En la llamada, el alumno responde a una pregunta del tutor: la corrige el modelo grande (tarea «corregir»).
+    corregir: bool = False
+    # Cabe el banco entero del examen oral (unas 20 preguntas pasan de 3000 caracteres).
+    contexto: str | None = Field(None, max_length=12_000)
+
+    @field_validator("contenido")
+    @classmethod
+    def _no_en_blanco(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("el mensaje está vacío")
+        return v
 
 
 class MensajeSalida(Salida):
@@ -61,6 +71,8 @@ class MensajeSalida(Salida):
     citas: list[dict] = []
     traza_id: str | None = None
     voto: bool | None = None
+    # «Esto no cuenta para el tutor»: se guarda por mensaje para que lo que lea el perfil pueda excluirlo.
+    cuenta: bool = True
 
 
 class DecisionEntrada(BaseModel):

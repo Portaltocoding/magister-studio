@@ -100,6 +100,7 @@ class Nodo(BaseModel):
 class Flecha(BaseModel):
     de: str = Field(max_length=40)
     a: str = Field(max_length=40)
+    etiqueta: str = Field("", max_length=40)
 
 
 class Mapa(BaseModel):
@@ -115,3 +116,21 @@ async def ver_mapa(mid: int) -> dict:
 @rutas.put("/estudio/{mid}/mapa")
 async def guardar_mapa(mid: int, cuerpo: Mapa) -> dict:
     return await estudio.guardar_mapa(mid, cuerpo.model_dump())
+
+
+@rutas.get("/estudio/{mid}/diagrama/{clave}")
+async def diagrama_apartado(mid: int, clave: str) -> dict:
+    """El diagrama de un apartado para la pizarra de la llamada ({"svg": null} si un dibujo no aclara nada)."""
+    try:
+        return await estudio.diagrama_apartado(mid, clave)
+    except ValueError as e:
+        raise _400(e) from e
+
+
+@rutas.post("/estudio/{mid}/mapa/generar")
+async def generar_mapa(mid: int) -> dict:
+    """El modelo lee la lección, elige los conceptos clave y los une. Sustituye el mapa que hubiera."""
+    try:
+        return await estudio.generar_mapa(mid)
+    except ValueError as e:
+        raise _400(e) from e

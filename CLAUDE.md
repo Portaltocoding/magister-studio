@@ -18,6 +18,7 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 - `cerebro` y `datos` solo importan de `magister.config`, para leer sus ajustes.
 - `material` importa de `cerebro`, `plan`, `tono` y `datos`; `tono` importa solo de `cerebro`; `trabajos` importa de `material` y `datos`; `api` importa además de `trabajos`.
 - `aprender` importa de `cerebro`, `plan`, `tono`, `datos` y `config`; `api` y `flujo` importan de `aprender`.
+- `voz` (la voz local con Piper y el registro de las llamadas) solo importa de `magister.config`; `api` importa de `voz`. Piper y sus voces van en `herramientas/piper/` y los registros en `servidor/registros/llamadas/`, los dos fuera de git.
 - `plan` es código puro: no importa de `datos`, `cerebro` ni `config`.
 - `cerebro` y `datos` nunca importan de `api` ni el uno del otro.
 - Las evals viven en `servidor/evals/` y se lanzan con `uv run python -m evals.<modulo>`.

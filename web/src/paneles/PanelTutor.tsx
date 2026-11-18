@@ -353,7 +353,16 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
     guardarAncho(n)
   }
   const [verMapa, setVerMapa] = useState(false)
-  const { mapa, cambiar: cambiarMapa, anadir: anadirAlMapa } = usarMapa(mid)
+  const { mapa, cambiar: cambiarMapa, anadir: anadirAlMapa, generar: generarMapa, generando: generandoMapa, errorMapa } = usarMapa(mid)
+  // La primera vez que abres el mapa de una lección, lo hace él solo leyendo la página.
+  const mapaPedido = useRef(false)
+  useEffect(() => {
+    if (verMapa && mapa && mapa.nodos.length === 0 && !mapaPedido.current) {
+      mapaPedido.current = true
+      generarMapa()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verMapa, mapa])
   const [papel, setPapel] = useState<HTMLDivElement | null>(null)
   const [seleccion, setSeleccion] = useState<{ texto: string; x: number; y: number } | null>(null)
   const ideasDesdeReexplicar = useRef(0)
@@ -550,8 +559,22 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
               </button>
             </div>
             <p className="nota">
-              Pocas palabras y una flecha solo si sabes explicar la relación. Selecciona texto en los apuntes para traerlo aquí.
+              {generandoMapa
+                ? 'Leyendo la lección para sacar los conceptos clave y unirlos…'
+                : 'Los conceptos clave de la lección y cómo se relacionan. Muévelos, quita o añade lo que quieras.'}
             </p>
+            {errorMapa && <p className="nota">{errorMapa}</p>}
+            <div className="mapa-barra">
+              <button
+                className="boton-mini"
+                disabled={generandoMapa}
+                onClick={() => {
+                  if (mapa.nodos.length === 0 || window.confirm('Se rehace el mapa desde la lección y se pierden tus cambios. ¿Seguimos?')) generarMapa()
+                }}
+              >
+                {generandoMapa ? 'Haciendo el mapa…' : mapa.nodos.length ? 'Rehacer desde la lección' : 'Hacer el mapa'}
+              </button>
+            </div>
             <MapaConceptos mapa={mapa} alCambiar={cambiarMapa} />
           </aside>
         ) : null

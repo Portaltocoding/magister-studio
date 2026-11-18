@@ -23,6 +23,7 @@ from magister.api.rutas_research import rutas as rutas_research
 from magister.api.rutas_plan import rutas as rutas_plan
 from magister.api.rutas_estudio import rutas as rutas_estudio
 from magister.api.rutas_notas import rutas as rutas_notas
+from magister.api.rutas_voz import rutas as rutas_voz
 from magister.api.seguridad import Proteccion
 from magister.config import ajustes
 from magister.datos import conversaciones as dc
@@ -89,6 +90,9 @@ async def ciclo_de_vida(_: FastAPI):
         if tarea is not None:
             tarea.cancel()
     iniciar_grafo(None)
+    from magister.voz import piper
+
+    await piper.cerrar()
     await sesion.cerrar()
 
 
@@ -155,6 +159,7 @@ app.include_router(rutas_produccion)
 app.include_router(rutas_agenda)
 app.include_router(rutas_estudio)
 app.include_router(rutas_notas)
+app.include_router(rutas_voz)
 app.include_router(rutas_examen)
 app.include_router(rutas_borrar)
 

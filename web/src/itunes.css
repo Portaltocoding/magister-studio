@@ -159,7 +159,6 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 
 
 /* ===== Mascota: volumen, gestos y vida ===== */
-.mascota .mascota-sombra { fill: color-mix(in srgb, var(--texto) 14%, transparent); }
 .mascota .mascota-oreja { fill: color-mix(in srgb, var(--m-claro) 22%, var(--m-cuerpo)); }
 .mascota .mascota-ala { fill: color-mix(in srgb, #000 22%, var(--m-cuerpo)); }
 .mascota .mascota-disco { fill: color-mix(in srgb, var(--m-claro) 14%, var(--m-cuerpo)); }

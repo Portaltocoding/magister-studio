@@ -14,7 +14,17 @@ from magister.cerebro.estructura import ErrorEstructura, estructurar
 from magister.cerebro.modelo import Turno
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
-from magister.flujo.comun import acciones_de_estudio, decir, escribir, fase, hablar, historial_reciente, sistema_de_estudio, turnos_recientes
+from magister.flujo.comun import (
+    acciones_de_estudio,
+    decir,
+    escribir,
+    fase,
+    hablar,
+    historial_reciente,
+    sistema_de_estudio,
+    tarea_de,
+    turnos_recientes,
+)
 from magister.flujo.estado import Estado
 
 K = 5
@@ -39,7 +49,9 @@ def necesita_reescritura(mensaje: str, hay_historial: bool) -> bool:
 async def reescribir(estado: Estado) -> dict:
     mensaje = estado.get("mensaje", "")
     turnos = estado.get("turnos", [])
-    if not necesita_reescritura(mensaje, len(turnos) > 1):
+    # En una llamada no se reescribe: «¿y eso?» es constante por voz y la reescritura añade una llamada al modelo
+    # (unos 5 s de silencio); el historial ya da el contexto a la respuesta.
+    if estado.get("llamada") or not necesita_reescritura(mensaje, len(turnos) > 1):
         return {"consulta": mensaje, "aclaracion": None}
     fase("reescribir")
     sistema = cargar("reescribir").rellenar(turnos=turnos_recientes(estado, 6), mensaje=mensaje)
@@ -64,6 +76,9 @@ async def aclarar(estado: Estado) -> dict:
 
 def hacer_recuperar(buscador: Buscador):
     async def recuperar(estado: Estado) -> dict:
+        # En una llamada sobre una lección, sus apuntes ya van en el prompt: buscar en las fuentes solo añade texto.
+        if estado.get("llamada") and estado.get("leccion_clave"):
+            return {"recuperados": [], "busqueda_id": None}
         fase("recuperar")
         consulta = estado.get("consulta") or estado.get("mensaje", "")
         r = await buscador.buscar(
@@ -98,16 +113,17 @@ async def responder(estado: Estado) -> dict:
     fase("responder")
     historial = historial_reciente(estado)
     recuperados = estado.get("recuperados", [])
+    tarea = tarea_de(estado)
     if not recuperados:
         # Sin fuentes: la pantalla lo marca con una etiqueta discreta (sin_fuentes), no con una frase delante.
         sistema = await sistema_de_estudio(cargar("conversar").texto, estado)
-        await hablar(sistema, historial)
+        await hablar(sistema, historial, tarea)
         escribir(citas=[], busqueda_id=estado.get("busqueda_id"), sin_fuentes=True)
         await acciones_de_estudio(estado, sin_fuentes=True)
         return {"citas": []}
     sistema = await sistema_de_estudio(cargar("responder").texto, estado) + "\n\n<fragmentos>\n" + _bloque(recuperados) + "\n</fragmentos>"
-    texto = await hablar(sistema, historial)
-    citas = [c.a_dict() for c in comprobar(texto, {x["id"]: x["texto"] for x in recuperados})]
+    texto = await hablar(sistema, historial, tarea)
+    citas =[c.a_dict() for c in comprobar(texto, {x["id"]: x["texto"] for x in recuperados})]
     escribir(citas=citas, busqueda_id=estado.get("busqueda_id"), sin_fuentes=False)
     await acciones_de_estudio(estado, sin_fuentes=False)
     return {"citas": citas}

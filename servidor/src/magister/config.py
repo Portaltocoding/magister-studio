@@ -78,6 +78,11 @@ class Ajustes(BaseSettings):
     nuevos_dia: int = 10  # conceptos nuevos que entran en la cola cada día
     simulado: bool = False  # si es verdadero, la sesión usa la base de simulación
 
+    # Voz local del tutor (Piper) y registro de las llamadas
+    voz_piper: str = str(RAIZ_SERVIDOR.parent / "herramientas" / "piper" / "piper" / "piper.exe")
+    voz_dir: str = str(RAIZ_SERVIDOR.parent / "herramientas" / "piper" / "voces")
+    registros: str = str(RAIZ_SERVIDOR / "registros")
+
     # Research (Parte III)
     research_pasos: int = 12
     research_llamadas: int = 8

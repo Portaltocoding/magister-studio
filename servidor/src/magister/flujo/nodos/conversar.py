@@ -1,5 +1,5 @@
 from magister.cerebro.prompts import cargar
-from magister.flujo.comun import acciones_de_estudio, hablar, historial_reciente, sistema_de_estudio
+from magister.flujo.comun import acciones_de_estudio, hablar, historial_reciente, sistema_de_estudio, tarea_de
 from magister.flujo.estado import Estado
 
 
@@ -10,6 +10,6 @@ async def conversar(estado: Estado) -> dict:
     if plan:
         lecciones = "\n".join(f"- {lec['clave']} {lec['titulo']}" for lec in plan.get("lecciones", []))
         sistema += f"\n\nEl alumno sigue este plan de estudio:\n{lecciones}"
-    await hablar(sistema, historial)
+    await hablar(sistema, historial, tarea_de(estado))
     await acciones_de_estudio(estado, sin_fuentes=True)
     return {}

@@ -28,6 +28,8 @@ export interface Burbuja {
   acciones?: AccionArnes[]
   // Dijiste «guárdalo»: la respuesta anterior acaba de ir a Mis notas.
   notaGuardada?: boolean
+  // Marcado «esto no cuenta para el tutor».
+  noCuenta?: boolean
 }
 
 interface Props {
@@ -85,6 +87,23 @@ function CuerpoTutor({
           if (clase.includes('language-recordar')) return <RecordarTarjeta texto={texto} completo={completo} />
           if (clase.includes('language-modo')) return <ModoTarjeta texto={texto} completo={completo} />
           if (clase.includes('language-opciones')) return <Opciones texto={texto} activo={completo && !escribiendo} alElegir={alEnviar} />
+          // De las llamadas: los conceptos que apuntó el tutor y el apartado que enseñó en la pizarra.
+          if (clase.includes('language-concepto'))
+            return (
+              <dl className="conceptos-llamada">
+                {texto
+                  .split('\n')
+                  .map((l) => l.replace(/^[-*\s]+/, '').match(/^\*{0,2}([^:]{2,60}?)\*{0,2}\s*:\s*(.+)$/))
+                  .filter((m): m is RegExpMatchArray => !!m)
+                  .map((m) => (
+                    <div key={m[1]}>
+                      <dt>{m[1]}</dt>
+                      <dd>{m[2]}</dd>
+                    </div>
+                  ))}
+              </dl>
+            )
+          if (clase.includes('language-ficha')) return <p className="nota">En la pizarra: el apartado {texto.trim()} de tus apuntes.</p>
         }
         return <pre>{children}</pre>
       },
@@ -240,6 +259,11 @@ export default function Hilo({
               <CuerpoTutor b={b} escribiendo={escribiendo} alEnviar={alEnviar} alCita={setCita} />
             ) : (
               <p className="propio">{b.contenido}</p>
+            )}
+            {b.rol === 'usuario' && b.noCuenta && (
+              <small className="nota" title="Lo marcaste como «esto no cuenta para el tutor»: no entra en tu perfil">
+                No cuenta
+              </small>
             )}
             {b.estado === 'interrumpido' && <small className="nota">Interrumpido</small>}
             {b.acciones && b.acciones.length > 0 && b.estado === 'completo' && <Acciones acciones={b.acciones} />}

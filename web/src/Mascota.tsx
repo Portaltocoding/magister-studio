@@ -103,7 +103,6 @@ export default function Mascota({ mini = false, forma: fija, gesto = 'normal' }:
       aria-hidden="true"
       focusable="false"
     >
-      {!mini && <ellipse className="mascota-sombra" cx="60" cy="118" rx="28" ry="3" />}
       <g className="mascota-figura">
         {forma === 'buho' && (
           <>

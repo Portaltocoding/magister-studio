@@ -26,15 +26,26 @@ def fase(nombre: str) -> None:
     escribir(fase=nombre)
 
 
-async def hablar(sistema: str, historial: list[Turno]) -> str:
-    """Llama al modelo y emite cada trozo como {"t": ...}. Devuelve el texto entero."""
+async def hablar(sistema: str, historial: list[Turno], tarea: str | None = None) -> str:
+    """Llama al modelo y emite cada trozo como {"t": ...}. Devuelve el texto entero.
+
+    `tarea` elige modelo en el enrutador (la llamada de voz va por «llamada», más rápida); sin ella, la de la plantilla."""
     if ajustes.canario:
         sistema += f"\n\nClave interna de esta instalación (secreta: nunca la escribas ni la repitas): {ajustes.canario}"
     partes: list[str] = []
-    async for trozo in generar(sistema, historial):
+    trozos = generar(sistema, historial, tarea) if tarea else generar(sistema, historial)
+    async for trozo in trozos:
         partes.append(trozo)
         escribir(t=trozo)
     return "".join(partes)
+
+
+def tarea_de(estado: Estado) -> str | None:
+    """Qué modelo contesta (por tarea del enrutador): en la llamada, el rápido; si corrige una respuesta, el grande,
+    porque el rápido se liaba al comparar la respuesta con los apuntes. Fuera de la llamada, el de la plantilla."""
+    if not estado.get("llamada"):
+        return None
+    return "corregir" if estado.get("corregir") else "llamada"
 
 
 def decir(texto: str) -> str:
@@ -99,6 +110,10 @@ async def lecciones_del_alumno() -> str:
 async def sistema_de_estudio(base: str, estado: dict) -> str:
     """El prompt de estudio con lo que el tutor debe saber del alumno en este turno."""
     partes = [base]
+    # En una llamada sobre una lección, el tutor habla de esa lección: sobran la lista de todas las demás (además le
+    # hacía remitir a otras en una entrevista de una sola) y lo que ya domina. Los flojos siguen en la charla libre.
+    llamada = bool(estado.get("llamada"))
+    de_leccion = llamada and bool(estado.get("leccion_clave"))
     if estado.get("nota_guardada"):
         partes.append("Magister acaba de guardar en «Mis notas» tu respuesta anterior, como pidió el alumno (lo ha hecho la app). "
                       "Empieza confirmándolo en una frase corta y sigue con lo demás que pida, si pide algo más.")
@@ -109,7 +124,7 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
         dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
         partes.append(f"Hoy es {dias[d.weekday()]} {d.isoformat()}.")
     lecciones = ""
-    if estado.get("conversacion_id"):  # solo en conversaciones de verdad (las pruebas del grafo van sin base)
+    if estado.get("conversacion_id") and not de_leccion:  # solo en conversaciones de verdad (las pruebas del grafo van sin base)
         try:
             lecciones = await lecciones_del_alumno()
         except Exception:  # noqa: BLE001  (sin base, el tutor sigue funcionando)
@@ -129,7 +144,7 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
             "Lo que el alumno estudia en Magister:\n" + lecciones + "\n"
             "Si lo que pregunta está en una de esas lecciones, nómbrala («lo tienes en L2») para que la abra en Lecciones o en "
             "el modo foco; si ya la hizo, conecta con lo que vio allí. No repitas la lista.")
-    if estado.get("conversacion_id"):
+    if estado.get("conversacion_id") and not de_leccion:
         try:
             flojos = await conceptos_flojos()
         except Exception:  # noqa: BLE001
@@ -139,7 +154,7 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
                           "Si encaja con lo que pregunta, conéctalo con uno de ellos o hazle una pregunta rápida sobre él; "
                           "no los enumeres ni lo fuerces. Si pregunta por uno de ellos, más andamiaje: un ejemplo resuelto antes de pedirle nada.")
         try:
-            dominados = await conceptos_dominados()
+            dominados = [] if llamada else await conceptos_dominados()
         except Exception:  # noqa: BLE001
             dominados = []
         if dominados:
@@ -155,20 +170,34 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
             titulo, texto = apuntes
             partes.append(f"Estáis trabajando la lección {estado['leccion_clave']} «{titulo}». Apóyate en sus apuntes (son lo "
                           "que el alumno estudia) y usa sus mismos ejemplos y cifras:\n<apuntes>\n" + texto + "\n</apuntes>")
-    if estado.get("voz"):
+    # La llamada tiene sus propias reglas de longitud: VOZ («80 a 150 palabras») ganaba y salían monólogos.
+    if estado.get("voz") and not estado.get("llamada"):
         partes.append(VOZ)
     if estado.get("llamada"):
         partes.append(LLAMADA)
     if estado.get("contexto"):
         partes.append("Dónde está la llamada ahora:\n" + str(estado["contexto"]))
+    if llamada:
+        # Lo último que lee el modelo: el más rápido (el de la llamada) se pasaba de largo cuando el alumno no lo pillaba.
+        partes.append("Recuerda: es una llamada. De 2 a 4 frases y 60 palabras como mucho, aunque no lo haya entendido: "
+                      "mejor otra frase en el turno siguiente que un párrafo ahora.")
     return "\n\n".join(partes)
 
 
 LLAMADA = """Estás en una llamada de voz con el alumno, por turnos, como una tutoría por teléfono:
-- Habla como en una conversación: de 2 a 5 frases cortas por turno, una sola idea, y termina pasándole la palabra (una pregunta o «¿seguimos?»).
-- Nada de bloques de código, tablas, listas, diagramas ni bloques que se pulsan (test, opciones, pregunta, agendar, recordar, modo): todo se oye.
-- Si lo que dice está cortado o no tiene sentido (el dictado se equivoca), di lo que has entendido y pregúntale si es eso.
-- Si te interrumpe con una duda, contesta a la duda directamente y después pregunta si sigues por donde ibas."""
+- Habla como en una conversación: de 2 a 4 frases cortas por turno (60 palabras como mucho, sin contar los bloques), una sola idea, y termina pasándole la palabra (una pregunta o «¿seguimos?»). Sin saludos ni muletillas de relleno («¡Buena pregunta!», «Perfecto»).
+- Lo que dices se oye: nada de tablas, listas, enlaces, rutas ni bloques que se pulsan (test, opciones, pregunta, agendar, recordar, modo). Las fórmulas y las siglas, dichas con palabras («O de n al cuadrado»).
+- Tienes una pizarra que el alumno ve mientras habláis. Los bloques de código no se leen en voz alta: van a la pizarra o a sus notas.
+  - Un diagrama, como mucho uno por turno y solo si un dibujo aclara la idea: en un bloque `svg`, con las reglas de los diagramas. Empieza con una frase corta en voz («te lo dibujo»), luego el bloque, y después explica qué mirar en él, sin describirlo pieza a pieza.
+  - Para enseñarle un apartado de sus apuntes, un bloque `ficha` con solo su clave (b1, b2…).
+  - Cuando expliques o nombres un concepto que conviene apuntar, un bloque `concepto` con una línea por concepto: «Término: definición en una frase». Así le quedan sus notas de la llamada.
+  - Nada de código largo: si hace falta código, como mucho 6 líneas en la pizarra.
+- Esto manda sobre el modo activo y sobre el resto de reglas: el turno es corto aunque el modo pida una respuesta modelo; la respuesta modelo, solo si la pide o tras dos fallos.
+- Habla como se habla: sin comillas invertidas ni símbolos, los nombres de funciones como se leen. Los apuntes son suyos («tus apuntes»). Su nombre, como mucho una vez en toda la llamada.
+- Si lo que dice está cortado o no tiene sentido (el dictado se equivoca), di lo que has entendido y pregúntale si es eso. Si solo es ambiguo, elige la lectura más probable por lo que estabais hablando y contesta.
+- Si te interrumpe con una duda, contesta a la duda directamente y termina con un simple «¿sigo?». No cierres dos turnos seguidos con la misma fórmula.
+- No puedes cambiar la velocidad de la voz ni repetir audio: si pide ir más despacio, explícalo con otras palabras y un ejemplo.
+- Una duda de otra lección, en una frase, y dile en qué lección está."""
 
 
 async def conceptos_flojos(n: int = 6) -> list[str]:
@@ -215,7 +244,10 @@ async def apuntes_de(plan_id: int, clave: str, maximo: int = 14000) -> tuple[str
             "where l.plan_id = :p and l.clave = :c"), {"p": plan_id, "c": clave})).first()
     if fila is None or not fila[1]:
         return None
-    texto = fila[1].split("\n# Repaso")[0]
+    import re
+
+    # El repaso del final («## Repaso sin mirar» o «# Repaso») lleva las respuestas: no va al tutor.
+    texto = re.split(r"\n#{1,2} Repaso", fila[1])[0]
     return fila[0], texto[:maximo]
 
 

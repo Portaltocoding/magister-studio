@@ -19,6 +19,7 @@ export interface Mensaje {
   citas?: CitaInfo[]
   traza_id?: string | null
   voto?: boolean | null
+  cuenta?: boolean
 }
 
 export interface Conversacion {
@@ -182,6 +183,8 @@ export interface ExtraMensaje {
   plan_id?: number | null
   leccion_clave?: string | null
   contexto?: string | null
+  // El alumno responde a algo que el tutor ha preguntado: lo corrige el modelo grande.
+  corregir?: boolean
 }
 
 export function enviar(cid: number, contenido: string, signal: AbortSignal, cuenta = true, voz = false, extra: ExtraMensaje = {}) {

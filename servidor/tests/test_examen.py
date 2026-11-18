@@ -234,7 +234,8 @@ async def test_estilo_de_examen_y_repasos_de_tema(cliente):
 @pytest.mark.anyio
 async def test_tu_mapa_se_guarda(cliente):
     mapa = {"nodos": [{"id": "a", "texto": "índice", "x": 10, "y": 20}, {"id": "b", "texto": "B-tree", "x": 120, "y": 20}],
-            "flechas": [{"de": "a", "a": "b"}]}
+            "flechas": [{"de": "a", "a": "b"}, {"de": "b", "a": "a", "etiqueta": "ordena"}]}
     assert (await cliente.put("/api/estudio/77/mapa", json=mapa)).status_code == 200
-    assert (await cliente.get("/api/estudio/77/mapa")).json()["flechas"] == [{"de": "a", "a": "b"}]
+    assert (await cliente.get("/api/estudio/77/mapa")).json()["flechas"] == [
+        {"de": "a", "a": "b", "etiqueta": ""}, {"de": "b", "a": "a", "etiqueta": "ordena"}]
     assert (await cliente.get("/api/estudio/78/mapa")).json() == {"nodos": [], "flechas": []}

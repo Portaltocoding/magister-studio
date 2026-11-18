@@ -432,7 +432,30 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .llamada-resumen { text-align: left; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); padding: 16px 20px; margin: 16px 0; box-shadow: var(--sombra-suave); }
 .llamada-resumen h2 { margin: 0 0 6px; font-size: 1rem; text-transform: none; letter-spacing: 0; color: var(--texto); }
 .llamada-colgada .botones { justify-content: center; }
-@media (max-width: 820px) { .llamada-tipos { grid-template-columns: minmax(0, 1fr); } .llamada-subtitulo { font-size: 1.1rem; } }
+/* Con pizarra: la mascota pequeña arriba con los subtítulos y la pizarra grande en el centro. */
+.llamada-compacta { width: 100%; display: flex; align-items: center; gap: 14px; margin: 12px 0 10px; text-align: left; }
+.llamada-compacta .llamada-avatar { width: 72px; height: 72px; margin: 0; flex: none; }
+.llamada-compacta .llamada-avatar .mascota { width: 56px; height: 56px; }
+.llamada-compacta-texto { min-width: 0; flex: 1; }
+.llamada-compacta .llamada-subtitulo { font-size: 1.05rem; min-height: 2.8em; margin: 2px 0 0; text-wrap: pretty; }
+.llamada-pizarra {
+  width: 100%; box-sizing: border-box; min-height: 260px; max-height: 58vh; overflow-y: auto; text-align: left;
+  background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); padding: 14px 18px 18px;
+}
+.llamada-pizarra-titulo { font-size: 0.8rem; font-weight: 650; color: var(--suave); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+.llamada-pizarra .diagrama-vivo { margin: 0; }
+.llamada-pizarra .diagrama-lienzo svg { max-height: 48vh; }
+.llamada-pizarra .mapa-lienzo { border: 0; background: transparent; }
+.llamada-ficha { font-size: 0.95rem; }
+.llamada.con-pizarra .llamada-botones { padding-top: 14px; }
+.llamada-notas { width: 100%; text-align: left; margin-top: 18px; }
+.llamada-notas h2 { font-size: 0.85rem; font-weight: 650; color: var(--suave); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 8px; }
+.llamada-notas dl, .conceptos-llamada { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin: 0; }
+.llamada-notas dl > div, .conceptos-llamada > div { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; }
+.llamada-notas dt, .conceptos-llamada dt { font-weight: 650; }
+.llamada-notas dd, .conceptos-llamada dd { margin: 2px 0 0; color: var(--suave); font-size: 0.9rem; line-height: 1.4; }
+.llamada-colgada .llamada-notas { margin: 18px 0; }
+@media (max-width: 820px) { .llamada-tipos { grid-template-columns: minmax(0, 1fr); } .llamada-subtitulo { font-size: 1.1rem; } .llamada-pizarra { max-height: none; } }
 @media (prefers-reduced-motion: reduce) { .llamada-onda { animation: none !important; } }
 
 
@@ -497,6 +520,7 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .mapa-flecha { stroke: currentColor; stroke-width: 1.8; cursor: pointer; opacity: 0.75; }
 .mapa-flecha:hover { opacity: 1; stroke-width: 2.6; }
 .mapa-vacio { fill: var(--suave); font-size: 14px; }
+.mapa-etiqueta { fill: var(--suave); font-size: 11px; font-style: italic; paint-order: stroke; stroke: var(--fondo); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
 .mapa-editar { width: 100%; height: 30px; box-sizing: border-box; font: inherit; font-size: 13px; font-weight: 600; border: 1px solid var(--texto); border-radius: 10px; padding: 0 8px; background: var(--fondo); color: var(--texto); }
 .volcado-apoyo { margin: 0 0 12px; }
 .volcado-apoyo .mapa-lienzo { max-height: 300px; }

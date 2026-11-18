@@ -24,16 +24,60 @@ export function vozLocal(): SpeechSynthesisVoice | null {
   return es.find((v) => v.localService && v.lang === 'es-ES') ?? es.find((v) => v.localService) ?? es[0] ?? null
 }
 
-// Lo que se lee: sin bloques, sin marcas de Markdown y con las fórmulas avisadas.
+// Lo que se lee: sin bloques, sin marcas de Markdown y con las fórmulas avisadas. Lo que va por líneas (títulos,
+// listas, tablas, citas) se quita antes de juntar el texto; los operadores (2*3, x > 3, snake_case) se dejan.
 export function paraLeer(t: string): string {
   return t
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/\$\$[\s\S]*?\$\$/g, ' (fórmula en pantalla) ')
-    .replace(/\$([^$\n]+)\$/g, '$1')
+    .replace(/```[\s\S]*?```/g, '\n')
+    .replace(/\$\$[\s\S]*?\$\$/g, ' (la fórmula está en pantalla) ')
+    .replace(/\$([^$\n]+)\$/g, (_, f: string) => (/[\\^{}]/.test(f) ? 'una fórmula' : f))
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\{[^}]*\}/g, '$1')
+    .replace(/\s*\{[.#][^}]*\}/g, '')
+    .replace(/https?:\/\/\S+/g, 'un enlace')
+    .replace(/^\s*\|.*$/gm, '')
+    .replace(/^#+\s+(.+?)\s*$/gm, '$1.')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+(.+?)\s*$/gm, '$1.')
+    .replace(/\*\*|__|`/g, '')
+    .replace(/(^|\s)[*_](?=\S)/g, '$1')
+    .replace(/(?<=\S)[*_](?=\s|$|[.,;:!?)])/g, '')
+    .replace(/\s*\|\s*/g, ', ')
+    .replace(/\s*=>\s*/g, ' entonces ')
+    .replace(/\s*->\s*/g, ' a ')
     .replace(/\[(\d+)\]/g, '')
-    .replace(/[#*_`>|]/g, '')
+    .replace(/\p{Extended_Pictographic}️?/gu, '')
+    .replace(/([.!?…:;])\s*\./g, '$1')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+// Cómo debe sonar lo que una voz española lee mal (solo para la voz: el subtítulo sigue con el texto escrito).
+const PRONUNCIACION: [RegExp, string][] = [
+  [/\bO\(\s*1\s*\)/g, 'O de uno'],
+  [/\bO\(\s*n\s*log\s*n\s*\)/g, 'O de n por logaritmo de n'],
+  [/\bO\(\s*log\s*n\s*\)/g, 'O de logaritmo de n'],
+  [/\bO\(\s*n\s*(\^\s*2|²)\s*\)/g, 'O de n al cuadrado'],
+  [/\bO\(\s*n\s*\)/g, 'O de n'],
+  [/\bHTTPS\b/g, 'hache te te pe ese'],
+  [/\bHTTP\b/g, 'hache te te pe'],
+  [/\bgRPC\b/g, 'ge erre pe ce'],
+  [/\bGraphQL\b/g, 'graf cu ele'],
+  [/\bUUIDs?\b/g, 'u u i de'],
+  [/\bJSON\b/g, 'yeison'],
+  [/\bSQL\b/g, 'ese cu ele'],
+  [/\bURLs?\b/g, 'u erre ele'],
+  [/\bRFC\b/g, 'erre efe ce'],
+  // Rutas como /pedidos/42?limit=20: se leen sus palabras, sin las barras.
+  [/(^|\s)\/[\w\-/{}.?=&%]+/g, (' $&' as string)],
+]
+
+export function pronunciar(frase: string): string {
+  let t = frase
+  for (const [patron, por] of PRONUNCIACION) {
+    t = por === ' $&' ? t.replace(patron, (m) => ' ' + m.replace(/[/?=&{}%]+/g, ' ').trim()) : t.replace(patron, por)
+  }
+  return t.replace(/\s+/g, ' ').trim()
 }
 
 // Velocidad y voz, compartidas por la llamada, Hablar y el vídeo, y recordadas en el navegador.
@@ -41,7 +85,9 @@ export function paraLeer(t: string): string {
 export const VELOCIDADES = [0.8, 1, 1.25, 1.5, 1.75, 2]
 export interface AjustesVoz {
   velocidad: number
-  voz: string | null // nombre de la voz; null = la local en español
+  // null = la mejor que haya (la natural de Magister si está instalada); «piper:<id>» = una voz de Magister;
+  // «navegador» = la del equipo; otro texto = el nombre de una voz del navegador.
+  voz: string | null
 }
 const CLAVE_VOZ = 'magister-voz'
 export function leerAjustesVoz(): AjustesVoz {
@@ -63,16 +109,68 @@ export function guardarAjustesVoz(a: AjustesVoz) {
 export function vocesEspanol(): SpeechSynthesisVoice[] {
   return (window.speechSynthesis?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().startsWith('es'))
 }
+// La voz del navegador: la elegida, o una «Natural» si el navegador la tiene (Edge), o la local en español.
 export function vozElegida(): SpeechSynthesisVoice | null {
   const nombre = leerAjustesVoz().voz
-  return (nombre && vocesEspanol().find((v) => v.name === nombre)) || vozLocal()
+  const voces = vocesEspanol()
+  return (
+    (nombre && voces.find((v) => v.name === nombre)) ||
+    voces.find((v) => /natural/i.test(v.name) && v.lang === 'es-ES') ||
+    voces.find((v) => /natural/i.test(v.name)) ||
+    vozLocal()
+  )
+}
+
+// Las voces naturales de Magister (Piper, en el servidor): suenan mucho mejor que las de Windows y no salen del equipo.
+export interface VozMagister {
+  id: string
+  nombre: string
+}
+export let vocesMagister: VozMagister[] = []
+export const vocesMagisterListas: Promise<VozMagister[]> =
+  typeof fetch === 'function'
+    ? fetch('/api/voz/voces')
+        .then((r) => (r.ok ? (r.json() as Promise<VozMagister[]>) : []))
+        .catch(() => [])
+        .then((v) => {
+          vocesMagister = v
+          window.dispatchEvent(new CustomEvent('magister-voces'))
+          return v
+        })
+    : Promise.resolve([])
+
+// La voz de Magister con la que se habla ahora, o null si toca la del navegador.
+export function vozMagister(): string | null {
+  const v = leerAjustesVoz().voz
+  if (v?.startsWith('piper:')) return vocesMagister.some((x) => x.id === v.slice(6)) ? v.slice(6) : (vocesMagister[0]?.id ?? null)
+  if (v === null) return vocesMagister[0]?.id ?? null
+  return null
+}
+
+// Cómo se llama la voz que suena (para el registro de la llamada).
+export function nombreVozActual(): string {
+  const m = vozMagister()
+  return m ? `magister:${m}` : (vozElegida()?.name ?? 'sin voz')
 }
 
 // Los locutores que están hablando: si cambias la velocidad o la voz, repiten la frase que suena con lo nuevo.
 const hablando = new Set<Locutor>()
 window.addEventListener('magister-voz', () => hablando.forEach((l) => l.repetirActual()))
 
-export const frases = (t: string) => t.split(/(?<=[.!?…:;])\s+(?=\S)/).map((x) => x.trim()).filter(Boolean)
+// Frases para decir de una en una. Se corta tras . ! ? …, pero no tras una abreviatura («p. ej.», «etc.», «EE. UU.»)
+// ni cuando lo siguiente empieza en minúscula (la frase sigue).
+const ABREVIATURA = /(?:^|[\s(])(?:p\.\s?ej|ej|etc|EE\.\s?UU|EE|Dr|Dra|Sr|Sra|Sres|pág|págs|cap|fig|vs|aprox|núm|art|a\.\s?C|d\.\s?C)\.$/i
+export function frases(t: string): string[] {
+  const salida: string[] = []
+  for (const trozo of t.split(/(?<=[.!?…])\s+(?=\S)/)) {
+    const x = trozo.trim()
+    if (!x) continue
+    const previa = salida[salida.length - 1]
+    if (previa && (ABREVIATURA.test(previa) || /^\d+\.$/.test(previa) || /^[a-zñáéíóúü]/.test(x))) salida[salida.length - 1] = `${previa} ${x}`
+    else salida.push(x)
+  }
+  return salida
+}
 
 const palabras = (t: string) =>
   t
@@ -98,7 +196,15 @@ export class Locutor {
   private cerrado = false
   private enviadas = 0
   private fin: (() => void) | null = null
-  // Lo último que ha dicho (para reconocer el eco) y la frase que suena (para el subtítulo).
+  // Cada frase que empieza lleva un número: los avisos de una ya cortada (onend tardío, audio que acaba) se ignoran.
+  private vez = 0
+  // Lo que suena: un enunciado del navegador (se guarda para que Chrome no lo recoja a medias) o un audio de Magister.
+  private u: SpeechSynthesisUtterance | null = null
+  private audio: HTMLAudioElement | null = null
+  // El audio de cada frase con la voz de Magister, pedido antes de que toque (así no hay huecos entre frases).
+  private audios = new Map<string, Promise<string | null>>()
+  private ultimas: string[] = []
+  // Lo último que ha dicho, sus tres últimas frases (para reconocer el eco), y la frase que suena (para el subtítulo).
   reciente = ''
   actual = ''
   alFrase: ((f: string) => void) | null = null
@@ -106,9 +212,11 @@ export class Locutor {
   // Texto acumulado de una respuesta que va llegando: dice las frases ya completas que aún no ha dicho.
   empujar(acumulado: string, terminado = false) {
     let visible = acumulado
-    if ((visible.match(/```/g) ?? []).length % 2) visible = visible.slice(0, visible.lastIndexOf('```'))
+    // Un bloque abierto (un diagrama que se está dibujando) no se lee, y lo dicho antes de él ya está completo.
+    const bloqueAbierto = (visible.match(/```/g) ?? []).length % 2 === 1
+    if (bloqueAbierto) visible = visible.slice(0, visible.lastIndexOf('```'))
     const lista = frases(paraLeer(visible))
-    const completas = terminado ? lista.length : Math.max(0, lista.length - 1)
+    const completas = terminado || bloqueAbierto ? lista.length : Math.max(0, lista.length - 1)
     for (; this.enviadas < completas; this.enviadas++) this.decir(lista[this.enviadas])
     if (terminado) this.cerrar()
   }
@@ -142,14 +250,17 @@ export class Locutor {
   repetirActual() {
     if (!this.hablando || !this.actual) return
     this.cola.unshift(this.actual)
-    window.speechSynthesis?.cancel() // su onend/onerror lanza la siguiente: la misma, otra vez
+    this.callar()
+    this.siguiente() // la misma frase, otra vez (sin volver a avisar del subtítulo)
   }
 
   parar() {
     hablando.delete(this)
     this.cola = []
     this.hablando = false
-    window.speechSynthesis?.cancel()
+    this.callar()
+    for (const p of this.audios.values()) void p.then((url) => url && URL.revokeObjectURL(url))
+    this.audios.clear()
     this.actual = ''
     const f = this.fin
     this.fin = null
@@ -166,6 +277,72 @@ export class Locutor {
     f?.()
   }
 
+  // Corta lo que suena sin tocar la cola.
+  private callar() {
+    this.vez++
+    if (this.u) {
+      this.u.onend = null
+      this.u.onerror = null
+      this.u = null
+    }
+    if (this.audio) {
+      this.audio.onended = null
+      this.audio.onerror = null
+      this.audio.pause()
+      this.audio = null
+    }
+    window.speechSynthesis?.cancel()
+  }
+
+  private pedirAudio(frase: string, voz: string): Promise<string | null> {
+    const clave = `${voz}|${frase}`
+    let p = this.audios.get(clave)
+    if (!p) {
+      p = fetch('/api/voz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: pronunciar(frase), voz }) })
+        .then((r) => (r.ok ? r.blob() : null))
+        .then((b) => (b ? URL.createObjectURL(b) : null))
+        .catch(() => null)
+      this.audios.set(clave, p)
+    }
+    return p
+  }
+
+  private conNavegador(frase: string, vez: number) {
+    const u = new SpeechSynthesisUtterance(pronunciar(frase))
+    u.lang = 'es-ES'
+    const voz = vozElegida()
+    if (voz) u.voice = voz
+    u.rate = leerAjustesVoz().velocidad
+    const sigue = () => {
+      if (this.vez === vez && this.hablando) this.siguiente()
+    }
+    u.onend = sigue
+    u.onerror = sigue
+    this.u = u
+    window.speechSynthesis.speak(u)
+  }
+
+  private conMagister(frase: string, voz: string, vez: number) {
+    // Las dos frases siguientes se piden ya, mientras suena esta.
+    for (const x of this.cola.slice(0, 2)) void this.pedirAudio(x, voz)
+    void this.pedirAudio(frase, voz).then((url) => {
+      if (this.vez !== vez || !this.hablando) return
+      if (!url) return this.conNavegador(frase, vez) // si Magister no puede, la del navegador
+      const a = new Audio(url)
+      a.playbackRate = leerAjustesVoz().velocidad
+      const sigue = () => {
+        // Ya sonó: se suelta (si hay que repetirla, el servidor la tiene guardada).
+        this.audios.delete(`${voz}|${frase}`)
+        URL.revokeObjectURL(url)
+        if (this.vez === vez && this.hablando) this.siguiente()
+      }
+      a.onended = sigue
+      a.onerror = sigue
+      this.audio = a
+      a.play().catch(sigue)
+    })
+  }
+
   private siguiente() {
     const frase = this.cola.shift()
     if (frase == null) {
@@ -180,17 +357,14 @@ export class Locutor {
     const repetida = frase === this.actual
     this.actual = frase
     if (!repetida) {
-      this.reciente = (this.reciente + ' ' + frase).slice(-600)
+      this.ultimas = [...this.ultimas, frase].slice(-3)
+      this.reciente = this.ultimas.join(' ')
       this.alFrase?.(frase)
     }
-    const u = new SpeechSynthesisUtterance(frase)
-    u.lang = 'es-ES'
-    const voz = vozElegida()
-    if (voz) u.voice = voz
-    u.rate = leerAjustesVoz().velocidad
-    u.onend = () => this.hablando && this.siguiente()
-    u.onerror = () => this.hablando && this.siguiente()
-    window.speechSynthesis.speak(u)
+    const vez = ++this.vez
+    const magister = vozMagister()
+    if (magister) this.conMagister(frase, magister, vez)
+    else this.conNavegador(frase, vez)
   }
 }
 

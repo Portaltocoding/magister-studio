@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
 
-// Tu mapa de palabras clave: lo construyes tú mientras estudias. Pocas palabras, y una flecha solo si entiendes la
-// relación (la flecha es una explicación que has hecho tuya). No es un resumen: es lo justo para obligarte a recordar.
+// El mapa de conceptos de la lección: lo hace el modelo leyendo los apuntes (los conceptos clave y cómo se relacionan,
+// con un verbo en cada flecha) y luego lo retocas tú.
 // Doble clic en el lienzo añade una palabra; arrastrar la mueve; «Unir» y dos clics hacen una flecha; un clic en una
 // flecha la quita.
 
@@ -15,6 +15,7 @@ export interface Nodo {
 export interface Flecha {
   de: string
   a: string
+  etiqueta?: string
 }
 export interface Mapa {
   nodos: Nodo[]
@@ -22,15 +23,31 @@ export interface Mapa {
 }
 
 const nuevoId = () => Math.random().toString(36).slice(2, 9)
-const ANCHO = 560
-const ALTO = 420
+// Las mismas medidas que ANCHO_MAPA y ALTO_MAPA en material/estudio.py, que coloca el mapa generado.
+const ANCHO = 720
+const ALTO = 540
 
 export function usarMapa(mid: number) {
   const [mapa, setMapa] = useState<Mapa | null>(null)
+  const [generando, setGenerando] = useState(false)
+  const [errorMapa, setErrorMapa] = useState('')
   const espera = useRef(0)
   useEffect(() => {
     pedir<Mapa>(`/api/estudio/${mid}/mapa`).then(setMapa).catch(() => setMapa({ nodos: [], flechas: [] }))
   }, [mid])
+  // El modelo lee la lección entera, elige los conceptos clave y los une. Sustituye el mapa que hubiera.
+  const generar = async () => {
+    window.clearTimeout(espera.current)
+    setGenerando(true)
+    setErrorMapa('')
+    try {
+      setMapa(await pedir<Mapa>(`/api/estudio/${mid}/mapa/generar`, { method: 'POST' }))
+    } catch {
+      setErrorMapa('No he podido hacer el mapa. Prueba otra vez en un momento.')
+    } finally {
+      setGenerando(false)
+    }
+  }
   const cambiar = (m: Mapa) => {
     setMapa(m)
     window.clearTimeout(espera.current)
@@ -50,7 +67,7 @@ export function usarMapa(mid: number) {
       return r
     })
   }
-  return { mapa, cambiar, anadir }
+  return { mapa, cambiar, anadir, generar, generando, errorMapa }
 }
 
 export default function MapaConceptos({ mapa, alCambiar, soloVer = false }: { mapa: Mapa; alCambiar?: (m: Mapa) => void; soloVer?: boolean }) {
@@ -115,16 +132,22 @@ export default function MapaConceptos({ mapa, alCambiar, soloVer = false }: { ma
           const d = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1
           const recorte = 22
           return (
-            <line
-              key={k}
-              className="mapa-flecha"
-              x1={p1.x + ((p2.x - p1.x) / d) * recorte}
-              y1={p1.y + ((p2.y - p1.y) / d) * recorte}
-              x2={p2.x - ((p2.x - p1.x) / d) * recorte}
-              y2={p2.y - ((p2.y - p1.y) / d) * recorte}
-              markerEnd="url(#mapa-punta)"
-              onClick={() => !soloVer && cambiar({ ...mapa, flechas: mapa.flechas.filter((_, j) => j !== k) })}
-            />
+            <g key={k}>
+              <line
+                className="mapa-flecha"
+                x1={p1.x + ((p2.x - p1.x) / d) * recorte}
+                y1={p1.y + ((p2.y - p1.y) / d) * recorte}
+                x2={p2.x - ((p2.x - p1.x) / d) * recorte}
+                y2={p2.y - ((p2.y - p1.y) / d) * recorte}
+                markerEnd="url(#mapa-punta)"
+                onClick={() => !soloVer && cambiar({ ...mapa, flechas: mapa.flechas.filter((_, j) => j !== k) })}
+              />
+              {f.etiqueta && (
+                <text className="mapa-etiqueta" x={(p1.x + p2.x) / 2} y={(p1.y + p2.y) / 2 - 4} textAnchor="middle">
+                  {f.etiqueta}
+                </text>
+              )}
+            </g>
           )
         })}
         {mapa.nodos.map((n) => {

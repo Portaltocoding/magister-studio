@@ -1,6 +1,8 @@
 """Temas, conversaciones y mensajes. Los mensajes pasan por el grafo (`flujo`)."""
 
+import asyncio
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import date
 
@@ -21,7 +23,7 @@ from magister.api.esquemas import (
 from magister.api.flujo import flujo_tutor
 from magister.config import ajustes
 from magister.datos import conversaciones as dc
-from magister.datos.sesion import sesion_por_peticion
+from magister.datos.sesion import nueva_sesion, sesion_por_peticion
 from magister.flujo import ejecutar
 from magister.flujo.intencion import pide_guardar
 
@@ -96,6 +98,45 @@ class Preparado:
     turnos: list[dict]
     cuenta: bool
     nota: dict | None = None  # la nota que acaba de guardar «guárdalo»
+    pregunta_id: int | None = None
+
+
+# Un turno cada vez por conversación: si llega otro (en la llamada, el dictado reenvía tu pregunta ampliada mientras la
+# anterior se está cortando), espera a que el anterior acabe o se corte, para que cada respuesta vea la anterior.
+_candados: dict[int, asyncio.Lock] = {}
+ESPERA_TURNO_S = 20
+
+
+@asynccontextmanager
+async def turno_en_curso(cid: int):
+    candado = _candados.setdefault(cid, asyncio.Lock())
+    try:
+        await asyncio.wait_for(candado.acquire(), timeout=ESPERA_TURNO_S)
+        tengo = True
+    except TimeoutError:
+        tengo = False  # el anterior se ha colgado: mejor contestar que dejar esperando
+    try:
+        yield
+    finally:
+        if tengo:
+            candado.release()
+
+
+async def historial_del_turno(cid: int, pregunta_id: int, llamada: bool) -> list[dict]:
+    """El historial al empezar el turno (ya con la respuesta del anterior), con esta pregunta al final.
+
+    En la llamada, si la pregunta anterior se quedó sin respuesta y esta la amplía («¿qué es X?» y luego «¿qué es X
+    exactamente?»), la anterior sobra: se borra para que el modelo no vea dos preguntas seguidas."""
+    async with nueva_sesion() as s:
+        filas = await dc.historial_completo(s, cid)
+        pregunta = next((m for m in filas if m.id == pregunta_id), None)
+        otras = [m for m in filas if m.id != pregunta_id]
+        if llamada and pregunta and otras and otras[-1].rol == "usuario" and otras[-1].id < pregunta_id:
+            previa = otras[-1]
+            if pregunta.contenido.strip().lower().startswith(previa.contenido.strip().lower()):
+                await dc.borrar_mensaje(s, previa.id)
+                otras = otras[:-1]
+    return [{"rol": m.rol, "contenido": m.contenido} for m in [*otras, *([pregunta] if pregunta else [])]]
 
 
 async def guardar_respuesta_anterior(s: AsyncSession, cid: int) -> dict | None:
@@ -147,9 +188,9 @@ async def preparar_mensaje(
     nota = None
     if tipo != "plan" and not cuerpo.voz and pide_guardar(cuerpo.contenido):
         nota = await guardar_respuesta_anterior(s, cid)
-    await dc.guardar_pregunta(s, cid, cuerpo.contenido, cuerpo.cuenta)
+    pregunta = await dc.guardar_pregunta(s, cid, cuerpo.contenido, cuerpo.cuenta)
     turnos = [{"rol": m.rol, "contenido": m.contenido} for m in await dc.historial_completo(s, cid)]
-    return Preparado(tipo, turnos, cuerpo.cuenta, nota)
+    return Preparado(tipo, turnos, cuerpo.cuenta, nota, pregunta.id)
 
 
 @rutas.post("/conversaciones/{cid}/mensajes", response_class=EventSourceResponse)
@@ -157,14 +198,17 @@ async def enviar_mensaje(
     cid: int, cuerpo: MensajeEntrada, p: Preparado = Depends(preparar_mensaje)
 ) -> AsyncIterator[ServerSentEvent]:
     fase_inicial = "diagnostico" if p.tipo == "plan" else "estudio"
-    eventos = ejecutar.mensaje(cid, cuerpo.contenido, p.turnos, hoy(), fase_inicial, voz=cuerpo.voz,
-                                extra={"llamada": cuerpo.llamada, "modo": cuerpo.modo, "plan_id_leccion": cuerpo.plan_id,
-                                       "leccion_clave": cuerpo.leccion_clave, "contexto": cuerpo.contexto,
-                                       "nota_guardada": p.nota is not None})
-    if p.nota is not None:
-        eventos = _con_nota(p.nota, eventos)
-    async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid}):
-        yield evento
+    async with turno_en_curso(cid):
+        turnos = await historial_del_turno(cid, p.pregunta_id, cuerpo.llamada) if p.pregunta_id else p.turnos
+        eventos = ejecutar.mensaje(cid, cuerpo.contenido, turnos, hoy(), fase_inicial, voz=cuerpo.voz,
+                                    extra={"llamada": cuerpo.llamada, "modo": cuerpo.modo, "plan_id_leccion": cuerpo.plan_id,
+                                           "leccion_clave": cuerpo.leccion_clave, "contexto": cuerpo.contexto,
+                                           "corregir": cuerpo.corregir and cuerpo.llamada,
+                                           "nota_guardada": p.nota is not None})
+        if p.nota is not None:
+            eventos = _con_nota(p.nota, eventos)
+        async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid}):
+            yield evento
 
 
 async def _con_nota(nota: dict, eventos: AsyncIterator[dict]) -> AsyncIterator[dict]:
