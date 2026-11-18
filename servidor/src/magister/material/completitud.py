@@ -5,6 +5,8 @@ aparece literal, es `FalloJuez` (no cuenta como «no explicado»).
 """
 
 import asyncio
+from functools import cache
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +18,7 @@ from magister.material import completitud_logica as logica
 from magister.material.modelos import EntradaMaterial
 
 semaforo = asyncio.Semaphore(4)
+GOLDEN = Path(__file__).resolve().parents[1] / "cerebro" / "prompts" / "comun" / "golden_completitud.md"
 
 
 class JuicioCompletitud(BaseModel):
@@ -28,12 +31,28 @@ def _plano(t: str) -> str:
     return " ".join(t.split())
 
 
+@cache
+def golden() -> str:
+    return GOLDEN.read_text(encoding="utf-8").replace("\r\n", "\n").strip()
+
+
+def sistema_juez() -> str:
+    """El prompt de sistema: solo lo fijo (criterio y ejemplos), idéntico entre llamadas para que se lea de caché."""
+    return cargar("juez_completitud").rellenar(golden=golden())
+
+
+def mensaje_juez(texto: str, concepto: dict) -> str:
+    """Lo variable: los apuntes primero (son iguales para todos los conceptos de un material) y el concepto al final."""
+    sinonimos = ", ".join(concepto.get("sinonimos", [])) or "ninguna"
+    return (f"<apuntes>\n{texto}\n</apuntes>\n\nConcepto: {concepto['nombre']}\nOtras formas de nombrarlo: {sinonimos}\n\n"
+            "Devuelve el juicio.")
+
+
 async def _juzgar(texto: str, concepto: dict) -> dict:
-    sistema = cargar("juez_completitud").rellenar(concepto=concepto["nombre"], sinonimos=", ".join(concepto.get("sinonimos", [])),
-                                                  apuntes=texto)
+    sistema = sistema_juez()
     async with semaforo:
         try:
-            j = await estructurar(sistema, "Devuelve el juicio.", JuicioCompletitud, reintentos=1, cachear=True)
+            j = await estructurar(sistema, mensaje_juez(texto, concepto), JuicioCompletitud, reintentos=1, cachear=True)
         except ErrorEstructura as e:
             return {"explicado": None, "cita_valida": False, "fallo_juez": str(e)}
     if _plano(j.cita) not in _plano(texto):
