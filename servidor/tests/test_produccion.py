@@ -100,6 +100,43 @@ async def test_una_llamada_queda_registrada_y_votar_dos_veces_deja_una(cliente) 
         quitar_observadores()
 
 
+def test_la_critica_del_juez_se_parte_por_dimension() -> None:
+    from magister.api.rutas_produccion import _motivos_del_juez
+
+    m = _motivos_del_juez("razonamiento: Enumera sin conectar; por ejemplo, «A; B».; economia: Hay metatexto")
+    assert [x["dimension"] for x in m] == ["razonamiento", "economia"]
+    assert m[0]["razon"] == "Enumera sin conectar; por ejemplo, «A; B»." and m[1]["nombre"] == "Que vaya al grano"
+    assert _motivos_del_juez("algo suelto") == [{"dimension": None, "nombre": "Por qué", "razon": "algo suelto"}]
+    assert _motivos_del_juez(None) == []
+
+
+async def test_triaje_con_feedback_y_deshacer(cliente, tmp_path, monkeypatch) -> None:
+    from magister.api import rutas_produccion
+    from magister.cerebro.modelo import quitar_observadores
+    from magister.observar import registro
+
+    monkeypatch.setattr(rutas_produccion, "RAIZ_SERVIDOR", tmp_path)
+    registro.instalar()
+    try:
+        cid = (await cliente.post("/api/conversaciones", json={"titulo": "x"})).json()["id"]
+        await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "explícame bernoulli"}, headers={"X-Request-Id": "traza-t"})
+        await cliente.post("/api/trazas/traza-t/feedback", json={"bien": False, "comentario": "me hizo un plan"})
+        [c] = (await cliente.get("/api/candidatos")).json()
+        # Se lee la pregunta y la respuesta del hilo, no el prompt de sistema.
+        assert c["pregunta"] == "explícame bernoulli" and c["respuesta"] and c["nota"] == "me hizo un plan"
+        r = await cliente.post(f"/api/candidatos/{c['id']}", json={"accion": "aceptar", "banco": "tono", "comentario": "pedí explicación",
+                                                                  "motivos": ["largo", "inventado"], "respuesta_buena": "Bernoulli dice…"})
+        assert r.json()["estado"] == "aceptado"
+        fichero = tmp_path / "evals" / "banco" / "tono" / "traza-t.json"
+        guardado = __import__("json").loads(fichero.read_text(encoding="utf-8"))
+        assert guardado["motivos"] == ["largo"] and guardado["comentario"] == "pedí explicación"
+        assert (await cliente.get("/api/candidatos")).json() == []
+        await cliente.post(f"/api/candidatos/{c['id']}/deshacer")
+        assert not fichero.exists() and len((await cliente.get("/api/candidatos")).json()) == 1
+    finally:
+        quitar_observadores()
+
+
 async def test_escribir_sin_json_da_415(cliente) -> None:
     r = await cliente.post("/api/temas", content=b"nombre=x", headers={"Content-Type": "application/x-www-form-urlencoded"})
     assert r.status_code == 415

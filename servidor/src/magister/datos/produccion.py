@@ -75,6 +75,10 @@ class CandidatoBanco(Base):
     salida: Mapped[str | None] = mapped_column(Text)
     respuesta_buena: Mapped[str | None] = mapped_column(Text)
     creado: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
+    # Tu feedback en el triaje: un comentario libre, los motivos marcados y, en los suspensos del juez, si acertó.
+    comentario: Mapped[str | None] = mapped_column(Text)
+    motivos: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    juez_acerto: Mapped[bool | None] = mapped_column(Boolean)
 
 
 class CacheRespuesta(Base):

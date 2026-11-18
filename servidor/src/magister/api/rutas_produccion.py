@@ -1,6 +1,7 @@
 """Producción (Parte VI): valorar respuestas, alertas, candidatos al banco y estado del sistema."""
 
 import json
+import re
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -30,7 +31,11 @@ class Feedback(BaseModel):
 class Triaje(BaseModel):
     accion: Literal["aceptar", "descartar"]
     banco: str | None = Field(None, pattern=r"^[a-z_]+$")
-    respuesta_buena: str | None = None
+    respuesta_buena: str | None = Field(None, max_length=8000)
+    # Tu feedback: qué falló (los motivos de «no me sirve»), un comentario y, si vino del juez, si acertó.
+    comentario: str | None = Field(None, max_length=2000)
+    motivos: list[Annotated[str, Field(max_length=20)]] = Field(default_factory=list, max_length=8)
+    juez_acerto: bool | None = None
 
 
 @rutas.post("/trazas/{traza_id}/feedback")
@@ -79,11 +84,43 @@ async def resolver(aid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> 
     return {"id": aid}
 
 
+# Qué miró el juez en cada dimensión, en palabras tuyas (las mismas que en Ajustes).
+NOMBRES_DIMENSION = {"razonamiento": "Que se entienda y razone bien", "economia": "Que vaya al grano", "trato": "Que el tono sea el tuyo"}
+
+
+def _motivos_del_juez(nota: str | None) -> list[dict]:
+    """La crítica del juez viene como «razonamiento: …; economia: …»: se parte por dimensión."""
+    if not nota:
+        return []
+    partes = re.split(r"(?:^|; )(razonamiento|economia|trato): ", nota)
+    if len(partes) < 3:
+        return [{"dimension": None, "nombre": "Por qué", "razon": nota}]
+    return [{"dimension": d, "nombre": NOMBRES_DIMENSION[d], "razon": r.strip()} for d, r in zip(partes[1::2], partes[2::2])]
+
+
 @rutas.get("/candidatos")
 async def candidatos(s: AsyncSession = Depends(sesion_por_peticion)) -> list[dict]:
+    """Los pendientes, con lo que preguntaste y lo que respondió el tutor (del hilo, por la traza) para leerlos a gusto.
+    La entrada guardada del juez es el prompt de sistema: no se envía."""
     filas = (await s.scalars(select(CandidatoBanco).where(CandidatoBanco.estado == "pendiente").order_by(CandidatoBanco.id))).all()
-    return [{"id": c.id, "traza_id": c.traza_id, "origen": c.origen, "entrada": c.entrada[-2000:], "salida": (c.salida or "")[-3000:],
-             "nota": c.nota} for c in filas]
+    hilo: dict[str, tuple[str | None, str]] = {}
+    if filas:
+        for traza, pregunta, respuesta in (await s.execute(text(
+            "select t.traza_id, (select u.contenido from mensajes u where u.conversacion_id = t.conversacion_id "
+            "and u.rol = 'usuario' and u.id < t.id order by u.id desc limit 1), t.contenido "
+            "from mensajes t where t.rol = 'tutor' and t.traza_id = any(:t)"), {"t": [c.traza_id for c in filas]})).all():
+            hilo[traza] = (pregunta, respuesta)
+    salida = []
+    for c in filas:
+        pregunta, respuesta = hilo.get(c.traza_id, (None, None))
+        if pregunta is None and c.origen != "juez":
+            pregunta = c.entrada
+        salida.append({
+            "id": c.id, "traza_id": c.traza_id, "origen": c.origen, "creado": c.creado.isoformat(),
+            "pregunta": (pregunta or "")[-2000:] or None, "respuesta": (respuesta or c.salida or "")[-6000:] or None,
+            "nota": c.nota, "motivos_juez": _motivos_del_juez(c.nota) if c.origen == "juez" else [],
+        })
+    return salida
 
 
 @rutas.post("/candidatos/{cid}")
@@ -91,6 +128,7 @@ async def triar(cid: int, cuerpo: Triaje, s: AsyncSession = Depends(sesion_por_p
     c = await s.get(CandidatoBanco, cid)
     if c is None:
         raise HTTPException(404, "candidato no encontrado")
+    motivos = afinado.motivos_validos(cuerpo.motivos)
     if cuerpo.accion == "aceptar":
         if not cuerpo.banco:
             raise HTTPException(422, "falta el banco")
@@ -98,12 +136,31 @@ async def triar(cid: int, cuerpo: Triaje, s: AsyncSession = Depends(sesion_por_p
         carpeta.mkdir(parents=True, exist_ok=True)
         (carpeta / f"{c.traza_id}.json").write_text(json.dumps(
             {"trace_id": c.traza_id, "origen": c.origen, "entrada": c.entrada, "salida_mala": c.salida,
-             "respuesta_buena": cuerpo.respuesta_buena, "nota": c.nota}, ensure_ascii=False, indent=1), encoding="utf-8")
+             "respuesta_buena": cuerpo.respuesta_buena, "nota": c.nota, "comentario": cuerpo.comentario, "motivos": motivos},
+            ensure_ascii=False, indent=1), encoding="utf-8")
+    # Si dices si el juez acertó, cuenta como tu valoración de esa respuesta (una sola vez, aunque deshagas y vuelvas).
+    if c.origen == "juez" and cuerpo.juez_acerto is not None and c.juez_acerto is None:
+        await afinado.registrar_valoracion(not cuerpo.juez_acerto, motivos if cuerpo.juez_acerto else [])
     c.estado = "aceptado" if cuerpo.accion == "aceptar" else "descartado"
-    c.banco, c.respuesta_buena = cuerpo.banco, cuerpo.respuesta_buena
+    c.banco, c.respuesta_buena = cuerpo.banco if cuerpo.accion == "aceptar" else None, cuerpo.respuesta_buena
+    c.comentario, c.motivos = cuerpo.comentario, motivos
+    if cuerpo.juez_acerto is not None:
+        c.juez_acerto = cuerpo.juez_acerto
     await s.commit()
     return {"id": cid, "estado": c.estado}
 
+
+@rutas.post("/candidatos/{cid}/deshacer")
+async def deshacer_triaje(cid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    """Vuelve a dejarlo pendiente; si estaba en el banco, quita su fichero."""
+    c = await s.get(CandidatoBanco, cid)
+    if c is None:
+        raise HTTPException(404, "candidato no encontrado")
+    if c.estado == "aceptado" and c.banco:
+        (RAIZ_SERVIDOR / "evals" / "banco" / c.banco / f"{c.traza_id}.json").unlink(missing_ok=True)
+    c.estado, c.banco = "pendiente", None
+    await s.commit()
+    return {"id": cid, "estado": c.estado}
 
 @rutas.get("/estado")
 async def estado(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:

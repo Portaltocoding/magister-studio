@@ -25,6 +25,11 @@ async def _actualizar(cambio) -> None:
         registro.exception("afinado: no se pudo actualizar")
 
 
+def motivos_validos(motivos: list[str]) -> list[str]:
+    """Solo los motivos que existen («largo», «sin_ejemplo»…), sin repetir."""
+    return list(dict.fromkeys(m for m in motivos if m in cf.MOTIVOS))
+
+
 async def registrar_valoracion(bien: bool, motivos: list[str]) -> None:
     await _actualizar(lambda e: _con_reglas(cf.registrar_usuario(e, bien, motivos)))
 
