@@ -19,6 +19,7 @@ from magister.api.rutas_material import rutas as rutas_material
 from magister.api.rutas_practica import rutas as rutas_practica
 from magister.api.rutas_tutor import rutas as rutas_tutor
 from magister.api.rutas_produccion import rutas as rutas_produccion
+from magister.api.rutas_modelos import rutas as rutas_modelos
 from magister.api.rutas_research import rutas as rutas_research
 from magister.api.rutas_plan import rutas as rutas_plan
 from magister.api.rutas_estudio import rutas as rutas_estudio
@@ -168,6 +169,7 @@ app.include_router(rutas_examen)
 app.include_router(rutas_video)
 app.include_router(rutas_borrar)
 app.include_router(rutas_cuota)
+app.include_router(rutas_modelos)
 
 # La API sirve también la página (web/dist) si está construida: un solo puerto, http://localhost:8000.
 _dist = __import__("pathlib").Path(__file__).resolve().parents[4] / "web" / "dist"

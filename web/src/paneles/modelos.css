@@ -1,0 +1,8 @@
+/* Panel de modelos (el mapa de quién hace qué) */
+.panel-modelos .tabla-ancha { overflow-x: auto; }
+.panel-modelos .tabla td { vertical-align: top; }
+.recomendaciones { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.recomendacion { padding: 8px 12px; border: 1px solid var(--borde); border-left-width: 4px; border-radius: 8px; font-size: 0.92rem; }
+.gravedad-alta { border-left-color: #b4544a; }
+.gravedad-media { border-left-color: #c08a2e; }
+.gravedad-baja { border-left-color: var(--borde); }
