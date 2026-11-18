@@ -104,3 +104,22 @@ async def test_la_ruta_del_guion_grafico(cliente) -> None:
     assert r.status_code == 200 and r.json()["titulo"] == "Coordenadas en un minuto"
     animados = {v["material_id"]: v["animado"] for v in (await cliente.get(f"/api/planes/{plan_id}/videos")).json()}
     assert animados == {sin: False, con: True}
+
+
+@pytest.mark.anyio
+async def test_el_perfil_de_materia_entra_en_el_guion_grafico(monkeypatch) -> None:
+    from magister.cerebro import materias
+    from magister.material.modelos import EntradaMaterial
+
+    vistos: list[str] = []
+
+    async def estructurar_falso(sistema, entrada, Modelo, **_):
+        vistos.append(sistema)
+        return gg.GuionGraficoModelo.model_validate(_fijo())
+
+    monkeypatch.setattr(gg, "estructurar", estructurar_falso)
+    datos = dict(plan_id=1, leccion_clave="L1", tema="Derecho civil", titulo="La usucapión", objetivos=[], conceptos=[])
+    await gg.generar_guion_grafico(EntradaMaterial(**datos), "apuntes", 1, "clase")
+    await gg.generar_guion_grafico(EntradaMaterial(**datos, materia="derecho"), "apuntes", 1, "clase")
+    sin, con = vistos
+    assert materias.texto("derecho") not in sin and con.endswith(materias.texto("derecho"))

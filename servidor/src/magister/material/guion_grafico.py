@@ -12,6 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from magister.cerebro import materias
 from magister.cerebro.estructura import ErrorEstructura, estructurar
 from magister.cerebro.prompts import cargar
 from magister.material.modelos import EntradaMaterial
@@ -361,6 +362,8 @@ async def generar_guion_grafico(entrada: EntradaMaterial, apuntes: str, minutos:
     sistema = cargar("guion_grafico").rellenar(palabras=presupuesto, minutos=minutos, conceptos=", ".join(nucleo),
                                                titulo=entrada.titulo, estilo=estilo_texto,
                                                apuntes=apuntes.split("\n# Repaso")[0][:20000])
+    if entrada.materia:
+        sistema += "\n\n" + materias.texto(entrada.materia)
     try:
         g = await estructurar(sistema, "Escribe el guion gráfico.", GuionGraficoModelo,
                               reglas=lambda x: reglas(x, presupuesto), tarea="generar")
