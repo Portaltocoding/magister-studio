@@ -80,7 +80,34 @@ def argumentos_claude(sistema: str, esquema: dict | None = None, modelo: str | N
     return args
 
 
+# Cada claude -p es un proceso de unos 390 MB que tarda unos 6 s (medido el 18-11-2026). Lo de segundo plano (generar
+# material, jueces) espera turno para no tumbar el equipo en un pico; lo tuyo en directo (chat, asesor, llamada) nunca.
+TAREAS_DE_FONDO = frozenset({"generar", "juez"})
+_turnos: dict[int, asyncio.Semaphore] = {}
+
+
+def _turno_de_fondo() -> asyncio.Semaphore | None:
+    from magister.cerebro.enrutador import tarea_de_prompt
+
+    p = prompt_actual.get()
+    if tarea_de_prompt(p[0] if p else None) not in TAREAS_DE_FONDO:
+        return None
+    # Un semáforo por bucle de eventos (las pruebas abren uno por prueba).
+    return _turnos.setdefault(id(asyncio.get_running_loop()), asyncio.Semaphore(max(1, ajustes.modelo_fondo_a_la_vez)))
+
+
 async def _lineas_claude(
+    sistema: str, entrada: str, esquema: dict | None = None, modelo: str | None = None
+) -> AsyncIterator[dict]:
+    """Como `_lanzar_claude`, pero lo de segundo plano espera su turno (TAREAS_DE_FONDO)."""
+    turno = _turno_de_fondo()
+    async with turno if turno is not None else contextlib.nullcontext():
+        async with contextlib.aclosing(_lanzar_claude(sistema, entrada, esquema, modelo)) as lineas:
+            async for evento in lineas:
+                yield evento
+
+
+async def _lanzar_claude(
     sistema: str, entrada: str, esquema: dict | None = None, modelo: str | None = None
 ) -> AsyncIterator[dict]:
     """Lanza claude -p y entrega cada línea JSON. Valida el final (result, código)."""

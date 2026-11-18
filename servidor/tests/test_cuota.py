@@ -84,3 +84,42 @@ def test_si_un_evento_no_trae_la_cuota_se_queda_la_buena(monkeypatch):
     from magister.cerebro import modelo
 
     assert "or limites" in open(modelo.__file__, encoding="utf-8").read()
+
+
+async def _contar_a_la_vez(prompt: str, n: int, monkeypatch) -> int:
+    import asyncio
+
+    from magister.cerebro import modelo
+
+    vivos, pico = 0, 0
+
+    async def falso(*a, **k):
+        nonlocal vivos, pico
+        vivos += 1
+        pico = max(pico, vivos)
+        await asyncio.sleep(0.02)
+        vivos -= 1
+        yield {"type": "result"}
+
+    monkeypatch.setattr(modelo, "_lanzar_claude", falso)
+
+    async def una():
+        modelo.prompt_actual.set((prompt, "v"))
+        async for _ in modelo._lineas_claude("s", "e"):
+            pass
+
+    await asyncio.gather(*(una() for _ in range(n)))
+    return pico
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.anyio
+async def test_lo_de_fondo_espera_turno_y_lo_tuyo_no(monkeypatch):
+    from magister.config import ajustes
+
+    monkeypatch.setattr(ajustes, "modelo_fondo_a_la_vez", 3)
+    assert await _contar_a_la_vez("apuntes_bloque", 10, monkeypatch) == 3  # material: como mucho 3 a la vez
+    assert await _contar_a_la_vez("juez_tono", 10, monkeypatch) == 3
+    assert await _contar_a_la_vez("conversar", 10, monkeypatch) == 10  # tu chat no espera nunca
