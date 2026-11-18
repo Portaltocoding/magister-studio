@@ -33,7 +33,11 @@
 }
 
 /* Al cambiar de pantalla, la nueva entra con un fundido y un pequeño desplazamiento. */
-.pantalla { animation: pantalla-entra 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Sin «both»: si el desplazamiento se quedara aplicado al terminar, la pantalla haría de caja contenedora de todo lo que
+   va con position: fixed dentro (el modo foco, el panel de citas) y lo encerraría en su altura, que es 0. Y las
+   pantallas que abren una capa a pantalla completa no se animan: el fundido la encerraría mientras dura. */
+.pantalla { animation: pantalla-entra 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+.pantalla:has(> .foco) { animation: none; }
 @keyframes pantalla-entra { from { opacity: 0; translate: 0 10px; } }
 
 /* Marcar un paso de un proyecto: la casilla da un pequeño salto y la fila se asienta. */
