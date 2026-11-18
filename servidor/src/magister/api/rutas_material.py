@@ -21,6 +21,7 @@ from magister.config import ajustes
 from magister.datos.material import BancoTono, BloqueMaterial, Etiqueta, Material, Pregunta
 from magister.datos.plan import LeccionFila
 from magister.datos.sesion import sesion_por_peticion
+from magister.material import videos_plan
 from magister.tono.juez import DIMENSIONES, rubrica
 from magister.trabajos import cola, eventos
 
@@ -90,6 +91,28 @@ async def crear_tests(plan_id: int, clave: str, n: int = 5, s: AsyncSession = De
     await s.close()
     ids = await anadir_tests(plan_id, clave, [(c, nombre) for c, nombre in conceptos], "\n\n".join(textos), max(2, min(8, n)))
     return {"tests": ids}
+
+
+class PrefVideos(BaseModel):
+    cuantos: Literal["ninguno", "pocos", "normal", "muchos"] | None = None
+    hacia: Literal["mas", "menos"] | None = None
+    minutos: Literal[3, 6, 10] | None = None
+    estilo: Literal["clase", "resumen", "analogias", "examen"] | None = None
+
+
+@rutas.get("/planes/{plan_id}/videos/recomendados")
+async def videos_recomendados(plan_id: int) -> dict:
+    """Las lecciones del plan que llevan vídeo (las más duras, tantas como pidas) y tu preferencia."""
+    pref = await videos_plan.preferencias()
+    elegidas = await videos_plan.recomendadas(plan_id, pref["cuantos"])
+    return {**pref, "lecciones": [{"clave": r.clave, "titulo": r.titulo, "razon": r.razon, "con_video": r.con_video}
+                                  for r in elegidas]}
+
+
+@rutas.put("/videos/preferencias")
+async def preferencias_videos(cuerpo: PrefVideos) -> dict:
+    """Cuántos vídeos quieres en tus planes («más» o «menos» mueve un paso), su duración y su estilo."""
+    return await videos_plan.guardar_preferencias(cuerpo.model_dump(exclude_none=True))
 
 
 @rutas.get("/planes/{plan_id}/videos")

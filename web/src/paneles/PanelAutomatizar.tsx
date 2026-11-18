@@ -106,21 +106,14 @@ export default function PanelAutomatizar() {
         </li>
         <li className="regla">
           <div>
-            <strong>Vídeo de cada lección preparada</strong>
+            <strong>Vídeo de las lecciones que lo piden</strong>
             <p className="nota">
-              Cuando una lección tiene apuntes y ningún vídeo, hace uno{' '}
+              Las que el roadmap elige para vídeo (las más duras, o las que más fallas; tú dices si más o menos y de cuántos
+              minutos, en Roadmap → Vídeos de este plan): cuando ya tienen apuntes, hace uno{' '}
               <select value={r.video_al_preparar.estilo} onChange={(e) => guardar({ ...r, video_al_preparar: { ...r.video_al_preparar, estilo: e.target.value } })}>
                 {ESTILOS.map(([id, n]) => (
                   <option key={id} value={id}>
                     {n.toLowerCase()}
-                  </option>
-                ))}
-              </select>{' '}
-              de{' '}
-              <select value={r.video_al_preparar.minutos} onChange={(e) => guardar({ ...r, video_al_preparar: { ...r.video_al_preparar, minutos: Number(e.target.value) } })}>
-                {[3, 6, 10].map((m) => (
-                  <option key={m} value={m}>
-                    {m} min
                   </option>
                 ))}
               </select>

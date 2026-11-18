@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BotonLibro, guardarIndice, TituloEditable, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
 import Horario from '../componentes/Horario.tsx'
+import VideosDelPlan from '../componentes/VideosDelPlan.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import {
@@ -312,6 +313,10 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               </ol>
             </section>
             <section>
+              <VideosDelPlan
+                planId={vista.plan_id}
+                preparadas={new Set(Object.keys(material).filter((c) => ['listo', 'revisar'].includes(material[c]?.tipos?.apuntes ?? '')))}
+              />
               {vista.examenes?.length > 0 && (
                 <>
                   <h2>Exámenes</h2>

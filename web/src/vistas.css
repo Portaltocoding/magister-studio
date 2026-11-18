@@ -818,3 +818,14 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .nota-comentario { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; font-size: 0.82rem; color: var(--suave); }
 .nota-comentario small { margin-left: 6px; color: var(--acento); }
 .nota-comentario textarea { font: inherit; font-size: 0.92rem; color: var(--texto); background: transparent; border: 1px solid var(--borde); border-radius: 10px; padding: 8px 10px; resize: vertical; }
+
+/* Vídeos de este plan (roadmap) */
+.videos-plan { margin-bottom: 22px; }
+.videos-plan-ajustes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 10px; }
+.videos-plan-duracion { display: inline-flex; gap: 4px; margin-left: auto; }
+.videos-plan .boton-mini.elegido { border-color: var(--texto); font-weight: 600; }
+.videos-plan-lista { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.videos-plan-lista > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 12px; border: 1px solid var(--borde); border-radius: 10px; background: var(--tarjeta); }
+.videos-plan-lista > li > span { display: flex; flex-direction: column; min-width: 0; }
+.videos-plan-lista small { color: var(--suave, inherit); opacity: 0.8; }
+.videos-plan-confirmar { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }

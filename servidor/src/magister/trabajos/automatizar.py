@@ -1,7 +1,8 @@
 """Automatizaciones: reglas que el alumno enciende y que la API revisa cada pocos minutos.
 
 - preparar_siguiente: prepara (apuntes y fichas) la próxima lección del calendario con unos días de antelación.
-- diapositivas_al_preparar / video_al_preparar: cuando una lección queda preparada, hace sus diapositivas o su vídeo.
+- diapositivas_al_preparar / video_al_preparar: cuando una lección queda preparada, hace sus diapositivas o su vídeo
+  (el vídeo, solo en las lecciones que el roadmap elige: plan/videos.py).
 - solo_de_noche: todo lo anterior solo entre las 0:00 y las 7:00, para no gastar cuota mientras estudias.
 
 Como mucho un trabajo por vuelta y nunca si ya hay uno en marcha: la cola no se llena sola.
@@ -14,6 +15,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import text
 
 from magister.datos.sesion import nueva_sesion
+from magister.material import videos_plan
 from magister.trabajos import cola
 
 registro = logging.getLogger(__name__)
@@ -90,6 +92,16 @@ async def _lecciones(hoy: date, dias: int) -> list[dict]:
     return [{"plan_id": p, "clave": c, "titulo": t, "fecha": f, "tipos": set(tipos or [])} for p, c, t, _, f, tipos in filas]
 
 
+async def _marcar_videos(lecciones: list[dict]) -> None:
+    """Qué lecciones llevan vídeo según tu preferencia del roadmap, y de cuántos minutos (el estilo es el de la regla)."""
+    pref = await videos_plan.preferencias()
+    elegidas: set[tuple[int, str]] = set()
+    for plan_id in {x["plan_id"] for x in lecciones}:
+        elegidas |= {(plan_id, r.clave) for r in await videos_plan.recomendadas(plan_id, pref["cuantos"])}
+    for x in lecciones:
+        x.update(video=(x["plan_id"], x["clave"]) in elegidas, minutos=pref["minutos"])
+
+
 def elegir_tarea(config: dict, lecciones: list[dict], hoy: date) -> tuple[dict, list[str], dict] | None:
     """La primera cosa que toca hacer según las reglas encendidas, o None. Sin efectos: se puede probar."""
     regla = config["preparar_siguiente"]
@@ -104,9 +116,12 @@ def elegir_tarea(config: dict, lecciones: list[dict], hoy: date) -> tuple[dict, 
                 return lec, ["diapositivas"], {}
     video = config["video_al_preparar"]
     if video.get("activa"):
+        # Solo las lecciones que tu plan elige para vídeo (las más duras, tantas como pidas en el roadmap); sin esa
+        # marca (configuraciones antiguas), todas.
         for lec in lecciones:
-            if "apuntes" in lec["tipos"] and "guion" not in lec["tipos"]:
-                return lec, ["guion"], {"video": {"estilo": video.get("estilo", "clase"), "minutos": int(video.get("minutos", 6))}}
+            if "apuntes" in lec["tipos"] and "guion" not in lec["tipos"] and lec.get("video", True):
+                return lec, ["guion"], {"video": {"estilo": lec.get("estilo") or video.get("estilo", "clase"),
+                                                  "minutos": int(lec.get("minutos") or video.get("minutos", 6))}}
     return None
 
 
@@ -118,7 +133,10 @@ async def una_vuelta(ahora: datetime | None = None) -> str | None:
         return None
     if await _hay_trabajo_en_marcha():
         return None
-    tarea = elegir_tarea(config, await _lecciones(ahora.date(), 7), ahora.date())
+    lecciones = await _lecciones(ahora.date(), 7)
+    if config["video_al_preparar"].get("activa"):
+        await _marcar_videos(lecciones)
+    tarea = elegir_tarea(config, lecciones, ahora.date())
     if tarea is None:
         return None
     lec, tipos, preferencias = tarea
