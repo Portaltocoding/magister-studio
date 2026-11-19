@@ -17,7 +17,7 @@ export interface Previa {
 }
 
 export interface DatosCalentamiento {
-  mapa: { clave: string; titulo: string; proposito: string; conceptos: { id: string; nombre: string; necesita: string[] }[] }[]
+  mapa: { clave: string; titulo: string; conceptos: { id: string; nombre: string; necesita: string[] }[] }[]
   previas: Previa[]
 }
 
@@ -84,7 +84,8 @@ export default function Calentamiento({ mid, datos, alTerminar }: { mid: number;
           {datos.mapa.map((b) => (
             <li key={b.clave}>
               <strong>{b.titulo}</strong>
-              {(priming?.apartados[b.clave] ?? b.proposito) && <small>{priming?.apartados[b.clave] ?? b.proposito}</small>}
+              {/* Sin priming, un texto neutro: el propósito interno del bloque ya no llega (destripaba las preguntas). */}
+              <small>{priming?.apartados[b.clave] || 'Un apartado de la lección.'}</small>
               <div className="calentamiento-conceptos">
                 {b.conceptos.map((c) => (
                   <span key={c.id} className="chip" title={c.necesita.length ? `Se apoya en: ${c.necesita.join(', ')}` : undefined}>

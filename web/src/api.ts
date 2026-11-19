@@ -27,6 +27,8 @@ export interface Mensaje {
   traza_id?: string | null
   voto?: boolean | null
   cuenta?: boolean
+  // Las respuestas rápidas del diagnóstico que acompañaban a este mensaje del tutor.
+  respuestas_rapidas?: { campo: string; opciones: { valor: string; etiqueta: string }[] } | null
 }
 
 export interface Conversacion {
@@ -311,6 +313,8 @@ export interface CambioAsesor {
   id: number
   estado: 'propuesta' | 'aplicada' | 'descartada' | 'deshecha' | 'caducada'
   resumen: string
+  // Lo que hace el cambio en una frase, para la cabeza de la tarjeta.
+  en_breve?: string
   lineas: { texto: string; motivo: string }[]
   mensaje_id: number | null
   proyecto_id: number | null

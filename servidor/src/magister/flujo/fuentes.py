@@ -59,18 +59,20 @@ async def calcular_apoyo(buscador: Buscador | None, plan_id: int, tema_id: int |
         # Lo que el research trajo para esta lección la apoya aunque esté en otro idioma: lo eligió el juez para ella.
         # Una búsqueda por objetivo dentro de esas versiones, sin umbral, y los 2 mejores de cada uno.
         por_objetivo: list[list[tuple[int, int, float]]] = []
+        textos = {x.fragmento_id: x.texto for x in r.recuperados}
         if anclados.get(lec.clave):
             filtro = Filtros(version_ids=anclados[lec.clave])
             for objetivo in lec.objetivos or [lec.titulo]:
                 ra = await buscador.buscar(objetivo, ajustes.apoyo_por_objetivo + 1, filtro, None)
                 por_objetivo.append([(x.fragmento_id, x.rango, x.puntuacion) for x in ra.recuperados])
-        elegidos = juntar_apoyo(por_objetivo, buenos)
+                textos.update({x.fragmento_id: x.texto for x in ra.recuperados})
+        elegidos = juntar_apoyo(por_objetivo, buenos, textos=textos)
         await rf.guardar_apoyo(plan_id, lec.clave, elegidos, len(elegidos) < ajustes.min_apoyo)
 
 
 def juntar_apoyo(
     por_objetivo: list[list[tuple[int, int, float]]], buenos: list[tuple[int, int, float]], tope: int | None = None,
-    cuantos: int | None = None,
+    cuantos: int | None = None, textos: dict[int, str] | None = None,
 ) -> list[tuple[int, int, float]]:
     """Primero los anclados, por turnos entre objetivos (hasta `cuantos` de cada uno, MAGISTER_APOYO_POR_OBJETIVO, sin
     repetir); luego los que pasan la puerta, hasta `tope` en total (MAGISTER_APOYO_TOPE: que un solo objetivo no llene
@@ -79,20 +81,37 @@ def juntar_apoyo(
     cuantos = ajustes.apoyo_por_objetivo if cuantos is None else cuantos
     vistos: set[int] = set()
     salida: list[tuple[int, float]] = []
+    aceptados: list[str] = []  # los textos de lo que ya entró (los que se conocen)
+
+    def entra(fid: int) -> bool:
+        """Ni el mismo id ni, con `textos`, una casi copia de lo que ya entró (dos búsquedas distintas pueden traer
+        trozos casi iguales de dos versiones de un mismo documento: contaban dos veces)."""
+        if fid in vistos:
+            return False
+        vistos.add(fid)
+        texto = (textos or {}).get(fid)
+        if texto:
+            # Excepción a «flujo no importa de fuentes»: `colapsar` es puro (sin base, red ni modelo) y se importa aquí,
+            # dentro de la función, para no duplicar el criterio de casi copia del índice.
+            from magister.fuentes.duplicados import colapsar
+
+            if aceptados and colapsar([*aceptados, texto])[-1] != len(aceptados):
+                return False
+            aceptados.append(texto)
+        return True
+
     colas = [list(c) for c in por_objetivo]
     tomados = [0] * len(colas)
     for _ in range(cuantos):
         for i, cola in enumerate(colas):
             while cola and tomados[i] < cuantos:
                 fid, _, p = cola.pop(0)
-                if fid not in vistos:
-                    vistos.add(fid)
+                if entra(fid):
                     salida.append((fid, p))
                     tomados[i] += 1
                     break
     for fid, _, p in buenos:
-        if fid not in vistos:
-            vistos.add(fid)
+        if entra(fid):
             salida.append((fid, p))
     return [(fid, n, p) for n, (fid, p) in enumerate(salida[:tope], start=1)]
 

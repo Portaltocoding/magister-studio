@@ -19,7 +19,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import TIMESTAMP
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 NOMBRES = {
@@ -85,4 +85,6 @@ class Mensaje(Base):
     ms_primer_token: Mapped[int | None] = mapped_column(Integer)
     ms_total: Mapped[int | None] = mapped_column(Integer)
     traza_id: Mapped[str | None] = mapped_column(String(64))
+    # Las respuestas rápidas del diagnóstico ({campo, opciones}), para pintarlas también al recargar.
+    respuestas_rapidas: Mapped[dict | None] = mapped_column(JSONB)
     creado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())

@@ -22,6 +22,12 @@ export const aBurbuja = (m: Mensaje): Burbuja => ({
   noCuenta: m.cuenta === false,
 })
 
+// Las respuestas rápidas guardadas solo valen si su mensaje sigue siendo el último del hilo.
+export const respuestasDelUltimo = (ms: Mensaje[]): { valor: string; etiqueta: string }[] => {
+  const u = ms[ms.length - 1]
+  return u && u.rol === 'tutor' ? (u.respuestas_rapidas?.opciones ?? []) : []
+}
+
 export const NOMBRE_FASE: Record<string, string> = {
   extraer: 'Entendiendo lo que quieres',
   a_diagnostico: 'Pasando a preparar tu plan',
@@ -219,5 +225,11 @@ export function usarConversacion(
     setOpciones([])
   }, [turnos])
 
-  return { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar, correr, parar, soltar }
+  // El hilo guardado (al abrir o recargar): las respuestas rápidas del último mensaje, si es del tutor, vuelven a salir.
+  const cargar = useCallback((ms: Mensaje[]) => {
+    setBurbujas(ms.map(aBurbuja))
+    setOpciones(respuestasDelUltimo(ms))
+  }, [])
+
+  return { burbujas, setBurbujas, cargar, escribiendo, fase, espera, opciones, enviar, correr, parar, soltar }
 }

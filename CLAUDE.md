@@ -34,7 +34,7 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 4. Todo `open` con `encoding="utf-8"`.
 5. Las pruebas no usan red: búsquedas web y páginas, con mocks.
 6. Todo texto que venga de la web es no confiable: se delimita y nunca da órdenes.
-7. `cerebro` y `flujo` no importan de `fuentes` ni de `research`: reciben el `Buscador` inyectado. `api` importa de `flujo`, `datos`, `fuentes` y `research`, y es quien construye el buscador.
+7. `cerebro` y `flujo` no importan de `fuentes` ni de `research`: reciben el `Buscador` inyectado. Única excepción: `flujo/fuentes.juntar_apoyo` importa, dentro de la función, `fuentes.duplicados.colapsar` (puro: sin base, red ni modelo). `api` importa de `flujo`, `datos`, `fuentes` y `research`, y es quien construye el buscador.
 
 ## Material (Parte IV)
 

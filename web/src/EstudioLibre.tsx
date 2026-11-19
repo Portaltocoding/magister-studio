@@ -22,7 +22,7 @@ import { recordarPlan } from './componentes/planActivo.ts'
 import { MENSAJE_SIN_CONEXION } from './componentes/errores.ts'
 import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
-import { aBurbuja, usarConversacion } from './componentes/usarConversacion.ts'
+import { usarConversacion } from './componentes/usarConversacion.ts'
 import { escribirEnChat } from './componentes/preferencias.ts'
 import { recienCreadaTras } from './componentes/turnos.ts'
 import Mascota from './Mascota.tsx'
@@ -77,7 +77,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
       .catch(() => undefined)
       .finally(() => window.setTimeout(() => irARuta('#/roadmap'), 1200))
   }, [])
-  const { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar: mandar, correr, parar, soltar } = usarConversacion(
+  const { burbujas, setBurbujas, cargar, escribiendo, fase, espera, opciones, enviar: mandar, correr, parar, soltar } = usarConversacion(
     abrir,
     setPropuesta,
     alGuardado,
@@ -118,7 +118,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
       /* sin almacenamiento */
     }
     listarMensajes(conversacionId)
-      .then((ms) => vigente && setBurbujas(ms.map(aBurbuja)))
+      .then((ms) => vigente && cargar(ms))
       .catch((e) => {
         if (!vigente) return
         // Un enlace a una conversación borrada o que nunca existió: pantalla vacía, no el error del servidor.

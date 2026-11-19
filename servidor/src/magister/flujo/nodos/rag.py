@@ -24,6 +24,7 @@ from magister.flujo.comun import (
     fase,
     hablar,
     historial_reciente,
+    sin_etiquetas,
     sistema_de_estudio,
     tarea_de,
     turnos_recientes,
@@ -62,7 +63,7 @@ async def reescribir(estado: Estado) -> dict:
         previa = next((t["contenido"] for t in reversed(turnos[:-1]) if t.get("rol") == "usuario"), "")
         return {"consulta": f"{previa[-300:]} {mensaje}".strip() if previa else mensaje, "aclaracion": None}
     fase("reescribir")
-    sistema = cargar("reescribir").rellenar(turnos=turnos_recientes(estado, 6), mensaje=mensaje)
+    sistema = cargar("reescribir").rellenar(turnos=turnos_recientes(estado, 6), mensaje=sin_etiquetas(mensaje))
     try:
         r = await estructurar(sistema, "Devuelve la reescritura.", Reescritura)
     except ErrorEstructura:

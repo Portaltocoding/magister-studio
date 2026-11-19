@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
+import { masReciente, olvidarPlan, planActivo, recordarPlan } from '../componentes/planActivo.ts'
 import { colorDeTema } from '../componentes/colorTema.ts'
 import { BotonLibro, guardarIndice, TituloEditable, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
 import Horario from '../componentes/Horario.tsx'
@@ -343,9 +343,13 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       setTema(null)
       const ps = await listarPlanes()
       setPlanes(ps)
-      if (ps.length) {
-        recordarPlan(ps[0].tema_id)
-        setTema(ps[0].tema_id)
+      // El más reciente de los que quedan (antes, el primero de la lista), o ninguno si no queda.
+      const siguiente = masReciente(ps)
+      if (siguiente) {
+        recordarPlan(siguiente.tema_id)
+        setTema(siguiente.tema_id)
+      } else {
+        olvidarPlan()
       }
       setAviso(`Plan «${nombre}» borrado.`)
     } catch (e) {
@@ -616,6 +620,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
             <section>
               <VideosDelPlan
                 planId={vista.plan_id}
+                temaId={tema}
                 preparadas={new Set(Object.keys(material).filter((c) => ['listo', 'revisar'].includes(material[c]?.tipos?.apuntes ?? '')))}
                 enMarcha={new Set(Object.keys(material).filter((c) => material[c]?.en_marcha))}
                 alAcabar={cargarMaterial}

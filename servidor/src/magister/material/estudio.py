@@ -190,7 +190,11 @@ async def corregir_volcado(plan_id: int, clave: str, recuerdo: str, alcance: lis
     titulos = {b["clave"]: b["titulo"] for b in (m.contrato or {}).get("bloques", [])}
     exigencia = ("Es un repaso a mitad de sesión: corrige solo los apartados indicados." if alcance else
                  "Es el repaso del tema completo.")
-    sistema = cargar("volcado").rellenar(apuntes=_texto(bloques, titulos, alcance)[:30000], recuerdo=recuerdo[:12000], exigencia=exigencia)
+    from magister.seguridad.entrada import neutralizar_etiquetas
+
+    # Lo que cuenta el alumno va entre etiquetas: no puede cerrarlas.
+    sistema = cargar("volcado").rellenar(apuntes=_texto(bloques, titulos, alcance)[:30000],
+                                         recuerdo=neutralizar_etiquetas(recuerdo[:12000]), exigencia=exigencia)
     r = await estructurar(sistema, "Devuelve la corrección.", CorreccionVolcado)
     salida = r.model_dump()
     salida["apartados"] = [{**a, "titulo": titulos.get(a["clave"], a["clave"])} for a in salida["apartados"]]
@@ -287,13 +291,17 @@ async def ayuda_parrafo(mid: int, clave_bloque: str, parrafo: str, accion: str, 
         hecho = await _leer(clave)
         if hecho and hecho.get("version") == _version(m):
             return hecho["texto"]
+    from magister.seguridad.entrada import neutralizar_etiquetas
+
+    # El párrafo y la pregunta llegan de la web: nada en ellos puede cerrar las etiquetas del prompt.
+    pregunta = neutralizar_etiquetas(pregunta) if pregunta else pregunta
     titulos = {x["clave"]: x["titulo"] for x in (m.contrato or {}).get("bloques", [])}
     pedido = PEDIDOS.get(accion) or (
         f"Ha explicado con sus palabras lo que acaba de leer: «{pregunta}». Dile si lo ha entendido (sé concreto) y, si le "
         "falta algo esencial o se equivoca, qué en una frase. Si está bien, díselo y añade un matiz que lo enriquezca."
         if accion == "comprobar" else f"Su pregunta sobre el párrafo: {pregunta}")
     sistema = cargar("parrafo").rellenar(pedido=pedido, alumno=await alumno(m.plan_id), titulo=titulos.get(b.clave, b.titulo),
-                                         apartado=b.texto[:8000], parrafo=parrafo[:3000])
+                                         apartado=b.texto[:8000], parrafo=neutralizar_etiquetas(parrafo[:3000]))
     texto = "".join([t async for t in generar(sistema, [Turno("usuario", pregunta or pedido)])]).strip()
     if accion not in ("pregunta", "comprobar"):
         await _guardar(clave, {"texto": texto, "version": _version(m)})

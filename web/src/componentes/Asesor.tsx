@@ -570,9 +570,7 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
         {TITULO_CAMBIO[cambio.estado]}
       </p>
       {/* Lo que hace, contado por el código a partir de las acciones validadas (no lo que el asesor prometió antes). */}
-      {(cambio as CambioAsesor & { en_breve?: string }).en_breve && (
-        <p className="asesor-cambio-breve">{(cambio as CambioAsesor & { en_breve?: string }).en_breve}</p>
-      )}
+      {cambio.en_breve && <p className="asesor-cambio-breve">{cambio.en_breve}</p>}
       <ul>
         {(cambio.lineas as LineaCambio[]).map((l, i) => (
           <li key={i}>

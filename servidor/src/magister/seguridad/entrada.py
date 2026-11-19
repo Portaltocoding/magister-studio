@@ -35,7 +35,8 @@ def html_a_texto(html: str) -> str:
 
 
 def marcar_externo(fragmento: str, id_: str | int, origen: str) -> str:
-    palabras = canonicalizar(fragmento).split()
+    # Lo que tenga forma de etiqueta (un `</fuente_externa>` de la página, por ejemplo) no puede cerrar el bloque.
+    palabras = neutralizar_etiquetas(canonicalizar(fragmento)).split()
     return f'<fuente_externa id="{id_}" origen="{origen}">\n{MARCADOR.join(palabras)}\n</fuente_externa>'
 
 

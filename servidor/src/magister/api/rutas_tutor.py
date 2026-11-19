@@ -185,7 +185,8 @@ async def _calentamiento(s: AsyncSession, m: Material, contrato: dict, usadas: s
     nombres = {c.id: c.nombre for c in conceptos.values()}
     mapa = []
     for b in contrato.get("bloques", []):
-        mapa.append({"clave": b["clave"], "titulo": b["titulo"], "proposito": b.get("proposito", ""),
+        # Sin el propósito del bloque: es la nota interna del generador y destripaba las preguntas previas.
+        mapa.append({"clave": b["clave"], "titulo": b["titulo"],
                      "conceptos": [{"id": cid, "nombre": nombres.get(cid, cid),
                                     "necesita": [nombres.get(d, d) for d in (conceptos[cid].depende_de if cid in conceptos else [])]}
                                    for cid in b.get("conceptos", [])]})

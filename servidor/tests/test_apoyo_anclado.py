@@ -41,6 +41,18 @@ def test_los_anclados_van_por_turnos_entre_objetivos_con_tope() -> None:
     assert [f for f, _, _ in juntar_apoyo([[(1, 1, 0.7), (2, 2, 0.7)], [(1, 1, 0.7), (3, 2, 0.7)]], [])] == [1, 3, 2]
 
 
+def test_dos_casi_copias_de_busquedas_distintas_cuentan_una_vez() -> None:
+    from magister.flujo.fuentes import juntar_apoyo
+
+    base = "El protocolo TCP garantiza la entrega ordenada de los segmentos mediante números de secuencia y acuses"
+    textos = {1: base, 2: base + " de recibo.", 3: "UDP no garantiza nada: envía datagramas sueltos sin conexión previa."}
+    # El 1 llega por un objetivo y su casi copia, el 2 (otra versión del documento), por la búsqueda general.
+    elegidos = juntar_apoyo([[(1, 1, 0.7)]], [(2, 1, 0.9), (3, 2, 0.8)], textos=textos)
+    assert [f for f, _, _ in elegidos] == [1, 3] and [r for _, r, _ in elegidos] == [1, 2]
+    # Sin textos, como antes: solo cuenta el id.
+    assert [f for f, _, _ in juntar_apoyo([[(1, 1, 0.7)]], [(2, 1, 0.9), (3, 2, 0.8)])] == [1, 2, 3]
+
+
 pytestmark = pytest.mark.anyio
 
 
@@ -56,7 +68,7 @@ class BuscadorAnclado:
         self.filtros.append(filtros)
         versiones = filtros.version_ids if filtros and filtros.version_ids is not None else list(self.fragmentos)
         ids = [f for v in versiones for f in self.fragmentos.get(v, [])][:k]
-        rec = [Recuperado(f, n, 0.70, "texto", "Doc", "doc.md", "web", 1) for n, f in enumerate(ids, start=1)]
+        rec = [Recuperado(f, n, 0.70, f"texto del fragmento {f}", "Doc", "doc.md", "web", 1) for n, f in enumerate(ids, start=1)]
         return ResultadoBusqueda(rec, None, {f: 0.70 for f in ids}, "hibrida", {})
 
     async def indice_fuentes(self, tema_id, max_caracteres=6000) -> str:

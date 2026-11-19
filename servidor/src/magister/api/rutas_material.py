@@ -64,6 +64,17 @@ async def pedir_material(plan_id: int, clave: str, cuerpo: PedirMaterial, s: Asy
         raise HTTPException(404, "lección no encontrada")
     from magister.material.entrada import huella_de_apoyo
 
+    if cuerpo.forzar:
+        # «Rehacer» lleva la hora en la clave y cada clic creaba otro trabajo: si ya hay uno de esta lección con los
+        # mismos tipos pendiente o en curso, se devuelve ese.
+        from magister.datos.material import Trabajo
+
+        vivos = (await s.execute(select(Trabajo.id, Trabajo.parametros).where(
+            Trabajo.tipo == "material", Trabajo.plan_id == plan_id, Trabajo.leccion_clave == clave,
+            Trabajo.estado.in_(("pendiente", "en_curso"))).order_by(Trabajo.id.desc()))).all()
+        igual = next((tid for tid, par in vivos if sorted((par or {}).get("tipos") or []) == sorted(cuerpo.tipos)), None)
+        if igual is not None:
+            return {"trabajo_id": igual, "nuevo": False}
     await s.close()
     fuentes = await huella_de_apoyo(plan_id, clave)
     clave_trabajo = cola.clave_idempotencia(
@@ -377,6 +388,8 @@ def _material(m: Material, con_texto: bool = False) -> dict:
 async def material_de_leccion(plan_id: int, clave: str, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     mats = (await s.scalars(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave)
                             .order_by(Material.estado == "generando", Material.id.desc()))).all()
+    if not mats and await s.get(LeccionFila, (plan_id, clave)) is None:
+        raise HTTPException(404, "lección no encontrada")  # antes, un 200 vacío para un plan que no existe
     ultimo: dict[str, Material] = {}
     for m in mats:
         ultimo.setdefault(m.tipo, m)

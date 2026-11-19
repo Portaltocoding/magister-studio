@@ -103,6 +103,8 @@ class MensajeSalida(Salida):
     voto: bool | None = None
     # «Esto no cuenta para el tutor»: se guarda por mensaje para que lo que lea el perfil pueda excluirlo.
     cuenta: bool = True
+    # Las respuestas rápidas del diagnóstico ({campo, opciones: [{valor, etiqueta}]}) que acompañaban a este mensaje.
+    respuestas_rapidas: dict | None = None
 
 
 class DecisionEntrada(BaseModel):

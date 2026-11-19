@@ -106,6 +106,7 @@ async def guardar_respuesta(
     ms_total: int,
     cuenta: bool = True,
     traza_id: str | None = None,
+    respuestas_rapidas: dict | None = None,
 ) -> int:
     """Guarda la respuesta del tutor con una sesión nueva (no la de la petición)."""
     async with nueva_sesion() as s:
@@ -120,6 +121,7 @@ async def guardar_respuesta(
             ms_total=ms_total,
             cuenta=cuenta,
             traza_id=traza_id,
+            respuestas_rapidas=respuestas_rapidas,
         )
         s.add(m)
         await s.execute(update(Conversacion).where(Conversacion.id == cid).values(actualizada_en=func.now()))

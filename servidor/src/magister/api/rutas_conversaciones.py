@@ -160,6 +160,8 @@ class Preparado:
     cuenta: bool
     nota: dict | None = None  # la nota que acaba de guardar «guárdalo»
     pregunta_id: int | None = None
+    # El cuerpo lo valida solo la dependencia: si la ruta también lo declaraba, cada error salía dos veces en el 422.
+    cuerpo: MensajeEntrada | None = None
 
 
 # Un turno cada vez por conversación. Si llega otro con uno en marcha (lo reenvías, o en la llamada el dictado manda tu
@@ -229,7 +231,7 @@ def guardador(cid: int, cuenta: bool):
         from magister.cerebro.modelo import traza_actual
 
         mid = await dc.guardar_respuesta(cid, texto, estado, ajustes.modelo, ajustes.motor, ms_primer, ms_total, cuenta,
-                                         traza_actual.get())
+                                         traza_actual.get(), extra.get("opciones"))
         if extra.get("citas"):
             await dc.guardar_citas(mid, extra["citas"], extra.get("busqueda_id"))
         return mid
@@ -254,13 +256,15 @@ async def preparar_mensaje(
         nota = await guardar_respuesta_anterior(s, cid)
     pregunta = await dc.guardar_pregunta(s, cid, cuerpo.contenido, cuerpo.cuenta)
     turnos = [{"rol": m.rol, "contenido": m.contenido} for m in await dc.historial_completo(s, cid)]
-    return Preparado(tipo, turnos, cuerpo.cuenta, nota, pregunta.id)
+    return Preparado(tipo, turnos, cuerpo.cuenta, nota, pregunta.id, cuerpo)
 
 
 @rutas.post("/conversaciones/{cid}/mensajes", response_class=EventSourceResponse)
 async def enviar_mensaje(
-    cid: int, cuerpo: MensajeEntrada, p: Preparado = Depends(preparar_mensaje)
+    cid: int, p: Preparado = Depends(preparar_mensaje)
 ) -> AsyncIterator[ServerSentEvent]:
+    cuerpo = p.cuerpo
+    assert cuerpo is not None
     fase_inicial = "diagnostico" if p.tipo == "plan" else "estudio"
     async with turno_en_curso(cid) as turno:
         turnos = await historial_del_turno(cid, p.pregunta_id, cuerpo.llamada) if p.pregunta_id else p.turnos

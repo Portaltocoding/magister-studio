@@ -23,6 +23,20 @@ export function recordarPlan(temaId: number | null | undefined): void {
   }
 }
 
+// Ya no hay plan con el que estés (borraste el último).
+export function olvidarPlan(): void {
+  try {
+    localStorage.removeItem(CLAVE)
+  } catch {
+    /* sin almacenamiento: no había nada guardado */
+  }
+}
+
+// Lógica pura: tras borrar un plan, el más reciente de los que quedan (el de id más alto), o ninguno.
+export function masReciente<T extends { plan_id: number }>(planes: T[]): T | undefined {
+  return planes.reduce<T | undefined>((mejor, p) => (!mejor || p.plan_id > mejor.plan_id ? p : mejor), undefined)
+}
+
 // Lógica pura: qué plan abrir. Manda el que pide la ruta (un enlace a una lección concreta); si no, el que tenías
 // elegido; si ese ya no existe (lo borraste), el primero.
 export function planQueToca<T extends { tema_id: number }>(planes: T[], deLaRuta: number | null | undefined, guardado: number | null): T | undefined {

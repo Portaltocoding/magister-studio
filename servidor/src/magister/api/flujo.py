@@ -112,9 +112,11 @@ async def flujo_tutor(
                         texto.append(seguro)
                         yield ServerSentEvent(data={"t": seguro}, event="delta")
                 elif tipo == "citas":
-                    extra = {k: v for k, v in ev.items() if k != "tipo"}
+                    extra.update({k: v for k, v in ev.items() if k != "tipo"})
                 else:
                     datos = {k: v for k, v in ev.items() if k != "tipo"}
+                    if tipo == "opciones":
+                        extra["opciones"] = datos  # las respuestas rápidas se guardan con el mensaje (al recargar)
                     yield ServerSentEvent(data=datos, event=str(tipo))
             resto = filtro.final()
             if resto:

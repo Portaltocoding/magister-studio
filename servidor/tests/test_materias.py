@@ -98,8 +98,13 @@ async def test_el_tutor_lleva_el_perfil_del_tema_de_la_conversacion(cliente) -> 
 async def test_sin_tema_ni_pista_todo_sigue_como_antes(cliente) -> None:
     from magister.flujo.comun import sistema_de_estudio
 
+    from magister.flujo.comun import IDIOMA_ESPANOL
+
     cid = (await cliente.post("/api/conversaciones", json={"titulo": "Una duda"})).json()["id"]
-    assert await sistema_de_estudio("BASE", {"conversacion_id": cid}) == await sistema_de_estudio("BASE", {})
+    # Sin tema ni pista, solo las preferencias de siempre: con español elegido (lo de serie), la línea del idioma.
+    con_conversacion = await sistema_de_estudio("BASE", {"conversacion_id": cid})
+    assert con_conversacion.startswith("BASE\n\n") and con_conversacion.endswith("- " + IDIOMA_ESPANOL)
+    assert con_conversacion.count("\n\n") == 1
     assert await sistema_de_estudio("BASE", {}) == "BASE"
 
 

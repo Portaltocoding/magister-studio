@@ -350,7 +350,8 @@ class BuscadorDeApoyo:
         from magister.cerebro.contratos import Recuperado, ResultadoBusqueda
 
         self.params.append(params)
-        rec = [Recuperado(i, n, c, "texto", "Doc", "doc.md", "vault", 1)
+        # Cada uno con su texto: textos iguales serían casi copias y el apoyo los contaría una vez.
+        rec = [Recuperado(i, n, c, f"texto del fragmento {i}", "Doc", "doc.md", "vault", 1)
                for n, (i, c) in enumerate(zip(self.ids, self.cosenos), start=1)][:k]
         puntos = {i: self.reranker for i in self.ids} if self.reranker is not None and params and params.puntuar_reranker else {}
         return ResultadoBusqueda(rec, None, dict(zip(self.ids, self.cosenos)), "hibrida", puntos)

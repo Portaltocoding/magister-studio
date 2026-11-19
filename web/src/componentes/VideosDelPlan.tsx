@@ -71,11 +71,14 @@ const esperar = (ms: number, signal: AbortSignal) =>
 
 export default function VideosDelPlan({
   planId,
+  temaId,
   preparadas,
   enMarcha,
   alAcabar,
 }: {
   planId: number
+  // El tema del plan: «Ver» abre #/video/<tema>, ese plan y no el que tuviera Vídeo.
+  temaId?: number | null
   preparadas: Set<string>
   // Lecciones con un trabajo de material en marcha (de aquí o de Lecciones): se sigue ese, no se pide otro.
   enMarcha?: Set<string>
@@ -277,7 +280,7 @@ export default function VideosDelPlan({
                 {l.con_video ? (
                   <span className="videos-plan-accion">
                     {t?.estado === 'hecho' && <small role="status">Listo</small>}
-                    <button className="boton-mini" onClick={() => irARuta('#/video')}>
+                    <button className="boton-mini" onClick={() => irARuta(temaId ? `#/video/${temaId}` : '#/video')}>
                       ▶ Ver
                     </button>
                   </span>
