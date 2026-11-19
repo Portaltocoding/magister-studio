@@ -51,13 +51,32 @@ export function leerModo(texto: string) {
 export function ModoTarjeta({ texto, completo }: { texto: string; completo: boolean }) {
   const p = usarPreferencias()
   const modo = leerModo(texto)
-  const [estado, setEstado] = useState<'propuesta' | 'hecho' | 'no'>('propuesta')
-  if (!completo || !modo.nombre) return null
+  const [estado, setEstado] = useState<'propuesta' | 'hecho' | 'activado' | 'no'>('propuesta')
+  const [fallo, setFallo] = useState(false)
+  // Un modo sin reglas no cambia nada: no se ofrece.
+  if (!completo || !modo.nombre || !modo.reglas.length) return null
+  // Si ya tienes uno con ese nombre, solo se activa: crearlo otra vez dejaba duplicados (_2) en cada recarga.
+  const igual = (s: string) => s.toLowerCase().replace(/\s+/g, '')
+  const existente = p ? todosLosModos(p).find((m) => igual(m.nombre) === igual(modo.nombre)) : undefined
   const crear = async (activar: boolean) => {
-    if (!p) return
-    const id = idDeModo(modo.nombre, todosLosModos(p).map((m) => m.id))
-    await cambiarPreferencias({ modos: [...p.modos, { id, ...modo }], ...(activar ? { modo: id } : {}) })
-    setEstado('hecho')
+    setFallo(false)
+    try {
+      if (!p) throw new Error('sin preferencias')
+      const id = idDeModo(modo.nombre, todosLosModos(p).map((m) => m.id))
+      await cambiarPreferencias({ modos: [...p.modos, { id, ...modo }], ...(activar ? { modo: id } : {}) })
+      setEstado('hecho')
+    } catch {
+      setFallo(true)
+    }
+  }
+  const activar = async (id: string) => {
+    setFallo(false)
+    try {
+      await cambiarPreferencias({ modo: id })
+      setEstado('activado')
+    } catch {
+      setFallo(true)
+    }
   }
   return (
     <div className={`agendar-tarjeta modo-tarjeta ${estado}`}>
@@ -69,7 +88,17 @@ export function ModoTarjeta({ texto, completo }: { texto: string; completo: bool
           <li key={r}>{r}</li>
         ))}
       </ul>
-      {estado === 'propuesta' ? (
+      {estado === 'propuesta' && existente ? (
+        <div className="botones">
+          <span className="nota">Ya lo tienes.</span>
+          <button className="boton boton-principal" onClick={() => activar(existente.id)}>
+            Activarlo
+          </button>
+          <button className="boton-mini" onClick={() => setEstado('no')}>
+            Ahora no
+          </button>
+        </div>
+      ) : estado === 'propuesta' ? (
         <div className="botones">
           <button className="boton boton-principal" onClick={() => crear(true)}>
             Crear y activar
@@ -83,8 +112,15 @@ export function ModoTarjeta({ texto, completo }: { texto: string; completo: bool
         </div>
       ) : estado === 'hecho' ? (
         <p className="nota">✓ Creado. Lo cambias con el selector de modo, junto al cuadro de texto.</p>
+      ) : estado === 'activado' ? (
+        <p className="nota">✓ Activado. Lo cambias con el selector de modo, junto al cuadro de texto.</p>
       ) : (
         <p className="nota">Vale, no lo creo.</p>
+      )}
+      {fallo && (
+        <p className="nota" role="alert">
+          {existente && estado === 'propuesta' ? 'No he podido activarlo.' : 'No he podido crearlo.'} Inténtalo de nuevo.
+        </p>
       )}
     </div>
   )

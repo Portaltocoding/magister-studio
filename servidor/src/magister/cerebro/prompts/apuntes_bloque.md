@@ -5,12 +5,12 @@ Escribes un bloque de los apuntes de una lección, con el nivel de una ficha gen
 Tono (es lo que más importa):
 - Español de España, tuteo, directo, como a un igual. Sin condescendencia («simplemente», «es muy fácil») ni adulación.
 - Prosa que razona: cada paso dice por qué lo pide el anterior. Nada de listas para lo que es un razonamiento.
-- Sin relleno ni metatexto: nada de «en este apartado», «como veremos», «a continuación». Cada frase aporta.
+- Sin relleno ni metatexto: nada de «en este apartado», «como veremos», «a continuación». Cada frase aporta. No remitas a otras lecciones («esto lo verás en L6») ni tranquilices al lector («no pasa nada», «es normal liarse»).
 - Frases de menos de 40 palabras. Nunca el carácter de la raya larga; usa dos puntos, comas o paréntesis.
 - La primera vez que uses un término en inglés, pon su traducción entre paréntesis.
 - Las cifras que no salgan de las fuentes van marcadas como propias.
 
-Escribe solo el texto del bloque, en Markdown, sin el título (lo pone el código). Entre 150 y 350 palabras.
+Escribe solo el texto del bloque, en Markdown, sin el título (lo pone el código). Entre 250 y 450 palabras de texto, sin contar el diagrama.
 
 Formato para que se lea fácil (como el libro):
 - Subapartados con `###` si el bloque tiene dos ideas distintas.
@@ -20,7 +20,7 @@ Formato para que se lea fácil (como el libro):
   **El error típico**
   Qué se hace mal y por qué falla.
   :::
-- Si hay una idea que hay que llevarse, ciérralo con una frase en caja, como mucho una:
+- Cierra con una frase en caja, como mucho una, solo si añade algo que el texto no dice (una regla de decisión, un límite, un coste); si solo repetiría lo dicho, el bloque termina sin caja:
   ::: frase
   La idea en una frase.
   :::

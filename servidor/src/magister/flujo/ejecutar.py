@@ -10,6 +10,7 @@ from datetime import date
 from langgraph.types import Command
 
 from magister.flujo.grafo import grafo
+from magister.flujo.intencion import rechaza_plan
 
 
 def _config(cid: int) -> dict:
@@ -61,9 +62,11 @@ async def _correr(entrada: dict | Command, cid: int) -> AsyncIterator[dict]:
 async def mensaje(
     cid: int, texto: str, turnos: list[dict], hoy: date, fase_inicial: str, voz: bool = False, extra: dict | None = None
 ) -> AsyncIterator[dict]:
-    """Un mensaje del alumno. Si había un plan propuesto, el mensaje cuenta como «cambiar»."""
+    """Un mensaje del alumno. Si había un plan propuesto, el mensaje cuenta como «cambiar», salvo que lo deje
+    («déjalo», «sin plan»): entonces lo descarta."""
     if await pendiente_de_decision(cid):
-        async for ev in decision(cid, {"accion": "cambiar", "texto": texto}, hoy, turnos):
+        accion = "descartar" if rechaza_plan(texto) else "cambiar"
+        async for ev in decision(cid, {"accion": accion, "texto": texto}, hoy, turnos):
             yield ev
         return
     entrada: dict = {"conversacion_id": cid, "mensaje": texto, "turnos": turnos, "hoy": hoy.isoformat(), "voz": voz,

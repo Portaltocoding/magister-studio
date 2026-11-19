@@ -204,3 +204,136 @@ async def test_generador_con_eco_y_reanudar(base, monkeypatch, tmp_path) -> None
     assert "## Claves {" in m.texto and "::: capitulo" in m.texto and m.estado in ("listo", "revisar")
     assert final["contrato"]["bloques"][0]["clave"] == "b1"
     eco.vaciar()
+
+
+# Arreglos de la auditoría de creación de contenido
+
+
+def test_lint_deja_los_simbolos_de_unidades_y_veta_los_emojis() -> None:
+    assert revisar("Mide un ángulo de 90° con el transportador.") == []
+    assert "unicode" in {h.regla for h in revisar("Mide un ángulo de 90 grados \U0001F600 con el transportador.")}
+    assert "unicode" in {h.regla for h in revisar("Mide un ángulo recto ✅ con el transportador.")}
+
+
+async def test_la_cita_del_juez_vale_aunque_los_apuntes_lleven_marcas(monkeypatch) -> None:
+    from magister.material import completitud
+
+    async def juicio(*_a, **_k):
+        return completitud.JuicioCompletitud(cita="clave primaria identifica cada fila", razon="r", explicado=True)
+
+    monkeypatch.setattr(completitud, "estructurar", juicio)
+    j = await completitud._juzgar("La **clave primaria** identifica `cada` fila.", {"nombre": "Clave primaria"})
+    assert j["cita_valida"] is True and j["explicado"] is True
+
+
+async def test_el_nucleo_sin_nombrar_se_le_pregunta_al_juez(monkeypatch) -> None:
+    from magister.material import completitud
+
+    juzgados: list[str] = []
+    veredicto = {"explicado": True}
+
+    async def juzgar(_texto, c):
+        juzgados.append(c["id"])
+        return {"explicado": veredicto["explicado"], "cita_valida": True}
+
+    monkeypatch.setattr(completitud, "_juzgar", juzgar)
+    texto = "Cada fila lleva un identificador que no se repite: así se distingue de las demás."
+    informe = await completitud.informe_completitud(texto, ENTRADA)
+    assert juzgados == ["clave-primaria"]  # la de ampliación sin nombrar no gasta juez
+    assert informe["faltan_nucleo"] == [] and informe["conceptos"]["clave-primaria"]["nombrado"] is False
+    veredicto["explicado"] = False
+    assert (await completitud.informe_completitud(texto, ENTRADA))["faltan_nucleo"] == ["clave-primaria"]
+
+
+async def _trabajo_que_falla(monkeypatch, error: Exception) -> int:
+    from magister.trabajos import cola
+    from magister.trabajos import material as trabajos_material
+
+    async def fallar(*_a, **_k):
+        raise error
+
+    monkeypatch.setattr(trabajos_material, "ejecutar", fallar)
+    tid, _ = await cola.encolar("material", None, None, {"tipos": ["apuntes"]}, f"clave-{id(error)}")
+    return tid
+
+
+async def _liberar(tid: int) -> None:
+    # Se salta la espera del reintento: el trabajo vuelve a estar listo para cogerse.
+    from sqlalchemy import update
+
+    from magister.datos.sesion import nueva_sesion
+    from magister.datos.material import Trabajo
+
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(update(Trabajo).where(Trabajo.id == tid).values(lease_hasta=None))
+
+
+async def test_un_error_de_estructura_falla_al_segundo_intento(base, monkeypatch) -> None:
+    from magister.cerebro.estructura import ErrorEstructura, Intento
+    from magister.trabajos import cola
+    from magister.trabajos.trabajador import MENSAJE_ESTRUCTURA, ejecutar_uno
+
+    tid = await _trabajo_que_falla(monkeypatch, ErrorEstructura("Contrato", [Intento(["falta el campo bloques"])]))
+    assert await ejecutar_uno("t1")
+    assert (await cola.leer(tid))["estado"] == "pendiente"
+    await _liberar(tid)
+    assert await ejecutar_uno("t1")
+    t = await cola.leer(tid)
+    assert t["estado"] == "fallido" and t["intentos"] == 2 and t["error"] == MENSAJE_ESTRUCTURA
+
+
+@pytest.mark.parametrize("error", ["modelo", "estructura"])
+async def test_un_trabajo_frenado_no_se_reintenta(base, monkeypatch, error) -> None:
+    from magister.cerebro.estructura import ErrorEstructura, Intento
+    from magister.cerebro.modelo import ErrorModelo
+    from magister.trabajos import cola
+    from magister.trabajos.trabajador import MENSAJE_FRENO, ejecutar_uno
+
+    freno = "freno: todas las llamadas al modelo en pausa por demasiadas llamadas seguidas"
+    e = ErrorModelo(freno) if error == "modelo" else ErrorEstructura("Contrato", [Intento([f"error del modelo: {freno}"])])
+    tid = await _trabajo_que_falla(monkeypatch, e)
+    assert await ejecutar_uno("t1")
+    t = await cola.leer(tid)
+    assert t["estado"] == "fallido" and t["intentos"] == 1 and t["error"] == MENSAJE_FRENO
+
+
+async def test_otro_error_del_modelo_se_sigue_reintentando(base, monkeypatch) -> None:
+    from magister.cerebro.modelo import ErrorModelo
+    from magister.trabajos import cola
+    from magister.trabajos.trabajador import ejecutar_uno
+
+    tid = await _trabajo_que_falla(monkeypatch, ErrorModelo("overloaded"))
+    assert await ejecutar_uno("t1")
+    assert (await cola.leer(tid))["estado"] == "pendiente"
+
+
+async def test_si_no_sale_el_animado_se_avisa(base, monkeypatch, tmp_path) -> None:
+    from magister.config import ajustes
+    from magister.material.entrada import entrada_de_leccion
+    from magister.trabajos import cola
+    from magister.trabajos import material as trabajos_material
+
+    monkeypatch.setattr(ajustes, "salidas", str(tmp_path))
+
+    async def sin_grafico(*_a, **_k):
+        return None
+
+    async def guion(*_a, **_k):
+        return "[[intuicion]]\nImagina una tabla.\n[[choque]]\nSin clave se repite.\n[[nombre]]\nEs la clave primaria."
+
+    monkeypatch.setattr(trabajos_material, "generar_guion_grafico", sin_grafico)
+    monkeypatch.setattr(trabajos_material, "generar_guion", guion)
+    plan_id = await plan_aceptado()
+    tid, _ = await cola.encolar("material", plan_id, "L1", {"tipos": ["guion"]}, "clave-animado")
+    entrada = await entrada_de_leccion(plan_id, "L1")
+    entrada.preferencias = {"video": {"animado": True}}
+
+    async def nada(*_a) -> None:
+        return None
+
+    async def seguir() -> bool:
+        return False
+
+    await trabajos_material._extras(tid, plan_id, "L1", ["guion"], entrada, "Apuntes.", nada, seguir)
+    avisos = (await cola.leer(tid))["avisos"]
+    assert {"regla": "video.sin_animado", "detalle": "No ha salido el vídeo animado: te dejo el guion narrado."} in avisos

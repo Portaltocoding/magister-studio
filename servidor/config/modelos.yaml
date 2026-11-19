@@ -31,6 +31,7 @@ plazos_prompt:
   diagrama_apartado: 90
   adelanto: 40
   guion_grafico: 420
+  proyecto_arquitectura: 90  # el dibujo es decorativo: no puede tener al proyecto esperando
 
 # Qué tarea es cada plantilla de prompt.
 prompts:

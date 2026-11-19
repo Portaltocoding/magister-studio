@@ -26,7 +26,10 @@ def etiqueta(p: float, vistas: int, ultimo_acierto: bool) -> str:
 
 async def plan_de_pregunta(pregunta_id: str) -> int:
     async with nueva_sesion() as s:
-        return (await s.get(Pregunta, pregunta_id)).plan_id
+        p = await s.get(Pregunta, pregunta_id)
+    if p is None:
+        raise LookupError("esa pregunta ya no existe")
+    return p.plan_id
 
 
 async def conceptos(ahora: datetime) -> list[dict]:

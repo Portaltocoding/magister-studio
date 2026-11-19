@@ -46,7 +46,9 @@ def tasas(informe: dict[str, dict], conceptos: list[dict]) -> dict[str, float]:
     nucleo = [c["id"] for c in conceptos if c.get("nucleo", True)]
     extension = [c["id"] for c in conceptos if not c.get("nucleo", True)]
 
-    def tasa(ids: list[str]) -> float:
-        return sum(1 for i in ids if informe[i]["nombrado"] and informe[i]["explicado"]) / len(ids) if ids else 1.0
+    def tasa(ids: list[str], hace_falta_nombrarlo: bool) -> float:
+        bien = sum(1 for i in ids if informe[i]["explicado"] and (informe[i]["nombrado"] or not hace_falta_nombrarlo))
+        return bien / len(ids) if ids else 1.0
 
-    return {"nucleo": round(tasa(nucleo), 3), "extension": round(tasa(extension), 3)}
+    # Al núcleo sin nombrar lo juzga el juez (un nombre largo casi nunca sale literal): si lo da por explicado, cuenta.
+    return {"nucleo": round(tasa(nucleo, False), 3), "extension": round(tasa(extension, True), 3)}

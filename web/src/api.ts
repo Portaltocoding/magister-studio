@@ -301,7 +301,7 @@ export function enviar(cid: number, contenido: string, signal: AbortSignal, cuen
 
 export const propuestaPendiente = (cid: number) => pedir<Propuesta | null>(`/api/conversaciones/${cid}/propuesta`)
 
-export function decidir(cid: number, accion: 'aceptar' | 'cambiar', texto: string | null, signal: AbortSignal) {
+export function decidir(cid: number, accion: 'aceptar' | 'cambiar' | 'descartar', texto: string | null, signal: AbortSignal) {
   return flujo<EventoTutor>(`/api/conversaciones/${cid}/plan/decision`, { accion, texto }, signal)
 }
 

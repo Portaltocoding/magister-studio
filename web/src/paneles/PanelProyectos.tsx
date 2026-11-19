@@ -600,6 +600,12 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
             )}
           </div>
 
+          {/* Un detallado que falla devuelve el proyecto a «listo» con el motivo: sin esto, el botón reaparece sin explicación. */}
+          {p.estado === 'listo' && p.error && p.error !== 'cancelado' && (
+            <p className="nota" role="alert">
+              Lo último que pediste no salió: {p.error}
+            </p>
+          )}
           {r.niveles.map((n) => (
             <NivelVista key={n.id} n={n} hechos={hechos} proyecto={p} alMarcar={marcar} alDetallar={() => detallar(n.numero)} ocupado={p.estado === 'generando'} />
           ))}

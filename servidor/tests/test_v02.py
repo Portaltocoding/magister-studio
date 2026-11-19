@@ -90,6 +90,22 @@ async def test_mensaje_con_plan_pendiente_es_un_cambio(cliente) -> None:
     assert fases[0] == "extraer" and "calendarizar" in fases
 
 
+async def test_ahora_no_descarta_el_plan_propuesto(cliente) -> None:
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "Plan", "tipo": "plan"})).json()["id"]
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": PETICION})
+    assert (await cliente.get(f"/api/conversaciones/{cid}/propuesta")).json() is not None
+    r = await cliente.post(f"/api/conversaciones/{cid}/plan/decision", json={"accion": "descartar"})
+    ev = eventos_sse(r.text)
+    assert ev[-1][0] == "fin" and "Vale, sin plan" in "".join(d.get("t", "") for e, d in ev if e == "delta")
+    assert (await cliente.get(f"/api/conversaciones/{cid}/propuesta")).json() is None
+    # Por escrito también: «déjalo» con un plan propuesto lo descarta en vez de rehacerlo.
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "hazme un plan de bases de datos"})
+    assert (await cliente.get(f"/api/conversaciones/{cid}/propuesta")).json() is not None
+    r = await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "déjalo, sin plan"})
+    assert "extraer" not in [d["nodo"] for e, d in eventos_sse(r.text) if e == "fase"]
+    assert (await cliente.get(f"/api/conversaciones/{cid}/propuesta")).json() is None
+
+
 async def test_tema_sin_plan_da_404(cliente) -> None:
     t = (await cliente.post("/api/temas", json={"nombre": "Redes"})).json()
     assert (await cliente.get(f"/api/temas/{t['id']}/plan")).status_code == 404

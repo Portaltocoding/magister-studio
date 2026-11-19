@@ -90,7 +90,7 @@ def _con_pasos(bloques: list[BloqueGen], donde: str) -> list[str]:
     errores = []
     for b in bloques:
         if not 2 <= len(b.pasos) <= 6:
-            errores.append(f"El bloque «{b.titulo}» de {donde} necesita de 2 a 6 pasos (tiene {len(b.pasos)}).")
+            errores.append(f"El bloque «{b.titulo}» en {donde} necesita de 2 a 6 pasos (tiene {len(b.pasos)}).")
         for p in b.pasos:
             errores += errores_paso(p)
     titulos = [p.titulo.strip().lower() for b in bloques for p in b.pasos]
@@ -127,6 +127,19 @@ def _texto_roadmap(r: RoadmapGen) -> str:
     return " ".join(partes)
 
 
+def _sueltos(r: RoadmapGen) -> list[str]:
+    """Los términos del glosario que no salen en ningún sitio del roadmap (relleno)."""
+    todo = _raices(_texto_roadmap(r))
+    return [t.termino for t in r.glosario if not _raices(re.sub(r"\(.*?\)", "", t.termino)) <= todo]
+
+
+def _glosario(r: RoadmapGen) -> list[Termino]:
+    """El glosario sin los términos sueltos, si quedan al menos 3 (si no, tal cual: la regla ya lo ha dicho)."""
+    sueltos = set(_sueltos(r))
+    limpio = [t for t in r.glosario if t.termino not in sueltos]
+    return limpio if len(limpio) >= 3 else list(r.glosario)
+
+
 def reglas_roadmap(r: RoadmapGen) -> list[str]:
     """Lo que el esquema no puede exigir, en código y sin juez: un esqueleto fiable cada vez."""
     errores = _con_pasos(r.niveles[0].bloques, "el nivel 1")
@@ -140,10 +153,10 @@ def reglas_roadmap(r: RoadmapGen) -> list[str]:
     objetivos = [n.objetivo.strip().lower() for n in r.niveles]
     if len(set(objetivos)) < len(objetivos):
         errores.append("Dos niveles tienen el mismo objetivo: cada nivel debe hacer algo más que el anterior.")
-    # El glosario es de lo que sale en el roadmap: un término que no aparece en ningún sitio es relleno.
-    todo = _raices(_texto_roadmap(r))
-    sueltos = [t.termino for t in r.glosario if not _raices(re.sub(r"\(.*?\)", "", t.termino)) <= todo]
-    if sueltos:
+    # El glosario es de lo que sale en el roadmap: los términos sueltos (relleno) se quitan al montar, y solo es un
+    # error si sin ellos se queda corto (no merece rehacer el roadmap entero por un término suelto).
+    sueltos = _sueltos(r)
+    if sueltos and len(r.glosario) - len(sueltos) < 3:
         errores.append(f"Estos términos del glosario no salen en el roadmap (quítalos o úsalos donde toque): {', '.join(sueltos)}.")
     terminos = [t.termino.strip().lower() for t in r.glosario]
     if len(set(terminos)) < len(terminos):
@@ -168,7 +181,7 @@ def montar(r: RoadmapGen) -> dict:
         })
     return {
         "resumen": r.resumen, "que_es": r.que_es, "por_que": r.por_que,
-        "glosario": [t.model_dump() for t in r.glosario], "arquitectura": r.arquitectura,
+        "glosario": [t.model_dump() for t in _glosario(r)], "arquitectura": r.arquitectura,
         "niveles": niveles, "riesgos": [x.model_dump() for x in r.riesgos], "fuera_de_alcance": r.fuera_de_alcance,
     }
 
@@ -211,7 +224,14 @@ def pasos(roadmap: dict) -> list[dict]:
 
 
 def texto_referencias(referencias: list[dict]) -> str:
-    return "\n".join(f"- {r['titulo']} ({r['url']}): {r.get('motivo', '')}" for r in referencias) or "(ninguna)"
+    """Las referencias de la web, marcadas como externas: son datos, nunca instrucciones."""
+    from magister.seguridad.entrada import AVISO, marcar_externo
+
+    if not referencias:
+        return "(ninguna)"
+    marcadas = [marcar_externo(f"{r['titulo'][:200]} ({r['url'][:500]}): {(r.get('motivo') or '')[:400]}", i, "web")
+                for i, r in enumerate(referencias, 1)]
+    return AVISO + "\n\n" + "\n".join(marcadas)
 
 
 async def generar_roadmap(datos: dict, referencias: list[dict]) -> dict:
@@ -223,7 +243,28 @@ async def generar_roadmap(datos: dict, referencias: list[dict]) -> dict:
     return montar(r)
 
 
-async def detallar_nivel(roadmap: dict, numero: int, hechos: list[str], decisiones: list[dict], datos: dict) -> dict:
+def texto_niveles_anteriores(roadmap: dict, numero: int, hechos: list[str]) -> str:
+    """Los pasos de los niveles ya detallados antes de este, con lo hecho marcado: el nivel nuevo parte de ahí."""
+    partes = []
+    for n in roadmap["niveles"]:
+        if n["numero"] >= numero or not n.get("detallado"):
+            continue
+        partes.append(f"Nivel {n['numero']}: {n['titulo']}")
+        partes += [f"- {'[hecho] ' if p['id'] in hechos else ''}{p['titulo']}: {p['que_haces']}"
+                   for b in n["bloques"] for p in b["pasos"]]
+    return "\n".join(partes) or "(ninguno)"
+
+
+def _texto_diario(decisiones: list[dict]) -> str:
+    lineas = []
+    for d in decisiones[-15:]:  # las más recientes: el diario puede crecer mucho
+        contexto = (d.get("contexto") or "").strip()
+        lineas.append(f"- {d['titulo']}: {d['decision']}" + (f" (contexto: {contexto})" if contexto else ""))
+    return "\n".join(lineas) or "(sin decisiones apuntadas)"
+
+
+def sistema_nivel(roadmap: dict, numero: int, hechos: list[str], decisiones: list[dict], datos: dict) -> str:
+    """El prompt para detallar un nivel (sin llamar al modelo, para poder probarlo)."""
     nivel = next(n for n in roadmap["niveles"] if n["numero"] == numero)
     hecho = [f"- {p['titulo']}" for p in pasos(roadmap) if p["id"] in hechos] or ["(todavía nada)"]
     resumen_proyecto = {
@@ -231,13 +272,18 @@ async def detallar_nivel(roadmap: dict, numero: int, hechos: list[str], decision
         "resumen": roadmap["resumen"], "arquitectura": roadmap["arquitectura"],
         "niveles": [{"numero": n["numero"], "titulo": n["titulo"], "objetivo": n["objetivo"]} for n in roadmap["niveles"]],
     }
-    sistema = cargar("proyecto_nivel").rellenar(
+    return cargar("proyecto_nivel").rellenar(
         proyecto=json.dumps(resumen_proyecto, ensure_ascii=False, indent=1),
+        niveles_anteriores=texto_niveles_anteriores(roadmap, numero, hechos),
         hecho="\n".join(hecho),
-        diario="\n".join(f"- {d['titulo']}: {d['decision']}" for d in decisiones) or "(sin decisiones apuntadas)",
+        diario=_texto_diario(decisiones),
         nivel=json.dumps({k: nivel[k] for k in ("numero", "titulo", "objetivo", "priming")}
                          | {"bloques": [{"titulo": b["titulo"], "priming": b["priming"]} for b in nivel["bloques"]]},
                          ensure_ascii=False, indent=1))
+
+
+async def detallar_nivel(roadmap: dict, numero: int, hechos: list[str], decisiones: list[dict], datos: dict) -> dict:
+    sistema = sistema_nivel(roadmap, numero, hechos, decisiones, datos)
     d = await estructurar(sistema, "Devuelve los bloques del nivel con sus pasos.", NivelDetallado,
                           reglas=lambda x: _con_pasos(x.bloques, f"el nivel {numero}"))
     return con_nivel_detallado(roadmap, numero, d)

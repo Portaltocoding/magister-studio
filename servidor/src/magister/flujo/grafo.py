@@ -6,7 +6,8 @@
             └─ fase = estudio ─────> reescribir ─> recuperar ─> responder ─> END
                                                └─ no se puede ─> aclarar ─> END
  planificar ─ válido ─> calendarizar ─> proponer (interrupt) ─ aceptar ─> guardar ─> END
-           ├─ solo capacidad ─> negociar ─> END             └─ cambiar ─> extraer
+           ├─ solo capacidad ─> negociar ─> END             ├─ cambiar ─> extraer
+           │                                                └─ descartar ─> a_estudio
            └─ otra regla ─────> explicar_fallo ─> END
 """
 
@@ -44,12 +45,20 @@ def enrutar_entrada(estado: Estado) -> str:
 
 async def a_diagnostico(estado: Estado) -> dict:
     fase("a_diagnostico")
-    return {"fase": "diagnostico", "plan": None, "sesiones": []}
+    # Un plan nuevo empieza de cero: el perfil del anterior (horas, nivel, plazo) sigue en el checkpoint.
+    return {"fase": "diagnostico", "perfil": {}, "plan": None, "sesiones": []}
 
 
 async def a_estudio(estado: Estado) -> dict:
+    if not estado.get("mensaje"):  # «Ahora no» con el botón: no hay nada que contestar
+        decir("Vale, sin plan. Cuando quieras, pregúntame lo que sea.")
+        return {"fase": "estudio"}
     decir("Vale, sin plan. Vamos con ello.\n\n")
     return {"fase": "estudio"}
+
+
+def tras_a_estudio(estado: Estado) -> str:
+    return "sigue" if estado.get("mensaje") else "fin"
 
 
 def tras_extraer(estado: Estado) -> str:
@@ -72,7 +81,7 @@ def construir_grafo(
     g.add_node("calendarizar", calendarizar)
     g.add_node("negociar", negociar)
     g.add_node("explicar_fallo", explicar_fallo)
-    g.add_node("proponer", proponer, destinations=("guardar", "extraer"))
+    g.add_node("proponer", proponer, destinations=("guardar", "extraer", "a_estudio"))
     g.add_node("guardar", hacer_guardar(buscador))
     g.add_node("a_diagnostico", a_diagnostico)
     g.add_node("a_estudio", a_estudio)
@@ -84,7 +93,7 @@ def construir_grafo(
         g.add_conditional_edges(START, enrutar_entrada, {"extraer": "extraer", "estudio": "conversar",
                                                          "a_diagnostico": "a_diagnostico", "a_estudio": "a_estudio"})
         finales.append("conversar")
-        g.add_edge("a_estudio", "conversar")
+        g.add_conditional_edges("a_estudio", tras_a_estudio, {"sigue": "conversar", "fin": END})
     else:
         g.add_node("reescribir", reescribir)
         g.add_node("aclarar", aclarar)
@@ -95,7 +104,7 @@ def construir_grafo(
         g.add_conditional_edges("reescribir", tras_reescribir, ["aclarar", "recuperar"])
         g.add_edge("recuperar", "responder")
         finales += ["aclarar", "responder"]
-        g.add_edge("a_estudio", "reescribir")
+        g.add_conditional_edges("a_estudio", tras_a_estudio, {"sigue": "reescribir", "fin": END})
     g.add_conditional_edges("extraer", tras_extraer, ["preguntar", "planificar"])
     g.add_conditional_edges("planificar", tras_salida, ["calendarizar", "negociar", "explicar_fallo"])
     g.add_conditional_edges("calendarizar", tras_salida, ["proponer", "negociar"])

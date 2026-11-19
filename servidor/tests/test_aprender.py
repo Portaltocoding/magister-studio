@@ -215,3 +215,12 @@ def test_la_red_recien_creada_es_fsrs():
     ahora = t0 + timedelta(days=4)
     assert abs(pr.p_recordar(e, ahora) - f.p_recordar(e, ahora)) < 1e-3
     assert pr.proxima(e) <= f.proxima(e)
+
+
+async def test_una_pregunta_que_ya_no_existe_da_un_error_controlado(base) -> None:
+    from magister.aprender import practica, progreso
+
+    with pytest.raises(LookupError, match="esa pregunta ya no existe"):
+        await practica.contexto_pregunta("p-que-no-esta")
+    with pytest.raises(LookupError, match="esa pregunta ya no existe"):
+        await progreso.plan_de_pregunta("p-que-no-esta")

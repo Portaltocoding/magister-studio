@@ -108,6 +108,20 @@ def test_intencion_de_plan() -> None:
     assert pide_plan("explícamelo y luego hazme un plan de estudio")
     assert deja_plan("déjalo, mejor otra cosa") and not deja_plan("sigue")
     assert deja_plan("No quiero un plan, explícamelo ya")
+    # «Expliques» también es pedir una explicación; un plan de ejecución o de negocio no es un plan de estudio.
+    assert not pide_plan("quiero que me expliques el plan de ejecución de una consulta")
+    assert not pide_plan("explícame mejor el plan de contingencia") and not pide_plan("quiero hacer un plan de negocio")
+    assert not pide_plan("enséñame cómo va el plan de pagos")
+    # Salvo que pida el plan además de la explicación.
+    for si in ("explícamelo y luego hazme un plan de estudio", "organízalo en el calendario",
+               "quiero que me expliques los closures y que me hagas un plan"):
+        assert pide_plan(si), si
+    for deja in ("explícame los joins", "explícanos esto", "no hagas un plan", "no hagamos el plan", "no quiero el plan",
+                 "cancela el plan", "cancela plan", "mejor otra cosa", "otra cosa distinta"):
+        assert deja_plan(deja), deja
+    # «Cancela» u «otra cosa» sueltos pueden ser un cambio del plan, no dejarlo.
+    for no in ("cancela la sesión del jueves", "otra cosa: menos horas el lunes"):
+        assert not deja_plan(no), no
 
 
 async def test_estudio_pasa_al_plan_y_vuelve() -> None:

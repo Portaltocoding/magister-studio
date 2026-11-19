@@ -17,6 +17,27 @@ async def test_en_la_llamada_mandan_sus_reglas_y_no_las_de_voz() -> None:
     assert VOZ in await sistema_de_estudio("BASE", {"voz": True})
 
 
+async def test_el_asesor_no_arrastra_el_modo_ni_la_longitud_del_chat(monkeypatch) -> None:
+    from magister.flujo import comun as rc
+
+    async def preferencias():
+        return {"modo": "socratico", "longitud": "detallada", "nivel": "experto", "instrucciones": ["Pon los ejemplos en Python."],
+                "aprendido": ["Menos rodeos."], "modos": []}
+
+    async def nada(*_a, **_k):
+        return []
+
+    monkeypatch.setattr(rc, "preferencias_tutor", preferencias)
+    for nombre in ("lecciones_del_alumno", "conceptos_flojos", "conceptos_dominados"):
+        monkeypatch.setattr(rc, nombre, nada)
+    asesor = await sistema_de_estudio("BASE", {"conversacion_id": 1, "asesor": True})
+    assert "Socrático" not in asesor and "detallada" not in asesor
+    assert "Python" in asesor and "Menos rodeos" in asesor and "nivel avanzado" in asesor
+    assert "manda sobre cualquier modo o longitud" in rc.ASESOR
+    # En el chat, el modo sigue valiendo.
+    assert "Socrático" in await sistema_de_estudio("BASE", {"conversacion_id": 1})
+
+
 async def test_el_asesor_contesta_corto_sobre_la_pantalla_y_sus_conversaciones_no_salen_en_el_historial(cliente, monkeypatch) -> None:
     from magister.flujo import comun as rc
     from magister.flujo.comun import ASESOR

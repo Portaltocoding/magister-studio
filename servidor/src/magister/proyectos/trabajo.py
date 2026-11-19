@@ -2,6 +2,7 @@
 arquitectura) y detallar un nivel. Son idempotentes: si se reintentan, vuelven a escribir el mismo proyecto."""
 
 import logging
+import re
 
 from sqlalchemy import select
 
@@ -33,6 +34,23 @@ async def _guardar(pid: int, **valores) -> None:
                 setattr(p, k, v)
 
 
+def leccion_de(datos: dict) -> dict:
+    """Lo que se le describe a la búsqueda: la idea casi entera, y para qué y lo que ya sabe si lo ha dicho."""
+    titulo = f"{datos['nombre']}: {datos['idea'][:1200]}"
+    if datos.get("objetivo"):
+        titulo += f"\nPara qué lo quiere: {datos['objetivo'][:600]}"
+    if datos.get("sabes"):
+        titulo += f"\nLo que ya sabe: {datos['sabes'][:600]}"
+    return {"tema": "Construir un proyecto", "titulo": titulo,
+            "objetivos": ["proyectos parecidos de código abierto", "arquitectura de referencia", "tutorial paso a paso",
+                          "documentación oficial de las herramientas"]}
+
+
+def motivo_limpio(motivo: str) -> str:
+    """Sin la nota del agente delante («3/3 · …»): el usuario solo ve el porqué."""
+    return motivo.split(" · ", 1)[-1] if re.match(r"\d+/\d+ · ", motivo) else motivo
+
+
 async def buscar_referencias(datos: dict) -> list[dict]:
     """Proyectos, tutoriales y documentación parecidos, con el agente de research (con su tope de coste).
     Si falla (sin red, sin presupuesto), el roadmap se hace igual, sin referencias."""
@@ -43,15 +61,12 @@ async def buscar_referencias(datos: dict) -> list[dict]:
     encontradas: list[dict] = []
 
     async def guardar(url: str, titulo: str, motivo: str) -> bool:
-        encontradas.append({"url": url, "titulo": titulo, "motivo": motivo})
+        encontradas.append({"url": url, "titulo": titulo, "motivo": motivo_limpio(motivo)})
         return True
 
     try:
         h = Herramientas(web_por_defecto, 0, "proyecto", None, guardar_propuesta=guardar)
-        leccion = {"tema": "Construir un proyecto", "titulo": f"{datos['nombre']}: {datos['idea'][:300]}",
-                   "objetivos": ["proyectos parecidos de código abierto", "arquitectura de referencia", "tutorial paso a paso",
-                                 "documentación oficial de las herramientas"]}
-        await research_fijo(leccion, h, max_urls=8, max_propuestas=5)
+        await research_fijo(leccion_de(datos), h, max_urls=8, max_propuestas=5)
     except Exception as e:  # noqa: BLE001 (las referencias son un extra: sin ellas el roadmap sale igual)
         registro.warning("referencias del proyecto: %s", e)
     return encontradas[:6]
@@ -82,8 +97,10 @@ async def detallar(trabajo_id: int, pid: int, numero: int) -> None:
     if not p.roadmap:
         raise LookupError("el proyecto aún no tiene roadmap")
     async with nueva_sesion() as s:
-        decisiones = [{"titulo": d.titulo, "decision": d.decision} for d in
-                      (await s.scalars(select(Decision).where(Decision.proyecto_id == pid).order_by(Decision.id))).all()]
+        # Las 15 más recientes, en el orden en que se tomaron.
+        filas = (await s.scalars(select(Decision).where(Decision.proyecto_id == pid)
+                                 .order_by(Decision.id.desc()).limit(15))).all()
+        decisiones = [{"titulo": d.titulo, "decision": d.decision, "contexto": d.contexto} for d in reversed(filas)]
     await cola.fase(trabajo_id, f"nivel {numero}", 1, 1)
     nuevo = await rm.detallar_nivel(p.roadmap, numero, list(p.hechos or []), decisiones, _datos(p))
     await _guardar(pid, roadmap=nuevo, estado="listo", error=None, trabajo_id=None)

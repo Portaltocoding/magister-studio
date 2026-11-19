@@ -76,7 +76,11 @@ async def intentar(cuerpo: IntentoEntrada) -> AsyncIterator[ServerSentEvent]:
     t0 = time.perf_counter()
     momento = ahora()
     servida = await practica.ultima_servida(cuerpo.pregunta_id)
-    enunciado, referencia, fragmentos = await practica.contexto_pregunta(cuerpo.pregunta_id)
+    try:
+        enunciado, referencia, fragmentos = await practica.contexto_pregunta(cuerpo.pregunta_id)
+    except LookupError:  # la pregunta se borró mientras la tenías delante
+        yield ServerSentEvent(data={"detalle": "Esa pregunta ya no existe (se regeneró el material). Pasa a la siguiente."}, event="error")
+        return
     try:
         c, version_corrector = await corregir(enunciado, referencia, fragmentos, cuerpo.respuesta)
     except Exception as e:  # noqa: BLE001

@@ -7,13 +7,14 @@ interface Props {
   ocupado: boolean
   alAceptar: (buscarFuentes: boolean) => void
   alCambiar: (texto: string) => void
+  alDescartar: () => void
 }
 
 const fecha = (iso: string | null) =>
   iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '·'
 
 // La cara de la pausa del grafo: el plan propuesto espera tu decisión.
-export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar }: Props) {
+export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar, alDescartar }: Props) {
   const [cambiando, setCambiando] = useState(false)
   const [texto, setTexto] = useState('')
   const [pulsado, setPulsado] = useState(false)
@@ -96,6 +97,17 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
           </button>
           <button className="boton" disabled={bloqueado} onClick={() => setCambiando(true)}>
             Cambiar algo
+          </button>
+          {/* Sin plan y de vuelta a estudio: la conversación sigue. */}
+          <button
+            className="boton-mini"
+            disabled={bloqueado}
+            onClick={() => {
+              setPulsado(true)
+              alDescartar()
+            }}
+          >
+            Ahora no
           </button>
         </div>
       )}

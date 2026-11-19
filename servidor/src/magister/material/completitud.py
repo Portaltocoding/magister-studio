@@ -1,10 +1,11 @@
-"""La completitud desde el generador: determinista para lo nombrado, juez solo para lo nombrado.
+"""La completitud desde el generador: determinista para lo nombrado; juez para lo nombrado y para el núcleo sin nombrar.
 
 Por concepto: `nombrado`, `explicado`, `cita_valida`, `orden_ok`. Si la cita del juez no
 aparece literal, es `FalloJuez` (no cuenta como «no explicado»).
 """
 
 import asyncio
+import re
 from functools import cache
 from pathlib import Path
 
@@ -28,7 +29,8 @@ class JuicioCompletitud(BaseModel):
 
 
 def _plano(t: str) -> str:
-    return " ".join(t.split())
+    # Sin marcas de formato: el juez cita «el término clave» aunque los apuntes digan «el **término** clave».
+    return " ".join(re.sub(r"[*_`$]", "", t).split())
 
 
 @cache
@@ -65,15 +67,15 @@ async def informe_completitud(markdown: str, entrada: EntradaMaterial) -> dict:
     cuerpo = markdown.split("\n# Repaso")[0]
     pos = logica.nombrados(cuerpo, conceptos)
     orden = logica.orden_ok(pos, conceptos, set(entrada.previos))
-    juicios = await asyncio.gather(*(_juzgar(cuerpo, c) if pos[c["id"]] is not None else asyncio.sleep(0, {"explicado": False})
-                                     for c in conceptos))
+    # Un concepto del núcleo puede explicarse sin su nombre literal: se le pregunta al juez antes de darlo por ausente.
+    juicios = await asyncio.gather(*(_juzgar(cuerpo, c) if pos[c["id"]] is not None or c.get("nucleo", True)
+                                     else asyncio.sleep(0, {"explicado": False}) for c in conceptos))
     informe = {}
     for c, j in zip(conceptos, juicios, strict=True):
         explicado = j.get("explicado")
         informe[c["id"]] = {"nombrado": pos[c["id"]] is not None, "explicado": bool(explicado) if explicado is not None else True,
                             "cita_valida": j.get("cita_valida", False), "orden_ok": orden[c["id"]], "fallo_juez": j.get("fallo_juez")}
-    faltan = [c["id"] for c in conceptos if c.get("nucleo", True)
-              and not (informe[c["id"]]["nombrado"] and informe[c["id"]]["explicado"])]
+    faltan = [c["id"] for c in conceptos if c.get("nucleo", True) and not informe[c["id"]]["explicado"]]
     return {"conceptos": informe, "faltan_nucleo": faltan, "tasas": logica.tasas(informe, conceptos)}
 
 

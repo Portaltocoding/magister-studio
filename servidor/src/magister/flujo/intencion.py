@@ -14,12 +14,18 @@ VERBOS = r"(haz|hazme|haced|hacer|hagamos|crea|creame|crear|monta|montame|montar
          r"me haces|me harias|podemos hacer|podrias hacer|puedes hacer|ayudame a hacer|ponlo|ponmelo|meterlo|metelo|meter)"
 OBJETOS = r"(plan|planning|roadmap|hoja de ruta|calendario|cronograma|temario|itinerario|plan de estudio)"
 PIDE_PLAN = re.compile(rf"\b{VERBOS}\b[^.?!]{{0,60}}\b{OBJETOS}\b|\b{OBJETOS}\b[^.?!]{{0,30}}\b(para|con)\b[^.?!]{{0,40}}\b(semanas?|meses?|dias?|horas?)\b")
-DEJAR_PLAN = re.compile(r"\b(dejalo|deja el plan|olvida el plan|olvidalo|cancela|cancelar el plan|sin plan|no quiero (un |el )?plan|"
-                        r"otra cosa|cambiemos de tema|explicamelo|solo (quiero )?(que me )?expli\w*|no necesito (un |el )?plan)\b")
+DEJAR_PLAN = re.compile(r"\b(dejalo|deja el plan|olvida el plan|olvidalo|cancela (el )?plan|cancelar el plan|sin plan|"
+                        r"no (quiero|hagas|hagamos) (un |el )?plan|mejor otra cosa|otra cosa distinta|cambiemos de tema|"
+                        r"explicamelo|explicame|explicanos|solo (quiero )?(que me )?expli\w*|no necesito (un |el )?plan)\b")
 # «En plan rápido», «plan B»: muletillas, no planes de estudio.
 COLOQUIAL = re.compile(r"\b(en plan|plan b|de buen plan|menudo plan|vaya plan)\b")
 # Pedir una explicación con «plan» por medio no es pedir un plan, salvo que nombre algo inequívoco.
-EXPLICAR = re.compile(r"\b(explica\w*|ense|cuentame|que es|como funciona|entender)")
+EXPLICAR = re.compile(r"\b(explica\w*|expliqu\w+|ense|cuentame|que es|como funciona|entender)")
+# Salvo que, además de la explicación, pida hacer el plan: «explícame X y hazme un plan».
+HAZ_PLAN = re.compile(r"\b(haz|hazme|hagas|hicieras|hicieses|harias|crea|creame|crees|monta|montame|montes|prepara|preparame|"
+                      r"prepares|organiza|organizame|organices|planificame|planifiques|me haces|me harias)\b[^.?!]{0,20}\b(un|el|mi)\s+plan\b")
+# «Plan de ejecución» (de una consulta), de negocio, de pensiones: planes que no son de estudio.
+OTROS_PLANES = re.compile(r"\bplan(es)? de (ejecucion|contingencia|accion|negocios?|pagos|comidas|pensiones)\b")
 INEQUIVOCO = re.compile(r"\b(roadmap|hoja de ruta|calendario|cronograma|temario|itinerario|planning|plan de estudios?)\b")
 
 
@@ -36,12 +42,12 @@ EXAMEN = re.compile(r"\b(tengo|tendre|tenemos|me toca|hay)\s+(un |el |mi )?exame
 
 
 def pide_plan(mensaje: str) -> bool:
-    t = COLOQUIAL.sub(" ", _norm(mensaje))
+    t = OTROS_PLANES.sub(" ", COLOQUIAL.sub(" ", _norm(mensaje)))
     if re.search(r"\b(modo|a partir de ahora|de ahora en adelante|desde ahora)\b", t) and not INEQUIVOCO.search(t):
         return False
     if not PIDE_PLAN.search(t) and not EXAMEN.search(t):
         return False
-    return not (EXPLICAR.search(t) and not INEQUIVOCO.search(t))
+    return not (EXPLICAR.search(t) and not INEQUIVOCO.search(t) and not HAZ_PLAN.search(t))
 
 
 # «Guárdalo», «guardémoslo», «apúntamelo», «esto a mis notas»: guardar la respuesta anterior en Mis notas.
@@ -57,12 +63,30 @@ SUELTO = re.compile(r"(^|[.!?,;:]\s*|\b(vale|venga|ok|pues|bien|y)\s+)(guarda|ap
 # «Guarda silencio», «¿dónde se guarda la sesión?»: no son peticiones de guardar.
 NO_GUARDAR = re.compile(r"\b(guarda (silencio|las formas|relacion|distancia)|se guarda|donde guarda|como guarda|"
                         r"guarda (en|el|la|los|las) (memoria|cache|estado|base|cookie|sesion|token))\b")
+# «Apúntalo para mañana a las 18:00», «guárdame un hueco el jueves»: eso es agenda, no «Mis notas».
+APUNTAR = re.compile(r"\b(apunt\w*|anot\w*|guardame un hueco)")
+AGENDA = re.compile(r"\b(calendario|agenda|hueco|examen|hoy|lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b|"
+                    r"\bma(?:ñ|ñ)ana\b|\b\d{1,2}:\d{2}\b|\bel \d{1,2}\b|\ba las \d")
+CALENDARIO = re.compile(r"\b(calendario|agenda|hueco)\b")
+MIS_NOTAS = re.compile(r"\bmis (notas|apuntes)\b")
 
 
 def pide_guardar(mensaje: str) -> bool:
     t = _norm(mensaje).strip()
+    if not MIS_NOTAS.search(t) and ((APUNTAR.search(t) and AGENDA.search(t)) or CALENDARIO.search(t)):
+        return False
     return bool(GUARDAR.search(t) or SUELTO.search(t)) and not NO_GUARDAR.search(t)
 
 
 def deja_plan(mensaje: str) -> bool:
     return bool(DEJAR_PLAN.search(_norm(mensaje)))
+
+
+# Con un plan propuesto delante, «explícame por qué L2 va antes» es hablar del plan, no dejarlo: solo lo descarta
+# quien lo rechaza con todas las letras.
+RECHAZAR_PLAN = re.compile(r"\b(dejalo|deja el plan|olvida el plan|olvidalo|cancela (el )?plan|cancelar el plan|sin plan|"
+                           r"no (quiero|hagas|hagamos|necesito) (un |el )?plan|ahora no|mejor otra cosa|cambiemos de tema)\b")
+
+
+def rechaza_plan(mensaje: str) -> bool:
+    return bool(RECHAZAR_PLAN.search(_norm(mensaje)))

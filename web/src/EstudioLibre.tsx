@@ -122,7 +122,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     mandar(texto, alCambiar)
   }
 
-  const resolver = (accion: 'aceptar' | 'cambiar', texto: string | null = null) => {
+  const resolver = (accion: 'aceptar' | 'cambiar' | 'descartar', texto: string | null = null) => {
     if (conversacionId == null) return
     setPropuesta(null)
     correr(accion === 'cambiar' ? texto : null, (signal) => decidir(conversacionId, accion, texto, signal), alCambiar)
@@ -149,6 +149,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
             resolver('aceptar')
           }}
           alCambiar={(t) => resolver('cambiar', t)}
+          alDescartar={() => resolver('descartar')}
         />
       )}
       {aviso && (

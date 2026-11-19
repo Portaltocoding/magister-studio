@@ -144,6 +144,9 @@ async def _extras(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], e
                 destino.write_text(json.dumps(grafico, ensure_ascii=False), encoding="utf-8")
                 rutas["grafico"] = str(destino)
                 texto = por_escenas(grafico)
+            else:
+                # Se había pedido animado: que no parezca que el guion narrado es lo que salió bien.
+                await cola.aviso(trabajo_id, "video.sin_animado", "No ha salido el vídeo animado: te dejo el guion narrado.")
         if texto is None:
             texto = await generar_guion(entrada, texto_apuntes, minutos, estilo, video.get("concepto"))
         hallazgos = auditar_guion(texto, minutos) + lint.revisar(texto, "guion")

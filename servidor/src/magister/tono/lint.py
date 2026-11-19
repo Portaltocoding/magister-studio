@@ -107,7 +107,8 @@ def revisar(texto: str, tipo: str = "apuntes", bloque: str = "") -> list[Hallazg
             continue
         if regla.id == "unicode":
             for i, c in enumerate(texto):
-                if ord(c) > 0xFFFF or unicodedata.category(c) == "So":
+                # Solo emojis y pictogramas: °, © o ™ son símbolos legítimos (unidades, marcas).
+                if ord(c) > 0xFFFF or 0x2600 <= ord(c) <= 0x27BF:
                     anotar(regla, i, i + 1, f"carácter {c!r} fuera del Unicode básico")
         elif regla.id == "frase_larga":
             for ini, frase in _frases(texto):

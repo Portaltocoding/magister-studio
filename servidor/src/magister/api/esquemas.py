@@ -85,5 +85,5 @@ class MensajeSalida(Salida):
 
 
 class DecisionEntrada(BaseModel):
-    accion: Literal["aceptar", "cambiar"]
+    accion: Literal["aceptar", "cambiar", "descartar"]
     texto: str | None = Field(None, max_length=5000)

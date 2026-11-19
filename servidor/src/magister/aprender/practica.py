@@ -189,7 +189,9 @@ async def contexto_pregunta(pregunta_id: str) -> tuple[str, str, list[str]]:
     """Enunciado, referencia (la fantasma) y los fragmentos de apoyo de su lección."""
     async with nueva_sesion() as s:
         p = await s.get(Pregunta, pregunta_id)
-        frag = (await s.scalars(text(
+        if p is None:
+            raise LookupError("esa pregunta ya no existe")
+        frag =(await s.scalars(text(
             "select f.texto from lecciones_fragmentos lf join fragmentos f on f.id = lf.fragmento_id "
             "where lf.plan_id = :p and lf.leccion_clave = :c order by lf.rango limit 5"), {"p": p.plan_id, "c": p.leccion_clave})).all()
     return p.enunciado, p.fantasma, list(frag)

@@ -17,6 +17,7 @@ FANTASMA_MIN, FANTASMA_MAX = 40, 90
 TIPOS_MIN = 3  # mezcla mínima de tipos distintos
 RELLENO = re.compile(r"\b(lorem|ipsum|xxx|rellenar|todo:|pendiente de escribir)\b", re.I)
 UMBRAL_DUPLICADO = 0.85  # coseno; se ajusta con evals/duplicados/umbral.py
+ES_TEST = re.compile(r"-t\d+$")  # ids de anadir_tests: regenerar las preguntas no las toca
 
 
 def _reglas(entrada: EntradaMaterial, claves_bloques: set[str]):
@@ -104,14 +105,25 @@ async def guardar_preguntas(entrada: EntradaMaterial, material_id: int | None, p
                       "enunciado": p.enunciado, "fantasma": p.fantasma, "donde": p.donde, "conceptos": p.conceptos,
                       "opciones": [o.model_dump() for o in p.opciones] if p.tipo == "test" and p.opciones else None})
     async with nueva_sesion() as s, s.begin():
-        viejas = select(Pregunta.id).where(Pregunta.plan_id == entrada.plan_id, Pregunta.leccion_clave == entrada.leccion_clave)
-        await s.execute(delete(PreguntaConcepto).where(PreguntaConcepto.pregunta_id.in_(viejas)))
-        await s.execute(delete(Pregunta).where(Pregunta.plan_id == entrada.plan_id, Pregunta.leccion_clave == entrada.leccion_clave))
+        # Regenerar no borra: las de test (-tNN, de anadir_tests) no se tocan, las demás se actualizan por id y las
+        # sobrantes se retiran, para que intentos y servidas sigan apuntando a algo.
+        viejas = {p.id: p for p in (await s.scalars(select(Pregunta).where(
+            Pregunta.plan_id == entrada.plan_id, Pregunta.leccion_clave == entrada.leccion_clave))).all()
+            if not ES_TEST.search(p.id)}
         for f in filas:
             # Una de test sin exactamente una opción buena no se sirve nunca: se queda en borrador (la auditoría lo avisa).
             mala = f["tipo"] == "test" and sum(o["buena"] for o in f["opciones"] or []) != 1
-            s.add(Pregunta(**{k: v for k, v in f.items() if k != "conceptos"}, estado="borrador" if mala else "activa"))
+            valores = {k: v for k, v in f.items() if k != "conceptos"} | {"estado": "borrador" if mala else "activa"}
+            vieja = viejas.pop(f["id"], None)
+            if vieja is None:
+                s.add(Pregunta(**valores))
+            else:
+                for k, v in valores.items():
+                    setattr(vieja, k, v)
+        for sobrante in viejas.values():
+            sobrante.estado = "retirada"
         await s.flush()
+        await s.execute(delete(PreguntaConcepto).where(PreguntaConcepto.pregunta_id.in_([f["id"] for f in filas])))
         for f in filas:
             for c in dict.fromkeys(f["conceptos"]):
                 s.add(PreguntaConcepto(pregunta_id=f["id"], plan_id=entrada.plan_id, concepto_id=c))

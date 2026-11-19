@@ -7,7 +7,7 @@ Gravedad: **veto** bloquea el material; **aviso** va al informe; **sospecha** la
 | id | Regla | Cómo se comprueba | Gravedad | Tipos | Patrón |
 |---|---|---|---|---|---|
 | raya | Nunca el carácter de la raya larga | Buscar el carácter | veto | todos | `—` |
-| unicode | Sin emojis ni símbolos fuera del Unicode básico | Rango de caracteres | veto | todos | (código) |
+| unicode | Sin emojis ni pictogramas; los símbolos de unidades (°, %) valen | Rango de caracteres | veto | todos | (código) |
 | metatexto | Sin metatexto: el texto no habla de sí mismo | Lista de giros | aviso | todos | `\b(en estos apuntes\|como veremos\|lo veremos en\|te lo cuento en\|a continuacion\|en esta seccion\|en este bloque\|como hemos visto\|vamos a ver)\b` |
 | condescendencia | Sin condescendencia | Lista de giros; el juez confirma | sospecha | todos | `\b(simplemente\|obviamente\|evidentemente\|es muy facil\|es facil ver\|lo ves enseguida\|como puedes ver\|es trivial\|cualquiera sabe\|como todo el mundo sabe)\b` |
 | ingles | Término inglés con traducción la primera vez | Glosario y primera aparición | aviso | todos | (código) |

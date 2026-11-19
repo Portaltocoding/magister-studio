@@ -50,7 +50,8 @@ ENTREVISTA = ("vale esto es importante guardemoslo como tal , ahora bien me gust
 
 
 @pytest.mark.parametrize("frase", [ENTREVISTA, "guárdalo", "Guárdame esto", "apúntamelo en mis notas", "esto a mis notas",
-                                   "vale, guarda esto", "anota la respuesta", "Guarda lo anterior, porfa"])
+                                   "vale, guarda esto", "anota la respuesta", "Guarda lo anterior, porfa",
+                                   "guárdamelo para mañana", "apúntamelo en mis notas para el examen del lunes"])
 def test_detecta_guardar(frase) -> None:
     from magister.flujo.intencion import pide_guardar
 
@@ -58,7 +59,10 @@ def test_detecta_guardar(frase) -> None:
 
 
 @pytest.mark.parametrize("frase", ["¿dónde se guarda la sesión?", "el navegador guarda la cookie", "localStorage guarda los datos",
-                                   "cómo guarda React el estado", "explícame closures", "me gustaría entenderlo mejor"])
+                                   "cómo guarda React el estado", "explícame closures", "me gustaría entenderlo mejor",
+                                   # Agenda, no «Mis notas».
+                                   "Apúntalo para mañana a las 18:00", "apúntame el examen del jueves en el calendario",
+                                   "guárdame un hueco el 12 para repasar", "anótalo en la agenda"])
 def test_no_confunde_guardar(frase) -> None:
     from magister.flujo.intencion import pide_guardar
 

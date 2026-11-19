@@ -141,8 +141,11 @@ async def borrar(pid: int) -> None:
 
 @rutas.post("/proyectos/{pid}/rehacer")
 async def rehacer(pid: int) -> dict:
-    """Vuelve a generar el roadmap (si falló, o si cambiaste la idea). Lo hecho se conserva por id de paso."""
-    await _proyecto(pid)
+    """Vuelve a generar el roadmap entero (si falló, o si cambiaste la idea). Los ids de los pasos van por posición:
+    lo marcado como hecho guarda sus ids viejos, que en el roadmap nuevo pueden caer en otros pasos o en ninguno."""
+    p = await _proyecto(pid)
+    if p.estado == "generando":
+        raise HTTPException(409, "ya se está generando algo de este proyecto")
     await _encolar(pid, "proyecto_roadmap", {"investigar": True, "vez": await _siguiente_vez(pid)})
     return _salida(await _proyecto(pid))
 
@@ -180,10 +183,14 @@ async def marcar(pid: int, paso_id: str, cuerpo: Hecho) -> dict:
 @rutas.post("/proyectos/{pid}/niveles/{numero}/detallar")
 async def detallar(pid: int, numero: int) -> dict:
     p = await _proyecto(pid)
-    if not any(n["numero"] == numero for n in (p.roadmap or {}).get("niveles", [])):
+    nivel = next((n for n in (p.roadmap or {}).get("niveles", []) if n["numero"] == numero), None)
+    if nivel is None:
         raise HTTPException(404, "ese nivel no existe")
     if p.estado == "generando":
         raise HTTPException(409, "ya se está generando algo de este proyecto")
+    # Volver a detallarlo machacaría sus pasos con otros y lo marcado como hecho dejaría de cuadrar.
+    if nivel.get("detallado"):
+        raise HTTPException(409, "ese nivel ya tiene sus pasos")
     await _encolar(pid, "proyecto_nivel", {"numero": numero, "vez": await _siguiente_vez(pid)})
     return _salida(await _proyecto(pid))
 

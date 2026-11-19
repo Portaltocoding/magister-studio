@@ -5,6 +5,8 @@
 
 Errores transitorios (el modelo, la red, un plazo): espera exponencial (2 s, factor 2,
 con jitter) hasta 5 intentos. Permanentes (la lección no existe): `fallido` sin reintento.
+Una salida estructurada que no sale bien falla al segundo intento, y lo frenado por el freno
+de llamadas no se reintenta: reintentar dentro de la pausa solo quema intentos.
 """
 
 import asyncio
@@ -24,6 +26,17 @@ from magister.trabajos import cola
 registro = logging.getLogger("magister.trabajador")
 TRANSITORIOS = (ErrorModelo, ErrorEstructura, TimeoutError, ConnectionError, OSError)
 LATIDO_S = 30
+INTENTOS_ESTRUCTURA = 2
+MENSAJE_ESTRUCTURA = ("No he conseguido un resultado válido tras varios intentos. Vuelve a pedirlo; "
+                      "si se repite, cambia algo de lo que pides.")
+MENSAJE_FRENO = "Hay demasiadas llamadas al modelo seguidas y están en pausa unos minutos. Vuelve a pedirlo luego."
+
+
+def frenado(e: Exception) -> bool:
+    """El freno llega como ErrorModelo («freno: ...») o, dentro de estructurar, como el último error de un ErrorEstructura."""
+    texto = str(e)
+    return (isinstance(e, ErrorModelo) and texto.startswith("freno:")) or (
+        isinstance(e, ErrorEstructura) and "error del modelo: freno:" in texto)
 
 
 def nombre() -> str:
@@ -74,7 +87,13 @@ async def ejecutar_uno(quien: str) -> bool:
     except (LeccionNoExiste, LookupError) as e:
         await cola.terminar(t.id, "fallido", str(e))
     except TRANSITORIOS as e:
-        if t.intentos >= ajustes.trabajos_intentos:
+        if frenado(e):
+            registro.warning("trabajo %s frenado: %s", t.id, e)
+            await cola.terminar(t.id, "fallido", MENSAJE_FRENO)
+        elif isinstance(e, ErrorEstructura) and t.intentos >= INTENTOS_ESTRUCTURA:
+            registro.warning("trabajo %s: sin salida válida tras %s intentos: %s", t.id, t.intentos, e)
+            await cola.terminar(t.id, "fallido", MENSAJE_ESTRUCTURA)
+        elif t.intentos >= ajustes.trabajos_intentos:
             await cola.terminar(t.id, "fallido", f"tras {t.intentos} intentos: {e}")
         else:
             espera = 2 * 2 ** (t.intentos - 1) * (0.5 + random.random())

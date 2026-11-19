@@ -79,3 +79,49 @@ async def test_estudio_conversa() -> None:
         {"rol": "usuario", "contenido": "hola tutor"}]}
     nodos, texto, _, _ = await correr(construir_grafo(InMemorySaver()), e)
     assert texto == "Eco: hola tutor "
+
+
+async def test_un_plan_nuevo_no_hereda_el_perfil_del_anterior() -> None:
+    """Tras aceptar un plan (fase estudio con el perfil completo en el checkpoint), pedir otro vuelve a preguntar."""
+    g = construir_grafo(InMemorySaver())
+    completo = eco.siguiente(Perfil)  # el perfil del plan anterior: tema, horas, nivel y plazo
+    e = {"conversacion_id": None, "fase": "estudio", "hoy": HOY, "mensaje": "hazme un plan de React", "turnos": [],
+         "perfil": completo}
+    # Sin extracción válida, extraer se queda con lo que había: el perfil viejo planificaría sin preguntar.
+    eco.encolar(Perfil, ["no_existe.json"] * 20)
+    nodos, _, inter, valores = await correr(g, e)
+    assert nodos == ["a_diagnostico", "extraer", "preguntar"] and not inter
+    assert valores["perfil"] != completo
+
+
+async def test_ahora_no_descarta_la_propuesta_y_vuelve_a_estudio() -> None:
+    g = construir_grafo(InMemorySaver())
+    eco.encolar(Plan, ["plan_ok.json"])
+    _, _, inter, _ = await correr(g, entrada())
+    assert inter
+    nodos, texto, inter2, valores = await correr(g, Command(resume={"accion": "descartar"}))
+    # Con el botón no hay pregunta que contestar: dice que sigue sin plan y termina, sin responder a un mensaje viejo.
+    assert texto.startswith("Vale, sin plan") and not inter2
+    assert "extraer" not in nodos and not any(n in nodos for n in ("conversar", "responder"))
+    assert valores["fase"] == "estudio" and valores["plan"] is None
+    estado = await g.aget_state({"configurable": {"thread_id": "1"}})
+    assert not any(t.interrupts for t in estado.tasks) and not estado.next
+
+
+async def test_dejarlo_por_escrito_descarta_y_contesta() -> None:
+    g = construir_grafo(InMemorySaver())
+    eco.encolar(Plan, ["plan_ok.json"])
+    await correr(g, entrada())
+    turnos = [{"rol": "usuario", "contenido": "déjalo, explícame los joins"}]
+    _, texto, inter, valores = await correr(g, Command(resume={"accion": "descartar", "texto": "déjalo, explícame los joins"},
+                                                       update={"turnos": turnos}))
+    assert texto.startswith("Vale, sin plan. Vamos con ello.") and "Eco:" in texto and not inter
+    assert valores["fase"] == "estudio"
+
+
+def test_con_un_plan_delante_solo_lo_descarta_quien_lo_rechaza() -> None:
+    from magister.flujo.intencion import rechaza_plan
+
+    assert all(rechaza_plan(t) for t in ("déjalo", "ahora no, gracias", "no quiero plan", "mejor otra cosa"))
+    # Preguntar por el plan o pedir un cambio no lo tira.
+    assert not any(rechaza_plan(t) for t in ("explícame por qué L2 va antes que L1", "hazlo más corto", "quita los domingos"))
