@@ -1,7 +1,21 @@
 // Los fallos del servidor se enseñan como una frase que se entiende, con el original guardado para copiarlo.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { errorLegible, MENSAJE_ESTRUCTURA, MENSAJE_FRENO } from '../src/componentes/errores.ts'
+import { errorLegible, MENSAJE_ESTRUCTURA, MENSAJE_FRENO, textoValidacion } from '../src/componentes/errores.ts'
+
+test('un 422 sale en castellano y sin repetir la misma frase', () => {
+  // Mensaje vacío: el min_length de pydantic, en inglés, y repetido.
+  const vacio = { type: 'string_too_short', loc: ['body', 'contenido'], msg: 'String should have at least 1 character' }
+  assert.equal(textoValidacion([vacio, vacio]), 'El mensaje está vacío.')
+  // Nuestro validador ya viene en castellano: se le quita «Value error, ».
+  assert.equal(textoValidacion([{ loc: ['body', 'contenido'], msg: 'Value error, el mensaje está vacío' }]), 'El mensaje está vacío.')
+  // Lo que no conocemos: una frase general, nunca el inglés.
+  const general = textoValidacion([{ loc: ['body', 'fecha'], msg: 'Input should be a valid date' }, { loc: ['body', 'x'], msg: 'Field required' }])
+  assert.equal(general, 'Algún dato no es válido. Revisa lo que has escrito y vuelve a probar.')
+  assert.doesNotMatch(general, /should|required/i)
+  assert.equal(textoValidacion([]), 'Algún dato no es válido. Revisa lo que has escrito y vuelve a probar.')
+  assert.equal(textoValidacion([{ loc: ['body', 'contenido'], msg: 'String should have at most 20000 characters' }]), 'El texto es demasiado largo.')
+})
 
 const traduce = (texto: string, empieza: string) => {
   const r = errorLegible(texto)

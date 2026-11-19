@@ -76,11 +76,16 @@ async def crear_fuente(cuerpo: FuenteEntrada, s: AsyncSession = Depends(sesion_p
 async def documentos(fid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> list[dict]:
     if await rf.fuente_por_id(s, fid) is None:
         raise HTTPException(404, "fuente no encontrada")
-    return [
-        {"id": d.id, "titulo": d.titulo, "uri": d.uri, "tema_id": d.tema_id, "version": _version(v) if v else None,
-         "fragmentos": n, "incompleta": ((v.metadatos or {}).get("incompleta") if v else None) or getattr(d, "incompleta", None)}
-        for d, v, n in await rf.documentos_de_fuente(s, fid)
-    ]
+    salida = []
+    for d, v, n in await rf.documentos_de_fuente(s, fid):
+        # Qué pasó, en claro, y si «Reintentar» puede servir (un fichero vacío o que no es lo que dice, no).
+        claro, destino = ingesta.explicar_problema(v.estado, v.motivo, v.texto is not None, n, d.uri or "") if v else ("", None)
+        salida.append({
+            "id": d.id, "titulo": d.titulo, "uri": d.uri, "tema_id": d.tema_id, "version": _version(v) if v else None,
+            "fragmentos": n, "incompleta": ((v.metadatos or {}).get("incompleta") if v else None) or getattr(d, "incompleta", None),
+            "que_paso": claro or None, "reintentable": destino is not None,
+        })
+    return salida
 
 
 @rutas.get("/documentos/{did}/versiones")
@@ -184,7 +189,7 @@ async def resumen_documentos(s: AsyncSession = Depends(sesion_por_peticion)) -> 
     del_research: list[dict] = []
     incompletas: list[dict] = []
     for d in await rf.ultimas_versiones(s):
-        claro, reintentar = ingesta.explicar_problema(d["estado"], d["motivo"], d["con_texto"], d["fragmentos"])
+        claro, reintentar = ingesta.explicar_problema(d["estado"], d["motivo"], d["con_texto"], d["fragmentos"], d["uri"] or "")
         fila = {k: d[k] for k in ("documento_id", "titulo", "uri", "fuente_id", "fuente", "version_id", "estado", "motivo",
                                   "fragmentos")}
         fila |= {**_origen(d["metadatos"]), "que_paso": claro or None, "reintentable": reintentar is not None}

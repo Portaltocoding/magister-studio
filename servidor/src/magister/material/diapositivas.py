@@ -151,6 +151,29 @@ def auditar_diapositivas(marp: str) -> list[Hallazgo]:
     return hallazgos
 
 
+_TEXTOS_MARP = {
+    "Previous slide": "Diapositiva anterior", "Next slide": "Diapositiva siguiente",
+    "Toggle fullscreen (f)": "Pantalla completa (f)", "Toggle overview view (o)": "Vista general (o)",
+    "Open presenter view (p)": "Vista del presentador (p)", "Close overview": "Cerrar la vista general",
+}
+# Dentro del iframe, las flechas, el espacio y Av/Re Pág pasan de diapositiva y no desplazan también la página de la
+# app (sin esto, el navegador lleva el desplazamiento al documento de fuera). Va después de los manejadores de Marp.
+_TECLAS_QUIETAS = ("<script>window.addEventListener('keydown',function(e){if(['ArrowLeft','ArrowRight','ArrowUp',"
+                   "'ArrowDown',' ','PageUp','PageDown','Home','End'].indexOf(e.key)>=0)e.preventDefault()});</script>")
+
+
+def castellanizar_marp(html: str) -> str:
+    """Los controles del visor de Marp en castellano («Diapositiva 4 de 11», no «Page 4 of 11») y las teclas sin
+    desplazar la página de fuera. Solo texto sobre el HTML que da Marp: si cambia su versión y no encaja, se queda
+    como estaba."""
+    html = re.sub(r"`Page \$\{([^}]+)\} of \$\{([^}]+)\}`", r"`Diapositiva ${\1} de ${\2}`", html)
+    for ingles, castellano in _TEXTOS_MARP.items():
+        html = html.replace(f'"{ingles}"', f'"{castellano}"')
+    if _TECLAS_QUIETAS not in html:
+        html = html.replace("</body>", f"{_TECLAS_QUIETAS}</body>", 1) if "</body>" in html else html + _TECLAS_QUIETAS
+    return html
+
+
 async def pintar_marp(marp: str, plan_id: int, clave: str) -> dict:
     carpeta = carpeta_salidas(plan_id, clave)
     md = carpeta / "diapositivas.md"
@@ -172,4 +195,7 @@ async def pintar_marp(marp: str, plan_id: int, clave: str) -> dict:
             continue
         if salida.exists():
             rutas[formato] = str(salida)
+            if formato == "html":
+                html = await asyncio.to_thread(salida.read_text, encoding="utf-8")
+                await asyncio.to_thread(salida.write_text, castellanizar_marp(html), encoding="utf-8")
     return rutas

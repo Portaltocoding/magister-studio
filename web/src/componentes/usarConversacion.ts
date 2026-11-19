@@ -1,9 +1,12 @@
 import { useCallback, useRef, useState } from 'react'
 import { ErrorApi, EVENTO_NOTAS, type EventoTutor, type Mensaje, type Propuesta } from '../api.ts'
 import type { Burbuja } from './Hilo.tsx'
-import { errorLegible } from './errores.ts'
+import { errorLegible, MENSAJE_SIN_CONEXION } from './errores.ts'
 import { escribirEnChat } from './preferencias.ts'
-import { crearTurnos, trasFalloAlEnviar } from './turnos.ts'
+import { crearTurnos, trasFalloAlEnviar, trasFalloSinConexion } from './turnos.ts'
+
+// Aceptar un plan que ya estaba aceptado (dos clics, dos pestañas): lo que se dice en vez de un error.
+export const MENSAJE_YA_ACEPTADO = 'Este plan ya estaba aceptado. Te llevo al Roadmap.'
 
 let contador = 0
 const claveNueva = () => `tmp-${++contador}`
@@ -57,6 +60,7 @@ export function usarConversacion(
   abrirFlujo: AbrirFlujo,
   alPlan?: (p: Propuesta) => void,
   alGuardado?: (plan_id: number, tema_id: number) => void,
+  alYaDecidido?: (plan_id: number | null) => void,
 ) {
   const [burbujas, setBurbujas] = useState<Burbuja[]>([])
   const [escribiendo, setEscribiendo] = useState(false)
@@ -75,7 +79,12 @@ export function usarConversacion(
       const nuevas: Burbuja[] = []
       if (propia !== null) nuevas.push({ clave: claveNueva(), rol: 'usuario', contenido: propia, estado: 'completo' })
       nuevas.push({ clave: claveNueva(), rol: 'tutor', contenido: '', estado: 'llegando' })
-      setBurbujas((previas) => [...previas, ...nuevas])
+      // El aviso de «sin conexión» de un intento anterior sobra en cuanto lo reenvías.
+      setBurbujas((previas) => {
+        const u = previas[previas.length - 1]
+        const sinAviso = u && u.estado === 'error' && u.contenido === MENSAJE_SIN_CONEXION ? previas.slice(0, -1) : previas
+        return [...sinAviso, ...nuevas]
+      })
       setEscribiendo(true)
       setOpciones([])
       setEspera(ESPERA_VACIA)
@@ -134,6 +143,12 @@ export function usarConversacion(
               }))
               break
             case 'error':
+              if (ev.ya_decidido) {
+                // La decisión ya estaba tomada (aceptaste dos veces): no es un fallo.
+                actualizarUltima((b) => ({ ...b, contenido: MENSAJE_YA_ACEPTADO, estado: 'completo' }))
+                alYaDecidido?.(ev.plan_id ?? null)
+                break
+              }
               actualizarUltima((b) => ({ ...b, contenido: errorLegible(ev.detalle).mensaje, estado: 'error' }))
               break
             case 'cortado':
@@ -155,19 +170,25 @@ export function usarConversacion(
           // Ya no es el hilo que ves: su fallo no se pinta en otra conversación.
         } else if (e instanceof DOMException && e.name === 'AbortError') {
           actualizarUltima((b) => ({ ...b, estado: 'interrumpido' }))
+        } else if (!empezo && e instanceof ErrorApi && e.codigo === 0) {
+          // Sin conexión no ha llegado nada: tu mensaje sale del hilo (no se envió) y vuelve a la caja para reenviarlo.
+          const error: Burbuja = { clave: claveNueva(), rol: 'tutor', contenido: MENSAJE_SIN_CONEXION, estado: 'error' }
+          setBurbujas((previas) => trasFalloSinConexion(previas, error, propia !== null))
+          if (propia !== null) escribirEnChat(propia)
         } else if (!empezo && e instanceof ErrorApi) {
           // Tu mensaje se queda en el hilo y su texto vuelve a la caja para reenviarlo.
           setBurbujas((previas) =>
             trasFalloAlEnviar(previas, {
               clave: claveNueva(),
               rol: 'tutor',
-              contenido: `No se pudo enviar: ${e.message}`,
+              contenido: `No se pudo enviar. ${errorLegible(e.message).mensaje}`,
               estado: 'error',
             }),
           )
           if (propia !== null) escribirEnChat(propia)
         } else {
-          actualizarUltima((b) => ({ ...b, contenido: String(e), estado: 'error' }))
+          // A mitad de respuesta (se cortó la red, un fallo del navegador): en castellano, nunca «TypeError: …».
+          actualizarUltima((b) => ({ ...b, contenido: errorLegible(String(e)).mensaje, estado: 'error' }))
         }
       } finally {
         if (turnos.vigente(mio)) {
@@ -178,7 +199,7 @@ export function usarConversacion(
         alAcabar?.()
       }
     },
-    [alPlan, alGuardado, turnos],
+    [alPlan, alGuardado, alYaDecidido, turnos],
   )
 
   const enviar = useCallback(

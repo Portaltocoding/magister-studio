@@ -116,7 +116,7 @@ def test_detallar_un_nivel_no_toca_los_demas() -> None:
 async def test_un_proyecto_de_punta_a_punta_por_la_api(cliente, monkeypatch) -> None:
     from magister.proyectos import trabajo
 
-    async def roadmap_falso(datos, referencias):
+    async def roadmap_falso(datos, referencias, **_):
         assert datos["nombre"] == "Copiloto" and referencias == []
         return rm.montar(_roadmap(2))
 
@@ -136,7 +136,8 @@ async def test_un_proyecto_de_punta_a_punta_por_la_api(cliente, monkeypatch) -> 
     monkeypatch.setattr(trabajo.cola, "fase", fase)
 
     r = await cliente.post("/api/proyectos", json={"nombre": "Copiloto", "idea": "Un agente que opera mi cuenta de AWS sin tocar nada sin permiso.", "investigar": False})
-    assert r.status_code == 201 and r.json()["estado"] == "generando"
+    # Su trabajo aún no ha empezado: «en cola», no «generando».
+    assert r.status_code == 201 and r.json()["estado"] == "en_cola"
     pid = r.json()["id"]
     await trabajo.ejecutar(0, "proyecto_roadmap", {"proyecto_id": pid, "investigar": False})
     p = (await cliente.get(f"/api/proyectos/{pid}")).json()
@@ -167,16 +168,21 @@ async def test_un_proyecto_nunca_se_queda_generando_si_su_trabajo_ya_no_va(clien
     r = await cliente.post("/api/proyectos", json={"nombre": "Atascado", "idea": "Un proyecto cuyo trabajo va a fallar del todo.", "investigar": False})
     pid = r.json()["id"]
     ver = (await cliente.get(f"/api/proyectos/{pid}")).json()
-    assert ver["estado"] == "generando" and ver["trabajo"]["estado"] == "pendiente" and "trabajador_vivo" in ver["trabajo"]
+    assert ver["estado"] == "en_cola" and ver["trabajo"]["estado"] == "pendiente" and "trabajador_vivo" in ver["trabajo"]
     # El trabajo falla del todo: la lista ya lo dice sin tener que abrir el proyecto.
     await cola.terminar(ver["trabajo"]["id"], "fallido", "el modelo no contestó")
     lista = {x["id"]: x for x in (await cliente.get("/api/proyectos")).json()}
     assert lista[pid]["estado"] == "error" and lista[pid]["error"] == "el modelo no contestó"
     # Reintentar lo vuelve a poner en marcha.
-    assert (await cliente.post(f"/api/proyectos/{pid}/rehacer")).json()["estado"] == "generando"
-    # Mientras se genera, no se encola otro encima.
+    r = (await cliente.post(f"/api/proyectos/{pid}/rehacer")).json()
+    assert r["estado"] == "en_cola"
+    tid = (await cliente.get(f"/api/proyectos/{pid}")).json()["trabajo"]["id"]
+    # Pedir lo mismo otra vez (un doble clic) no encola otro: devuelve el mismo.
     r = await cliente.post(f"/api/proyectos/{pid}/rehacer")
-    assert r.status_code == 409 and r.json()["detail"] == "ya se está generando algo de este proyecto"
+    assert r.status_code == 200 and (await cliente.get(f"/api/proyectos/{pid}")).json()["trabajo"]["id"] == tid
+    # Con uno en la cola, no se encola otro distinto encima: se cancela antes.
+    r = await cliente.post(f"/api/proyectos/{pid}/niveles/1/detallar")
+    assert r.status_code == 409 and "cancélalo" in r.json()["detail"]
     # Si su trabajo desaparece (se borró la cola, una restauración), tampoco se queda colgado.
     from sqlalchemy import delete
 
@@ -283,7 +289,7 @@ async def test_rehacer_por_la_api_conserva_lo_hecho_avisa_y_se_puede_volver(clie
 
     mapas = [_con_pasos(_IAM, _CLI, _EC2)]
 
-    async def roadmap_falso(datos, referencias):
+    async def roadmap_falso(datos, referencias, **_):
         return mapas[-1]
 
     async def sin_dibujo(datos, mapa):
@@ -309,7 +315,7 @@ async def test_rehacer_por_la_api_conserva_lo_hecho_avisa_y_se_puede_volver(clie
     assert r.status_code == 428 and "2 pasos hechos" in r.json()["detail"] and "cuota" in r.json()["detail"]
     assert "volver" in r.json()["detail"] and (await cliente.get(f"/api/proyectos/{pid}")).json()["estado"] == "listo"
     r = await cliente.post(f"/api/proyectos/{pid}/rehacer", json={"confirmado": True})
-    assert r.status_code == 200 and r.json()["estado"] == "generando"
+    assert r.status_code == 200 and r.json()["estado"] == "en_cola"
     mapas.append(_con_pasos(("Leer los costes del mes", "Consulta Cost Explorer y saca lo gastado este mes."), _CLI, _IAM))
     tid = (await cliente.get(f"/api/proyectos/{pid}")).json()["trabajo"]["id"]
     await trabajo.ejecutar(tid, "proyecto_roadmap", {"proyecto_id": pid, "investigar": False})
@@ -422,7 +428,7 @@ async def test_detallar_por_la_api_un_nivel_con_un_bloque_nuevo(cliente, monkeyp
     mapa = rm.montar(r)
     assert mapa["niveles"][1]["detallado"]
 
-    async def roadmap_falso(datos, referencias):
+    async def roadmap_falso(datos, referencias, **_):
         return mapa
 
     async def sin_dibujo(datos, mapa):
@@ -455,3 +461,259 @@ async def test_detallar_por_la_api_un_nivel_con_un_bloque_nuevo(cliente, monkeyp
     assert p["hechos"] == ["n2-b1-p1"] and list(p["hechos_en"]) == ["n2-b1-p1"]
     r = await cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar")
     assert r.status_code == 409 and r.json()["detail"] == "ese nivel ya tiene sus pasos"
+
+
+# --- Rehacer: el imperativo y el infinitivo son el mismo paso -------------------------------------------------------
+# Los pares de un rehacer de verdad (la novela del ensayo): 6 pasos hechos y «conservados: 0».
+
+_NOVELA_ANTES = [
+    ("Lee las bases de un concurso real", "Busca las bases de uno o dos concursos de novela corta que te interesen y anota en un documento: extensión mínima y máxima, plazo, formato del archivo, si es anónimo y premio. Guarda el documento como bases.md o bases.docx."),
+    ("Escribe la premisa en tres frases", "En un documento nuevo llamado premisa, escribe tres frases: quién es la jefa de estación y qué quiere, qué se lo impide (la línea se cierra) y qué decisión difícil tiene que tomar. Añade una cuarta frase con cómo termina la historia."),
+    ("Crea el registro de progreso", "Crea una hoja de cálculo o una nota con tres columnas: fecha, palabras escritas y escena. Apunta ahí cada día lo que escribas, y fija un objetivo de 400 a 600 palabras por sesión."),
+    ("Haz las fichas de la protagonista y del pueblo", "Escribe una ficha de media página para la jefa de estación (edad, pasado, miedo, lo que cree al empezar y lo que entenderá al final) y otra del pueblo, con cuatro o cinco personajes secundarios y una línea sobre cada uno."),
+    ("Pruébala en voz alta y ajusta", 'Lee solo las frases de "qué cambia" de cada ficha, de seguido. Mueve, une o elimina escenas hasta que la sucesión tenga sentido y suba la tensión.'),
+]
+_NOVELA_DESPUES = [
+    ("Leer las bases del concurso", "Elige uno o dos concursos de novela corta que te interesen, busca sus bases oficiales y anota en 00-ficha/concurso.txt el límite mínimo y máximo de palabras, el formato de envío, si es anónimo, la fecha límite y las condiciones de originalidad."),
+    ("Escribir la premisa", "En 00-ficha/premisa.txt escribe la premisa en una o dos frases con esta forma: una jefa de estación (quién) que quiere X (deseo) pero Y se lo impide (obstáculo). Haz tres versiones y quédate con la mejor."),
+    ("Crear el registro de palabras", "Crea una hoja de cálculo con las columnas fecha, palabras escritas ese día, palabras totales y una nota breve. Pon como meta 500 palabras por sesión de una hora y 2.500 por semana."),
+    ("Ficha de la protagonista", "En 00-ficha/protagonista.txt escribe: nombre, edad, años en la estación, qué quiere, qué teme, qué se niega a ver de sí misma y una costumbre concreta que la defina."),
+    ("Releer en voz alta y ajustar el plan", "Lee cap01 en voz alta sin cambiar el texto. Anota en 03-revision/notas.txt tres hallazgos (qué suena bien, qué suena raro, qué falta o sobra) y ajusta la escaleta si el capítulo te ha enseñado algo."),
+]
+
+
+def test_las_formas_verbales_y_los_articulos_no_cuentan() -> None:
+    for a, b in [("Lee las bases", "Leer las bases"), ("Crea el bot", "Crear un bot"), ("Escribe la premisa", "Escribir la premisa"),
+                 ("Define los personajes", "Definir el personaje"), ("Pruébala en voz alta", "Probar en voz alta"),
+                 ("Hazlo en local", "Hacer en local"), ("Léele la versión corta", "Leer la versión corta")]:
+        assert rm._raices(a) == rm._raices(b), (a, b)
+    assert rm._raices("Volúmenes EBS") == rm._raices("volumen ebs")
+    # Las palabras de verdad siguen distinguiéndose.
+    assert rm._raices("Crear la carpeta") != rm._raices("Crear el registro")
+
+
+def test_rehacer_conserva_los_pasos_que_siguen_aunque_cambie_el_verbo() -> None:
+    viejo, nuevo = _con_pasos(*_NOVELA_ANTES), _con_pasos(*_NOVELA_DESPUES)
+    pares = {k: v for k, v in rm.emparejar(viejo, nuevo).items() if "-p" in k}
+    # Las bases, la premisa y el registro son los mismos pasos (imperativo contra infinitivo, con otro texto).
+    assert pares == {"n1-b1-p1": "n1-b1-p1", "n1-b1-p2": "n1-b1-p2", "n1-b1-p3": "n1-b1-p3"}
+    # Negativos: «Haz las fichas de la protagonista y del pueblo» no es solo «Ficha de la protagonista», ni probar la
+    # escaleta en voz alta es releer el capítulo: comparten título a medias y casi nada de lo que se hace.
+    assert "n1-b1-p4" not in pares and "n1-b1-p5" not in pares
+    m = rm.conservar(viejo, nuevo, ["n1-b1-p1", "n1-b1-p3", "n1-b1-p4"], {})
+    assert m["conservados"] == 2 and m["no_conservados"] == ["n1-b1-p4"]
+    assert [x["titulo"] for x in m["ya_no_estan"]] == ["Haz las fichas de la protagonista y del pueblo"]
+
+
+def test_dos_pasos_con_numeros_distintos_no_son_el_mismo() -> None:
+    texto = "Escribe una o dos líneas por capítulo: qué pasa, quién aparece y qué cambia al terminar."
+    viejo = _con_pasos(("Capítulos 1 a 6 de la escaleta", texto), _IAM)
+    nuevo = _con_pasos(("Capítulos 7 a 12 de la escaleta", texto), _CLI)
+    assert "n1-b1-p1" not in rm.emparejar(viejo, nuevo)
+    # Ni dos «Crear …» de cosas distintas.
+    viejo = _con_pasos(("Crear la carpeta de la novela", "Crea una carpeta con subcarpetas para la ficha y el borrador."), _IAM)
+    nuevo = _con_pasos(("Crear el registro de palabras", "Crea una hoja de cálculo con la fecha y las palabras del día."), _CLI)
+    assert "n1-b1-p1" not in rm.emparejar(viejo, nuevo)
+
+
+def test_al_rehacer_el_modelo_ve_el_roadmap_de_antes_y_que_conserve_los_titulos() -> None:
+    datos = {"nombre": "La última estación", "idea": "Una novela corta."}
+    viejo = _con_pasos(*_NOVELA_ANTES)
+    sistema = rm.sistema_roadmap(datos, [], viejo, ["n1-b1-p1"])
+    anterior = sistema.split("<roadmap_anterior>")[1].split("</roadmap_anterior>")[0]
+    assert "- [hecho] Lee las bases de un concurso real" in anterior and "- Escribe la premisa en tres frases" in anterior
+    assert "conserva su título exacto" in sistema
+    # La primera vez no hay roadmap de antes.
+    assert "es la primera vez" in rm.sistema_roadmap(datos, [])
+    # Sin marca de género ni comillas rectas; y lo del código, en ASCII.
+    for nombre in ("proyecto_roadmap", "proyecto_nivel"):
+        from magister.cerebro.prompts import cargar
+
+        texto = cargar(nombre).texto
+        assert "sin marcar su género" in texto and "«si te atascas»" in texto and "ASCII" in texto and "/añadir" in texto
+
+
+async def test_rehacer_por_la_api_le_pasa_el_roadmap_de_antes(cliente, monkeypatch) -> None:
+    from magister.proyectos import trabajo
+
+    vistos = []
+
+    async def roadmap_falso(datos, referencias, anterior=None, hechos=None):
+        vistos.append((anterior, hechos))
+        return _con_pasos(*_NOVELA_DESPUES)
+
+    async def nada(*a, **k):
+        return None
+
+    monkeypatch.setattr(rm, "generar_roadmap", roadmap_falso)
+    monkeypatch.setattr(rm, "dibujar_arquitectura", nada)
+    monkeypatch.setattr(trabajo.cola, "fase", nada)
+    pid = await _con_roadmap(_con_pasos(*_NOVELA_ANTES), hechos=["n1-b1-p1", "n1-b1-p4"])
+    assert (await cliente.post(f"/api/proyectos/{pid}/rehacer", json={"confirmado": True})).status_code == 200
+    tid = (await cliente.get(f"/api/proyectos/{pid}")).json()["trabajo"]["id"]
+    await trabajo.ejecutar(tid, "proyecto_roadmap", {"proyecto_id": pid, "investigar": False})
+    assert [x["titulo"] for x in rm.pasos(vistos[0][0])][0] == "Lee las bases de un concurso real"
+    assert vistos[0][1] == ["n1-b1-p1", "n1-b1-p4"]
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert p["roadmap"]["conservados"] == 1 and p["roadmap"]["no_conservados"] == ["n1-b1-p4"] and p["anterior"]
+
+
+# --- El proyecto en cola se sigue usando ----------------------------------------------------------------------------
+
+async def _con_roadmap(mapa: dict | None = None, **extra) -> int:
+    from magister.datos.proyectos import Proyecto
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s, s.begin():
+        p = Proyecto(nombre="Copiloto", idea="Un agente que opera mi cuenta de AWS.", estado="listo",
+                     roadmap=mapa or rm.montar(_roadmap(3)), **extra)
+        s.add(p)
+        await s.flush()
+        return p.id
+
+
+async def _trabajos(pid: int, tipo: str | None = None) -> list[tuple[int, str]]:
+    from sqlalchemy import select
+
+    from magister.datos.material import Trabajo
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s:
+        consulta = select(Trabajo.id, Trabajo.estado).where(Trabajo.parametros["proyecto_id"].astext == str(pid))
+        if tipo:
+            consulta = consulta.where(Trabajo.tipo == tipo)
+        return [tuple(x) for x in (await s.execute(consulta.order_by(Trabajo.id))).all()]
+
+
+async def test_en_cola_se_lee_se_marca_y_se_cancela_y_no_choca_con_otro_trabajo(cliente) -> None:
+    from magister.trabajos import cola
+
+    pid = await _con_roadmap()
+    r = await cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar")
+    assert r.status_code == 200 and r.json()["estado"] == "en_cola"
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert p["estado"] == "en_cola" and p["trabajo"]["nivel"] == 2 and p["trabajo"]["tipo"] == "proyecto_nivel"
+    assert {x["id"]: x["estado"] for x in (await cliente.get("/api/proyectos")).json()}[pid] == "en_cola"
+    # Lo que no choca con detallar el nivel 2: marcar pasos y el diario.
+    assert (await cliente.put(f"/api/proyectos/{pid}/pasos/n1-b1-p1", json={"hecho": True})).json()["progreso"]["hechos"] == 1
+    assert (await cliente.post(f"/api/proyectos/{pid}/decisiones", json={"titulo": "Usar boto3", "decision": "El SDK oficial."})).status_code == 201
+    # Lo que sí choca (otro trabajo, volver al anterior): 409 que dice que se cancele.
+    for r in [await cliente.post(f"/api/proyectos/{pid}/rehacer", json={"confirmado": True}),
+              await cliente.post(f"/api/proyectos/{pid}/volver")]:
+        assert r.status_code == 409 and "en la cola" in r.json()["detail"] and "cancélalo" in r.json()["detail"]
+    # Cancelarlo deja el proyecto libre, sin error a la vista («cancelado» la pantalla no lo enseña).
+    assert await cola.cancelar(p["trabajo"]["id"])
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert p["estado"] == "listo" and p["error"] == "cancelado" and p["trabajo"] is None
+    assert (await cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar")).status_code == 200
+
+
+async def test_un_doble_clic_encola_un_solo_trabajo_y_la_clave_no_depende_del_reloj(cliente) -> None:
+    import asyncio
+
+    pid = await _con_roadmap()
+    a, b = await asyncio.gather(cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar"),
+                                cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar"))
+    assert a.status_code == b.status_code == 200
+    assert len(await _trabajos(pid, "proyecto_nivel")) == 1
+    # Rehacer dos veces seguidas (confirmar con doble clic): uno.
+    pid = await _con_roadmap()
+    a, b = await asyncio.gather(cliente.post(f"/api/proyectos/{pid}/rehacer", json={"confirmado": True}),
+                                cliente.post(f"/api/proyectos/{pid}/rehacer", json={"confirmado": True}))
+    assert a.status_code == b.status_code == 200 and len(await _trabajos(pid, "proyecto_roadmap")) == 1
+
+
+async def test_marcar_varios_pasos_a_la_vez_no_pierde_ninguno(cliente) -> None:
+    import asyncio
+
+    pid = await _con_roadmap(rm.montar(_roadmap(6)))
+    ids = [f"n1-b1-p{i}" for i in range(1, 7)]
+    respuestas = await asyncio.gather(*(cliente.put(f"/api/proyectos/{pid}/pasos/{x}", json={"hecho": True}) for x in ids))
+    assert all(r.status_code == 200 for r in respuestas)
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert sorted(p["hechos"]) == sorted(ids) and sorted(p["hechos_en"]) == sorted(ids)
+
+
+async def test_borrar_cancela_su_trabajo_y_lo_que_no_existe_es_404(cliente) -> None:
+    pid = await _con_roadmap()
+    await cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar")
+    assert (await cliente.delete(f"/api/proyectos/{pid}")).status_code == 204
+    assert [e for _, e in await _trabajos(pid)] == ["cancelado"]
+    assert (await cliente.delete(f"/api/proyectos/{pid}")).status_code == 404
+    assert (await cliente.delete("/api/proyectos/999999")).status_code == 404
+
+
+async def test_el_detalle_no_pisa_lo_que_cambio_mientras_tanto(cliente) -> None:
+    from magister.datos.proyectos import Proyecto
+    from magister.datos.sesion import nueva_sesion
+    from magister.proyectos import trabajo
+
+    base = rm.montar(_roadmap(2))
+    nuevo = _detallar_n2(base, "Escribir el plan", "Aprobar el plan")
+    pid = await _con_roadmap(base)
+    # Mientras el modelo escribía, el asesor cambió un paso del nivel 1: se queda, y el nivel 2 sale detallado.
+    cambiado = {**base, "niveles": [{**base["niveles"][0], "titulo": "Solo leer"}, base["niveles"][1]]}
+    async with nueva_sesion() as s, s.begin():
+        (await s.get(Proyecto, pid)).roadmap = cambiado
+    await trabajo._guardar_detalle(pid, base, nuevo, 2)
+    async with nueva_sesion() as s:
+        r = (await s.get(Proyecto, pid)).roadmap
+    assert r["niveles"][0]["titulo"] == "Solo leer" and r["niveles"][1] == nuevo["niveles"][1]
+    # Si lo que cambió es el propio nivel 2, no se adivina: falla y se vuelve a pedir.
+    otro = {**base, "niveles": [base["niveles"][0], {**base["niveles"][1], "objetivo": "Otra cosa."}]}
+    async with nueva_sesion() as s, s.begin():
+        (await s.get(Proyecto, pid)).roadmap = otro
+    with pytest.raises(LookupError, match="ha cambiado mientras se detallaba"):
+        await trabajo._guardar_detalle(pid, base, nuevo, 2)
+
+
+# --- Entradas: espacios, pasos que no existen y 422 en castellano ---------------------------------------------------
+
+async def test_un_nombre_de_solo_espacios_es_un_422_en_castellano(cliente) -> None:
+    r = await cliente.post("/api/proyectos", json={"nombre": "     ", "idea": "Una idea con más de diez letras.", "investigar": False})
+    assert r.status_code == 422 and r.json()["detail"] == "el nombre necesita al menos 2 caracteres, sin contar los espacios"
+    r = await cliente.post("/api/proyectos", json={"nombre": "Bot", "idea": "            ", "objetivo": "   "})
+    assert r.status_code == 422 and r.json()["detail"] == "la idea necesita al menos 10 caracteres, sin contar los espacios"
+    r = await cliente.post("/api/proyectos", json={"idea": "Una idea con más de diez letras."})
+    assert r.status_code == 422 and r.json()["detail"] == "falta el nombre"
+    assert (await cliente.get("/api/proyectos/abc")).json()["detail"] == "el número del proyecto tiene que ser un número entero"
+    # Lo opcional de solo espacios se guarda vacío, no como «   ».
+    r = await cliente.post("/api/proyectos", json={"nombre": "  Bot  ", "idea": "Una idea con más de diez letras.", "ritmo": "  ", "investigar": False})
+    assert r.status_code == 201 and r.json()["nombre"] == "Bot"
+    assert (await cliente.get(f"/api/proyectos/{r.json()['id']}")).json()["ritmo"] is None
+
+
+async def test_una_decision_de_espacios_o_de_un_paso_que_no_existe_es_un_422(cliente) -> None:
+    pid = await _con_roadmap()
+    r = await cliente.post(f"/api/proyectos/{pid}/decisiones", json={"titulo": "    ", "decision": "Algo que decidí."})
+    assert r.status_code == 422 and "el título" in r.json()["detail"]
+    r = await cliente.post(f"/api/proyectos/{pid}/decisiones", json={"titulo": "Usar boto3", "decision": "El SDK.", "paso_id": "zz-no-existe"})
+    assert r.status_code == 422 and "ese paso no está en el proyecto" in r.json()["detail"]
+    r = await cliente.post(f"/api/proyectos/{pid}/decisiones", json={"titulo": "Usar boto3", "decision": "El SDK.", "paso_id": "n1-b1-p1", "contexto": "  "})
+    assert r.status_code == 201 and r.json()["paso_id"] == "n1-b1-p1" and r.json()["contexto"] is None
+
+
+# --- Lo que va en el código, en ASCII --------------------------------------------------------------------------------
+
+def test_un_comando_con_ene_deja_un_aviso_en_el_paso() -> None:
+    malo = rm.PasoGen(titulo="Crear el comando de alta", que_haces="Registra el comando /añadir con CommandHandler y guarda el tema.",
+                      antes="Un CommandHandler responde a un comando que empieza por barra.", hecho_si="Escribir /añadir en el chat responde «Hecho»", minutos=30)
+    aviso = rm.aviso_ascii(malo)
+    assert aviso and "«/añadir» por «/anadir»" in aviso
+    assert rm.aviso_ascii(rm.PasoGen(**{**malo.model_dump(), "que_haces": "Guarda `funcion_rápida` en capítulo_1.py con una función.",
+                                        "hecho_si": "python -c 'print(1)' devuelve 1 sin errores"}))
+    # Un texto para el usuario con tildes, una URL o una ruta en ASCII no avisan.
+    bien = rm.PasoGen(**{**malo.model_dump(), "que_haces": "Registra /anadir y responde «Añadido» al usuario; mira https://core.telegram.org/bots.",
+                         "hecho_si": "Escribir /anadir en el chat responde «Añadido»"})
+    assert rm.aviso_ascii(bien) is None
+    r = _roadmap(2)
+    r.niveles[0].bloques[0].pasos[0] = malo
+    m = rm.montar(r)
+    assert "aviso" in m["niveles"][0]["bloques"][0]["pasos"][0] and "aviso" not in m["niveles"][0]["bloques"][0]["pasos"][1]
+
+
+def test_sin_software_la_pantalla_lo_sabe() -> None:
+    r = _roadmap(2)
+    assert rm.montar(r)["software"] is True
+    r.software = False
+    assert rm.montar(r)["software"] is False

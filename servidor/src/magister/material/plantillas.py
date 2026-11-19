@@ -26,10 +26,53 @@ def montar(plantilla: str, valores: dict[str, str]) -> str:
 ESTILOS = {"libro": "practica.css", "ficha": "ficha.css"}
 
 
+def barajar(lista: list, semilla: str) -> list:
+    """La misma baraja que `web/src/barajar.ts` (FNV-1a y Fisher-Yates, en 32 bits): misma semilla, mismo orden, así
+    el PDF y la web enseñan las opciones de una pregunta igual, y la buena no sale siempre la primera."""
+    m = 0xFFFFFFFF
+    h = 2166136261
+    for c in semilla:
+        h = ((h ^ ord(c)) * 16777619) & m
+
+    def azar() -> float:
+        nonlocal h
+        h = ((h ^ (h >> 15)) * 2246822507) & m
+        h = ((h ^ (h >> 13)) * 3266489909) & m
+        h ^= h >> 16
+        return h / 4294967296
+
+    copia = list(lista)
+    for i in range(len(copia) - 1, 0, -1):
+        j = int(azar() * (i + 1))
+        copia[i], copia[j] = copia[j], copia[i]
+    return copia
+
+
+LETRAS = "abcdefgh"
+
+
+def _pregunta(i: int, p: dict) -> str:
+    """Una pregunta del repaso como elemento de lista: todo lo de dentro va sangrado al ancho de «10. », no fijo, para
+    que el bloque `::: fantasma` siga dentro del elemento (con 3 espacios fijos, la 10 enseñaba el marcado crudo).
+    Las tipo test llevan sus opciones barajadas por pregunta; la respuesta dice qué letra es la buena."""
+    sangria = " " * len(f"{i}. ")
+    partes = [f"{i}. {p['enunciado'].strip()}"]
+    fantasma = (p.get("fantasma") or "").strip()
+    opciones = [o for o in (p.get("opciones") or []) if (o.get("texto") or "").strip()]
+    if opciones:
+        orden = barajar(opciones, str(p.get("id", i)))
+        # La letra en negrita: «- a) …» suelto, pandoc lo lee como otra lista ordenada y pinta «a.».
+        partes.append("\n".join(f"{sangria}- **{LETRAS[k]})** {o['texto'].strip()}" for k, o in enumerate(orden)))
+        buena = next((LETRAS[k] for k, o in enumerate(orden) if o.get("buena")), None)
+        if buena:
+            fantasma = f"**Respuesta: {buena})**. {fantasma}" if fantasma else f"**Respuesta: {buena})**"
+    lineas = fantasma.splitlines() or [""]
+    partes.append("\n".join([f"{sangria}::: fantasma", *(f"{sangria}{x}" if x.strip() else "" for x in lineas), f"{sangria}:::"]))
+    return "\n\n".join(partes) + "\n"
+
+
 def _repaso(repaso: list[dict]) -> str:
-    return "\n".join(
-        f"{i}. {p['enunciado']}\n\n   ::: fantasma\n   {p['fantasma']}\n   :::\n" for i, p in enumerate(repaso, start=1)
-    ) or "_Las preguntas de repaso se generan con el material._"
+    return "\n".join(_pregunta(i, p) for i, p in enumerate(repaso, start=1)) or "_Las preguntas de repaso se generan con el material._"
 
 
 def _montar_ficha(titulo: str, pie: str, salida: str, definiciones: list[dict], bloques: list[tuple[str, str]],
@@ -60,13 +103,13 @@ def montar_apuntes(titulo: str, pie: str, salida: str, definiciones: list[dict],
         for d in definiciones
     )
     total = len(bloques)
+    # Ningún bloque abre página: el primero sigue a las definiciones donde acaben (si abría página y la rejilla se
+    # pasaba por una tarjeta, quedaba una página con esa tarjeta sola: el aviso «casi vacía» del motor).
     cuerpo = "\n\n".join(
-        f"::: teoria\n## {t} {{{'' if i == 1 else '.nb '}etq=\"{_etq(f'Teoría · {i} de {total}')}\"}}\n\n{texto.strip()}\n:::"
+        f"::: teoria\n## {t} {{.nb etq=\"{_etq(f'Teoría · {i} de {total}')}\"}}\n\n{texto.strip()}\n:::"
         for i, (t, texto) in enumerate(bloques, start=1)
     )
-    preguntas = "\n".join(
-        f"{i}. {p['enunciado']}\n\n   ::: fantasma\n   {p['fantasma']}\n   :::\n" for i, p in enumerate(repaso, start=1)
-    ) or "_Las preguntas de repaso se generan con el material._"
+    preguntas = _repaso(repaso)
     palabras = sum(len(texto.split()) for _, texto in bloques)
     entrada = (f"Lección {clave} de **{tema}**. " if clave and tema else "") + (
         f"{total} bloques, unos {max(5, round(palabras / 180))} minutos de lectura, y {len(repaso)} preguntas para repasar sin mirar."

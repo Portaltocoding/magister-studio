@@ -49,6 +49,8 @@ class Riesgo(BaseModel):
 
 
 class RoadmapGen(BaseModel):
+    software: bool = Field(True, description="true si lo que se construye es un programa (código, una app, un bot); "
+                                             "false si es otra cosa (una novela, un mueble, un huerto)")
     resumen: str = Field(description="El priming del proyecto entero: como mucho 5 líneas")
     que_es: str
     por_que: str = Field(description="Por qué merece la pena y qué demuestra, para su objetivo")
@@ -86,6 +88,40 @@ def errores_paso(p: PasoGen) -> list[str]:
     return errores
 
 
+# Lo que en el código tiene que ir en ASCII aunque el texto esté en castellano: un comando («/añadir» no lo admite el
+# CommandHandler de python-telegram-bot, solo [a-z0-9_]), un identificador entre comillas invertidas o un fichero.
+_COMANDO = re.compile(r"(?<![\w/:.])/([^\W_][\w-]*)")
+_CODIGO = re.compile(r"`([^`\s\"']+)`")
+_FICHERO = re.compile(r"(?<![\w/])([\w-]+\.(?:py|txt|md|json|js|ts|tsx|html|css|csv|ya?ml|toml|sh|sql|env))\b")
+
+
+def _ascii(t: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
+
+
+def aviso_ascii(p: PasoGen | dict) -> str | None:
+    """Un aviso si el paso pide un comando, un identificador o un fichero con tildes o eñes (no se puede comprobar el
+    código que saldrá, pero esto falla casi siempre). None si no hay nada."""
+    d = p.model_dump() if isinstance(p, BaseModel) else p
+    texto = " ".join(str(d.get(k) or "") for k in ("titulo", "que_haces", "antes", "hecho_si"))
+    malos = []
+    for patron, forma in ((_COMANDO, "/{}"), (_CODIGO, "{}"), (_FICHERO, "{}")):
+        for m in patron.finditer(texto):
+            if not m.group(1).isascii() and forma.format(m.group(1)) not in malos:
+                malos.append(forma.format(m.group(1)))
+    if not malos:
+        return None
+    cambios = ", ".join(f"«{x}» por «{_ascii(x)}»" for x in malos[:3])
+    return (f"Ojo: {cambios}. Los comandos, los nombres en el código, las rutas y los ficheros van sin tildes ni eñes "
+            "(en python-telegram-bot, por ejemplo, un comando solo admite a-z, 0-9 y _).")
+
+
+def paso_de(pid: str, p: PasoGen) -> dict:
+    """Un paso como lo guarda el roadmap: su id, sus campos y, si lo hay, el aviso de ASCII."""
+    aviso = aviso_ascii(p)
+    return {"id": pid, **p.model_dump(), **({"aviso": aviso} if aviso else {})}
+
+
 def _con_pasos(bloques: list[BloqueGen], donde: str) -> list[str]:
     """El esqueleto de un nivel detallado: bloques de 2 a 6 pasos, y cada paso completo y comprobable."""
     errores = []
@@ -101,20 +137,72 @@ def _con_pasos(bloques: list[BloqueGen], donde: str) -> list[str]:
     return errores
 
 
-_VACIAS = {"y", "de", "del", "la", "el", "los", "las", "en", "con", "por", "para", "un", "una", "o"}
+# Artículos, determinantes, preposiciones y conjunciones: no dicen de qué va un paso.
+_VACIAS = {
+    "y", "e", "o", "u", "ni", "de", "del", "a", "al", "la", "el", "lo", "los", "las", "en", "con", "por", "para", "un",
+    "una", "unos", "unas", "uno", "su", "sus", "tu", "tus", "mi", "mis", "que", "se", "te", "le", "les", "me", "nos",
+    "si", "es", "sin", "sobre", "entre", "hasta", "desde", "hacia", "como", "cada", "este", "esta", "estos", "estas",
+    "ese", "esa", "esos", "esas", "eso", "esto", "aquel", "aquella", "otro", "otra", "otros", "otras", "todo", "toda",
+    "todos", "todas", "mas", "muy", "ya", "solo", "tambien", "pero", "cual", "cuales",
+}
+# Imperativos irregulares (con tilde o sin ella) -> su infinitivo: «haz» es «hacer», «prueba» es «probar».
+_IRREGULARES = {
+    "haz": "hacer", "pon": "poner", "di": "decir", "ten": "tener", "ven": "venir", "sal": "salir", "ve": "ir",
+    "prueba": "probar", "cuenta": "contar", "piensa": "pensar", "empieza": "empezar", "elige": "elegir",
+    "sigue": "seguir", "mueve": "mover", "vuelve": "volver", "muestra": "mostrar", "recuerda": "recordar",
+    "encuentra": "encontrar", "despliega": "desplegar", "cierra": "cerrar", "repite": "repetir", "pide": "pedir",
+    "sirve": "servir", "consigue": "conseguir", "corrige": "corregir", "escoge": "escoger", "resuelve": "resolver",
+    "devuelve": "devolver", "comprueba": "comprobar", "mide": "medir", "juega": "jugar", "entiende": "entender",
+    "advierte": "advertir", "convierte": "convertir", "invierte": "invertir", "pierde": "perder", "suelta": "soltar",
+}
+_CLITICOS = ("selos", "selas", "melo", "mela", "telo", "tela", "los", "las", "les", "nos", "lo", "la", "le", "me", "te", "se")
+
+
+def _palabras_con_tilde(t: str) -> list[tuple[str, bool]]:
+    """Las palabras en minúscula y sin tildes (la ñ, n), con si llevaban tilde: un imperativo con pronombre la lleva
+    («pruébala», «léele»)."""
+    salida = []
+    for w in re.findall(r"[^\W_]+", t.lower()):
+        d = unicodedata.normalize("NFD", w)
+        tilde = any(unicodedata.category(c) == "Mn" and not (c == "̃" and i and d[i - 1] == "n")
+                    for i, c in enumerate(d))
+        salida.append(("".join(c for c in d if unicodedata.category(c) != "Mn"), tilde))
+    return salida
+
+
+def _verbal(w: str) -> bool:
+    return w in _IRREGULARES or w.endswith(("a", "e", "ar", "er", "ir"))
+
+
+def _raiz(w: str, con_tilde: bool) -> str:
+    """La raíz de una palabra para comparar títulos de pasos: sin plural, sin el pronombre pegado de un imperativo
+    («pruébala», «hazlo»), y el imperativo y el infinitivo dan lo mismo (lee/leer, crea/crear, escribe/escribir,
+    define/definir). Se aplica igual a los dos lados, así que a un sustantivo también le quita la -a o la -e final:
+    «base» y «bases» quedan en «bas», en los dos títulos."""
+    for c in _CLITICOS:
+        resto = w[: -len(c)]
+        if w.endswith(c) and len(resto) >= 2 and (resto in _IRREGULARES or (con_tilde and _verbal(resto))):
+            w = resto
+            break
+    w = _IRREGULARES.get(w, w)
+    if len(w) > 4 and w.endswith("es") and w[-3] not in "aeiou":
+        w = w[:-2]
+    elif len(w) > 3 and w.endswith("s"):
+        w = w[:-1]
+    for fin in ("ar", "er", "ir", "a", "e"):
+        if w.endswith(fin) and len(w) - len(fin) >= 2:
+            return w[: -len(fin)]
+    return w
 
 
 def _raices(t: str) -> set[str]:
-    """Las palabras importantes, sin plural: «volúmenes EBS» y «Volumen EBS» dan lo mismo."""
+    """Las palabras importantes, sin plural ni forma verbal: «volúmenes EBS» y «Volumen EBS» dan lo mismo, y «Lee
+    las bases» y «Leer las bases», también."""
     salida = set()
-    for w in _normal(t).split():
+    for w, tilde in _palabras_con_tilde(t):
         if w in _VACIAS:
             continue
-        for fin in ("es", "s"):
-            if len(w) > 4 and w.endswith(fin):
-                w = w[: -len(fin)]
-                break
-        salida.add(w)
+        salida.add(_raiz(w, tilde))
     return salida
 
 
@@ -181,6 +269,8 @@ def montar(r: RoadmapGen) -> dict:
             "bloques": _bloques(f"n{i}", n.bloques),
         })
     return {
+        # Sin software, la pantalla no habla de «Arquitectura» ni de «seguridad» (una novela no tiene).
+        "software": r.software,
         "resumen": r.resumen, "que_es": r.que_es, "por_que": r.por_que,
         "glosario": [t.model_dump() for t in _glosario(r)], "arquitectura": r.arquitectura,
         "niveles": niveles, "riesgos": [x.model_dump() for x in r.riesgos], "fuera_de_alcance": r.fuera_de_alcance,
@@ -199,7 +289,7 @@ def _bloques(prefijo: str, bloques: list[BloqueGen], ocupados: frozenset[str] = 
         bid = f"{prefijo}-b{j}"
         salida.append({
             "id": bid, "titulo": b.titulo, "priming": b.priming,
-            "pasos": [{"id": f"{bid}-p{k}", **p.model_dump()} for k, p in enumerate(b.pasos, 1)],
+            "pasos": [paso_de(f"{bid}-p{k}", p) for k, p in enumerate(b.pasos, 1)],
         })
     return salida
 
@@ -248,7 +338,7 @@ def con_bloques_rellenos(roadmap: dict, numero: int, detalle: NivelDetallado, oc
                         k += 1
                         while f"{b['id']}-p{k}" in usados:
                             k += 1
-                        ps.append({"id": f"{b['id']}-p{k}", **p.model_dump()})
+                        ps.append(paso_de(f"{b['id']}-p{k}", p))
                     b = {**b, "pasos": ps}
                 bloques.append(b)
             n = {**n, "detallado": True, "bloques": bloques}
@@ -264,13 +354,29 @@ def pasos(roadmap: dict) -> list[dict]:
 # Un roadmap rehecho sale con ids por posición. Para que lo hecho y el diario (que van por id) sigan valiendo, cada
 # paso, bloque o nivel nuevo que sea el mismo que uno de antes hereda su id. Ante la duda, no se empareja: es mejor
 # un paso hecho que se apunta aparte que uno que aparece hecho sin estarlo.
-PARECIDO_MINIMO = 0.6  # la media del parecido del título y del texto
-PARECIDO_TITULO = 0.5  # y el título, por sí solo, al menos esto
+# Calibrado con un rehacer de verdad (la novela del ensayo): «Lee las bases de un concurso real» y «Leer las bases del
+# concurso» dan 0,88 de título y 0,30 de texto; los que no son el mismo paso pero se parecen en el título («Haz las
+# fichas de la protagonista y del pueblo» y «Ficha de la protagonista») comparten poco texto (0,12).
+PARECIDO_MINIMO = 0.4  # la media del parecido del título y del texto
+PARECIDO_TITULO = 0.5  # el título, por sí solo, al menos esto
+PARECIDO_TEXTO = 0.2  # y el texto (qué haces), al menos esto: dos pasos distintos con un título parecido no lo pasan
 MARGEN_DUDA = 0.1  # si el segundo candidato se queda a menos de esto del primero, no se sabe cuál es: no se empareja
 
 
 def _parecido(a: set[str], b: set[str]) -> float:
     return len(a & b) / len(a | b) if a and b else 0.0
+
+
+def _parecido_titulo(a: set[str], b: set[str]) -> float:
+    """La media de Jaccard y de cuánto del título más corto está en el otro: «Escribir la premisa» está entero en
+    «Escribe la premisa en tres frases». Si los dos llevan números y no son los mismos («Capítulos 1 a 6» y
+    «Capítulos 7 a 12»), no son el mismo paso."""
+    if not a or not b:
+        return 0.0
+    numeros_a, numeros_b = {x for x in a if x.isdigit()}, {x for x in b if x.isdigit()}
+    if numeros_a and numeros_b and numeros_a != numeros_b:
+        return 0.0
+    return (_parecido(a, b) + len(a & b) / min(len(a), len(b))) / 2
 
 
 def _emparejar_lista(viejos: list[tuple[str, str, str]], nuevos: list[tuple[str, str, str]]) -> dict[str, str]:
@@ -296,8 +402,8 @@ def _emparejar_lista(viejos: list[tuple[str, str, str]], nuevos: list[tuple[str,
     for iv, tv, qv in libres_v:
         rt, rq = _raices(tv), _raices(qv)
         for i_n, (nt, nq) in raices_n.items():
-            t = _parecido(rt, nt)
-            notas[(iv, i_n)] = (t + _parecido(rq, nq)) / 2 if t >= PARECIDO_TITULO else 0.0
+            t, q = _parecido_titulo(rt, nt), _parecido(rq, nq)
+            notas[(iv, i_n)] = (t + q) / 2 if t >= PARECIDO_TITULO and q >= PARECIDO_TEXTO else 0.0
 
     def claro(candidatos: list[tuple[float, str]]) -> str | None:
         candidatos = sorted(candidatos, reverse=True)
@@ -346,7 +452,8 @@ def conservar(viejo: dict, nuevo: dict, hechos: list[str], hechos_en: dict, usad
     """El roadmap `nuevo` (recién montado, con ids por posición) con los ids de `viejo` donde el nivel, el bloque o el
     paso es el mismo (`emparejar`): así lo hecho, sus fechas y el diario siguen valiendo sin tocarlos. Los demás
     reciben ids que no han existido nunca (ni en `viejo`, ni en lo hecho, ni en lo apuntado, ni en `usados`: los
-    pasos del diario). Lleva «conservados» (cuántos pasos hechos siguen) y «ya_no_estan»."""
+    pasos del diario). Lleva «conservados» (cuántos pasos hechos siguen), «no_conservados» (los ids de los hechos que
+    este rehacer no conserva) y «ya_no_estan»."""
     heredado = {n: v for v, n in emparejar(viejo, nuevo).items()}
     ocupados = {*ids_de(viejo.get("niveles", [])), *(n["id"] for n in viejo.get("niveles", [])), *hechos, *hechos_en,
                 *(x["id"] for x in viejo.get("ya_no_estan", [])), *usados, *heredado.values()}
@@ -379,6 +486,9 @@ def conservar(viejo: dict, nuevo: dict, hechos: list[str], hechos_en: dict, usad
     salida = {**nuevo, "niveles": niveles}
     presentes = {p["id"] for p in pasos(salida)}
     salida["conservados"] = sum(1 for x in dict.fromkeys(hechos) if x in presentes)
+    # Los pasos hechos que este rehacer no ha podido conservar (los de rehacer antes siguen en «ya_no_estan»).
+    de_antes = {p["id"] for p in pasos(viejo)}
+    salida["no_conservados"] = [x for x in dict.fromkeys(hechos) if x in de_antes and x not in presentes]
     return apuntar_perdidos(viejo, salida, hechos, hechos_en)
 
 
@@ -393,13 +503,39 @@ def texto_referencias(referencias: list[dict]) -> str:
     return AVISO + "\n\n" + "\n".join(marcadas)
 
 
-async def generar_roadmap(datos: dict, referencias: list[dict]) -> dict:
-    sistema = cargar("proyecto_roadmap").rellenar(
-        nombre=datos["nombre"], idea=datos["idea"], objetivo=datos.get("objetivo") or "(no lo ha dicho)",
-        sabes=datos.get("sabes") or "(no lo ha dicho)", ritmo=datos.get("ritmo") or "(no lo ha dicho)",
-        referencias=texto_referencias(referencias))
+MAX_ANTERIOR = 6000
+
+
+def texto_anterior(roadmap: dict | None, hechos: list[str] | None = None) -> str:
+    """El roadmap de antes de rehacerlo, para el prompt: sus niveles, bloques y los títulos de sus pasos, con lo hecho
+    marcado. Así el modelo puede dejar igual el título de lo que sigue siendo lo mismo (y lo hecho se conserva)."""
+    if not roadmap or not roadmap.get("niveles"):
+        return "(es la primera vez: no hay roadmap anterior)"
+    hechos_set = set(hechos or [])
+    lineas = []
+    for n in roadmap["niveles"]:
+        lineas.append(f"Nivel {n['numero']}: {n['titulo']}")
+        for b in n["bloques"]:
+            lineas.append(f"  Bloque: {b['titulo']}")
+            lineas += [f"    - {'[hecho] ' if p['id'] in hechos_set else ''}{p['titulo']}" for p in b["pasos"]]
+    return "\n".join(lineas)[:MAX_ANTERIOR]
+
+
+async def generar_roadmap(datos: dict, referencias: list[dict], anterior: dict | None = None,
+                          hechos: list[str] | None = None) -> dict:
+    """El roadmap nuevo. `anterior`: el de antes, si se está rehaciendo (con `hechos`, lo que ya está hecho en él)."""
+    sistema = sistema_roadmap(datos, referencias, anterior, hechos)
     r = await estructurar(sistema, "Devuelve el roadmap de construcción.", RoadmapGen, reglas=reglas_roadmap)
     return montar(r)
+
+
+def sistema_roadmap(datos: dict, referencias: list[dict], anterior: dict | None = None,
+                    hechos: list[str] | None = None) -> str:
+    """El prompt del roadmap (sin llamar al modelo, para poder probarlo)."""
+    return cargar("proyecto_roadmap").rellenar(
+        nombre=datos["nombre"], idea=datos["idea"], objetivo=datos.get("objetivo") or "(no lo ha dicho)",
+        sabes=datos.get("sabes") or "(no lo ha dicho)", ritmo=datos.get("ritmo") or "(no lo ha dicho)",
+        referencias=texto_referencias(referencias), anterior=texto_anterior(anterior, hechos))
 
 
 def texto_niveles_anteriores(roadmap: dict, numero: int, hechos: list[str]) -> str:

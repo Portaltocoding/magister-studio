@@ -49,8 +49,10 @@ tr { break-inside: avoid; }
 .caja code { background: #333; color: var(--amarillo); }
 
 /* Cajas con borde, en rejilla. Uso: ::: rejilla  (dentro, varios ::: marco con **Título** y texto)  ::: */
-.rejilla { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3mm; margin: 2mm 0 5mm; break-inside: avoid; }
-.marco { border: 1.2px solid var(--tinta); padding: 3.5mm; font-size: 8.7pt; }
+/* La rejilla puede partirse entre páginas por filas; cada tarjeta, nunca (si no, una definición quedaba partida y,
+   con la rejilla entera sin partir, la página de antes casi vacía). */
+.rejilla { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3mm; margin: 2mm 0 5mm; break-inside: auto; }
+.marco { border: 1.2px solid var(--tinta); padding: 3.5mm; font-size: 8.7pt; break-inside: avoid; }
 .marco p { margin: 0 0 1mm; }
 .marco strong:first-child { display: block; margin-bottom: 1.2mm; font-size: 9pt; }
 
@@ -97,6 +99,12 @@ ul.task-list { list-style: none; padding-left: 2px; }
 .idx li .t { flex: 1; }
 .idx li.l1 { font-weight: 700; margin-top: 2.5mm; }
 .idx li.l2 { padding-left: 4mm; font-size: 8.6pt; color: #333; }
+/* Las opciones de una pregunta tipo test del repaso: ya llevan su letra. */
+.practica ol > li > ul { list-style: none; padding-left: 1mm; }
+/* El índice del libro: por temas, cada lección con la página de su capítulo (la rellena render_win.mjs). */
+.indice-libro ul { list-style: none; padding-left: 0; margin: 1mm 0 5mm; }
+.indice-libro li { display: flex; gap: 6px; border-bottom: 0.6px dotted var(--linea); margin: 0 0 1.4mm; }
+.indice-libro li .pg { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 .katex { font-size: 1.04em; }
 .katex-display { margin: 2mm 0; }
 

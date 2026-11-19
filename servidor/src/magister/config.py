@@ -80,6 +80,9 @@ class Ajustes(BaseSettings):
     trabajos_en_api: bool = True  # el trabajador corre dentro de la API (o aparte con magister-trabajador)
     trabajos_lease_s: int = 120
     trabajos_intentos: int = 5
+    # Cuántos trabajos de la cola corre a la vez cada trabajador (dentro de la API o aparte). Nunca dos de la misma
+    # lección, y los largos (incorporar, proyectos, MP4) dejan siempre un hueco a los demás.
+    trabajos_a_la_vez: int = 2
     duracion_guion_min: int = 8
 
     # Producción (Parte VI)

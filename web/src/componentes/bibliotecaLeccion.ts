@@ -119,7 +119,8 @@ export function chipNecesidad(l: { necesita_fuentes?: string | null; necesita_fu
 } {
   const efectiva = l.necesita_fuentes ?? 'conviene'
   const guardada = l.necesita_fuentes_guardada && NECESIDADES.includes(l.necesita_fuentes_guardada) ? l.necesita_fuentes_guardada : efectiva
-  return { valor: guardada, nota: guardada !== efectiva ? 'tu material manda: se busca igual' : '' }
+  // «Se busca igual» chocaba con «tu material ya la cubre» en la misma fila: la nota dice solo qué etiqueta cuenta.
+  return { valor: guardada, nota: guardada !== efectiva ? `tu material manda: cuenta como «${efectiva}»` : '' }
 }
 
 // Al aceptar un plan con «buscar fuentes»: las lecciones sin material que sí necesitan fuentes (las marcadas «no» se

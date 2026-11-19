@@ -74,7 +74,10 @@ def texto_automatico(lec: dict, material_propio: bool = False, automatico: bool 
     """La frase del Roadmap: por qué esta lección se investiga sola o no. Sin el automático, nada se busca solo."""
     motivo = motivo_automatico(lec, material_propio)
     if not lec.get("sin_material"):
-        return "No hace falta: tu material lo cubre."
+        # Una sola frase que no choca con el chip de la etiqueta: diga «conviene» o «imprescindible», con material
+        # bastante no se busca sola, y a mano se puede. (Cuántos fragmentos cuentan como material: los distintos, ver
+        # `fuentes.duplicados.colapsar`.)
+        return "Tu material ya la cubre: no se busca sola. Si quieres más, «Buscar fuentes»."
     if motivo == "no":
         return "No hace falta: se explica bien sin fuentes."
     if not automatico:

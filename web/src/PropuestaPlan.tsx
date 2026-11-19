@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { NecesitaFuentes, Propuesta } from './api.ts'
 import BarraCuota from './componentes/BarraCuota.tsx'
+import { numero, plural, textoSustituye } from './componentes/formato.ts'
 
 // Si una lección necesita fuentes (ADR-0021): lo decide el plan y lo cambias en Roadmap. Aquí y no en PanelPlan, que se
 // carga aparte (lazy).
@@ -30,14 +31,22 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
   // «Aceptar y buscar fuentes» busca en las lecciones que las necesitan: dos llamadas por cada una. Aceptar sin más no
   // gasta modelo; «Rehacer» vuelve a planificar.
   const aBuscar = propuesta.lecciones.filter((l) => l.necesita_fuentes !== 'no').length
+  // Ya hay un plan aceptado de este tema: aceptar este lo sustituye (lo dice la tarjeta y lo dicen los botones).
+  const sustituye = propuesta.sustituye ?? null
+  const idAviso = 'propuesta-sustituye'
 
   return (
     <section className="propuesta" aria-label="Plan propuesto">
       <h2>Plan propuesto{propuesta.tema ? `: ${propuesta.tema}` : ''}</h2>
       <p className="nota">
-        {propuesta.total_horas} h de {propuesta.capacidad_horas} h disponibles · acaba el {fecha(propuesta.fin)} ·{' '}
-        {propuesta.sesiones.length} sesiones
+        {numero(propuesta.total_horas)} h de {numero(propuesta.capacidad_horas)} h disponibles · acaba el {fecha(propuesta.fin)} ·{' '}
+        {plural(propuesta.sesiones.length, 'sesión', 'sesiones')}
       </p>
+      {sustituye && (
+        <p className="aviso-sustituye" role="note" id={idAviso}>
+          {textoSustituye(sustituye)}
+        </p>
+      )}
       {propuesta.razonamiento && <p className="razonamiento">{propuesta.razonamiento}</p>}
       <ol className="lecciones">
         {propuesta.lecciones.map((l) => (
@@ -46,7 +55,7 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
               {l.clave} · {l.titulo}
             </strong>{' '}
             <span className="nota-linea">
-              {l.horas} h{l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''}
+              {numero(l.horas, 2)} h{l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''}
             </span>{' '}
             {l.necesita_fuentes && (
               // Lo que decide el plan; se cambia en Roadmap, lección a lección, una vez aceptado.
@@ -95,22 +104,24 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
           <button
             className="boton boton-principal"
             disabled={bloqueado}
+            aria-describedby={sustituye ? idAviso : undefined}
             onClick={() => {
               setPulsado(true)
               alAceptar(true)
             }}
           >
-            Aceptar y buscar fuentes
+            {sustituye ? 'Sustituir y buscar fuentes' : 'Aceptar y buscar fuentes'}
           </button>
           <button
             className="boton"
             disabled={bloqueado}
+            aria-describedby={sustituye ? idAviso : undefined}
             onClick={() => {
               setPulsado(true)
               alAceptar(false)
             }}
           >
-            Aceptar
+            {sustituye ? 'Aceptar y sustituir' : 'Aceptar'}
           </button>
           <button className="boton" disabled={bloqueado} onClick={() => setCambiando(true)}>
             Cambiar algo

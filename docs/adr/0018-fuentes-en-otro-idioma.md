@@ -33,3 +33,18 @@ Citas (afirmación en español, fragmento en inglés, coseno con la frase más p
 - El reranker devuelve logits (sin sigmoide) con sentence-transformers 6.3; si una versión nueva los pasara por una sigmoide, el umbral 1,5 dejaría de valer y hay que volver a medir.
 - Una instalación nueva sigue empezando en `v1` (la migración no cambia): hasta lanzar `magister indexar --activar v3`, la bibliografía entra. Hacerlo por defecto pediría una migración de datos que cree y active `v3`.
 - Uno de los tres textos (Synthese) trae solo el resumen, las notas y la bibliografía (el cuerpo no se descargó): con `v3` le queda un trozo, el resumen.
+
+## Nota del 19-11-2026: la vía léxica, el relleno y lo que viene de la web
+
+**Contexto.** Un probador encontró tres cosas. (1) «¿Qué es el complejo sinaptonémico y en qué subfase aparecen los quiasmas?» exigía las cinco palabras en un mismo fragmento (`websearch_to_tsquery` es un AND): la vía léxica salía vacía aunque los apuntes dijeran «los quiasmas se ven en el diploteno». (2) Un .txt de 60 KB con una frase repetida aportaba de 4 a 8 de los 8 fragmentos de apoyo de cada lección y el Roadmap decía que tu material la cubría. (3) En el research, la misma página de Khan Academy se leyó cinco veces por cinco subdominios, y LibreTexts llegaba al juez con 2.500 caracteres de macros de MathJax (profundidad 0, «descartada por cita»).
+
+**Decisión** (los umbrales no cambian).
+
+1. **Vía léxica: primero el AND, después el OR.** `fuentes/buscar.buscar_lexica_completa` devuelve primero los fragmentos con todas las palabras y después los que tienen alguna, por `ts_rank_cd`; con exclusiones («-mitosis») solo el AND. `ResultadoBusqueda.lexica_completa` dice cuáles tienen todas.
+2. **Un acierto léxico completo en una fuente tuya es «hay fuentes».** En la híbrida, si el coseno no llega, un fragmento que no es web y tiene todas las palabras de la consulta resuelve en el escalón `lexica`, antes del reranker. Los aciertos del OR no cuentan.
+3. **Las copias cuentan como una.** Al indexar, un trozo con exactamente las mismas palabras que otro del mismo documento no entra (`duplicados.sin_repetir`; no toca ningún trozo, la regla `version.texto[inicio:fin] == fragmento.texto` sigue). Al buscar, los fragmentos iguales o con Jaccard de shingles ≥ 0,8 con uno mejor colocado se quitan antes de cortar a k (`duplicados.colapsar`, `Consulta.colapsar_duplicados`): así tampoco llenan el apoyo de una lección.
+4. **Research.** El tope de 2 lecturas y 2 propuestas es por sitio (`herramientas.dominio_base`), no por subdominio; una lectura con el mismo crudo que otra ya leída en la tarea no vuelve al juez; las macros de MathJax se quitan al extraer (`extraer.sin_macros`); y la trayectoria dice el motivo real de cada descarte (`fijo.por_que_no_vale`: «sin cita», «profundidad 0»...). La cita sigue siendo literal: solo se perdonan las remisiones entre paréntesis («(see synapsis)»).
+
+**Medido** (base de ensayo, e5-small y mMARCO, sin red). La pregunta del probador contra la nota de meiosis entera (un solo fragmento, 1.106 caracteres, del vault): coseno 0,834 y reranker −2,23; contra fragmentos de otras lecciones, 0,827-0,836 y de −4,6 a −7,0. Contra solo su sección «Meiosis I», 0,856 y −0,87. Con estos datos el coseno no separa lo que contesta de lo ajeno en esta nota, y bajar umbrales no está justificado. Trocear el vault por encabezados daría 0,856, pero es otra configuración del índice (las del vault no se trocean si caben) y hay que medirla con el banco antes.
+
+**Consecuencias.** Esa pregunta sigue en «nada»: la nota no habla del complejo sinaptonémico, así que no tiene todas sus palabras. «¿Los quiasmas se ven en el diploteno?» sí resuelve por la vía léxica.

@@ -23,7 +23,7 @@ from magister.cerebro.estructura import ErrorEstructura, Intento, estructurar
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
 from magister.fuentes.extraer import recomponer
-from magister.research.herramientas import Herramientas, delimitar, descartar_url, dominio
+from magister.research.herramientas import Herramientas, delimitar, descartar_url, dominio, dominio_base
 
 SIN_CORREO = "con un correo en MAGISTER_UNPAYWALL_EMAIL se buscaría su versión en abierto"
 
@@ -101,18 +101,41 @@ def normalizar(t: str) -> str:
     return " ".join(t.lower().split())
 
 
+# Las remisiones entre paréntesis de una enciclopedia («(see synapsis)», «(véase la figura 2)») son navegación: al
+# copiar la frase, el juez las salta. Solo esas; cualquier otra palabra que falte sigue tirando la cita.
+_REMISION = re.compile(r"\s*\((?:see|see also|cf\.?|fig\.?|figure|véase|vease|ver|consulta)\b[^()]{0,60}\)", re.I)
+
+
 def cita_en(cita: str, extracto: str) -> bool:
-    """La cita está en el extracto, tal cual salvo comillas, guiones, mayúsculas y espacios. Una cita de menos de 3
-    palabras no demuestra nada."""
+    """La cita está en el extracto, tal cual salvo comillas, guiones, mayúsculas, espacios y remisiones entre
+    paréntesis. Una cita de menos de 3 palabras no demuestra nada."""
     c = normalizar(cita).strip(" .,;:\"'")
-    return len(c.split()) >= 3 and c in normalizar(extracto)
+    if len(c.split()) < 3:
+        return False
+    e = normalizar(extracto)
+    return c in e or normalizar(_REMISION.sub("", cita)).strip(" .,;:\"'") in normalizar(_REMISION.sub("", extracto))
+
+
+def por_que_no_vale(nota: Nota, extracto: str, exigir_objetivos: bool = True) -> str | None:
+    """El primer motivo por el que una nota no vale (para la trayectoria: antes todo salía «por cita», también una
+    página de profundidad 0 sin cita), o None si vale."""
+    if nota.tipo in TIPOS_FUERA:
+        return f"tipo {nota.tipo}"
+    if exigir_objetivos and not nota.objetivos:
+        return "no explica ningún objetivo"
+    if nota.profundidad < 2:
+        return f"profundidad {nota.profundidad}"
+    if nota.autoridad < 1:
+        return "autoridad 0"
+    if not cita_en(nota.cita, extracto):
+        return "cita" if nota.cita.strip() else "sin cita"
+    return None
 
 
 def vale(nota: Nota, extracto: str, exigir_objetivos: bool = True) -> bool:
     """Profundidad 2 o más, autoridad 1 o más, ni portada ni comercial ni espejo ni muro, algún objetivo explicado y una
     cita que está de verdad."""
-    return (nota.profundidad >= 2 and nota.autoridad >= 1 and nota.tipo not in TIPOS_FUERA
-            and (bool(nota.objetivos) or not exigir_objetivos) and cita_en(nota.cita, extracto))
+    return por_que_no_vale(nota, extracto, exigir_objetivos) is None
 
 
 def puntuacion(nota: Nota) -> int:
@@ -129,11 +152,11 @@ def elegir(notas_validas: list[Nota], n_objetivos: int, max_propuestas: int = 6,
     por_dominio: Counter[str] = Counter()
 
     def cabe(x: Nota) -> bool:
-        return all(x is not e for e in elegidas) and por_dominio[dominio(x.url)] < max_por_dominio
+        return all(x is not e for e in elegidas) and por_dominio[dominio_base(x.url)] < max_por_dominio
 
     def tomar(x: Nota) -> None:
         elegidas.append(x)
-        por_dominio[dominio(x.url)] += 1
+        por_dominio[dominio_base(x.url)] += 1
 
     if n_objetivos == 0:
         for x in orden:
@@ -276,11 +299,13 @@ async def research_fijo(
     for url in urls:
         if len(lecturas) >= max_urls or intentos >= tope:
             break
-        if por_dominio[dominio(url)] >= MAX_POR_DOMINIO:
-            traza.append({"accion": "descartar", "url": url, "motivo": "ya hay 2 lecturas de ese dominio"})
+        # Por sitio, no por subdominio (`dominio_base`): las lecturas fallidas también cuentan, así un sitio que ya dio
+        # dos veces «muy poco texto» no se vuelve a intentar.
+        if por_dominio[dominio_base(url)] >= MAX_POR_DOMINIO:
+            traza.append({"accion": "descartar", "url": url, "motivo": "ya hay 2 lecturas de ese sitio"})
             continue
         intentos += 1
-        por_dominio[dominio(url)] += 1
+        por_dominio[dominio_base(url)] += 1
         lectura = await h.leer_pagina(url)
         traza.append({"accion": "leer", "url": url, "error": lectura.error, "crudo_sha": lectura.crudo_sha,
                       "formato": lectura.formato})
@@ -325,9 +350,10 @@ async def research_fijo(
             continue  # una URL que no se leyó (la pide una página) no existe para el código
         vistas.add(nota.url)
         nota.objetivos = sorted({o for o in nota.objetivos if 1 <= o <= n})
-        ok = vale(nota, por_url[nota.url].extracto, exigir_objetivos=n > 0)
-        if not cita_en(nota.cita, por_url[nota.url].extracto):
-            traza.append({"accion": "descartada", "url": nota.url, "por": "cita"})
+        motivo = por_que_no_vale(nota, por_url[nota.url].extracto, exigir_objetivos=n > 0)
+        ok = motivo is None
+        if motivo is not None:
+            traza.append({"accion": "descartada", "url": nota.url, "por": motivo})
         resumen_notas.append({**ficha_de(nota), "url": nota.url, "valida": ok})
         if ok:
             validas.append(nota)

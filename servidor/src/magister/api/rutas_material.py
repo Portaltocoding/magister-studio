@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
 from magister.datos.material import BancoTono, BloqueMaterial, Etiqueta, Material, Pregunta
-from magister.datos.plan import LeccionFila
+from magister.datos.plan import LeccionFila, PlanFila
 from magister.datos.sesion import sesion_por_peticion
 from magister.material import videos_plan
 from magister.tono.juez import DIMENSIONES, rubrica
@@ -227,9 +227,13 @@ async def poner_titulo(plan_id: int, cuerpo: TituloPropio) -> dict:
 
 @rutas.get("/planes/{plan_id}/libro")
 async def ver_libro(plan_id: int) -> dict | None:
+    """Cómo va el libro, con lo que la web necesita: nunca la ruta del PDF en el disco (se baja por /libro/pdf)."""
     from magister.material.libro import estado_libro
 
-    return await estado_libro(plan_id)
+    e = await estado_libro(plan_id)
+    if e is None:
+        return None
+    return {k: e[k] for k in ("estado", "lecciones", "faltan", "paginas", "error", "fecha") if k in e}
 
 
 @rutas.post("/planes/{plan_id}/libro", status_code=202)
@@ -259,28 +263,48 @@ async def libro_pdf(plan_id: int):
 
 @rutas.get("/planes/{plan_id}/materiales")
 async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
-    """Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha."""
+    """Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha.
+
+    - `tipos[tipo]`: el estado del último material de ese tipo (`generando` solo si no hay ninguno terminado).
+    - `ids[tipo]` y `apuntes_id`: SOLO de materiales terminados (listo, revisar o bloqueado); uno a medias no se puede
+      abrir (su contrato está a medio hacer). `apuntes_listos` dice si hay apuntes que se pueden estudiar
+      (listo o revisar): es el campo que debe mirar quien ofrezca «Empezar».
+    - `trabajo`: el trabajo de material en marcha, si lo hay: `{"id", "estado": "pendiente" | "en_curso",
+      "tipos": [...]}` («En cola» frente a «Generando», y si solo se hacen las diapositivas o el guion).
+      `en_marcha` sigue para quien ya lo miraba."""
+    if await s.get(PlanFila, plan_id) is None:
+        raise HTTPException(404, "plan no encontrado")
     filas = (await s.execute(text(
         "select distinct on (leccion_clave, tipo) leccion_clave, tipo, estado, id from materiales "
         "where plan_id = :p order by leccion_clave, tipo, (estado = 'generando'), id desc"), {"p": plan_id})).all()
     fichas = dict((await s.execute(text(
         "select leccion_clave, count(*) from preguntas where plan_id = :p and estado = 'activa' and not sonda "
         "group by leccion_clave"), {"p": plan_id})).all())
-    en_marcha = set((await s.scalars(text(
-        "select leccion_clave from trabajos where plan_id = :p and tipo = 'material' and estado in ('pendiente', 'en_curso')"),
-        {"p": plan_id})).all())
+    trabajos = {c: {"id": i, "estado": e, "tipos": (p or {}).get("tipos") or ["apuntes"]}
+                for c, i, e, p in (await s.execute(text(
+                    "select distinct on (leccion_clave) leccion_clave, id, estado, parametros from trabajos "
+                    "where plan_id = :p and tipo = 'material' and estado in ('pendiente', 'en_curso') "
+                    "order by leccion_clave, (estado = 'en_curso') desc, id"), {"p": plan_id})).all()}
+
+    def vacio() -> dict:
+        return {"tipos": {}, "ids": {}, "fichas": 0, "en_marcha": False, "apuntes_listos": False, "trabajo": None}
+
     salida: dict[str, dict] = {}
     for clave, tipo, estado, mid in filas:
-        d = salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})
+        d = salida.setdefault(clave, vacio())
         d["tipos"][tipo] = estado
-        d.setdefault("ids", {})[tipo] = mid  # para abrir cada material (foco, vídeo)
+        if estado == "generando":
+            continue
+        d["ids"][tipo] = mid  # para abrir cada material (foco, vídeo)
         if tipo == "apuntes":
             d["apuntes_id"] = mid
-    for clave in set(fichas) | en_marcha:
-        salida.setdefault(clave, {"tipos": {}, "fichas": 0, "en_marcha": False})
+            d["apuntes_listos"] = estado in ("listo", "revisar")
+    for clave in set(fichas) | set(trabajos):
+        salida.setdefault(clave, vacio())
     for clave, d in salida.items():
         d["fichas"] = fichas.get(clave, 0)
-        d["en_marcha"] = clave in en_marcha
+        d["trabajo"] = trabajos.get(clave)
+        d["en_marcha"] = clave in trabajos
     return salida
 
 
@@ -324,6 +348,16 @@ async def eventos_trabajo(tid: int) -> AsyncIterator[ServerSentEvent]:
         yield ServerSentEvent(data={k: v for k, v in ev.items() if k != "tipo"}, event=ev["tipo"])
 
 
+def contrato_publico(contrato: dict | None) -> dict | None:
+    """Lo del contrato que la web pinta: los bloques (clave, título y conceptos), las definiciones y las fórmulas.
+    Nunca el `proposito` de cada bloque ni el `razonamiento`: son instrucciones para el modelo («Responde: …
+    Aclara que…»), no texto para leer."""
+    if not contrato:
+        return contrato
+    return {"bloques": [{k: b.get(k) for k in ("clave", "titulo", "conceptos") if k in b} for b in contrato.get("bloques", [])],
+            "definiciones": contrato.get("definiciones", []), "formulas": contrato.get("formulas", [])}
+
+
 def _material(m: Material, con_texto: bool = False) -> dict:
     salida = {"id": m.id, "tipo": m.tipo, "estado": m.estado, "motivo": m.motivo, "trabajo_id": m.trabajo_id,
               "ficheros": [k for k, v in FICHEROS.items() if Path(ajustes.salidas, f"{m.plan_id}-{m.leccion_clave}", v).exists()
@@ -331,7 +365,7 @@ def _material(m: Material, con_texto: bool = False) -> dict:
               "informes": m.informes, "actualizado_en": m.actualizado_en.isoformat()}
     if con_texto:
         salida["texto"] = m.texto
-        salida["contrato"] = m.contrato
+        salida["contrato"] = contrato_publico(m.contrato)
     if m.tipo == "apuntes":
         from magister.material.almacen import estilo_de
 

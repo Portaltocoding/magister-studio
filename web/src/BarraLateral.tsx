@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { borrarConversacion, type Conversacion } from './api.ts'
+import { borrarConversacion, ErrorApi, type Conversacion } from './api.ts'
+import { errorLegible } from './componentes/errores.ts'
 import { GRUPOS, TALLER, type IdModo } from './modos.ts'
 import { claveSeccion } from './componentes/tema.ts'
 
@@ -200,7 +201,16 @@ export default function BarraLateral({
                   aria-label={`Borrar ${c.titulo}`}
                   onClick={async () => {
                     if (!confirm(`¿Borrar «${c.titulo}»?`)) return
-                    await borrarConversacion(c.id)
+                    try {
+                      await borrarConversacion(c.id)
+                    } catch (e) {
+                      // Ya no existe (la borraste en otra pestaña): es lo que querías, se quita de la lista.
+                      if (!(e instanceof ErrorApi && e.codigo === 404)) {
+                        alert(`No he podido borrar «${c.titulo}». ${errorLegible(e instanceof Error ? e.message : String(e)).mensaje}`)
+                        alCambiar()
+                        return
+                      }
+                    }
                     if (c.id === activa) alElegirConversacion(null)
                     alCambiar()
                   }}

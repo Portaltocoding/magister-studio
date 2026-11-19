@@ -95,7 +95,7 @@ test('al aceptar: lo marcado «no» no se lanza, se cuentan las tareas lanzadas 
 test('el chip enseña la etiqueta guardada y avisa si tu material la cambia', () => {
   assert.deepEqual(chipNecesidad({ necesita_fuentes: 'conviene', necesita_fuentes_guardada: 'no' }), {
     valor: 'no',
-    nota: 'tu material manda: se busca igual',
+    nota: 'tu material manda: cuenta como «conviene»',
   })
   assert.deepEqual(chipNecesidad({ necesita_fuentes: 'imprescindible', necesita_fuentes_guardada: 'imprescindible' }), {
     valor: 'imprescindible',

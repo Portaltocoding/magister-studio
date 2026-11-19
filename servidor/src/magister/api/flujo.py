@@ -6,6 +6,7 @@ aunque el cliente se vaya a medias.
 """
 
 import asyncio
+import logging
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 
@@ -18,6 +19,7 @@ from magister.seguridad.salida import CanarioDetectado, FiltroSalida
 
 Guardar = Callable[[str, str, int | None, int, dict], Awaitable[int | None]]
 CORTADO = "He dejado esta respuesta a medias: ha llegado otra pregunta."
+registro = logging.getLogger("magister.api")
 
 
 class TurnoCortado(Exception):
@@ -81,10 +83,13 @@ async def flujo_tutor(
     eventos: AsyncIterator[dict],
     guardar: Guardar,
     inicio: dict,
+    guardar_corte_vacio: bool = False,
 ) -> AsyncIterator[ServerSentEvent]:
     """`guardar(texto, estado, ms_primer_token, ms_total, extra)` devuelve el id guardado (o None).
 
-    `extra` lleva las citas y la traza de búsqueda, que viajan en el evento `fin`."""
+    `extra` lleva las citas y la traza de búsqueda, que viajan en el evento `fin`. Con `guardar_corte_vacio`, un corte
+    antes de la primera palabra («Parar» a los 4 s) también se guarda, vacío y como «interrumpido»: la pregunta no
+    queda sin respuesta en el hilo. Un fallo inesperado acaba en `error`, nunca con el flujo cortado sin más."""
     t0 = time.perf_counter()
     ms_primer: int | None = None
     texto: list[str] = []
@@ -130,13 +135,18 @@ async def flujo_tutor(
             except CanarioDetectado:
                 estado = "error"
                 detalle_error = "he cortado la respuesta: contenía algo que no debía salir"
+        except Exception:  # noqa: BLE001  (sale como `error`: el cliente no se queda esperando un `fin` que no llega)
+            registro.exception("el turno ha fallado")
+            estado = "error"
+            detalle_error = "algo ha fallado en el servidor; vuelve a intentarlo"
     finally:
         ms_total = int((time.perf_counter() - t0) * 1000)
         contenido = "".join(texto)
         if estado == "error" and not contenido:
             contenido = f"[error] {detalle_error}"
-        # Un corte antes de la primera palabra (le interrumpes en una llamada) no deja un mensaje vacío en el hilo.
-        if contenido or estado == "error":
+        # Un corte antes de la primera palabra (le interrumpes en una llamada) no deja un mensaje vacío en el hilo, salvo
+        # que se pida (`guardar_corte_vacio`, el chat escrito): entonces queda como «interrumpido».
+        if contenido or estado == "error" or (guardar_corte_vacio and estado == "interrumpido"):
             with anyio.CancelScope(shield=True):
                 mensaje_id = await guardar(contenido, estado, ms_primer, ms_total, extra)
     if cortado:

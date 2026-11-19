@@ -56,6 +56,9 @@ interface Props {
   guardable?: boolean
 }
 
+// Lo que «Parar» tarda en poder pulsarse tras enviar (el segundo clic de un doble clic llega antes).
+const PARAR_TRAS_ENVIAR_MS = 500
+
 const ESTADO_ADJUNTO: Record<Adjunto['estado'], string> = {
   subiendo: 'subiendo…',
   indexando: 'leyéndolo…',
@@ -243,9 +246,48 @@ export default function Hilo({
   // El servidor no admite mensajes de más de 20.000 caracteres: se avisa y no se envía (recortar en la caja lo haría sin decirlo).
   const largo = demasiadoLargo(borrador)
 
+  // `escribiendo` llega con el siguiente render: dos clics (o Intro y clic) en el mismo instante lo verían aún en false
+  // y mandarían la pregunta dos veces. Esta marca se pone al momento y dura hasta que el hilo empieza a responder
+  // (o 1 s, si el envío no llega a arrancar: crear la conversación falló).
+  const enviadoEn = useRef(0)
+  // «Parar» sale en el mismo sitio que «Enviar»: el segundo clic de un doble clic caería en él y cortaría la respuesta.
+  // Durante un momento tras enviar no se puede pulsar; luego sí, también con el teclado.
+  // Se ajusta en el mismo render en que empieza a escribir (no en un efecto): si no, «Parar» se pintaba un instante
+  // ya pulsable.
+  const [pararListo, setPararListo] = useState(!escribiendo)
+  const [escribiaAntes, setEscribiaAntes] = useState(escribiendo)
+  if (escribiaAntes !== escribiendo) {
+    setEscribiaAntes(escribiendo)
+    setPararListo(!escribiendo)
+  }
+  useEffect(() => {
+    if (!escribiendo) {
+      enviadoEn.current = 0
+      return
+    }
+    const t = window.setTimeout(() => setPararListo(true), PARAR_TRAS_ENVIAR_MS)
+    return () => window.clearTimeout(t)
+  }, [escribiendo])
+  // Intro (o Enviar) mientras responde: se dice por qué no sale, en vez de no hacer nada.
+  const [avisoOcupado, setAvisoOcupado] = useState(false)
+  useEffect(() => {
+    if (!avisoOcupado) return
+    const t = window.setTimeout(() => setAvisoOcupado(false), 4000)
+    return () => window.clearTimeout(t)
+  }, [avisoOcupado])
+  useEffect(() => {
+    if (!escribiendo) setAvisoOcupado(false)
+  }, [escribiendo])
+
   const mandar = () => {
     const texto = borrador.trim()
-    if (!texto || escribiendo || deshabilitado || largo) return
+    if (!texto || deshabilitado || largo) return
+    if (escribiendo) {
+      setAvisoOcupado(true)
+      return
+    }
+    if (Date.now() - enviadoEn.current < 1000) return
+    enviadoEn.current = Date.now()
     setBorrador('')
     alEnviar(texto)
     caja.current?.focus()
@@ -370,7 +412,7 @@ export default function Hilo({
           disabled={deshabilitado}
         />
         {escribiendo ? (
-          <button type="button" className="boton" onClick={alParar}>
+          <button type="button" className="boton" onClick={alParar} disabled={!pararListo} title="Parar la respuesta">
             Parar
           </button>
         ) : (
@@ -379,6 +421,11 @@ export default function Hilo({
           </button>
         )}
       </form>
+      {avisoOcupado && (
+        <p className="nota" role="status">
+          Espera a que termine la respuesta (o párala con «Parar»): tu mensaje sigue en la caja.
+        </p>
+      )}
       {largo && (
         <p className="nota" role="alert">
           Tu mensaje tiene {largoMensaje(borrador.trim()).toLocaleString('es-ES')} caracteres y el máximo es{' '}

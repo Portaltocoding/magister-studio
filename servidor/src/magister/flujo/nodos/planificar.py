@@ -5,8 +5,18 @@ from magister.flujo import fuentes as fuentes_plan
 from magister.flujo.comun import fase, hoy_de, perfil_de, perfil_json, reglas_plan
 from magister.flujo.estado import Estado
 from magister.plan.esquemas import PlanNuevo
+from magister.plan.razonamiento import pulir_razonamiento
 from magister.plan.reglas import ajustar_a_alcance, es_solo_capacidad, presupuesto, solo_alcance
 from magister.plan.reglas import reglas_plan as construir_reglas
+
+
+def _para_el_alumno(plan: PlanNuevo, perfil) -> dict:
+    """El plan como dict, con el razonamiento sin jerga ni horas que no salgan del plan (plan/razonamiento.py): las
+    horas que recortó `ajustar_a_alcance` o que el modelo contó mal no llegan al alumno."""
+    datos = plan.model_dump(mode="json")
+    datos["razonamiento"] = pulir_razonamiento(plan.razonamiento, [lec.horas for lec in plan.lecciones],
+                                               {h for h in (perfil.horas_por_dia or []) if h})
+    return datos
 
 
 def hacer_planificar(buscador=None):
@@ -41,7 +51,7 @@ async def planificar(estado: Estado, buscador=None) -> dict:
         # Si solo se pasa de horas para lo que pide, se recortan en proporción: mejor un plan ajustado que ninguno.
         if solo_alcance(ultimo) and salida:
             plan = ajustar_a_alcance(PlanNuevo.model_validate(salida))
-            return {"plan": plan.model_dump(mode="json"), "errores": [x for i in fallidos for x in i.errores],
+            return {"plan": _para_el_alumno(plan, perfil), "errores": [x for i in fallidos for x in i.errores],
                     "intentos": len(fallidos), "salida": "calendarizar",
                     "version_prompt": f"{plantilla.etiqueta} {ajustes.modelo}"}
         necesarias = sum(float(lec.get("horas", 0)) for lec in salida.get("lecciones", []))
@@ -53,7 +63,7 @@ async def planificar(estado: Estado, buscador=None) -> dict:
             "plan": None,
         }
     return {
-        "plan": plan.model_dump(mode="json"),
+        "plan": _para_el_alumno(plan, perfil),
         "errores": [x for i in fallidos for x in i.errores],
         "intentos": len(fallidos) + 1,
         "salida": "calendarizar",

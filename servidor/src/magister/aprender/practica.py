@@ -145,12 +145,26 @@ async def _a_repetir_hoy(ahora: datetime) -> list[tuple[int, str]]:
         filas = (await s.execute(text(
             "select plan_id, concepto_id, pregunta_id, coalesce(nota_usuario, nota_corrector) from intentos "
             "where momento >= :d order by plan_id, concepto_id, momento"), {"d": inicio})).all()
-    return por_repetir([tuple(f) for f in filas])
+        claves = {(f[0], f[1]) for f in filas}
+        preguntas: dict[tuple[int, str], set[str]] = {k: set() for k in claves}
+        if claves:
+            for plan_id, cid, pid in (await s.execute(
+                select(PreguntaConcepto.plan_id, PreguntaConcepto.concepto_id, Pregunta.id)
+                .join(Pregunta, Pregunta.id == PreguntaConcepto.pregunta_id)
+                .where(PreguntaConcepto.concepto_id.in_({c for _, c in claves}), Pregunta.estado == "activa",
+                       Pregunta.sonda.is_(False)))).all():
+                if (plan_id, cid) in preguntas:
+                    preguntas[(plan_id, cid)].add(pid)
+    return por_repetir([tuple(f) for f in filas], preguntas)
 
 
-def por_repetir(filas: list[tuple[int, str, str, str]]) -> list[tuple[int, str]]:
+def por_repetir(filas: list[tuple[int, str, str, str]], preguntas: dict[tuple[int, str], set[str]] | None = None
+                ) -> list[tuple[int, str]]:
     """`filas`: (plan, concepto, pregunta, nota) de hoy, en orden. Acertar una pregunta que ya fallaste hoy (por
-    ejemplo, copiando la explicación) no saca al concepto del reaprendizaje: hace falta acertar otra."""
+    ejemplo, copiando la explicación) no saca al concepto del reaprendizaje: hace falta acertar otra.
+
+    `preguntas`: las activas de cada concepto. Si no queda ninguna sin fallar hoy (el concepto tiene una sola), no
+    hay otra que acertar: acertar la misma después del fallo lo da por recuperado."""
     from magister.aprender.estado import es_acierto
 
     por: dict[tuple[int, str], list[tuple[str, str]]] = {}
@@ -161,7 +175,8 @@ def por_repetir(filas: list[tuple[int, str, str, str]]) -> list[tuple[int, str]]
         falladas = {pid for pid, nota in lista if not es_acierto(nota)}
         if es_acierto(lista[0][1]) or len(lista) >= INTENTOS_AL_DIA:
             continue
-        if not any(es_acierto(nota) and pid not in falladas for pid, nota in lista):
+        sin_otra = preguntas is not None and not (preguntas.get(k, set()) - falladas)
+        if not any(es_acierto(nota) and (sin_otra or pid not in falladas) for pid, nota in lista):
             salida.append(k)
     return salida
 
@@ -184,18 +199,71 @@ async def siguiente(ahora: datetime, concepto_id: str | None = None) -> dict | N
         vistas = dict((await s.execute(text(
             "select pregunta_id, count(*) from intentos where concepto_id = :c group by 1"), {"c": f["concepto_id"]})).all())
         falladas_hoy = set((await s.scalars(text(
-            "select pregunta_id from intentos where concepto_id = :c and momento >= :d and coalesce(nota_usuario, nota_corrector) = 'fallo'"
+            # Como en `por_repetir`: un «parcial» también es fallarla.
+            "select pregunta_id from intentos where concepto_id = :c and momento >= :d "
+            "and coalesce(nota_usuario, nota_corrector) not in ('bien', 'perfecta')"
         ), {"c": f["concepto_id"], "d": inicio_dia})).all())
-        candidatas = [p for p in preguntas if p[0] not in falladas_hoy] or list(preguntas)
+        sin_fallar = [p for p in preguntas if p[0] not in falladas_hoy]
+        candidatas = sin_fallar or list(preguntas)
         pid, enunciado, opciones = min(candidatas, key=lambda p: (vistas.get(p[0], 0), p[0]))
         brazo = await s.scalar(select(ConceptoFila.brazo).where(ConceptoFila.plan_id == f["plan_id"], ConceptoFila.id == f["concepto_id"]))
         prog = programador(brazo) if brazo else programador()
         s.add(Servida(plan_id=f["plan_id"], concepto_id=f["concepto_id"], pregunta_id=pid, momento=ahora,
                       p_predicha=f["p"], version_programador=prog.version))
+        # El repaso es de todos tus planes a la vez (como el estado de un concepto): cada pregunta dice de cuál es.
+        donde = (await s.execute(text(
+            "select t.nombre, l.titulo from planes p join temas t on t.id = p.tema_id "
+            "left join lecciones l on l.plan_id = p.id and l.clave = :c where p.id = :p"),
+            {"p": f["plan_id"], "c": f["leccion_clave"]})).first()
         await s.commit()
     return {"pregunta_id": pid, "concepto_id": f["concepto_id"], "plan_id": f["plan_id"], "nombre": f["nombre"],
             "enunciado": enunciado, "p": f["p"], "quedan": len(pendientes), "otra_vez": bool(f.get("otra_vez")),
+            # Si no queda otra pregunta sin fallar hoy, la vuelta es con la misma: la interfaz no promete «otra».
+            "otra_pregunta": bool(sin_fallar),
+            "tema": donde[0] if donde else None, "leccion_clave": f["leccion_clave"],
+            "leccion_titulo": donde[1] if donde else None,
             "opciones": [o["texto"] for o in opciones] if opciones else None}
+
+
+def primero_del_dia(momento: datetime, anteriores: list[datetime]) -> bool:
+    """Si un intento espaciado es el repaso de su día: ningún otro espaciado del mismo concepto antes, ese día de
+    estudio. Es lo único que cuenta para el programador (`estado_de`)."""
+    from magister.aprender.estado import dia_de_estudio
+
+    dia = dia_de_estudio(momento)
+    return not any(m < momento and dia_de_estudio(m) == dia for m in anteriores)
+
+
+async def cuenta_para_el_repaso(intento: Intento) -> bool:
+    """Si cambiar la nota de este intento cambia algo del programador: solo si es el primer espaciado del día."""
+    if intento.tipo != "espaciado":
+        return False
+    async with nueva_sesion() as s:
+        antes = (await s.scalars(select(Intento.momento).where(
+            Intento.concepto_id == intento.concepto_id, Intento.tipo == "espaciado", Intento.momento < intento.momento,
+            Intento.momento > intento.momento - timedelta(days=2)))).all()
+    return primero_del_dia(intento.momento, list(antes))
+
+
+async def ultimo_intento(desde: datetime) -> dict | None:
+    """El último intento corregido en Repaso desde `desde` (sin tests, fichas ni exámenes), con su corrección y su
+    explicación: lo que la interfaz enseña si recargaste mientras se corregía."""
+    async with nueva_sesion() as s:
+        fila = (await s.execute(
+            select(Intento, Pregunta.enunciado, ConceptoFila.nombre)
+            .join(Pregunta, Pregunta.id == Intento.pregunta_id, isouter=True)
+            .join(ConceptoFila, (ConceptoFila.plan_id == Intento.plan_id) & (ConceptoFila.id == Intento.concepto_id), isouter=True)
+            .where(Intento.momento >= desde, Intento.version_corrector.not_in(["test", "ficha"]),
+                   Intento.clave_idempotencia.not_like("examen-%"))
+            .order_by(Intento.momento.desc()).limit(1))).first()
+    if fila is None:
+        return None
+    i, enunciado, nombre = fila
+    c = i.correccion or {}
+    return {"intento_id": str(i.id), "pregunta_id": i.pregunta_id, "concepto_id": i.concepto_id, "nombre": nombre,
+            "enunciado": enunciado, "respuesta": i.respuesta, "momento": i.momento.isoformat(), "tipo": i.tipo,
+            "nota": i.nota_corrector, "nota_usuario": i.nota_usuario, "ideas_ausentes": c.get("ideas_ausentes", []),
+            "errores": c.get("errores", []), "explicacion": i.explicacion or ""}
 
 
 async def contexto_pregunta(pregunta_id: str) -> tuple[str, str, list[str]]:

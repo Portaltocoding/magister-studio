@@ -17,7 +17,7 @@ def _dsn(url: str) -> str:
 
 def _eventos(t: dict, avisos_vistos: int) -> list[dict]:
     salida = [{"tipo": "fase", "trabajo_id": t["id"], "nodo": t["nodo"] or t["estado"], "paso": t["paso"], "total": t["total"],
-               "estado": t["estado"]}]
+               "estado": t["estado"], "cola": t.get("cola")}]
     for a in t["avisos"][avisos_vistos:]:
         salida.append({"tipo": "aviso", "trabajo_id": t["id"], **a})
     if t["estado"] == "hecho":
@@ -29,7 +29,8 @@ def _eventos(t: dict, avisos_vistos: int) -> list[dict]:
 
 
 async def seguir(trabajo_id: int, url: str | None = None, latido_s: float = 15.0) -> AsyncIterator[dict]:
-    """Al conectar emite el estado actual; después, uno por cada NOTIFY de este trabajo."""
+    """Al conectar emite el estado actual; después, uno por cada NOTIFY de este trabajo y, si no llega ninguno, uno
+    cada `latido_s` (así un trabajo en cola ve bajar los que tiene delante, que avisan con su propio id)."""
     cola_local: asyncio.Queue[str] = asyncio.Queue()
     conexion = await asyncpg.connect(_dsn(url or ajustes.db_url))
 

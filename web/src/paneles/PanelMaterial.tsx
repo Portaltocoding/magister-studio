@@ -23,6 +23,16 @@ import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import { errorLegible } from '../componentes/errores.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
+import {
+  estadoLeccion,
+  leerRutaLeccion,
+  porcentaje,
+  rutaLeccion,
+  textoCola,
+  type Cola,
+  type EstadoLeccion,
+  type Pestana,
+} from '../componentes/leccionMaterial.ts'
 
 // Lo que sale si no eliges nada: lo de casi siempre.
 const RECOMENDADO: Respuestas = {
@@ -54,6 +64,7 @@ interface Trabajo {
   total: number
   avisos: { regla: string; detalle: string }[]
   error: string | null
+  cola?: Cola | null
 }
 
 interface MaterialLeccion {
@@ -62,19 +73,20 @@ interface MaterialLeccion {
   ultimo_trabajo: Trabajo | null
 }
 
-interface EstadoLeccion {
-  tipos: Record<string, string>
-  fichas: number
-  en_marcha: boolean
-}
-
 type EventoTrabajo =
-  | { tipo: 'fase'; nodo: string; paso: number; total: number; estado: string }
+  | { tipo: 'fase'; nodo: string; paso: number; total: number; estado: string; cola?: Cola | null }
   | { tipo: 'aviso'; regla: string; detalle: string }
   | { tipo: 'fin'; materiales: number[] }
   | { tipo: 'error'; detalle: string }
 
-type Pestana = 'apuntes' | 'fichas' | 'diapositivas' | 'guion'
+// Un motivo guardado antes de que dijera el título («bloques por revisar: b2»): se dice con los títulos.
+function motivoLegible(motivo: string, titulos: Record<string, string>): string {
+  const viejo = motivo.match(/^bloques por revisar: (.+)$/)
+  if (!viejo) return motivo
+  const nombres = viejo[1].split(/,\s*/).map((c) => `«${titulos[c] ?? c}»`)
+  const lista = nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`
+  return `${nombres.length === 1 ? `El bloque ${lista} no ha pasado` : `Los bloques ${lista} no han pasado`} la revisión de estilo tras varios intentos. Puedes leerlo igualmente (el contenido está) o rehacer solo ese bloque con «Rehacer» junto a su título.`
+}
 
 const NODOS: Record<string, string> = {
   pendiente: 'En cola',
@@ -97,13 +109,6 @@ const NODOS: Record<string, string> = {
 
 const fichero = (m: MaterialInfo, nombre: string) => `/api/materiales/${m.id}/fichero/${nombre}`
 
-function estadoLeccion(e: EstadoLeccion | undefined): { clase: string; texto: string } {
-  if (!e) return { clase: 'sin', texto: 'Sin material' }
-  if (e.en_marcha) return { clase: 'marcha', texto: 'Generando' }
-  if (e.tipos.apuntes === 'listo') return { clase: 'listo', texto: `Listo · ${e.fichas} fichas` }
-  if (e.tipos.apuntes) return { clase: 'revisar', texto: `Por revisar · ${e.fichas} fichas` }
-  return { clase: 'sin', texto: 'Sin material' }
-}
 
 // Fichas y Vídeo: cada lección como un bloque de aprendizaje (apuntes, fichas, diapositivas y guion).
 export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 'video' }) {
@@ -129,39 +134,55 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   const raiz = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const [, temaRuta, claveRuta, pestanaRuta] = window.location.hash.replace(/^#\/?/, '').split('/')
-    if (['apuntes', 'fichas', 'diapositivas', 'guion'].includes(pestanaRuta)) setPestana(pestanaRuta as Pestana)
+    const ruta = leerRutaLeccion(window.location.hash)
+    if (ruta.pestana) setPestana(ruta.pestana)
     setFallo(false)
     listarPlanes()
       .then((ps) => {
         setPlanes(ps)
-        const elegido = planActivo(ps, temaRuta ? Number(temaRuta) : null)
-        if (temaRuta) window.history.replaceState(null, '', `#/${modoVista === 'video' ? 'video' : 'fichas'}`)
+        const elegido = planActivo(ps, ruta.tema)
         if (!elegido) return setPlanes(ps)
+        // Un enlace a un plan que no existe (#/fichas/9999/L1) no abre otro en silencio: se dice cuál se abre.
+        const sinPlan = ruta.tema != null && elegido.tema_id !== ruta.tema
         // La lista se enseña cuando también ha llegado el plan: si este falla, sale «Reintentar» y no una lista vacía.
         return Promise.all([verPlan(elegido.tema_id), pedir<{ leccion_clave?: string }>('/api/hoy').catch(() => null)]).then(([v, hoy]) => {
           setPlanes(ps)
           setPlan(v)
           // Sin lección en la URL, abre la que toca hoy (no siempre la primera).
           const existe = (c?: string | null) => !!c && v.lecciones.some((l) => l.clave === c)
-          setClave(existe(claveRuta) ? claveRuta : existe(hoy?.leccion_clave) ? hoy!.leccion_clave! : (v.lecciones[0]?.clave ?? null))
+          const abierta = !sinPlan && existe(ruta.clave) ? ruta.clave : existe(hoy?.leccion_clave) ? hoy!.leccion_clave! : (v.lecciones[0]?.clave ?? null)
+          setClave(abierta)
+          if (sinPlan)
+            setAviso(`No encuentro el plan ${ruta.tema}: el enlace es antiguo o el plan se borró. Te abro «${elegido.tema}»; tus otros planes están en el selector de arriba.`)
+          else if (ruta.clave && !existe(ruta.clave))
+            setAviso(`Este plan no tiene la lección ${ruta.clave}. Te abro ${abierta ?? 'la lista'}; las que tiene están a la izquierda.`)
         })
       })
       .catch(() => setFallo(true))
   }, [modoVista, intento])
 
-  // Un enlace a otra lección (#/fichas/1/L4) con el panel ya abierto: se cambia de lección sin recargar.
+  // Un enlace a otra lección (#/fichas/1/L4) con el panel ya abierto: se cambia de lección sin recargar; si es de otro
+  // plan, se vuelve a cargar todo desde la ruta.
+  const temaAbierto = useRef<number | null>(null)
+  temaAbierto.current = plan?.tema_id ?? null
   useEffect(() => {
     const alCambiar = () => {
-      const [modoRuta, , claveRuta, pestanaRuta] = window.location.hash.replace(/^#\/?/, '').split('/')
-      if (modoRuta !== 'fichas' || !claveRuta) return
-      setClave(claveRuta)
-      if (['apuntes', 'fichas', 'diapositivas', 'guion'].includes(pestanaRuta)) setPestana(pestanaRuta as Pestana)
-      window.history.replaceState(null, '', '#/fichas')
+      const r = leerRutaLeccion(window.location.hash)
+      if (r.modo !== (modoVista === 'video' ? 'video' : 'fichas') || !r.tema) return
+      if (r.tema !== temaAbierto.current) return setIntento((x) => x + 1)
+      if (r.clave) setClave(r.clave)
+      if (r.pestana) setPestana(r.pestana)
     }
     window.addEventListener('hashchange', alCambiar)
     return () => window.removeEventListener('hashchange', alCambiar)
-  }, [])
+  }, [modoVista])
+
+  // La URL dice dónde estás (plan, lección y pestaña) sin apilar historial: recargar te deja ahí mismo.
+  useEffect(() => {
+    if (!plan) return
+    const ruta = rutaLeccion(modoVista === 'video' ? 'video' : 'fichas', plan.tema_id, clave, pestana)
+    if (window.location.hash !== ruta) window.history.replaceState(window.history.state, '', ruta)
+  }, [plan, clave, pestana, modoVista])
 
   const cargarEstados = useCallback(() => {
     // Los estados de la lista son un adorno (listo, sin material): si fallan, se quedan como estaban.
@@ -227,7 +248,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
       const r = await fetch(`/api/trabajos/${id}/eventos`, { signal: c.signal })
       for await (const ev of leerSSE<EventoTrabajo>(r)) {
         if (ev.tipo === 'fase')
-          setTrabajo((t) => t && { ...t, estado: ev.estado, nodo: ev.nodo, paso: ev.paso, total: ev.total })
+          setTrabajo((t) => t && { ...t, estado: ev.estado, nodo: ev.nodo, paso: ev.paso, total: ev.total, cola: ev.cola ?? null })
         else if (ev.tipo === 'aviso')
           setTrabajo((t) => t && { ...t, avisos: [...t.avisos, { regla: ev.regla, detalle: ev.detalle }] })
         else if (ev.tipo === 'error') {
@@ -328,6 +349,15 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   }
 
   const enCurso = trabajo && ['pendiente', 'en_curso'].includes(trabajo.estado)
+  // La barra nunca retrocede dentro del mismo trabajo (las fases traen cada una su «paso de total»).
+  const maximo = useRef<{ id: number; valor: number }>({ id: 0, valor: 0 })
+  const avance = (() => {
+    if (!trabajo) return 0
+    const valor = porcentaje(trabajo.estado === 'pendiente' ? 'pendiente' : trabajo.nodo, trabajo.paso, trabajo.total)
+    if (maximo.current.id !== trabajo.id) maximo.current = { id: trabajo.id, valor }
+    else maximo.current.valor = Math.max(maximo.current.valor, valor)
+    return maximo.current.valor
+  })()
   const apuntes = datos?.materiales.apuntes
   const diapos = datos?.materiales.diapositivas
   const guion = datos?.materiales.guion
@@ -432,7 +462,11 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 {leccion.clave} · {temaNombre}
               </span>
               <h1>{plan ? <TituloEditable planId={plan.plan_id} clave={leccion.clave} largo={leccion.titulo} indice={indice} /> : leccion.titulo}</h1>
-              {indice?.titulos[leccion.clave] && <p className="bloque-titulo-largo">{leccion.titulo}</p>}
+              {/* El título largo, solo si dice algo más que el sencillo (si son iguales, salía repetido bajo el h1). */}
+              {indice?.titulos[leccion.clave] &&
+                indice.titulos[leccion.clave].trim().toLowerCase() !== leccion.titulo.trim().toLowerCase() && (
+                  <p className="bloque-titulo-largo">{leccion.titulo}</p>
+                )}
               {leccion.objetivos.length > 0 && (
                 <p className="bloque-objetivos">Con qué saldrás: {leccion.objetivos.join('; ')}</p>
               )}
@@ -480,7 +514,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 </details>
               </div>
               {apuntes && apuntes.estado !== 'listo' && apuntes.motivo && (
-                <p className="nota">Por revisar: {apuntes.motivo}</p>
+                <p className="nota">{motivoLegible(apuntes.motivo, contrato)}</p>
               )}
             </div>
           </header>
@@ -516,13 +550,17 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               <TextoError texto={trabajo.error} antes="No se ha podido preparar. " rol="status" />
             ) : (
               <Pensando
-                texto={`${NODOS[trabajo.nodo ?? ''] ?? trabajo.nodo ?? 'En cola'}${trabajo.total > 1 ? ` · bloque ${trabajo.paso + 1} de ${trabajo.total}` : ''}`}
+                texto={
+                  trabajo.estado === 'pendiente'
+                    ? textoCola(trabajo.cola)
+                    : `${NODOS[trabajo.nodo ?? ''] ?? trabajo.nodo ?? 'Empezando'}${trabajo.total > 1 ? ` · bloque ${trabajo.paso + 1} de ${trabajo.total}` : ''}`
+                }
               />
             )}
             {enCurso && (
               <>
                 <span className="barra">
-                  <span style={{ width: `${trabajo.total ? ((trabajo.paso + 1) / trabajo.total) * 100 : 5}%` }} />
+                  <span style={{ width: `${Math.max(2, avance)}%` }} />
                 </span>
                 <button
                   className="boton-mini"
@@ -603,7 +641,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               <Vacio
                 etiqueta="Sin diapositivas"
                 titulo="Las diapositivas se hacen cuando las pides"
-                texto="Unas doce, con los colores del libro, a partir de los apuntes de esta lección. Tarda un par de minutos."
+                texto="Unas doce, con los colores del libro, a partir de los apuntes de esta lección. Hacerlas lleva un minuto o dos; si hay otros trabajos antes, te digo cuántos."
                 acciones={[{ texto: 'Hacer las diapositivas', principal: true, alPulsar: () => pedirExtra('diapositivas') }]}
               >
                 <BarraCuota accion={{ accion: 'diapositivas' }} />
@@ -613,7 +651,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
               <Vacio
                 etiqueta="Sin guion"
                 titulo="El guion del vídeo se escribe cuando lo pides"
-                texto="Por escenas, para verlo narrado en Vídeo. Sale de los apuntes de esta lección y tarda un par de minutos."
+                texto="Por escenas, para verlo narrado en Vídeo. Sale de los apuntes de esta lección; escribirlo lleva unos minutos y, si hay otros trabajos antes, te digo cuántos."
                 acciones={[{ texto: 'Escribir el guion', principal: true, alPulsar: () => pedirExtra('guion') }]}
               >
                 <BarraCuota accion={{ accion: 'video', minutos: 6 }} />

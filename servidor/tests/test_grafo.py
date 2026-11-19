@@ -133,7 +133,7 @@ async def test_aceptar_otro_dia_recalcula_desde_hoy(monkeypatch) -> None:
 
     guardado: dict = {}
 
-    async def falso_guardar_plan(tema, cid, perfil, plan, sesiones, version_prompt, modelo):
+    async def falso_guardar_plan(tema, cid, perfil, plan, sesiones, version_prompt, modelo, emparejar=None):
         guardado["sesiones"] = sesiones
         return 1, 1
 
@@ -142,6 +142,7 @@ async def test_aceptar_otro_dia_recalcula_desde_hoy(monkeypatch) -> None:
 
     monkeypatch.setattr(nodo_guardar, "guardar_plan", falso_guardar_plan)
     monkeypatch.setattr(nodo_guardar, "calcular_apoyo", sin_apoyo)
+    monkeypatch.setattr(nodo_guardar, "recolocar_con_progreso", sin_apoyo)
     g = construir_grafo(InMemorySaver())
     eco.encolar(Plan, ["plan_ok.json"])
     _, _, inter, _ = await correr(g, entrada())

@@ -93,7 +93,9 @@ def test_con_material_tuyo_el_no_no_manda_pero_tampoco_se_busca_solo() -> None:
 
 def test_lo_que_se_dice_en_el_roadmap() -> None:
     lec = {"clave": "L1", "sin_material": False, "necesita_fuentes": "imprescindible"}
-    assert texto_automatico(lec) == "No hace falta: tu material lo cubre."
+    assert texto_automatico(lec) == "Tu material ya la cubre: no se busca sola. Si quieres más, «Buscar fuentes»."
+    # Con material tuyo y un «no» guardado, el chip dice que tu material manda: la frase no le lleva la contraria.
+    assert "No hace falta" not in texto_automatico({**lec, "necesita_fuentes": "no"}, material_propio=True)
     lec["sin_material"] = True
     assert texto_automatico(lec).startswith("Hacen falta: se buscan solas")
     assert texto_automatico({**lec, "necesita_fuentes": "conviene"}) == "Te vendría bien: búscalas cuando quieras."

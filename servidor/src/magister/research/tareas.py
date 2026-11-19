@@ -190,6 +190,10 @@ async def lanzar(plan_id: int, claves: list[str], sistema: str = "fijo", objetiv
             lec.clave: {"necesita_fuentes": necesidad_efectiva(getattr(lec, "necesita_fuentes", None), None, propio)[0]}
             for lec in await dp.lecciones(s, plan_id)
         }
+    # Una clave que no es del plan no llega a la base (la clave foránea fallaba con un 500).
+    if desconocidas := [c for c in dict.fromkeys(claves) if c not in lecciones]:
+        raise LookupError(f"El plan {plan_id} no tiene {'la lección' if len(desconocidas) == 1 else 'las lecciones'} "
+                          f"{', '.join(desconocidas)}.")
     buscar, saltadas = separar_por_necesidad(lecciones, claves, forzar)
     ids = await crear(plan_id, buscar, sistema, objetivos) if buscar else []
     lanzar_en_fondo(ids)

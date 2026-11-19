@@ -226,20 +226,33 @@ export default function LectorLibro({ markdown, raiz, rehacer, variante }: Props
   const [activa, setActiva] = useState<string | null>(null)
 
   useEffect(() => {
-    const vistos = new Map<string, boolean>()
-    const obs = new IntersectionObserver(
-      (entradas) => {
-        entradas.forEach((e) => vistos.set(e.target.id, e.isIntersecting))
-        const primera = indice.find((s) => vistos.get(s.id))
-        if (primera) setActiva(primera.id)
-      },
-      { root: raiz ?? null, rootMargin: '0px 0px -60% 0px' },
-    )
-    indice.forEach((s) => {
-      const el = document.getElementById(s.id)
-      if (el) obs.observe(el)
-    })
-    return () => obs.disconnect()
+    // La sección que lees es la última cuyo título ya ha pasado por encima del 40 % de la vista. Al final del todo,
+    // la última («Repaso sin mirar») nunca llega ahí: si ya no se puede bajar más, es esa (antes se quedaba marcada
+    // la anterior, o la que entrara en la franja aunque estuvieras más abajo).
+    const caja = raiz instanceof HTMLElement ? raiz : null
+    const desplaza: HTMLElement | Window = caja ?? window
+    let pendiente = 0
+    const mirar = () => {
+      pendiente = 0
+      const doc = caja ?? document.documentElement
+      const arriba = caja ? caja.getBoundingClientRect().top : 0
+      const alto = caja ? caja.clientHeight : window.innerHeight
+      const titulos = indice.map((s) => ({ s, el: document.getElementById(s.id) })).filter((x) => x.el)
+      if (!titulos.length) return
+      const alFinal = doc.scrollTop > 0 && doc.scrollHeight - doc.scrollTop - doc.clientHeight < 8
+      const pasados = titulos.filter((x) => x.el!.getBoundingClientRect().top - arriba <= alto * 0.4)
+      const elegida = alFinal ? titulos[titulos.length - 1] : (pasados[pasados.length - 1] ?? titulos[0])
+      setActiva(elegida.s.id)
+    }
+    const alDesplazar = () => {
+      if (!pendiente) pendiente = window.requestAnimationFrame(mirar)
+    }
+    mirar()
+    desplaza.addEventListener('scroll', alDesplazar, { passive: true })
+    return () => {
+      if (pendiente) window.cancelAnimationFrame(pendiente)
+      desplaza.removeEventListener('scroll', alDesplazar)
+    }
   }, [indice, raiz])
 
   return (

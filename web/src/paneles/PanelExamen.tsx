@@ -12,6 +12,7 @@ import { errorLegible } from '../componentes/errores.ts'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
 import { barajar } from '../barajar.ts'
+import { borrarExamen, claveExamen, contador, guardarExamen, leerExamen, MAX_RESPUESTA } from '../componentes/repaso.ts'
 
 type Modo = 'examen' | 'evaluacion'
 type Nota = 'fallo' | 'parcial' | 'bien' | 'perfecta'
@@ -84,7 +85,6 @@ const TIPOS: Record<string, string> = {
   hablada: 'En voz alta',
   test: 'Tipo test',
 }
-const nueva = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
 const conMates = { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }
 const color = (n: number) => (n >= 8 ? 'nota-alta' : n >= 5 ? 'nota-media' : 'nota-baja')
 const fecha = (iso: string) =>
@@ -93,11 +93,14 @@ const fecha = (iso: string) =>
 // Corrige una respuesta con el mismo corrector del repaso. Devuelve la nota y la explicación.
 // Las tipo test se comparan con la opción buena, sin modelo. Si el corrector falla, lanza: quien llama
 // lo enseña como «No se pudo corregir» en vez de inventarse un fallo.
-async function corregir(p: PreguntaExamen, r: Respuesta, alTrozo?: (t: string) => void) {
+// La clave es estable (examen y pregunta), la misma que usa el servidor al corregir de una vez: si aquello falló a
+// medias o se repite, no se duplica el intento, se devuelve el que ya estaba.
+async function corregir(examenId: number, p: PreguntaExamen, r: Respuesta, alTrozo?: (t: string) => void) {
+  const clave = claveExamen(examenId, p.pregunta_id)
   if (p.opciones?.length) {
     const t = await pedir<{ acierto: boolean; porque: string }>(
       '/api/practica/test',
-      enviarJson({ pregunta_id: p.pregunta_id, opcion: r.texto, confianza: r.confianza, clave: nueva() }),
+      enviarJson({ pregunta_id: p.pregunta_id, opcion: r.texto, confianza: r.confianza, clave }),
     )
     return { nota: (t.acierto ? 'bien' : 'fallo') as Nota, explicacion: t.porque, intento_id: undefined }
   }
@@ -111,7 +114,7 @@ async function corregir(p: PreguntaExamen, r: Respuesta, alTrozo?: (t: string) =
       concepto_id: p.concepto_id,
       respuesta: r.texto,
       confianza: r.confianza,
-      clave: nueva(),
+      clave,
     },
   )) {
     if (ev.tipo === 'nota' && ev.nota) nota = ev.nota
@@ -170,6 +173,7 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
     pedir<OpcionLeccion[]>(`/api/planes/${plan.plan_id}/examen/opciones`)
       .then((o) => {
         setOpciones(o)
+        setOpcionesDe(plan.plan_id)
         const con = o.filter((x) => x.preguntas > 0).map((x) => x.clave)
         const pedidas = desdeRuta?.lecciones.filter((c) => con.includes(c)) ?? []
         setElegidas(pedidas.length ? pedidas : con)
@@ -181,6 +185,28 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
   }, [plan, desdeRuta])
 
   const disponibles = opciones.filter((o) => elegidas.includes(o.clave)).reduce((a, o) => a + o.preguntas, 0)
+
+  // Si el plan elegido aún no tiene preguntas, los otros planes que sí: se dice cuál es cuál en vez de un «Sin
+  // preguntas» a secas (que parecía de todo, no de este plan).
+  const [otros, setOtros] = useState<ResumenPlan[]>([])
+  const [opcionesDe, setOpcionesDe] = useState<number | null>(null)
+  useEffect(() => {
+    setOtros([])
+    if (!plan || !planes || opcionesDe !== plan.plan_id || opciones.some((o) => o.preguntas > 0)) return
+    let vivo = true
+    Promise.all(
+      planes
+        .filter((p) => p.plan_id !== plan.plan_id)
+        .map((p) =>
+          pedir<OpcionLeccion[]>(`/api/planes/${p.plan_id}/examen/opciones`)
+            .then((o) => (o.some((x) => x.preguntas > 0) ? p : null))
+            .catch(() => null),
+        ),
+    ).then((xs) => vivo && setOtros(xs.filter((x): x is ResumenPlan => x != null)))
+    return () => {
+      vivo = false
+    }
+  }, [plan, planes, opciones, opcionesDe])
 
   if (planes == null) return falloCarga ? <Cargando error={falloCarga} reintentar={reintentar} /> : <Pensando texto="Cargando…" />
   if (!plan)
@@ -237,10 +263,22 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
 
       {conPreguntas.length === 0 ? (
         <Vacio
-          etiqueta="Sin preguntas todavía"
-          titulo="Prepara alguna lección y podrás examinarte"
-          texto="Cada lección preparada trae su banco de preguntas: de ahí salen los exámenes."
-          acciones={[{ texto: 'Preparar una lección', principal: true, alPulsar: () => irA('fichas') }]}
+          etiqueta={`«${plan.tema}» aún no tiene preguntas`}
+          titulo="Prepara alguna lección de este plan y podrás examinarte"
+          texto={
+            'Cada lección preparada trae su banco de preguntas: de ahí salen los exámenes.' +
+            (otros.length ? ` Tus otros planes sí tienen: ${otros.map((o) => `«${o.tema}»`).join(', ')}.` : '')
+          }
+          acciones={[
+            { texto: 'Preparar una lección', principal: true, alPulsar: () => irA('fichas') },
+            ...otros.slice(0, 3).map((o) => ({
+              texto: `Examinarme de «${o.tema}»`,
+              alPulsar: () => {
+                recordarPlan(o.tema_id)
+                setPlan(o)
+              },
+            })),
+          ]}
         />
       ) : (
         <section className="examen-preparar">
@@ -355,11 +393,21 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
 
 // ---------- Hacer el examen ----------
 
-function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r: Resumen) => void; alSalir: () => void }) {
+function Haciendo({
+  examen,
+  alAcabar,
+  alSalir,
+  guardado,
+}: {
+  examen: Examen
+  alAcabar: (r: Resumen) => void
+  alSalir: () => void
+  guardado?: { respuestas: Record<string, Respuesta>; i: number; inicio: number } | null
+}) {
   const { preguntas } = examen
   const evaluacion = examen.modo === 'evaluacion'
-  const [i, setI] = useState(0)
-  const [resp, setResp] = useState<Record<string, Respuesta>>({})
+  const [i, setI] = useState(() => Math.min(Math.max(0, guardado?.i ?? 0), preguntas.length - 1))
+  const [resp, setResp] = useState<Record<string, Respuesta>>(() => guardado?.respuestas ?? {})
   const [segundos, setSegundos] = useState(0)
   const [corrigiendo, setCorrigiendo] = useState<{ hechas: number; total: number; deUnaVez?: boolean } | null>(null)
   const [corrigiendoUna, setCorrigiendoUna] = useState(false)
@@ -379,7 +427,13 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
   }, [p.pregunta_id, servidas])
 
   // El tiempo sale del reloj, no de sumar ticks: con la pestaña oculta o el portátil suspendido, setInterval se para.
-  const inicio = useRef(Date.now())
+  // Al recargar, sigue desde cuando empezaste (el reloj del examen no vuelve a cero).
+  const inicio = useRef(guardado?.inicio ?? Date.now())
+
+  // Lo que llevas, en sessionStorage a cada cambio: recargar a mitad no lo pierde. Mientras se corrige no se toca.
+  useEffect(() => {
+    if (!corrigiendo) guardarExamen({ examen, respuestas: resp, i, inicio: inicio.current })
+  }, [examen, resp, i, corrigiendo])
   useEffect(() => {
     if (corrigiendo) return
     const t = setInterval(() => setSegundos(Math.floor((Date.now() - inicio.current) / 1000)), 1000)
@@ -431,7 +485,7 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
       while (siguiente < pendientes.length) {
         const q = pendientes[siguiente++]
         try {
-          const c = await corregir(q, finales[q.pregunta_id])
+          const c = await corregir(examen.id, q, finales[q.pregunta_id])
           finales[q.pregunta_id] = { ...finales[q.pregunta_id], ...c }
         } catch {
           finales[q.pregunta_id] = { ...finales[q.pregunta_id], nota: null, explicacion: 'No se pudo corregir.' }
@@ -469,7 +523,7 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
     setCorrigiendoUna(true)
     poner({ explicacion: '' })
     try {
-      const c = await corregir(p, r, (t) =>
+      const c = await corregir(examen.id, p, r, (t) =>
         setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], explicacion: (x[p.pregunta_id]?.explicacion ?? '') + t } })),
       )
       setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: c.nota, intento_id: c.intento_id, explicacion: c.explicacion } }))
@@ -595,15 +649,23 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
               ))}
             </div>
           ) : (
+          <>
           <textarea
             className="examen-respuesta"
             value={r.texto}
             disabled={corregida || corrigiendoUna}
+            maxLength={MAX_RESPUESTA}
             onChange={(e) => poner({ texto: e.target.value })}
             placeholder="Tu respuesta, con tus palabras"
             aria-label="Tu respuesta"
             autoFocus
           />
+          {!corregida && contador(r.texto.length).visible && (
+            <p className="nota" aria-live="polite">
+              {contador(r.texto.length).texto} caracteres
+            </p>
+          )}
+          </>
           )}
           <div className="foco-confianza">
             <span>¿Cómo de seguro estás?</span>
@@ -613,14 +675,19 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
               </button>
             ))}
             {evaluacion && !corregida && (
-              <button className="boton boton-principal" disabled={!r.texto.trim() || corrigiendoUna} onClick={comprobarAhora}>
+              <button
+                className="boton boton-principal"
+                disabled={!r.texto.trim() || r.texto.trim().length > MAX_RESPUESTA || corrigiendoUna}
+                onClick={comprobarAhora}
+              >
                 {corrigiendoUna ? 'Corrigiendo…' : 'Comprobar'}
               </button>
             )}
           </div>
           {evaluacion && (corrigiendoUna || r.explicacion) && (
             <div className={`correccion nota-${r.nota ?? ''}`}>
-              {r.nota ? <strong>{NOTA[r.nota]}</strong> : <Pensando texto="Leyendo tu respuesta…" />}
+              {/* «Leyendo…» solo mientras se corrige: si falló, se queda el motivo y se puede volver a comprobar. */}
+              {r.nota ? <strong>{NOTA[r.nota]}</strong> : corrigiendoUna ? <Pensando texto="Leyendo tu respuesta…" /> : null}
               <Markdown {...conMates}>{r.explicacion ?? ''}</Markdown>
             </div>
           )}
@@ -720,7 +787,9 @@ function Resultado({ resumen, alVolver, irA }: { resumen: Resumen; alVolver: () 
 
 // Modo Examen: preparas, haces (en modo foco), corriges y ves la nota con la revisión.
 export default function PanelExamen({ irA }: { irA: (m: IdModo) => void }) {
-  const [examen, setExamen] = useState<Examen | null>(null)
+  // Si recargaste a mitad de un examen, vuelve con lo que llevabas (sessionStorage, por examen).
+  const [guardado] = useState(() => leerExamen<Examen, Respuesta>())
+  const [examen, setExamen] = useState<Examen | null>(() => guardado?.examen ?? null)
   const [resultado, setResultado] = useState<Resumen | null>(null)
   const [vuelta, setVuelta] = useState(0)
 
@@ -728,8 +797,13 @@ export default function PanelExamen({ irA }: { irA: (m: IdModo) => void }) {
     return (
       <Haciendo
         examen={examen}
-        alSalir={() => setExamen(null)}
+        guardado={guardado && guardado.examen.id === examen.id ? guardado : null}
+        alSalir={() => {
+          borrarExamen()
+          setExamen(null)
+        }}
         alAcabar={(r) => {
+          borrarExamen()
           if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined)
           setExamen(null)
           setResultado(r)

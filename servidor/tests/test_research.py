@@ -779,6 +779,19 @@ async def test_lanzar_salta_lo_que_no_necesita_fuentes(cliente, monkeypatch) -> 
     assert r.status_code == 422
 
 
+async def test_lanzar_una_leccion_que_no_existe_es_404(cliente, monkeypatch) -> None:
+    from magister.research import tareas
+
+    plan_id = await _plan_de_prueba()
+    lanzadas: list[int] = []
+    monkeypatch.setattr(tareas, "lanzar_en_fondo", lambda ids: lanzadas.extend(ids))
+    # Antes fallaba la clave foránea al crear la tarea: un 500.
+    r = await cliente.post("/api/research", json={"plan_id": plan_id, "leccion_claves": ["L1", "L99"], "forzar": True})
+    assert r.status_code == 404 and "L99" in r.json()["detail"] and "lección" in r.json()["detail"]
+    assert lanzadas == []  # ni la que existe: todo o nada
+    assert (await cliente.post("/api/research", json={"plan_id": 999999, "leccion_claves": ["L1"]})).status_code == 404
+
+
 async def test_el_chip_trae_la_etiqueta_guardada_ademas_de_la_efectiva(base, monkeypatch) -> None:
     from types import SimpleNamespace
 
@@ -1012,3 +1025,86 @@ async def test_una_propuesta_pendiente_se_pone_al_dia_y_lo_decidido_no_se_toca(b
             "select url, tarea_id, motivo, estado from propuestas order by url"))).all()}
     assert filas["https://a.example/x"] == (nueva, "ahora", "pendiente")
     assert filas["https://a.example/y"] == (vieja, "antes", "rechazada")
+
+
+# Lo que encontró un probador en las tareas 1 y 2 de la base de ensayo (rejugado sin red con sus crudos)
+
+
+def test_el_sitio_cuenta_sin_subdominios() -> None:
+    from magister.research.herramientas import dominio_base
+
+    assert {dominio_base(f"https://{s}.khanacademy.org/x") for s in ("www", "en", "es", "life")} == {"khanacademy.org"}
+    assert dominio_base("https://www.bbc.co.uk/a") == "bbc.co.uk"
+    assert dominio_base("https://educacion.gob.es/a") == "educacion.gob.es"
+    assert dominio_base("https://ana.github.io/a") != dominio_base("https://luis.github.io/b")
+    assert dominio_base("https://bio.libretexts.org/a") == "libretexts.org"
+
+
+async def test_un_sitio_con_muy_poco_texto_no_se_intenta_cinco_veces() -> None:
+    class WebKhan(WebTresConsultas):
+        async def buscar(self, consulta: str, n: int) -> list[Resultado]:
+            return [Resultado(str(i), f"https://{s}.khanacademy.org/meiosis", "") for i, s in enumerate(("www", "en", "es", "life", "pt"))]
+
+        async def descargar(self, url: str) -> tuple[str, bytes]:
+            return url, b"<html><body><article><h1>Meiosis</h1><p>Video.</p></article></body></html>"
+
+    eco.encolar(Consultas, [{"consultas": [consulta(1, "uno cola definición")]}])
+    r = await research_fijo({**TRES, "objetivos": TRES["objetivos"][:1]}, Herramientas(WebKhan(), 1, "L2"))
+    assert len(_lecturas(r)) == 2
+    assert sum(1 for x in r["trayectoria"] if x.get("motivo") == "ya hay 2 lecturas de ese sitio") == 3
+
+
+async def test_el_mismo_contenido_por_otra_direccion_no_se_vuelve_a_leer() -> None:
+    class WebEspejo(WebTresConsultas):
+        async def descargar(self, url: str) -> tuple[str, bytes]:
+            return url, pagina("Colas", "Siempre el mismo texto sobre colas.")
+
+    h = Herramientas(WebEspejo(), 1, "L2")
+    await h.buscar_web("uno cola")
+    primera = await h.leer_pagina("https://uno0.example/")
+    segunda = await h.leer_pagina("https://uno1.example/")
+    assert primera.error is None and segunda.crudo_sha == primera.crudo_sha
+    assert segunda.error == "error: es el mismo contenido que https://uno0.example/, ya leído"
+
+
+def test_cita_con_una_remision_entre_parentesis() -> None:
+    from magister.research.fijo import cita_en
+
+    # Wikipedia, tarea 1: el juez copió la frase sin «(see synapsis)».
+    extracto = ("The process of alignment of paired homologous chromosomes is called synapsis (see synapsis). "
+                "During synapsis, genetic recombination usually occurs.")
+    assert cita_en("The process of alignment of paired homologous chromosomes is called synapsis. During synapsis, "
+                   "genetic recombination usually occurs.", extracto)
+    # Saltarse otras palabras sigue sin valer (GeeksforGeeks, tarea 1): el criterio de fondo no cambia.
+    assert not cita_en("homologous chromosomes pair up in a process",
+                       "homologous chromosomes, each consisting of two sister chromatids, pair up in a process")
+    assert not cita_en("chromosomes is called synapsis", "chromosomes is called (a long aside) synapsis")
+
+
+def test_la_trayectoria_dice_por_que_se_descarta_una_nota() -> None:
+    from magister.research.fijo import por_que_no_vale
+
+    extracto = "Una cola M/M/1 tiene llegadas de Poisson y un solo servidor."
+    assert por_que_no_vale(Nota(**nota("u", [], "", profundidad=0, autoridad=3)), extracto) == "no explica ningún objetivo"
+    assert por_que_no_vale(Nota(**nota("u", [1], "", profundidad=1)), extracto) == "profundidad 1"
+    assert por_que_no_vale(Nota(**nota("u", [1], "")), extracto) == "sin cita"
+    assert por_que_no_vale(Nota(**nota("u", [1], "una cola inventada aquí")), extracto) == "cita"
+    assert por_que_no_vale(Nota(**nota("u", [1], "tiene llegadas de Poisson")), extracto) is None
+
+
+def test_el_preambulo_de_mathjax_no_llena_el_extracto() -> None:
+    from magister.fuentes.extraer import inicio_del_cuerpo, sin_macros
+    from magister.research.herramientas import _extraer
+
+    # LibreTexts, tareas 1 y 2: decenas de «$ \newcommand... $» antes del texto, y el juez puntuó profundidad 0.
+    macros = "".join(rf"<p>$ \newcommand{{\m{i}}}[1]{{\mathbf{{#1}}}} $</p>" for i in range(40))
+    html = pagina("7.6: Genetic Variation", "Sexual reproduction results in infinite possibilities of genetic variation.",
+                  ).replace(b"<article>", f"<article>{macros}".encode())
+    lectura = _extraer("https://bio.libretexts.org/x", html)
+    assert "newcommand" not in lectura.extracto and "Sexual reproduction" in lectura.extracto[:400]
+    # Una página que enseña LaTeX con un ejemplo suelto no pierde su ejemplo.
+    ejemplo = "Así:\n" + r"\newcommand{\R}{\mathbb{R}}" + "\nY ya."
+    assert sin_macros(ejemplo) == ejemplo
+    # Un índice con viñeta delante (« Índice», un PDF de Word) tampoco es el cuerpo.
+    prosa = "La interfase es la etapa que media entre dos divisiones celulares sucesivas. " * 15
+    assert inicio_del_cuerpo([" Índice: 1. El ciclo celular. " + prosa, prosa]) == 1

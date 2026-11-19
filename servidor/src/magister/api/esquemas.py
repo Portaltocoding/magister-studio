@@ -10,8 +10,21 @@ class Salida(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+def _sin_espacios(v: str, que: str) -> str:
+    """Se valida lo que queda sin los espacios de los lados: un título de solo espacios no es un título."""
+    v = v.strip()
+    if not v:
+        raise ValueError(f"{que} está vacío")
+    return v
+
+
 class TemaEntrada(BaseModel):
     nombre: str = Field(min_length=1, max_length=200)
+
+    @field_validator("nombre")
+    @classmethod
+    def _nombre(cls, v: str) -> str:
+        return _sin_espacios(v, "el nombre")
 
 
 class TemaSalida(Salida):
@@ -29,6 +42,11 @@ class ConversacionEntrada(BaseModel):
     tema_id: int | None = None
     # libre: Estudio libre; plan: conversación de diagnóstico que acaba en un plan; asesor: la mascota flotante
     tipo: Literal["libre", "plan", "asesor"] = "libre"
+
+    @field_validator("titulo")
+    @classmethod
+    def _titulo(cls, v: str) -> str:
+        return _sin_espacios(v, "el título")
 
 
 class ConversacionSalida(Salida):

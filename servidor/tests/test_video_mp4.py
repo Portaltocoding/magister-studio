@@ -59,12 +59,30 @@ def test_los_subtitulos_se_desplazan_por_lo_que_dura_cada_escena() -> None:
 
 
 def test_lista_de_imagenes_con_su_duracion(tmp_path) -> None:
-    lista = video._lista_imagenes([tmp_path / "a.png", tmp_path / "b.png"], [1.5, 2.25])
+    lista = video._lista_imagenes([tmp_path / "a.png", tmp_path / "b.png"], [1.48, 2.24])
     assert lista.splitlines() == [
-        "ffconcat version 1.0", "file 'a.png'", "duration 1.500000", "file 'b.png'", "duration 2.250000", "file 'b.png'",
+        "ffconcat version 1.0", "file 'a.png'", "duration 1.480000", "file 'b.png'", "duration 2.240000", "file 'b.png'",
     ]
     with pytest.raises(video.ErrorVideo):
         video._lista_imagenes([tmp_path / "a.png"], [1.0, 2.0])
+
+
+def test_las_escenas_caen_en_fotogramas_sin_acumular_error() -> None:
+    import random
+
+    # Lo que encontró un probador: con unas 100 escenas, la imagen acababa 2 s antes que la voz (cada escena perdía su
+    # fracción de fotograma). Medido con ffmpeg 9 y 100 escenas de 1 a 4 s: antes 260,24 s de imagen para 262,34 de
+    # voz; ahora 262,32 (menos de un fotograma).
+    rng = random.Random(3)
+    duraciones = [rng.uniform(1, 4) for _ in range(100)]
+    cuadradas = video.en_fotogramas(duraciones)
+    assert all(abs(d * video.FPS - round(d * video.FPS)) < 1e-9 for d in cuadradas)
+    acumulado = real = 0.0
+    for d, c in zip(duraciones, cuadradas, strict=True):
+        real += d
+        acumulado += c
+        assert abs(acumulado - real) <= 0.5 / video.FPS + 1e-9  # cada cambio de imagen, a menos de medio fotograma
+    assert video.en_fotogramas([0.01, 0.01]) == [0.04, 0.04]  # nunca una escena sin fotograma
 
 
 def test_una_sola_codificacion_con_imagenes_audio_y_subtitulos(tmp_path) -> None:
@@ -75,6 +93,9 @@ def test_una_sola_codificacion_con_imagenes_audio_y_subtitulos(tmp_path) -> None
     assert [orden[i + 1] for i, x in enumerate(orden) if x == "-i"] == [str(tmp_path / n) for n in ("l.txt", "v.wav", "s.srt")]
     assert "libx264" in orden and "aac" in orden and "mov_text" in orden
     assert orden[orden.index("-t") + 1] == "12.346"
+    # Las imágenes a fotogramas fijos antes de alargar la última: la pista de vídeo no acaba antes que la voz.
+    filtro = orden[orden.index("-vf") + 1]
+    assert filtro.startswith(f"fps={video.FPS},") and "tpad=stop_mode=clone" in filtro
 
 
 @pytest.mark.anyio
@@ -129,8 +150,9 @@ async def test_exportar_codifica_una_vez_y_los_subtitulos_salen_de_los_wav(monke
     assert total == pytest.approx(d1 + d2 + d3, abs=1e-3)
     assert float(vistos["voz"]) == pytest.approx(total, abs=1e-9)
     duraciones = [float(x.split()[1]) for x in vistos["lista"].splitlines() if x.startswith("duration ")]
-    assert duraciones == pytest.approx([d1, d2, d3], abs=1e-3)
-    assert sum(duraciones) == pytest.approx(total, abs=1e-5)  # la imagen dura lo mismo que el audio
+    # En fotogramas enteros (25 por segundo): cada cambio de imagen, a menos de medio fotograma de su audio.
+    assert duraciones == pytest.approx([d1, d2, d3], abs=0.5 / video.FPS + 1e-6)
+    assert sum(duraciones) == pytest.approx(total, abs=0.5 / video.FPS + 1e-6)  # la imagen dura lo que el audio
     # El subtítulo de la última escena empieza justo donde acaba el audio de las anteriores.
     subs = {}
     for bloque in vistos["srt"].strip().split("\n\n"):

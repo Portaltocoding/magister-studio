@@ -47,6 +47,9 @@ class Consulta:
     # Puntuar los k con el reranker aunque el coseno llegue (el apoyo de las lecciones cuenta fragmento a fragmento).
     # En el chat no: ahí solo corre si el coseno no llega (ADR-0018).
     puntuar_reranker: bool = False
+    # Fragmentos (casi) iguales cuentan como uno: un fichero de relleno con la misma frase repetida no llena el top-k
+    # ni el apoyo de una lección. Las evals de recuperación que comparan ids lo pueden apagar.
+    colapsar_duplicados: bool = True
 
 
 @dataclass
@@ -60,6 +63,9 @@ class ResultadoBusqueda:
     # Puntuación del reranker por fragmento. Solo se calcula cuando el coseno no llega (pregunta en español, fuente en
     # inglés: ADR-0018); vacío si no corrió.
     puntuacion_reranker: dict[int, float] = field(default_factory=dict)
+    # Los fragmentos que tienen todas las palabras de la consulta (el AND de la vía léxica). None: no se sabe (un
+    # buscador de antes, o sin vía léxica); en la vía léxica sola, entonces, todo acierto cuenta como completo.
+    lexica_completa: set[int] | None = None
 
     @property
     def mejor_reranker(self) -> float | None:
@@ -71,19 +77,30 @@ class ResultadoBusqueda:
         return self.escalon(umbral, umbral_reranker) != "nada"
 
     def escalon(self, umbral: float, umbral_reranker: float) -> Escalon:
-        """En qué escalón se resolvió: un acierto léxico (sin vía densa), el coseno, el reranker o nada."""
+        """En qué escalón se resolvió: un acierto léxico, el coseno, el reranker o nada.
+
+        El acierto léxico cuenta sin vía densa y, en la híbrida, cuando el coseno no llega pero un fragmento de una
+        fuente tuya (no web; el filtro de tema ya lo deja en tu tema o sin tema) tiene todas las palabras de la
+        consulta: el coseno de e5 sobre una nota larga se diluye (0,83 frente a 0,83-0,84 de lo ajeno, medido), y una
+        coincidencia literal completa en tus apuntes no es ruido."""
         if not self.recuperados:
             return "nada"
         if self.mejor_similitud >= umbral:
             return "lexica" if self.via == "lexica" else "densa"
+        if self.lexica_completa and any(r.fragmento_id in self.lexica_completa and r.fuente_tipo != "web"
+                                        for r in self.recuperados):
+            return "lexica"
         mejor = self.mejor_reranker
         return "reranker" if mejor is not None and mejor > umbral_reranker else "nada"
 
     @property
     def mejor_similitud(self) -> float:
         if self.via == "lexica":
-            # Sin vía densa no hay coseno; un acierto léxico (todas las palabras, con AND) ya es relevante.
-            return 1.0 if self.recuperados else 0.0
+            # Sin vía densa no hay coseno; un acierto léxico con todas las palabras (el AND) ya es relevante. Los que
+            # solo tienen alguna (la vía léxica completa la lista con un OR) no.
+            if self.lexica_completa is None:
+                return 1.0 if self.recuperados else 0.0
+            return 1.0 if any(r.fragmento_id in self.lexica_completa for r in self.recuperados) else 0.0
         if self.similitud_densa:
             return max(self.similitud_densa.get(r.fragmento_id, 0.0) for r in self.recuperados) if self.recuperados else 0.0
         return max((r.puntuacion for r in self.recuperados), default=0.0)

@@ -5,14 +5,25 @@ Se mira por `concepto_id` en todos los planes, porque replanificar no te hace ol
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
+from magister.config import ajustes
 from magister.datos.aprender import Intento
 from magister.datos.sesion import nueva_sesion
 
 ACIERTOS = ("bien", "perfecta")
+
+
+def dia_de_estudio(m: datetime, zona: str | None = None, inicio_dia: str | None = None) -> date:
+    """El día de estudio de un momento: en `MAGISTER_ZONA` y empezando a `MAGISTER_INICIO_DIA` (a las 01:00 de Madrid
+    aún es el día anterior). No mira el reloj: el momento entra como argumento. Un momento sin zona se lee en UTC."""
+    if m.tzinfo is None:
+        m = m.replace(tzinfo=timezone.utc)
+    h, mi = (int(x) for x in (inicio_dia or ajustes.inicio_dia).split(":"))
+    return (m.astimezone(ZoneInfo(zona or ajustes.zona)) - timedelta(hours=h, minutes=mi)).date()
 
 
 def nota_final(nota_corrector: str, nota_usuario: str | None) -> str:
@@ -57,11 +68,13 @@ def estado_de(concepto_id: str, momento: datetime, intentos: list[tuple]) -> Est
     todos = sorted(((x[0], nota_final(x[1], x[2]), x[4] if len(x) > 4 else None, x[5] if len(x) > 5 else None)
                     for x in intentos if x[3] == "espaciado" and x[0] < momento), key=lambda t: t[0])
     # Solo el primer intento de cada día es un repaso: repetir el mismo día no dice nada del olvido y sesgaría el
-    # modelo (FSRS hace lo mismo: filtra los repasos con 0 días de separación).
+    # modelo (FSRS hace lo mismo: filtra los repasos con 0 días de separación). El día es el de estudio (tu zona y
+    # tu hora de corte), no el de UTC: a las 00:30 y a las 02:00 de Madrid sigue siendo la misma noche.
     repasos, extras, dias = [], [], set()
     for m, n, conf, lat in todos:
-        if m.date() not in dias:
-            dias.add(m.date())
+        d = dia_de_estudio(m)
+        if d not in dias:
+            dias.add(d)
             repasos.append((m, n))
             extras.append({"confianza": conf, "latencia_ms": lat})
     return EstadoConcepto(concepto_id, momento, repasos, extras)

@@ -66,7 +66,7 @@ def test_plantilla_falla_con_hueco() -> None:
         montar("{{titulo}} {{falta}}", {"titulo": "x"})
     md = montar_apuntes("Índices", "Magister · BD", "a.pdf", [{"termino": "Índice", "ingles": "index", "definicion": "Una estructura."}],
                         [("Por qué", "Texto.")], [{"enunciado": "¿Qué?", "fantasma": "Esto."}])
-    assert "## Por qué {etq=" in md and "::: teoria" in md and "::: fantasma" in md and "**Índice** · *index*" in md
+    assert "## Por qué {.nb etq=" in md and "::: teoria" in md and "::: fantasma" in md and "**Índice** · *index*" in md
 
 
 ENTRADA = EntradaMaterial(

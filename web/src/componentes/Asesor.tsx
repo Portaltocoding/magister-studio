@@ -9,6 +9,7 @@ import { EVENTO_SUENO } from './animo.ts'
 import { buscarFaq, esPantallaDePlan, ofreceCambio, sugerenciasDe } from './faqs.ts'
 import { planQueToca, temaActivo } from './planActivo.ts'
 import { aCss } from './escala.ts'
+import { sinIds, sinPromesa } from './textoAsesor.ts'
 
 // El asesor: la mascota de la barra de arriba, cogida y dejada donde quieras. Se queda flotando sobre la pantalla y,
 // al pulsarla, abre una ventanita de chat que sabe dónde estás: lo que pone la pantalla le llega con cada pregunta.
@@ -151,11 +152,43 @@ async function planDeLaApp(): Promise<number | null> {
   }
 }
 
-// Lo que pone la pantalla, en texto y sin el propio asesor (va al tutor marcado como datos de la página).
+// Los títulos de lo que hay en pantalla de un proyecto, por id (niveles, bloques y pasos): para no enseñar ids.
+function titulosEnPantalla(): Map<string, string> {
+  const titulos = new Map<string, string>()
+  document.querySelectorAll<HTMLElement>('main.central [data-id][data-titulo]').forEach((el) => titulos.set(el.dataset.id!, el.dataset.titulo!))
+  document.querySelectorAll<HTMLElement>('main.central [id^="paso-"]').forEach((el) => {
+    const t = el.querySelector('strong')?.textContent?.trim()
+    if (t) titulos.set(el.id.slice(5), `«${t}»`)
+  })
+  return titulos
+}
+
+// El roadmap entero de un proyecto en pantalla, en corto (niveles, bloques y títulos de los pasos, con lo hecho): el
+// texto de la pantalla se corta a los 6000 caracteres y, sin esto, el asesor no veía los últimos niveles.
+function esquemaProyecto(): string {
+  const niveles = Array.from(document.querySelectorAll<HTMLElement>('main.central section.proyecto-nivel'))
+  if (!niveles.length) return ''
+  const lineas = niveles.map((n) => {
+    const cabeza = n.dataset.titulo ?? n.querySelector('h2')?.textContent?.trim() ?? ''
+    const esbozado = n.classList.contains('esbozado') ? ' (aún sin pasos: se detalla con su botón)' : ''
+    const bloques = Array.from(n.querySelectorAll<HTMLElement>('.proyecto-bloque')).map((b) => {
+      const pasos = Array.from(b.querySelectorAll<HTMLElement>('[id^="paso-"]')).map((p) => {
+        const hecho = p.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked ? ' [hecho]' : ''
+        return `    - ${p.querySelector('strong')?.textContent?.trim() ?? ''}${hecho}`
+      })
+      return [`  Bloque ${b.dataset.titulo ?? b.querySelector('h3')?.textContent?.trim() ?? ''}`, ...pasos].join('\n')
+    })
+    return [`${cabeza.replace(/^el nivel/, 'Nivel')}${esbozado}`, ...bloques].join('\n')
+  })
+  return `<roadmap_entero>\n${lineas.join('\n').slice(0, 5000)}\n</roadmap_entero>\n`
+}
+
+// Lo que pone la pantalla, en texto y sin el propio asesor (va al tutor marcado como datos de la página). En un
+// proyecto, primero su roadmap entero en corto.
 function textoPantalla(): string {
   const main = document.querySelector('main.central') as HTMLElement | null
   if (!main) return ''
-  return main.innerText.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim().slice(0, 6000)
+  return esquemaProyecto() + main.innerText.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim().slice(0, 6000)
 }
 
 export default function Asesor() {
@@ -429,9 +462,14 @@ function RespuestaAsesor({ m, alCambiar, alRepetir, enfocarCambio = false }: {
   enfocarCambio?: boolean
 }) {
   if (!m.texto) return <div className="asesor-tutor"><span className="asesor-escribiendo" aria-label="Pensando" /></div>
-  const { cuerpo, acciones } = separarAcciones(m.texto)
-  // El bloque ```cambio es el encargo para el servidor: lo que ves es la tarjeta con el cambio ya preparado.
-  const limpio = cuerpo.replace(/```[\s\S]*?(```|$)/g, (b) => (/^```(svg|test|opciones|concepto|ficha|cambio)/.test(b) ? '' : b))
+  // Con la tarjeta (o el porqué de que no salió) ya aquí, la frase con la que lo prometió sobra: la tarjeta dice lo que
+  // de verdad se preparó.
+  const { cuerpo, acciones } = separarAcciones(m.cambio || m.fallo || m.aviso ? sinPromesa(m.texto) : m.texto)
+  // El bloque ```cambio es el encargo para el servidor: lo que ves es la tarjeta con el cambio ya preparado. Y sin ids.
+  const limpio = sinIds(
+    cuerpo.replace(/```[\s\S]*?(```|$)/g, (b) => (/^```(svg|test|opciones|concepto|ficha|cambio)/.test(b) ? '' : b)),
+    titulosEnPantalla(),
+  )
   return (
     <div className="asesor-tutor">
       <Markdown>{limpio}</Markdown>
@@ -531,6 +569,10 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
         {cambio.estado === 'aplicada' ? '✓ ' : ''}
         {TITULO_CAMBIO[cambio.estado]}
       </p>
+      {/* Lo que hace, contado por el código a partir de las acciones validadas (no lo que el asesor prometió antes). */}
+      {(cambio as CambioAsesor & { en_breve?: string }).en_breve && (
+        <p className="asesor-cambio-breve">{(cambio as CambioAsesor & { en_breve?: string }).en_breve}</p>
+      )}
       <ul>
         {(cambio.lineas as LineaCambio[]).map((l, i) => (
           <li key={i}>

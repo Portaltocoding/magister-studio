@@ -80,7 +80,8 @@ async def montar_markdown(material_id: int, estilo: str | None = None) -> str:
     md = montar_apuntes(
         titulo=titulo, pie=f"Magister · {tema}", salida=str(carpeta_salidas(m.plan_id, m.leccion_clave) / "apuntes.pdf"),
         definiciones=contrato.get("definiciones", []), bloques=lista,
-        repaso=[{"enunciado": p.enunciado, "fantasma": p.fantasma} for p in preguntas if not p.sonda],
+        repaso=[{"id": p.id, "enunciado": p.enunciado, "fantasma": p.fantasma, "opciones": p.opciones}
+                for p in preguntas if not p.sonda],
         clave=m.leccion_clave, objetivos=objetivos, tema=tema, estilo=estilo or estilo_de(m),
     )
     informes = [x for x in (m.informes or []) if x.get("nodo") != "estilo"]
@@ -105,12 +106,25 @@ async def escribir_markdown(material_id: int) -> Path:
     return ruta
 
 
+def motivo_revisar(marcados: list[str], contrato: dict | None) -> str:
+    """Por qué unos apuntes quedan «por revisar», dicho para quien los lee: qué bloques (por su título, no «b2») y
+    qué puede hacer. La regla no cambia: un bloque que no pasa el juez de estilo tras los intentos queda marcado."""
+    titulos = {b.get("clave"): b.get("titulo") for b in (contrato or {}).get("bloques", [])}
+    nombres = [f"«{titulos.get(c) or c}»" for c in marcados]
+    lista = nombres[0] if len(nombres) == 1 else f"{', '.join(nombres[:-1])} y {nombres[-1]}"
+    que = f"El bloque {lista} no ha pasado" if len(nombres) == 1 else f"Los bloques {lista} no han pasado"
+    return (f"{que} la revisión de estilo tras varios intentos. Puedes leerlo igualmente (el contenido está) o "
+            "rehacer solo ese bloque con «Rehacer» junto a su título.")
+
+
 async def cerrar_apuntes(material_id: int, final: dict) -> None:
     estado, motivo = "listo", None
     if final.get("vetado"):
         estado, motivo = "bloqueado", final["vetado"]
+        for b in (final.get("contrato") or {}).get("bloques", []):
+            motivo = motivo.replace(f" en {b.get('clave')}:", f" en «{b.get('titulo')}»:")
     elif final.get("marcados"):
-        estado, motivo = "revisar", f"bloques por revisar: {', '.join(final['marcados'])}"
+        estado, motivo = "revisar", motivo_revisar(final["marcados"], final.get("contrato"))
     ultimo_completitud = next((x for x in reversed(final.get("informes", [])) if x.get("nodo") == "completitud"), None)
     if estado == "listo" and ultimo_completitud and ultimo_completitud.get("faltan_nucleo") and final.get("ampliado"):
         estado, motivo = "revisar", "faltan conceptos del núcleo tras ampliar"

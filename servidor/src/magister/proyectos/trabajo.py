@@ -123,7 +123,11 @@ async def crear(trabajo_id: int, pid: int, investigar: bool) -> None:
     # Primero el roadmap y después las referencias, para los bloques del nivel 1: así se busca lo que hay que
     # construir, no lo que ya dominas.
     await cola.fase(trabajo_id, "roadmap", 1, 3)
-    mapa = await _guardar_roadmap(trabajo_id, pid, await rm.generar_roadmap(datos, []))
+    # Si se está rehaciendo, el modelo ve el de antes para dejar igual el título de lo que sigue (si este trabajo se
+    # reintenta, el de antes es el que guardó la primera vez).
+    anterior = (p.roadmap_anterior or {}).get("roadmap") if (p.roadmap_anterior or {}).get("trabajo_id") == trabajo_id else p.roadmap
+    nuevo = await rm.generar_roadmap(datos, [], anterior=anterior, hechos=list(p.hechos or []))
+    mapa = await _guardar_roadmap(trabajo_id, pid, nuevo)
     if investigar and not (p.referencias or []):
         await cola.fase(trabajo_id, "referencias", 2, 3)
         await _guardar(pid, referencias=await buscar_referencias(datos, mapa))
@@ -151,7 +155,33 @@ async def detallar(trabajo_id: int, pid: int, numero: int) -> None:
     await cola.fase(trabajo_id, f"nivel {numero}", 1, 1)
     nuevo = await rm.detallar_nivel(p.roadmap, numero, list(p.hechos or []), decisiones, _datos(p),
                                     usados=diario | frozenset(p.hechos_en or {}))
-    await _guardar(pid, roadmap=nuevo, estado="listo", error=None, trabajo_id=None)
+    await _guardar_detalle(pid, p.roadmap, nuevo, numero)
+
+
+def _sin_numero(n: dict | None) -> dict | None:
+    return {k: v for k, v in n.items() if k != "numero"} if n is not None else None
+
+
+async def _guardar_detalle(pid: int, base: dict, nuevo: dict, numero: int) -> None:
+    """Guarda el nivel recién detallado sin pisar lo que cambió mientras el modelo escribía: mientras el trabajo está
+    en cola el proyecto se sigue usando (el asesor cambia otro nivel, marcas pasos). Se pone solo ese nivel sobre el
+    roadmap de ahora; si el que cambió es justo ese nivel, no se adivina: falla y se vuelve a pedir."""
+    nivel_base = next(n for n in base["niveles"] if n["numero"] == numero)
+    nivel_nuevo = next(n for n in nuevo["niveles"] if n["id"] == nivel_base["id"])
+    async with nueva_sesion() as s, s.begin():
+        p = await s.scalar(select(Proyecto).where(Proyecto.id == pid).with_for_update())
+        if p is None:
+            raise LookupError(f"el proyecto {pid} ya no existe")
+        actual = p.roadmap or {}
+        if actual == base:
+            roadmap = nuevo
+        else:
+            ahora = next((n for n in actual.get("niveles", []) if n["id"] == nivel_base["id"]), None)
+            if _sin_numero(ahora) != _sin_numero(nivel_base):
+                raise LookupError(f"el nivel {numero} ha cambiado mientras se detallaba: vuelve a pedirlo")
+            roadmap = {**actual, "niveles": [{**nivel_nuevo, "numero": n["numero"]} if n["id"] == nivel_base["id"] else n
+                                             for n in actual["niveles"]]}
+        p.roadmap, p.estado, p.error, p.trabajo_id = roadmap, "listo", None, None
 
 
 async def ejecutar(trabajo_id: int, tipo: str, parametros: dict) -> None:

@@ -13,6 +13,7 @@ class Estado(TypedDict, total=False):
     conversacion_id: int
     fase: str  # diagnostico | estudio
     hoy: str  # AAAA-MM-DD, lo pone quien invoca
+    ahora: str | None  # HH:MM de hoy, lo pone quien invoca: el reparto no usa la franja de hoy que ya ha pasado
     mensaje: str  # último mensaje del alumno
     voz: bool  # el alumno habla y escucha (modo Hablar): respuestas para el oído
     llamada: bool  # llamada de voz por turnos

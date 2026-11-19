@@ -7,6 +7,7 @@ import VideosDelPlan from '../componentes/VideosDelPlan.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import BarraCuota from '../componentes/BarraCuota.tsx'
+import { plural } from '../componentes/formato.ts'
 import { ETIQUETA_FUENTES } from '../PropuestaPlan.tsx'
 import {
   algunaBuscando,
@@ -34,6 +35,7 @@ import {
   type LeccionVista,
   type NecesitaFuentes,
   type ResumenPlan,
+  type SesionPlan,
   type VistaPlan,
 } from '../api.ts'
 
@@ -220,6 +222,8 @@ export const fechaCorta = (iso: string | null) =>
     : '·'
 
 const pct = (x: number) => `${Math.round(x * 100)} %`
+// Para el ancho de una barra: CSS no admite «0 %» (con espacio) y la barra salía llena.
+const anchoPct = (x: number) => `${Math.max(0, Math.min(100, Math.round(x * 100)))}%`
 
 // Roadmap: tus planes aceptados, sus lecciones con ideas clave y el calendario por semanas.
 export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
@@ -255,6 +259,13 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       .catch((e) => setFalloCarga(mensajeDe(e)))
   }, [tema, intento])
 
+  // Las tarjetas de arriba (fecha de fin, progreso) salen de /api/planes: tras cambiar el calendario se vuelven a pedir.
+  const recargarPlanes = useCallback(() => {
+    listarPlanes()
+      .then(setPlanes)
+      .catch(() => undefined)
+  }, [])
+
   const cargar = useCallback(() => {
     if (tema == null) return
     verPlan(tema)
@@ -271,11 +282,12 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       if (id != null && id === vista?.plan_id) {
         cargar()
         cargarMaterial()
+        recargarPlanes()
       }
     }
     window.addEventListener(EVENTO_CAMBIO_APLICADO, al)
     return () => window.removeEventListener(EVENTO_CAMBIO_APLICADO, al)
-  }, [cargar, cargarMaterial, vista?.plan_id])
+  }, [cargar, cargarMaterial, recargarPlanes, vista?.plan_id])
 
   // Mientras alguna lección busca fuentes, se refresca cada 5 s; cuando ninguna busca, para.
   const buscando = vista ? algunaBuscando(vista.lecciones) : false
@@ -346,6 +358,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
     try {
       setVista(await recalcularPlan(tema, hoyIso()))
       setAviso('Calendario recalculado desde hoy. Lo hecho no se toca.')
+      recargarPlanes()
     } catch (e) {
       setAviso(String((e as Error).message))
     }
@@ -395,10 +408,10 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               {p.tema}
             </strong>
             <span className="nota">
-              {p.lecciones} lecciones · {num(p.total_horas)} h · acaba {fechaCorta(p.fin)}
+              {plural(p.lecciones, 'lección', 'lecciones')} · {num(p.total_horas)} h · acaba {fechaCorta(p.fin)}
             </span>
             <span className="barra" aria-label={`Progreso ${pct(p.progreso)}`}>
-              <span style={{ width: pct(p.progreso) }} />
+              <span style={{ width: anchoPct(p.progreso) }} />
             </span>
           </button>
         ))}
@@ -418,9 +431,16 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               className="boton boton-principal"
               onClick={async () => {
                 if (tema == null || !reajuste.sesiones) return
-                setVista(await pedir<VistaPlan>(`/api/temas/${tema}/plan/reajuste/aceptar`, enviarJson({ sesiones: reajuste.sesiones })))
-                setReajuste(null)
-                setAviso('Reajuste aplicado.')
+                // Solo los campos que admite el servidor (rechaza cualquier otro): clave, fecha, inicio y horas.
+                const sesiones = (reajuste.sesiones as SesionPlan[]).map(({ clave, fecha, inicio, horas }) => ({ clave, fecha, inicio, horas }))
+                try {
+                  setVista(await pedir<VistaPlan>(`/api/temas/${tema}/plan/reajuste/aceptar`, enviarJson({ sesiones })))
+                  setReajuste(null)
+                  setAviso('Reajuste aplicado.')
+                  recargarPlanes()
+                } catch (e) {
+                  setAviso(`No he podido aplicar el reajuste. ${mensajeDe(e)}`)
+                }
               }}
             >
               Aceptar
@@ -467,6 +487,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                 setVista(v)
                 setHorario(false)
                 setAviso(`Horario guardado. Ahora acabas el ${fechaCorta(v.fin)}.`)
+                recargarPlanes()
               }}
             />
           )}
@@ -638,6 +659,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                               onChange={async (e) => {
                                 await marcarSesion(x.id, e.target.value as typeof x.estado)
                                 cargar()
+                                recargarPlanes() // el progreso de la tarjeta
                               }}
                             >
                               <option value="pendiente">pendiente</option>

@@ -3,6 +3,9 @@
     uv run magister-trabajador          proceso aparte
     (o dentro de la API con MAGISTER_TRABAJOS_EN_API=true, el valor por defecto)
 
+Corre MAGISTER_TRABAJOS_A_LA_VEZ trabajos a la vez (2 por defecto): un research o un MP4 largo ya no deja en espera
+los apuntes y las diapositivas de lo demás.
+
 Errores transitorios (el modelo, la red, un plazo): espera exponencial (2 s, factor 2,
 con jitter) hasta 5 intentos. Permanentes (la lección no existe): `fallido` sin reintento.
 Una salida estructurada que no sale bien falla al segundo intento, y lo frenado por el freno
@@ -112,8 +115,16 @@ async def ejecutar_uno(quien: str) -> bool:
     return True
 
 
-async def bucle(pausa: float = 2.0) -> None:
-    quien = nombre()
+async def bucle(pausa: float = 2.0, a_la_vez: int | None = None) -> None:
+    """MAGISTER_TRABAJOS_A_LA_VEZ trabajadores en este proceso, cada uno con su nombre y su bucle. Que no cojan el
+    mismo trabajo ni dos de la misma lección lo garantiza la reserva en la base (`cola.coger`), no este proceso: vale
+    igual con otro `magister-trabajador` aparte. Cada tarea lleva su propio contexto (la traza del trabajo)."""
+    n = max(1, a_la_vez or cola.a_la_vez())
+    base = nombre()
+    await asyncio.gather(*(_uno(base if n == 1 else f"{base}-{k}", pausa) for k in range(1, n + 1)))
+
+
+async def _uno(quien: str, pausa: float) -> None:
     registro.info("trabajador %s en marcha", quien)
     while True:
         try:

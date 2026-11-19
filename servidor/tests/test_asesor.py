@@ -276,6 +276,7 @@ async def test_de_la_respuesta_a_aplicar_y_deshacer(cliente) -> None:
     cambio = next(d for e, d in eventos if e == "cambio")
     assert cambio["estado"] == "propuesta" and "Tests con moto" in cambio["lineas"][0]["texto"] and cambio["consultado"] == []
     assert cambio["pendiente"] == "El paso del nivel 2 se queda fuera: detállalo primero."
+    assert cambio["en_breve"] == "Añade 1 paso."  # lo cuenta el código, no lo que dijo el chat
     # Nada cambia hasta que lo apruebas.
     assert len(await _pasos_n1(cliente, pid)) == 2
     assert [c["id"] for c in (await cliente.get(f"/api/conversaciones/{cid}/cambios")).json()] == [cambio["id"]]
@@ -289,16 +290,98 @@ async def test_de_la_respuesta_a_aplicar_y_deshacer(cliente) -> None:
     assert len(await _pasos_n1(cliente, pid)) == 2
 
 
-async def test_si_el_proyecto_cambia_antes_de_aplicarlo_la_propuesta_caduca(cliente) -> None:
+async def _propuesto(cliente, cid: int, pid: int, *acciones: dict) -> dict:
     from magister.cerebro.estructura import eco
 
+    eco.encolar(ag.Paso, [_propone(*acciones)])
+    return next(d for e, d in await _pedir(cliente, cid, pid) if e == "cambio")
+
+
+async def _cambiar_roadmap(pid: int, cambiar) -> None:
+    from magister.datos.proyectos import Proyecto
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s, s.begin():
+        p = await s.get(Proyecto, pid)
+        r = __import__("copy").deepcopy(p.roadmap)
+        cambiar(r)
+        p.roadmap = r
+
+
+async def test_si_el_proyecto_cambia_antes_de_aplicarlo_la_propuesta_caduca(cliente) -> None:
     pid, cid = await _preparado(cliente)
-    eco.encolar(ag.Paso, [_propone({"tipo": "anadir_pasos", "bloque_id": "n1-b1", "pasos": [_paso("Tests con moto")]})])
-    cambio = next(d for e, d in await _pedir(cliente, cid, pid) if e == "cambio")
-    await cliente.put(f"/api/proyectos/{pid}/pasos/n1-b1-p1", json={"hecho": True})
+    cambio = await _propuesto(cliente, cid, pid, {"tipo": "anadir_pasos", "bloque_id": "n1-b1", "pasos": [_paso("Tests con moto")]})
+    await _cambiar_roadmap(pid, lambda r: r["niveles"][0]["bloques"][0]["pasos"][0].update(titulo="Crea la cuenta y el MFA"))
     r = (await cliente.post(f"/api/cambios/{cambio['id']}/aplicar")).json()
     assert r["estado"] == "caducada" and "ha cambiado" in r["motivo_estado"]
     assert len(await _pasos_n1(cliente, pid)) == 2
+
+
+async def test_marcar_un_paso_que_la_propuesta_no_toca_no_la_caduca(cliente) -> None:
+    pid, cid = await _preparado(cliente)
+    anadir = await _propuesto(cliente, cid, pid, {"tipo": "anadir_pasos", "bloque_id": "n1-b1", "pasos": [_paso("Tests con moto")]})
+    quitar = await _propuesto(cliente, cid, pid, {"tipo": "quitar_paso", "paso_id": "n1-b1-p2"})
+    await cliente.put(f"/api/proyectos/{pid}/pasos/n1-b1-p1", json={"hecho": True})
+    # Añadir no depende de lo hecho: se aplica, y la marca de después se queda.
+    r = (await cliente.post(f"/api/cambios/{anadir['id']}/aplicar")).json()
+    assert r["estado"] == "aplicada"
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert p["hechos"] == ["n1-b1-p1"] and len(rm.pasos(p["roadmap"])) == 3
+    # Quitar un paso sí depende de si está hecho (se pierde): marcarlo después lo caduca. (Esta, además, ya era de
+    # otro roadmap: el que acaba de cambiar el cambio aplicado.)
+    await cliente.put(f"/api/proyectos/{pid}/pasos/n1-b1-p2", json={"hecho": True})
+    assert (await cliente.post(f"/api/cambios/{quitar['id']}/aplicar")).json()["estado"] == "caducada"
+    pid, cid = await _preparado(cliente)
+    quitar = await _propuesto(cliente, cid, pid, {"tipo": "quitar_paso", "paso_id": "n1-b1-p2"})
+    await cliente.put(f"/api/proyectos/{pid}/pasos/n1-b1-p2", json={"hecho": True})
+    assert (await cliente.post(f"/api/cambios/{quitar['id']}/aplicar")).json()["estado"] == "caducada"
+    # Y marcar otro paso (el p1) no la caduca.
+    quitar = await _propuesto(cliente, cid, pid, {"tipo": "quitar_paso", "paso_id": "n1-b1-p2"})
+    await cliente.put(f"/api/proyectos/{pid}/pasos/n1-b1-p1", json={"hecho": True})
+    assert (await cliente.post(f"/api/cambios/{quitar['id']}/aplicar")).json()["estado"] == "aplicada"
+    assert (await cliente.get(f"/api/proyectos/{pid}")).json()["hechos"] == ["n1-b1-p1"]
+
+
+async def test_deshacer_es_exacto_y_respeta_lo_que_marcaste_despues(cliente) -> None:
+    pid, cid = await _preparado(cliente)
+    marcar = await _propuesto(cliente, cid, pid, {"tipo": "marcar_paso", "paso_id": "n1-b1-p1", "hecho": True},
+                              {"tipo": "anadir_pasos", "bloque_id": "n1-b1", "pasos": [_paso("Tests con moto")]})
+    assert (await cliente.post(f"/api/cambios/{marcar['id']}/aplicar")).json()["estado"] == "aplicada"
+    # Después marcas otro paso a mano: deshacer quita lo que hizo el cambio (la marca del p1 y el paso nuevo) y deja
+    # la tuya.
+    await cliente.put(f"/api/proyectos/{pid}/pasos/n1-b1-p2", json={"hecho": True})
+    assert (await cliente.post(f"/api/cambios/{marcar['id']}/deshacer")).json()["estado"] == "deshecha"
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert p["hechos"] == ["n1-b1-p2"] and list(p["hechos_en"]) == ["n1-b1-p2"] and len(rm.pasos(p["roadmap"])) == 2
+    # Si marcas lo que el cambio tocó (el paso que creó), no se deshace a ciegas.
+    anadir = await _propuesto(cliente, cid, pid, {"tipo": "anadir_pasos", "bloque_id": "n1-b1", "pasos": [_paso("Tests con moto")]})
+    nuevo = (await cliente.post(f"/api/cambios/{anadir['id']}/aplicar")).json()["nuevos"][0]
+    await cliente.put(f"/api/proyectos/{pid}/pasos/{nuevo}", json={"hecho": True})
+    r = await cliente.post(f"/api/cambios/{anadir['id']}/deshacer")
+    assert r.status_code == 409 and "has marcado o desmarcado un paso que tocó este cambio" in r.json()["detail"]
+    # Y dos veces, en buen castellano.
+    r = await cliente.post(f"/api/cambios/{marcar['id']}/deshacer")
+    assert r.status_code == 409 and r.json()["detail"] == "solo se deshace un cambio aplicado (este está deshecho)"
+    r = await cliente.post(f"/api/cambios/{anadir['id']}/aplicar")
+    assert r.status_code == 409 and r.json()["detail"] == "este cambio ya está aplicado"
+    r = await cliente.post("/api/cambios/abc/aplicar")
+    assert r.status_code == 422 and r.json()["detail"] == "el número del cambio tiene que ser un número entero"
+
+
+async def test_con_el_proyecto_en_cola_el_asesor_cambia_lo_que_no_choca(cliente) -> None:
+    pid, cid = await _preparado(cliente)
+    assert (await cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar")).json()["estado"] == "en_cola"
+    # Se prepara (antes daba 409 todo el rato) y se aplica fuera del nivel que espera a detallarse.
+    fuera = await _propuesto(cliente, cid, pid, {"tipo": "anadir_pasos", "bloque_id": "n1-b1", "pasos": [_paso("Tests con moto")]})
+    dentro = await _propuesto(cliente, cid, pid, {"tipo": "nuevo_bloque", "nivel_id": "n2", "titulo": "Desplegar",
+                                                  "priming": "Llevarlo a la nube cuando el plan ya se aprueba."})
+    r = await cliente.post(f"/api/cambios/{dentro['id']}/aplicar")
+    assert r.status_code == 409 and "el nivel 2 está en la cola para detallarse" in r.json()["detail"]
+    # No caduca: sigue en propuesta para cuando acabe.
+    assert [c["estado"] for c in (await cliente.get(f"/api/conversaciones/{cid}/cambios")).json()][-1] == "propuesta"
+    assert (await cliente.post(f"/api/cambios/{fuera['id']}/aplicar")).json()["estado"] == "aplicada"
+    # Deshacer lo de fuera también vale con el trabajo en cola.
+    assert (await cliente.post(f"/api/cambios/{fuera['id']}/deshacer")).json()["estado"] == "deshecha"
 
 
 async def test_sin_bloque_cambio_no_se_prepara_nada(cliente) -> None:
@@ -386,7 +469,7 @@ def test_la_huella_cubre_el_plan_solo_si_el_cambio_lo_toca() -> None:
     proyecto, p = _proyecto(), _plan()
     nota = _cambios({"tipo": "guardar_nota", "nota": "Algo que guardar."})
     mover = _cambios({"tipo": "mover_sesion", "sesion_id": 12, "fecha": "2026-11-23"})
-    assert cb.huella_de(nota, proyecto, p) == cb.huella(proyecto["roadmap"], proyecto["hechos"])  # como antes
+    assert cb.huella_de(nota, proyecto, p) == cb.huella_propuesta(nota, proyecto)  # como antes
     otro = _plan()
     otro["sesiones"][0]["estado"] = "hecha"
     assert cb.huella_de(mover, None, p) != cb.huella_de(mover, None, otro)
@@ -511,3 +594,29 @@ async def test_preparar_apuntes_encola_como_lecciones_y_no_se_deshace(cliente, e
     r = await cliente.post(f"/api/planes/{plan_id}/lecciones/L2/material", json={})
     assert r.json() == {"trabajo_id": trabajos[0].id, "nuevo": False}
     assert (await cliente.post(f"/api/cambios/{cambio['id']}/deshacer")).status_code == 409
+
+
+# --- Lo que dice la tarjeta lo escribe el código ----------------------------------------------------------------------
+
+def test_lo_que_hace_la_propuesta_en_una_frase_sale_de_sus_acciones() -> None:
+    def breve(*acciones: dict) -> str:
+        return cb.en_breve([{"motivo": "…", **a} for a in acciones])
+
+    bloque = {"tipo": "nuevo_bloque", "nivel_id": "n1", "titulo": "Tests", "priming": "…", "pasos": [_paso(f"P{i}") for i in range(5)]}
+    assert breve(bloque) == "Añade 1 bloque y 5 pasos."
+    # El bloque sin pasos que el asesor anunció «con cinco pasos»: la tarjeta dice lo que hay de verdad.
+    assert breve({**bloque, "pasos": []}) == "Añade 1 bloque."
+    assert breve({"tipo": "cambiar_paso", "paso_id": "n1-b1-p1"}, {"tipo": "cambiar_paso", "paso_id": "n1-b1-p2"},
+                 {"tipo": "cambiar_bloque", "bloque_id": "n1-b1"}, {"tipo": "quitar_paso", "paso_id": "n1-b1-p3"},
+                 {"tipo": "apuntar_decision"}) == "Cambia 2 pasos y 1 bloque, quita 1 paso y apunta 1 decisión en el diario."
+    assert breve({"tipo": "nuevo_nivel", "bloques": [{"titulo": "A", "priming": "…"}, {"titulo": "B", "priming": "…"}]}) == "Añade 1 nivel y 2 bloques."
+    assert breve() == ""
+
+
+def test_los_ids_no_llegan_al_alumno() -> None:
+    r = _roadmap()
+    assert cb.sin_ids("Lo pongo en el paso n1-b1-p2, tras n1-b1-p1.", r) == "Lo pongo en el paso «Alarmas de gasto», tras «Crea la cuenta»."
+    assert cb.sin_ids("En el bloque n1-b1 del nivel n2.", r) == "En el bloque «La cuenta» del nivel 2 «Aplica»."
+    # Lo que no es un id del proyecto (n8-b1, una versión), tal cual.
+    assert cb.sin_ids("Usa n8-b1 y la v2-b1.", r) == "Usa n8-b1 y la v2-b1."
+    assert cb.sin_ids(None, r) is None

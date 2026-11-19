@@ -7,13 +7,14 @@ from datetime import date, datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.sse import ServerSentEvent
 
+from magister.api.rutas_proyectos import RutaEnCastellano
 from magister.asesor import arnes, herramientas
 from magister.asesor.agente import NoSePuede, preparar
-from magister.asesor.cambios import encargo_de, sin_bloque_cambio
+from magister.asesor.cambios import encargo_de, sin_bloque_cambio, sin_ids
 from magister.cerebro.estructura import ErrorEstructura
 from magister.cerebro.modelo import ErrorModelo
 
-rutas = APIRouter(prefix="/api")
+rutas = APIRouter(prefix="/api", route_class=RutaEnCastellano)
 registro = logging.getLogger("magister.asesor")
 
 
@@ -30,6 +31,7 @@ async def tras_respuesta(cid: int, proyecto_id: int | None, texto: str, mensaje_
         return
     yield ServerSentEvent(data={"nodo": "preparar_cambio", "detalle": "Preparando el cambio…"}, event="fase")
     propuesta = None
+    proyecto = None
     try:
         proyecto = await arnes.leer_proyecto(proyecto_id)
         plan = await arnes.leer_plan(plan_id, hoy)
@@ -45,7 +47,8 @@ async def tras_respuesta(cid: int, proyecto_id: int | None, texto: str, mensaje_
                                                  prompt, lecturas, plan)
     except NoSePuede as e:
         # No es un fallo: el agente explica por qué no cabe en lo que puede hacer (se enseña tal cual).
-        yield ServerSentEvent(data={"detalle": str(e), "explicado": True}, event="cambio_fallido")
+        yield ServerSentEvent(data={"detalle": sin_ids(str(e), (proyecto or {}).get("roadmap")), "explicado": True},
+                              event="cambio_fallido")
         return
     except arnes.ErrorCambio as e:
         yield ServerSentEvent(data={"detalle": e.detalle}, event="cambio_fallido")

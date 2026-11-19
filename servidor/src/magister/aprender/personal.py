@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import text
 
-from magister.aprender.estado import es_acierto, nota_final
+from magister.aprender.estado import dia_de_estudio, es_acierto, nota_final
 from magister.aprender.programador import MARCA_NOTAS
 from magister.datos.sesion import nueva_sesion
 
@@ -61,7 +61,7 @@ async def series(con_extras: bool = False) -> list[list[tuple]]:
     por: dict[tuple, list] = {}
     for plan_id, cid, momento, nc, nu, conf, lat in filas:
         lista = por.setdefault((plan_id, cid), [])
-        if not lista or lista[-1][0].date() != momento.date():
+        if not lista or dia_de_estudio(lista[-1][0]) != dia_de_estudio(momento):  # el día de estudio, como en `estado_de`
             lista.append((momento, nota_final(nc, nu), conf, lat) if con_extras else (momento, nota_final(nc, nu)))
     return list(por.values())
 

@@ -9,7 +9,7 @@ Cada diapositiva:
 - `titulo`: corto y concreto (dice la idea, no el tema: «PUT reemplaza, PATCH modifica» mejor que «Verbos»).
 - `lineas`: de 2 a 5 líneas de menos de 16 palabras. Si una línea define algo, empieza por el término y dos puntos («Idempotencia: repetir deja el mismo estado»). Sin viñetas anidadas.
 - `tabla`: Markdown, solo si el bloque compara cosas (opciones, verbos, códigos). Entonces `lineas` va vacía.
-- `codigo`: un ejemplo corto (como mucho 8 líneas de menos de 60 caracteres) cuando lo concreto ayuda: una petición HTTP, una consulta, una firma. Si no, null.
+- `codigo`: solo si la lección es de programación, bases de datos o sistemas y un ejemplo corto ayuda (como mucho 8 líneas de menos de 60 caracteres): una petición HTTP, una consulta, una firma. Una cuenta, una cifra o una cadena de causas no son código: van en `lineas` o en `clave`. Si no, null.
 - `clave`: la frase que hay que recordar de esa diapositiva, en una línea; null si no hay una clara. No repitas lo que ya dicen las líneas.
 - `nota`: la prosa que dirías en voz alta (lo que no cabe en la diapositiva), de 60 a 120 palabras, en español de España, sin el carácter de la raya larga.
 

@@ -8,7 +8,10 @@ consulta, conservando el orden de la fusión.
 
 import asyncio
 import math
+import re
 import time
+from dataclasses import replace
+
 from sqlalchemy import text
 
 from magister.cerebro.contratos import Consulta, Filtros, Recuperado, ResultadoBusqueda
@@ -16,6 +19,7 @@ from magister.datos import repositorio_fuentes as rf
 from magister.datos.fuentes import Busqueda
 from magister.datos.sesion import nueva_sesion
 from magister.config import ajustes
+from magister.fuentes import duplicados as dup
 from magister.fuentes.embeber import embeber, modelo_listo
 from magister.fuentes.fusion import rrf
 from magister.fuentes.reranker import reordenar
@@ -69,16 +73,46 @@ async def buscar_densa(consulta: str, k: int, filtros: Filtros | None, indice: s
     return [(int(i), float(p)) for i, p in filas]
 
 
-async def buscar_lexica(consulta: str, k: int, filtros: Filtros | None, indice: str | None = None) -> list[tuple[int, float]]:
+_NEGADA = re.compile(r"(?<!\S)-[^\W_]")
+
+
+def consulta_o(consulta: str) -> str:
+    """Las palabras de la consulta unidas con OR, para `to_tsquery`. Solo letras y cifras: nada que la sintaxis de
+    tsquery pueda leer como operador. Vacío si la consulta excluye palabras («-mitosis»): entonces solo vale el AND."""
+    if _NEGADA.search(consulta):
+        return ""
+    palabras = [p for p in re.findall(r"[^\W_]+", consulta) if p.lower() != "or"]
+    return " | ".join(dict.fromkeys(palabras))
+
+
+async def buscar_lexica_completa(
+    consulta: str, k: int, filtros: Filtros | None, indice: str | None = None,
+) -> tuple[list[tuple[int, float]], set[int]]:
+    """(pares, los que tienen todas las palabras). Primero los que tienen todas (el AND de `websearch_to_tsquery`) y
+    después los que tienen alguna (OR), por `ts_rank_cd`. Antes solo el AND: una pregunta larga («¿qué es el complejo
+    sinaptonémico y en qué subfase aparecen los quiasmas?») exigía las cinco palabras en un fragmento y la vía léxica
+    salía vacía aunque tus apuntes dijeran «los quiasmas se ven en el diploteno»."""
     config_id, _ = await _config(indice)
     donde, valores = _filtros_sql(filtros)
-    sql = text(
-        f"select f.id, ts_rank_cd(f.lexico, q, 1) as p {DESDE}, websearch_to_tsquery('spanish', :q) q "
-        f"where {donde} and f.lexico @@ q order by p desc, f.id limit :k"
-    )
+    o = consulta_o(consulta)
+    if o:
+        sql = text(
+            f"select f.id, ts_rank_cd(f.lexico, qo, 1) as p, f.lexico @@ qa as completo {DESDE}, "
+            f"websearch_to_tsquery('spanish', :q) qa, to_tsquery('spanish', :qo) qo "
+            f"where {donde} and (f.lexico @@ qa or f.lexico @@ qo) order by completo desc, p desc, f.id limit :k"
+        )
+    else:
+        sql = text(
+            f"select f.id, ts_rank_cd(f.lexico, qa, 1) as p, true as completo {DESDE}, websearch_to_tsquery('spanish', :q) qa "
+            f"where {donde} and f.lexico @@ qa order by p desc, f.id limit :k"
+        )
     async with nueva_sesion() as s:
-        filas = (await s.execute(sql, {**valores, "q": consulta, "k": k, "config_id": config_id})).all()
-    return [(int(i), float(p)) for i, p in filas]
+        filas = (await s.execute(sql, {**valores, "q": consulta, "qo": o, "k": k, "config_id": config_id})).all()
+    return [(int(i), float(p)) for i, p, _ in filas], {int(i) for i, _, c in filas if c}
+
+
+async def buscar_lexica(consulta: str, k: int, filtros: Filtros | None, indice: str | None = None) -> list[tuple[int, float]]:
+    return (await buscar_lexica_completa(consulta, k, filtros, indice))[0]
 
 
 async def hidratar(pares: list[tuple[int, float]]) -> list[Recuperado]:
@@ -107,6 +141,13 @@ async def _esperar_modelo(nombre: str | None) -> bool:
     return True
 
 
+def _colapsar(recuperados: list[Recuperado]) -> list[Recuperado]:
+    """Fuera las copias (casi) iguales de un fragmento mejor colocado (`duplicados.colapsar`), con los rangos de nuevo
+    de 1 a n. Así un fichero de relleno aporta un fragmento, no ocho, al chat y al apoyo de una lección."""
+    quedan = dup.colapsar([r.texto for r in recuperados])
+    return [replace(recuperados[i], rango=n) for n, i in enumerate(quedan, start=1)]
+
+
 def _como_recuperados(pares: list[tuple[int, float]]) -> list[Recuperado]:
     return [Recuperado(fid, n, p, "", "", "", "", 0) for n, (fid, p) in enumerate(pares, start=1)]
 
@@ -129,6 +170,7 @@ class BuscadorHibrido:
         config_id, config_params = await _config(params.indice)
         densa: list[tuple[int, float]] = []
         lexica: list[tuple[int, float]] = []
+        completos: set[int] | None = None
         n = max(params.n_candidatos, k)
         via = params.via
         # Recién arrancado, e5 aún se está cargando: la híbrida no espera más de unos segundos y, si no está, va
@@ -137,12 +179,12 @@ class BuscadorHibrido:
             via = "lexica"
         # Las dos vías no dependen una de otra: a la vez.
         if via == "hibrida":
-            densa, lexica = await asyncio.gather(buscar_densa(consulta, n, filtros, params.indice),
-                                                 buscar_lexica(consulta, n, filtros, params.indice))
+            densa, (lexica, completos) = await asyncio.gather(buscar_densa(consulta, n, filtros, params.indice),
+                                                              buscar_lexica_completa(consulta, n, filtros, params.indice))
         elif via == "densa":
             densa = await buscar_densa(consulta, n, filtros, params.indice)
         else:
-            lexica = await buscar_lexica(consulta, n, filtros, params.indice)
+            lexica, completos = await buscar_lexica_completa(consulta, n, filtros, params.indice)
         if via == "hibrida":
             fusion = rrf(_como_recuperados(densa), _como_recuperados(lexica))
             pares = [(r.fragmento_id, r.puntuacion) for r in fusion]
@@ -153,17 +195,23 @@ class BuscadorHibrido:
         puntos_reranker: dict[int, float] = {}
         if params.reranker and pares:
             candidatos = await hidratar(pares[: params.n_candidatos])
+            if params.colapsar_duplicados:
+                candidatos = _colapsar(candidatos)
             t1 = time.perf_counter()
             rerank = await asyncio.to_thread(reordenar, consulta, candidatos)
             ms_reranker = int((time.perf_counter() - t1) * 1000)
             recuperados = rerank[:k]
             puntos_reranker = {r.fragmento_id: r.puntuacion for r in rerank}
+        elif params.colapsar_duplicados:
+            # Se hidratan los candidatos, no solo k: si hay copias, el hueco lo ocupa el siguiente distinto.
+            recuperados = _colapsar(await hidratar(pares[:n]))[:k]
         else:
             recuperados = await hidratar(pares[:k])
+        if not params.reranker:
             # Pregunta en español y fuente en inglés: el coseno de e5 se queda en 0,78-0,85 aunque la sección conteste.
             # Solo entonces, el reranker (multilingüe) puntúa estos k: es la segunda puerta de «hay fuentes» (ADR-0018).
             # El apoyo de las lecciones lo pide siempre (`puntuar_reranker`): cuenta fragmento a fragmento.
-            mejor = ResultadoBusqueda(recuperados, None, dict(densa), via).mejor_similitud
+            mejor = ResultadoBusqueda(recuperados, None, dict(densa), via, lexica_completa=completos).mejor_similitud
             if recuperados and (params.puntuar_reranker or mejor < ajustes.umbral_fuentes):
                 t1 = time.perf_counter()
                 puntos_reranker = {r.fragmento_id: r.puntuacion for r in await asyncio.to_thread(reordenar, consulta, recuperados)}
@@ -186,7 +234,7 @@ class BuscadorHibrido:
             s.add(b)
             await s.flush()
             busqueda_id = b.id
-        return ResultadoBusqueda(recuperados, busqueda_id, dict(densa), via, puntos_reranker)
+        return ResultadoBusqueda(recuperados, busqueda_id, dict(densa), via, puntos_reranker, completos)
 
     def similitud_frases(self, afirmacion: str, frases: list[str]) -> list[float]:
         """Coseno de e5 entre una afirmación y cada frase, para comprobar citas entre idiomas (cerebro.citas). Usa el

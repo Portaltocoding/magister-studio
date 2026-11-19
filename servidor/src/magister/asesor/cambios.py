@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from magister.plan.calendario import a_hora, horas_utiles
 from magister.plan.reglas import fmt
-from magister.proyectos.roadmap import BloqueGen, PasoGen, errores_paso, ids_de
+from magister.proyectos.roadmap import BloqueGen, PasoGen, aviso_ascii, errores_paso, ids_de, paso_de
 
 TipoAccion = Literal[
     # Añadir partes
@@ -146,6 +146,31 @@ def huella(roadmap: dict | None, hechos: list[str] | None) -> str:
     return hashlib.sha256(datos.encode("utf-8")).hexdigest()
 
 
+def hechos_que_lee(c: Cambios, roadmap: dict | None) -> set[str]:
+    """Los pasos cuyo «hecho» importa a la propuesta: los que marca o desmarca y los que quita (con ellos se pierde lo
+    hecho). Lo demás no depende de lo hecho: mover, cambiar o añadir hace lo mismo con un paso marcado que sin marcar,
+    y `aplicar` vuelve a simular sobre lo hecho de ese momento, así que no se pierde ninguna marca."""
+    niveles = (roadmap or {}).get("niveles", [])
+    ids: set[str] = set()
+    for a in c.acciones:
+        if a.tipo in ("marcar_paso", "quitar_paso") and a.paso_id:
+            ids.add(a.paso_id)
+        elif a.tipo == "quitar_bloque":
+            ids |= {p["id"] for n in niveles for b in n["bloques"] if b["id"] == a.bloque_id for p in b["pasos"]}
+        elif a.tipo == "quitar_nivel":
+            ids |= {p["id"] for n in niveles if n["id"] == a.nivel_id for b in n["bloques"] for p in b["pasos"]}
+    return ids
+
+
+def huella_propuesta(c: Cambios, proyecto: dict) -> str:
+    """La huella del proyecto para una propuesta: el roadmap entero y lo hecho SOLO de los pasos que lee
+    (`hechos_que_lee`). Así marcar un paso que la propuesta no toca no la caduca, y marcar uno que sí, la caduca."""
+    lee = hechos_que_lee(c, proyecto["roadmap"])
+    datos = json.dumps({"roadmap": proyecto["roadmap"], "lee": sorted(lee),
+                        "hechos": sorted(x for x in proyecto["hechos"] if x in lee)}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(datos.encode("utf-8")).hexdigest()
+
+
 def usa_plan(c: Cambios) -> bool:
     return any(a.tipo in DEL_PLAN for a in c.acciones)
 
@@ -157,13 +182,38 @@ def huella_plan(plan: dict) -> str:
     return hashlib.sha256(datos.encode("utf-8")).hexdigest()
 
 
-def huella_de(c: Cambios, proyecto: dict | None, plan: dict | None) -> str | None:
-    """La huella con la que se guarda una propuesta: la del proyecto (como siempre) y, si toca el plan, también la suya."""
-    del_proyecto = huella(proyecto["roadmap"], proyecto["hechos"]) if proyecto else None
+def huella_de(c: Cambios, proyecto: dict | None, plan: dict | None, antigua: bool = False) -> str | None:
+    """La huella con la que se guarda una propuesta: la del proyecto (`huella_propuesta`) y, si toca el plan, también
+    la suya. `antigua`: la de antes, con todo lo hecho dentro, para no caducar propuestas guardadas con ella (era más
+    estricta: si coincide, también vale)."""
+    if proyecto:
+        del_proyecto = huella(proyecto["roadmap"], proyecto["hechos"]) if antigua else huella_propuesta(c, proyecto)
+    else:
+        del_proyecto = None
     if plan is None or not usa_plan(c):
         return del_proyecto
     datos = json.dumps({"proyecto": del_proyecto, "plan": huella_plan(plan)}, sort_keys=True)
     return hashlib.sha256(datos.encode("utf-8")).hexdigest()
+
+
+def hechos_tocados(antes: tuple[list[str], dict], despues: tuple[list[str], dict], nuevos: list[str]) -> set[str]:
+    """Los pasos cuyo «hecho» (o su fecha) cambió al aplicar, más los que creó el cambio: lo único de lo hecho que
+    «Deshacer» devuelve a como estaba (lo que marcaste después en otros pasos se queda)."""
+    (h0, f0), (h1, f1) = antes, despues
+    ids = set(h0) | set(h1) | set(f0) | set(f1)
+    return {x for x in ids if (x in h0) != (x in h1) or f0.get(x) != f1.get(x)} | set(nuevos)
+
+
+def deshacer_hechos(ahora: tuple[list[str], dict], antes: tuple[list[str], dict], despues: tuple[list[str], dict],
+                    tocados: set[str]) -> tuple[list[str], dict] | None:
+    """Lo hecho tras deshacer: lo de ahora, con los pasos `tocados` como estaban antes de aplicar. None si alguno de
+    esos ya no está como lo dejó el cambio (lo has marcado o desmarcado después): entonces no se deshace a ciegas."""
+    (h, f), (h0, f0), (h1, f1) = ahora, antes, despues
+    if any((x in h) != (x in h1) or f.get(x) != f1.get(x) for x in tocados):
+        return None
+    hechos = [x for x in h if x not in tocados] + [x for x in h0 if x in tocados]
+    fechas = {k: v for k, v in f.items() if k not in tocados} | {k: v for k, v in f0.items() if k in tocados}
+    return hechos, fechas
 
 
 def deshacible(lineas: list[dict]) -> bool:
@@ -289,7 +339,7 @@ def _anadir_pasos(a: Accion, r: Resultado, errores: list[str]) -> None:
     if posicion is None:
         return
     siguiente = _siguiente(r, f"{bloque['id']}-p")
-    nuevos = [{"id": f"{bloque['id']}-p{siguiente + k}", **p.model_dump()} for k, p in enumerate(a.pasos)]
+    nuevos = [paso_de(f"{bloque['id']}-p{siguiente + k}", p) for k, p in enumerate(a.pasos)]
     bloque["pasos"][posicion:posicion] = nuevos
     r.bloques_tocados.add(bloque["id"])
     r.lineas.append(Linea(f"Añadir {len(nuevos)} {'paso' if len(nuevos) == 1 else 'pasos'} a «{bloque['titulo']}»: "
@@ -316,7 +366,7 @@ def _bloque_nuevo(r: Resultado, nivel: dict, b: BloqueGen, donde: str, errores: 
     bid = f"{nivel['id']}-b{_siguiente(r, nivel['id'] + '-b', ocupados)}"
     ocupados.add(bid)
     return {"id": bid, "titulo": titulo, "priming": priming,
-            "pasos": [{"id": f"{bid}-p{k}", **p.model_dump()} for k, p in enumerate(b.pasos, 1)]}
+            "pasos": [paso_de(f"{bid}-p{k}", p) for k, p in enumerate(b.pasos, 1)]}
 
 
 def _nuevo_bloque(a: Accion, r: Resultado, errores: list[str]) -> None:
@@ -457,6 +507,9 @@ def _cambiar_paso(a: Accion, r: Resultado, errores: list[str]) -> None:
     if e:
         errores += e
         return
+    nuevo.pop("aviso", None)
+    if aviso := aviso_ascii(nuevo):
+        nuevo["aviso"] = aviso
     bloque["pasos"][i] = nuevo
     r.lineas.append(Linea(_linea_cambio("el paso", actual["titulo"], campos), a.motivo))
 
@@ -841,6 +894,95 @@ def _como_queda(r: Resultado) -> list[str]:
                 errores.append(f"El bloque «{b['titulo']}» se queda con {len(b['pasos'])} pasos (de 1 a {MAX_PASOS_BLOQUE}): "
                                "quítalo (quitar_bloque) o reparte los pasos.")
     return errores
+
+
+# --- Lo que se le dice al alumno, en código ----------------------------------------------------------------------
+
+def _cuantos(n: int, uno: str, varios: str) -> str:
+    return f"{n} {uno if n == 1 else varios}"
+
+
+def _y(partes: list[str]) -> str:
+    return partes[0] if len(partes) == 1 else ", ".join(partes[:-1]) + " y " + partes[-1]
+
+
+def en_breve(acciones: list[dict]) -> str:
+    """Qué hace la propuesta, en una frase y contado en código a partir de sus acciones ya validadas («Añade 1 bloque y
+    5 pasos y apunta 1 decisión en el diario.»). Va en la tarjeta en lugar de lo que el asesor dijo en el chat antes de
+    prepararla, que podía no cuadrar con lo que salió."""
+    def n(*tipos: str) -> int:
+        return sum(1 for a in acciones if a.get("tipo") in tipos)
+
+    def pasos_nuevos() -> int:
+        total = 0
+        for a in acciones:
+            if a.get("tipo") in ("anadir_pasos", "nuevo_bloque"):
+                total += len(a.get("pasos") or [])
+            elif a.get("tipo") == "nuevo_nivel":
+                total += sum(len(b.get("pasos") or []) for b in a.get("bloques") or [])
+        return total
+
+    bloques_nuevos = n("nuevo_bloque") + sum(len(a.get("bloques") or []) for a in acciones if a.get("tipo") == "nuevo_nivel")
+    # (verbo, lo que se hace): los del mismo verbo, juntos («cambia 2 pasos y 1 bloque»).
+    partes: list[tuple[str, str]] = [("añade", x) for x in (
+        _cuantos(n("nuevo_nivel"), "nivel", "niveles") if n("nuevo_nivel") else "",
+        _cuantos(bloques_nuevos, "bloque", "bloques") if bloques_nuevos else "",
+        _cuantos(pasos_nuevos(), "paso", "pasos") if pasos_nuevos() else "") if x]
+    for tipo, verbo, uno, varios in (
+        ("mover_paso", "mueve", "paso", "pasos"), ("mover_bloque", "mueve", "bloque", "bloques"),
+        ("cambiar_paso", "cambia", "paso", "pasos"), ("cambiar_bloque", "cambia", "bloque", "bloques"),
+        ("cambiar_nivel", "cambia", "nivel", "niveles"), ("quitar_paso", "quita", "paso", "pasos"),
+        ("quitar_bloque", "quita", "bloque", "bloques"), ("quitar_nivel", "quita", "nivel", "niveles"),
+        ("marcar_paso", "marca", "paso", "pasos"),
+        ("apuntar_decision", "apunta", "decisión en el diario", "decisiones en el diario"),
+        ("guardar_nota", "guarda", "nota en «Mis notas»", "notas en «Mis notas»"),
+        ("mover_sesion", "mueve", "sesión del calendario", "sesiones del calendario"),
+        ("marcar_leccion", "marca", "lección", "lecciones"),
+        ("preparar_leccion", "prepara los apuntes de", "lección", "lecciones"),
+        ("apuntar_evento", "apunta", "cosa en tu agenda", "cosas en tu agenda"),
+    ):
+        if k := n(tipo):
+            partes.append((verbo, _cuantos(k, uno, varios)))
+    grupos: dict[str, list[str]] = {}
+    for verbo, que in partes:
+        grupos.setdefault(verbo, []).append(que)
+    if not grupos:
+        return ""
+    texto = _y([f"{verbo} {_y(cosas)}" for verbo, cosas in grupos.items()])
+    return texto[0].upper() + texto[1:] + "."
+
+
+_ID = re.compile(r"(?<![\w-])(n\d+(?:-b\d+(?:-p\d+)?)?)(?![\w-])")
+
+
+def titulos_por_id(roadmap: dict | None) -> dict[str, str]:
+    """{id: título} de los niveles, bloques y pasos del roadmap (y de lo hecho que ya no está)."""
+    salida: dict[str, str] = {}
+    for n in (roadmap or {}).get("niveles", []):
+        salida[n["id"]] = f"el nivel {n['numero']} «{n['titulo']}»"
+        for b in n["bloques"]:
+            salida[b["id"]] = f"«{b['titulo']}»"
+            salida |= {p["id"]: f"«{p['titulo']}»" for p in b["pasos"]}
+    for x in (roadmap or {}).get("ya_no_estan", []):
+        salida.setdefault(x["id"], f"«{x['titulo']}»")
+    return salida
+
+
+def sin_ids(texto: str | None, roadmap: dict | None) -> str | None:
+    """El texto con los ids (n3-b3-p3) cambiados por el título de lo que nombran: el alumno no ve los ids. El prompt ya
+    lo pide; esto no depende de que el modelo lo cumpla. «el paso «X»» en vez de «el paso n1-b1-p1»: no se repite
+    «paso»."""
+    if not texto:
+        return texto
+    titulos = titulos_por_id(roadmap)
+
+    def cambiar(m: re.Match) -> str:
+        return titulos.get(m.group(1), m.group(1))
+
+    salida = _ID.sub(cambiar, texto)
+    # «el nivel el nivel 2 «X»» (si el modelo escribió «el nivel n2»): una vez basta.
+    salida = re.sub(r"\b(el|del|al) nivel (el nivel )", r"\1 nivel ", salida)
+    return re.sub(r"\b([Dd]e|[Aa]) el nivel\b", lambda m: ("del" if m.group(1).lower() == "de" else "al") + " nivel", salida)
 
 
 def simular(c: Cambios, proyecto: dict | None, momento: str, plan: dict | None = None, hoy: date | None = None) -> Resultado:

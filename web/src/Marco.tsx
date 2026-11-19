@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { hoyIso, listarConversaciones, type Conversacion } from './api.ts'
 import BarraLateral from './BarraLateral.tsx'
 import BarraSesion from './BarraSesion.tsx'
@@ -11,28 +11,22 @@ import { acentoDe, sincronizarAcento, usarColores, variables } from './component
 import Central from './Central.tsx'
 import { grupoDe, MODOS, type IdModo } from './modos.ts'
 import { claveSeccion } from './componentes/tema.ts'
+import { hayQueEscribir, leerRuta, rutaDe } from './rutas.ts'
 
-// El modo y la conversación viajan en la URL (#/roadmap, #/conversacion/6):
-// recargar no te saca de donde estabas y se puede enlazar una vista.
-function leerRuta(): { modo: IdModo; conversacion: number | null } {
-  const partes = window.location.hash.replace(/^#\/?/, '').split('/')
-  if (partes[0] === 'conversacion' && Number(partes[1])) return { modo: 'libre', conversacion: Number(partes[1]) }
-  const modo = MODOS.find((m) => m.id === partes[0] && m.encendido)?.id
-  // Sin ruta se abre Hoy, que te recibe con lo que toca.
-  return { modo: modo ?? (partes[0] ? 'libre' : 'hoy'), conversacion: null }
-}
-
-function escribirRuta(modo: IdModo, conversacion: number | null) {
-  const ruta = modo === 'libre' && conversacion != null ? `#/conversacion/${conversacion}` : `#/${modo}`
-  // #/fichas/3/L2 lleva a una lección: el panel lo lee y luego limpia la ruta.
-  if (window.location.hash !== ruta && !window.location.hash.startsWith(`${ruta}/`))
-    window.history.replaceState(null, '', ruta)
+// El modo y la conversación viajan en la URL (#/roadmap, #/conversacion/6, #/nuevo-plan): recargar no te saca de donde
+// estabas y se puede enlazar una vista. Lo que eliges tú (barra lateral, riel, pestañas, un botón que lleva a otra
+// pantalla) deja entrada en la historia, y Atrás y Adelante te devuelven; lo que la app corrige sola (la ruta vacía,
+// la conversación recién creada) la sustituye.
+function escribirRuta(ruta: string, apilar: boolean) {
+  if (!hayQueEscribir(window.location.hash, ruta)) return
+  if (apilar) window.history.pushState(null, '', ruta)
+  else window.history.replaceState(null, '', ruta)
 }
 
 // Tres zonas: la barra lateral y la barra de sesión no cambian;
 // la zona central recibe el modo activo y pinta lo suyo.
 export default function Marco() {
-  const inicial = leerRuta()
+  const inicial = leerRuta(window.location.hash)
   const [modo, setModo] = useState<IdModo>(inicial.modo)
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([])
   const [activa, setActiva] = useState<number | null>(inicial.conversacion)
@@ -100,9 +94,7 @@ export default function Marco() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => sincronizarAcento(colores), [])
   useEffect(() => setMenu(false), [modo, activa])
-  const [tipoNueva, setTipoNueva] = useState<'libre' | 'plan'>(() =>
-    window.location.hash.startsWith('#/nuevo-plan') ? 'plan' : 'libre',
-  )
+  const [tipoNueva, setTipoNueva] = useState<'libre' | 'plan'>(() => (inicial.nuevoPlan ? 'plan' : 'libre'))
 
   const recargar = useCallback(() => {
     listarConversaciones()
@@ -111,18 +103,40 @@ export default function Marco() {
   }, [])
 
   useEffect(recargar, [recargar])
-  useEffect(() => escribirRuta(modo, activa), [modo, activa])
+  // El próximo cambio de pantalla lo ha pedido el usuario: va a la historia (pushState). Lo consume escribirRuta.
+  const apilar = useRef(false)
   useEffect(() => {
+    escribirRuta(rutaDe(modo, activa, tipoNueva), apilar.current)
+    apilar.current = false
+  }, [modo, activa, tipoNueva])
+  useEffect(() => {
+    // Un enlace (#/…), Ctrl+K, o Atrás y Adelante: la pantalla sigue a la ruta. Con pushState, Atrás dispara popstate
+    // (y hashchange); los dos llegan aquí y dejan lo mismo.
     const alCambiar = () => {
-      const r = leerRuta()
+      const r = leerRuta(window.location.hash)
       // «Crear mi plan» (Hoy, tutor, foco, Ctrl+K) llega aquí: abre el cuestionario del plan, no el chat libre.
-      if (window.location.hash.startsWith('#/nuevo-plan')) setTipoNueva('plan')
+      if (r.nuevoPlan) setTipoNueva('plan')
       else if (r.modo === 'libre' && r.conversacion == null) setTipoNueva('libre')
+      apilar.current = false
       setModo(r.modo)
       setActiva(r.conversacion)
     }
     window.addEventListener('hashchange', alCambiar)
-    return () => window.removeEventListener('hashchange', alCambiar)
+    window.addEventListener('popstate', alCambiar)
+    return () => {
+      window.removeEventListener('hashchange', alCambiar)
+      window.removeEventListener('popstate', alCambiar)
+    }
+  }, [])
+  // Ir a una pantalla porque lo has elegido tú.
+  const irA = useCallback((m: IdModo) => {
+    apilar.current = true
+    if (m === 'libre') {
+      // Estudio libre desde la barra o el riel: el chat, no el cuestionario del plan que tuvieras abierto.
+      setActiva(null)
+      setTipoNueva('libre')
+    }
+    setModo(m)
   }, [])
 
   const actual = conversaciones.find((c) => c.id === activa)
@@ -134,8 +148,16 @@ export default function Marco() {
       data-seccion={claveSeccion(grupoDe(modo))}
       style={variables(acentoDe(colores, null))}
     >
+      {/* El primer Tab: al contenido, sin pasar por el riel ni la cabecera. Un botón (no un enlace #…: la ruta es la app). */}
+      <button
+        type="button"
+        className="saltar-contenido"
+        onClick={() => document.querySelector<HTMLElement>('main.central')?.focus()}
+      >
+        Saltar al contenido
+      </button>
       <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />
-      <Riel modo={modo} hoy={hoy} alAbrir={() => setMenu(true)} alIr={(m) => setModo(m)} />
+      <Riel modo={modo} hoy={hoy} alAbrir={() => setMenu(true)} alIr={irA} />
       <BarraLateral
         alCerrar={() => setMenu(false)}
         fija={fija}
@@ -145,15 +167,12 @@ export default function Marco() {
         alElegir={(m) => {
           // Aunque ya estés en ese modo (p. ej. «Magister» desde Estudio libre), la barra se pliega.
           setMenu(false)
-          if (m === 'libre') {
-            setActiva(null)
-            setTipoNueva('libre')
-          }
-          setModo(m)
+          irA(m)
         }}
         conversaciones={conversaciones}
         activa={activa}
         alElegirConversacion={(id) => {
+          apilar.current = true
           setActiva(id)
           if (id == null) setTipoNueva('libre')
           setModo('libre')
@@ -162,18 +181,21 @@ export default function Marco() {
       />
       <BarraSesion alMenu={() => setMenu(!menu)} />
       <Paleta conversaciones={conversaciones} alPlegar={() => setMenu((x) => !x)} />
-      <main className="central">
+      <main className="central" tabIndex={-1}>
         <Central
           modo={modo}
           conversacionId={activa}
           tipoConversacion={tipo}
           alCrearConversacion={(id) => {
+            // La conversación nueva sustituye a «#/libre» (o a «#/nuevo-plan»): Atrás no vuelve a la caja vacía.
+            apilar.current = false
             setActiva(id)
             recargar()
           }}
           alCambiarConversaciones={recargar}
-          irA={setModo}
+          irA={irA}
           alNuevoPlan={() => {
+            apilar.current = true
             setActiva(null)
             setTipoNueva('plan')
             setModo('libre')

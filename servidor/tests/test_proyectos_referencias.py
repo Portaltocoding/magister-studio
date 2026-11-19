@@ -48,7 +48,7 @@ async def _proyecto(cliente, monkeypatch, research) -> tuple[int, list[str]]:
 
     orden: list[str] = []
 
-    async def roadmap_falso(datos, referencias):
+    async def roadmap_falso(datos, referencias, **_):
         orden.append("roadmap")
         assert referencias == []
         return _mapa()

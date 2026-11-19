@@ -126,6 +126,7 @@
 .asesor-cambio-preparando { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 0.86rem; color: var(--suave); }
 @media (prefers-reduced-motion: reduce) { .asesor-cambio { animation: none; } }
 .asesor-cambio-consultado { margin: 8px 0 0; font-size: 0.8rem; color: var(--suave); }
+.asesor-cambio-breve { margin: 4px 0 6px; font-size: 0.9rem; font-weight: 600; line-height: 1.4; }
 .asesor-cambio-aviso { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--borde); font-size: 0.88rem; line-height: 1.45; }
 /* Textos largos (rutas, ids, nombres sin espacios) que no desborden la ventanita. */
 .asesor-tu, .asesor-tutor, .asesor-cambio { overflow-wrap: anywhere; min-width: 0; }

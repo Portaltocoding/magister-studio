@@ -209,13 +209,32 @@ def _srt(tiempos: list[tuple[float, float, str]]) -> str:
     return "\n".join(f"{i}\n{t(a)} --> {t(b)}\n{texto}\n" for i, (a, b, texto) in enumerate(tiempos, start=1))
 
 
+FPS = 25
+
+
+def en_fotogramas(duraciones: list[float], fps: int = FPS) -> list[float]:
+    """Las duraciones de las escenas pasadas a fotogramas enteros sin que el error se acumule: se redondea el final de
+    cada escena (la suma hasta ella), no cada duración. ffmpeg recortaba cada imagen al fotograma de antes y, con 100
+    escenas, la imagen acababa unos 2 s antes que el audio (226,28 frente a 228,29 s) y cada cambio de diapositiva se
+    adelantaba un poco más que el anterior."""
+    salida: list[float] = []
+    antes = 0
+    acumulado = 0.0
+    for d in duraciones:
+        acumulado += d
+        fin = max(antes + 1, round(acumulado * fps))
+        salida.append((fin - antes) / fps)
+        antes = fin
+    return salida
+
+
 def _lista_imagenes(imagenes: list[Path], duraciones: list[float]) -> str:
-    """La lista del demuxer concat de ffmpeg: cada imagen con lo que dura su escena. La última se repite sin duración,
-    porque si no ffmpeg ignora la duración de la última entrada."""
+    """La lista del demuxer concat de ffmpeg: cada imagen con lo que dura su escena, en fotogramas enteros
+    (`en_fotogramas`). La última se repite sin duración, porque si no ffmpeg ignora la duración de la última entrada."""
     if not imagenes or len(imagenes) != len(duraciones):
         raise ErrorVideo("las imágenes no cuadran con las escenas")
     lineas = ["ffconcat version 1.0"]
-    for img, dur in zip(imagenes, duraciones):
+    for img, dur in zip(imagenes, en_fotogramas(duraciones)):
         lineas += [f"file '{img.name}'", f"duration {dur:.6f}"]
     lineas.append(f"file '{imagenes[-1].name}'")
     return "\n".join(lineas) + "\n"
@@ -223,11 +242,13 @@ def _lista_imagenes(imagenes: list[Path], duraciones: list[float]) -> str:
 
 def _orden_montaje(lista: Path, audio: Path, srt: Path, salida: Path, total: float, titulo: str) -> list[str]:
     """Los argumentos de la única pasada de ffmpeg: imágenes (lista concat), un solo audio y los subtítulos, todo
-    codificado a la vez y cortado a lo que dura el audio."""
+    codificado a la vez y cortado a lo que dura el audio. La última imagen se alarga (tpad) y `-t` la corta: la pista
+    de vídeo nunca acaba antes que la voz."""
     return [
         "-f", "concat", "-safe", "0", "-i", str(lista), "-i", str(audio), "-i", str(srt),
         "-map", "0:v", "-map", "1:a", "-map", "2:s",
-        "-vf", "format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-r", "25",
+        "-vf", f"fps={FPS},format=yuv420p,tpad=stop_mode=clone:stop_duration=2", "-c:v", "libx264", "-preset", "veryfast",
+        "-tune", "stillimage", "-r", str(FPS),
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "1",
         "-c:s", "mov_text", "-metadata:s:s:0", "language=spa", "-metadata", f"title={titulo}",
         "-t", f"{total:.3f}", "-movflags", "+faststart", str(salida),

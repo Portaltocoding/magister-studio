@@ -1,17 +1,20 @@
 """El plan aceptado tal como lo pinta la interfaz, y el recálculo tras un atraso."""
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from magister.cerebro.prompts import cargar
 from magister.config import ajustes
 from magister.datos import plan as dp
 from magister.datos import repositorio_fuentes as rf
+from magister.datos.sesion import nueva_sesion
 from magister.flujo.nodos.calendarizar import reglas_calendario
 from magister.plan.apoyo import estado_apuntes
-from magister.plan.calendario import NoCabe, a_hora, calendarizar
+from magister.plan.calendario import NoCabe, Sesion, a_hora, calendarizar, error_en_sesiones
+from magister.plan.sustituir import emparejar_lecciones
 from magister.plan.esquemas import Concepto, Leccion, Perfil, Plan
 from magister.plan.examenes import con_estado, hitos
 
@@ -179,24 +182,55 @@ async def vista_por_id(s: AsyncSession, plan_id: int, hoy: date) -> dict | None:
     }
 
 
-async def recalcular(s: AsyncSession, tema_id: int, desde: date) -> dict | str | None:
-    """Regenera las sesiones pendientes desde `desde`. Devuelve la vista, un mensaje si no cabe, o None."""
+def _hechas(sesiones: list, dia: date) -> tuple[dict[str, float], float]:
+    """Las horas hechas de cada lección y las hechas el día `dia` (lo siguiente de ese día va detrás, no a la misma
+    hora). Las saltadas no cuentan como estudiadas."""
+    hechas: dict[str, float] = defaultdict(float)
+    del_dia = 0.0
+    for x in sesiones:
+        if x.estado == "hecha":
+            hechas[x.leccion_clave] += x.horas
+            if x.fecha == dia:
+                del_dia += x.horas
+    return dict(hechas), del_dia
+
+
+async def sustitucion(s: AsyncSession, nombre_tema: str, lecciones_nuevas: list[dict],
+                      conversacion_id: int | None = None) -> dict | None:
+    """Si ya hay un plan aceptado del tema donde iría este plan (el de la conversación o, si no tiene, el del mismo
+    nombre: como `guardar_plan`), lo que tiene y lo que pasaría al nuevo al aceptarlo (el campo `sustituye` de la
+    propuesta); None si no lo hay."""
+    tema = await dp.tema_para_plan(s, nombre_tema or "Sin tema", conversacion_id)
+    fila = await dp.plan_aceptado(s, tema.id) if tema is not None else None
+    if fila is None:
+        return None
+    viejas = [(x.clave, x.titulo) for x in await dp.lecciones(s, fila.id)]
+    nuevas = [(str(x.get("clave", "")), str(x.get("titulo", ""))) for x in lecciones_nuevas]
+    return {"tema_id": tema.id, "tema": tema.nombre,
+            **await dp.resumen_sustituido(s, fila.id, emparejar_lecciones(viejas, nuevas))}
+
+
+async def recolocar_con_progreso(plan_id: int, tema_id: int, hoy: date, ahora: time | None = None) -> None:
+    """Un plan que sustituye a otro y se trae sesiones hechas: lo pendiente se vuelve a repartir sin lo ya estudiado
+    (el calendario propuesto contaba cada lección entera). Si no cabe, se queda el propuesto."""
+    async with nueva_sesion() as s:
+        if any(x.estado == "hecha" for x in await dp.sesiones(s, plan_id)):
+            await recalcular(s, tema_id, hoy, ahora)
+
+
+async def recalcular(s: AsyncSession, tema_id: int, desde: date, ahora: time | None = None) -> dict | str | None:
+    """Regenera las sesiones pendientes desde `desde`. Devuelve la vista, un mensaje si no cabe, o None.
+    `ahora`: la hora, solo si `desde` es hoy (la franja de hoy que ya pasó no se usa)."""
     fila = await dp.plan_aceptado(s, tema_id)
     if fila is None:
         return None
     perfil = Perfil.model_validate(fila.perfil)
     plan = await _plan_pydantic(s, fila.id)
-    hechas: dict[str, float] = defaultdict(float)
-    hoy_hechas = 0.0  # lo ya estudiado el día `desde`: lo siguiente va detrás, no a la misma hora
-    for x in await dp.sesiones(s, fila.id):
-        if x.estado in ("hecha", "saltada"):
-            hechas[x.leccion_clave] += x.horas if x.estado == "hecha" else 0
-        if x.estado == "hecha" and x.fecha == desde:
-            hoy_hechas += x.horas
+    hechas, hoy_hechas = _hechas(await dp.sesiones(s, fila.id), desde)
     inicios = [a_hora(h) for h in (perfil.inicio_por_dia or [None] * 7)]
     resultado = calendarizar(
         plan, perfil.horas_por_dia or [0] * 7, inicios, desde, None, dict(hechas), reglas_calendario(),
-        usado_inicial=round(hoy_hechas * 60),
+        usado_inicial=round(hoy_hechas * 60), ahora=ahora,
     )
     if isinstance(resultado, NoCabe):
         return resultado.mensaje()
@@ -267,11 +301,13 @@ async def proponer_reajuste(s: AsyncSession, tema_id: int, ahora) -> dict | None
         return None
     perfil = Perfil.model_validate(fila.perfil)
     plan = await _plan_pydantic(s, fila.id)
-    antes = [{"fecha": x.fecha.isoformat(), "clave": x.leccion_clave} for x in await dp.sesiones(s, fila.id) if x.estado == "pendiente"]
-    hechas: dict[str, float] = defaultdict(float)
-    for x in await dp.sesiones(s, fila.id):
-        if x.estado == "hecha":
-            hechas[x.leccion_clave] += x.horas
+    todas = await dp.sesiones(s, fila.id)
+    antes = [{"fecha": x.fecha.isoformat(), "clave": x.leccion_clave} for x in todas if x.estado == "pendiente"]
+    # «Hoy» y la hora en tu zona, no en UTC: entre las 00:00 y la 01:00 (02:00 en verano) serían días distintos.
+    local = ahora.astimezone(ZoneInfo(ajustes.zona))
+    hoy = local.date()
+    # Lo ya estudiado hoy y la parte de la franja de hoy que ya ha pasado no se vuelven a programar (como en recalcular).
+    hechas, hoy_hechas = _hechas(todas, hoy)
     estados = [c for c in await estado_conceptos(ahora) if c["plan_id"] == fila.id]
     por_leccion: dict[str, list[str]] = defaultdict(list)
     for c in estados:
@@ -279,25 +315,31 @@ async def proponer_reajuste(s: AsyncSession, tema_id: int, ahora) -> dict | None
     dominadas = {k for k, v in por_leccion.items() if v and all(e == "dominado" for e in v)}
     carga = {x.fecha: x.minutos / 60 for x in await prever_carga(ahora, 28)}
     inicios = [a_hora(h) for h in (perfil.inicio_por_dia or [None] * 7)]
-    # «Hoy» en tu zona, no en UTC: entre las 00:00 y la 01:00 (02:00 en verano) serían días distintos.
-    hoy = ahora.astimezone(ZoneInfo(ajustes.zona)).date()
-    nuevo, avisos = reajustar(plan, perfil.horas_por_dia or [0] * 7, inicios, hoy, perfil.plazo, dict(hechas), carga,
-                              dominadas, reglas_calendario())
+    nuevo, avisos = reajustar(plan, perfil.horas_por_dia or [0] * 7, inicios, hoy, perfil.plazo, hechas, carga,
+                              dominadas, reglas_calendario(), usado_inicial=round(hoy_hechas * 60), ahora=local.time())
     if isinstance(nuevo, NoCabe):
         return {"cambios": [], "avisos": [nuevo.mensaje()], "sesiones": None, "texto": nuevo.mensaje()}
     despues = [x.a_dict() for x in nuevo.sesiones]
     cambios = diferencias(antes, [{"fecha": x["fecha"], "clave": x["clave"]} for x in despues])
     texto = ""
     if cambios:
-        sistema = ("Eres el tutor. Explica al alumno en tres o cuatro frases, en español de España y tuteando, este cambio de su "
-                   "calendario. No decides nada: el cambio ya está calculado. Sin el carácter de la raya larga.")
+        sistema = cargar("reajuste").rellenar()
         texto = "".join([t async for t in generar(sistema, [Turno("usuario", "\n".join(cambios + avisos))])]).strip()
     return {"cambios": cambios, "avisos": avisos, "sesiones": despues, "texto": texto, "plan_id": fila.id}
 
 
-async def aplicar_reajuste(s: AsyncSession, tema_id: int, sesiones: list[dict], hoy) -> dict | None:
+class SesionesNoValidas(ValueError):
+    """Las sesiones del reajuste que llegan de fuera no se pueden guardar; el mensaje dice por qué."""
+
+
+async def aplicar_reajuste(s: AsyncSession, tema_id: int, sesiones: list[Sesion], hoy: date) -> dict | None:
+    """Guarda el reajuste que aceptas. Las sesiones llegan de la web: se comprueban antes de borrar nada
+    (`SesionesNoValidas`)."""
     fila = await dp.plan_aceptado(s, tema_id)
     if fila is None:
         return None
-    await dp.sustituir_pendientes(s, fila.id, sesiones)
+    error = error_en_sesiones(sesiones, {lec.clave for lec in await dp.lecciones(s, fila.id)}, hoy)
+    if error:
+        raise SesionesNoValidas(error)
+    await dp.sustituir_pendientes(s, fila.id, [x.a_dict() for x in sesiones])
     return await vista_por_id(s, fila.id, hoy)

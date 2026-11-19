@@ -13,9 +13,11 @@ PETICION = (
 
 @pytest.fixture(autouse=True)
 def hoy_fijo(monkeypatch):
-    from magister.api import rutas_conversaciones
+    from magister.api import rutas_conversaciones, rutas_plan
 
     monkeypatch.setattr(rutas_conversaciones, "hoy", lambda: date(2026, 11, 9))
+    # Recalcular no acepta un `desde` anterior a hoy: el «hoy» de las rutas del plan, el mismo.
+    monkeypatch.setattr(rutas_plan, "hoy", lambda: date(2026, 11, 9))
 
 
 async def test_v02_de_la_peticion_al_calendario(cliente) -> None:

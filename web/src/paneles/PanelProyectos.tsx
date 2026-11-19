@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { EVENTO_CAMBIO_APLICADO, crearConversacion, enviarJson, pedir, type CambioAplicado } from '../api.ts'
+import { EVENTO_CAMBIO_APLICADO, ErrorApi, crearConversacion, enviarJson, pedir, type CambioAplicado } from '../api.ts'
+import Vacio from '../componentes/Vacio.tsx'
 import Diagrama from '../componentes/Diagrama.tsx'
 import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import { celebrar } from '../componentes/animo.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
-import { avisoRehacer, porDetallar, resumenRehecho, type HechoQueYaNoEsta } from './rehacerProyecto.ts'
+import { avisoRehacer, perdidosAlRehacer, porDetallar, queHace, resumenRehecho, textoEnCola, type HechoQueYaNoEsta, type TrabajoProyecto } from './rehacerProyecto.ts'
 import { agruparReferencias, leerIdea, olvidarIdea, tituloDePaso, type Referencia } from './referenciasProyecto.ts'
 
 // Proyectos: le cuentas lo que quieres construir y saca el roadmap de construcción. Arriba, la explicación del
@@ -20,6 +21,7 @@ interface Paso {
   antes: string
   hecho_si: string
   minutos: number
+  aviso?: string // un comando, identificador o fichero con tildes o eñes (lo detecta el servidor)
 }
 interface Bloque {
   id: string
@@ -38,6 +40,7 @@ interface Nivel {
   bloques: Bloque[]
 }
 interface Roadmap {
+  software?: boolean // false: no es un programa (una novela): sin «Arquitectura» ni «seguridad»
   resumen: string
   que_es: string
   por_que: string
@@ -48,6 +51,7 @@ interface Roadmap {
   fuera_de_alcance: string[]
   // Si viene de rehacer otro: cuántos pasos hechos siguen y lo hecho de los que ya no están.
   conservados?: number
+  no_conservados?: string[] // los ids de los hechos que el último rehacer no conservó
   ya_no_estan?: HechoQueYaNoEsta[]
 }
 interface Progreso {
@@ -59,7 +63,8 @@ interface Progreso {
 interface ProyectoResumen {
   id: number
   nombre: string
-  estado: 'generando' | 'listo' | 'error'
+  // en_cola: su trabajo aún no ha empezado (el proyecto se sigue usando); generando: el modelo está en ello.
+  estado: 'en_cola' | 'generando' | 'listo' | 'error'
   error: string | null
   progreso: Progreso
 }
@@ -74,7 +79,7 @@ interface Proyecto extends ProyectoResumen {
   hechos: string[]
   hechos_en?: Record<string, string>
   anterior?: boolean // hay un roadmap de antes del último «rehacer» al que volver
-  trabajo?: { id: number; estado: string; nodo: string | null; trabajador_vivo?: boolean } | null
+  trabajo?: TrabajoProyecto | null
 }
 interface Decision {
   id: number
@@ -219,11 +224,6 @@ function Retomar({ p, ultimaDecision, alDetallar, ocupado }: { p: Proyecto; ulti
   )
 }
 
-const FASES: Record<string, string> = {
-  referencias: 'Buscando proyectos y documentación parecidos…',
-  roadmap: 'Escribiendo el roadmap: niveles, bloques y pasos…',
-  arquitectura: 'Dibujando la arquitectura…',
-}
 const horas = (min: number) => (min < 60 ? `${min} min` : `${String(Math.round((min / 60) * 10) / 10).replace('.', ',')} h`)
 
 function idDeRuta(): number | null {
@@ -267,7 +267,7 @@ function ListaProyectos({ alAbrir }: { alAbrir: (id: number) => void }) {
   }, [])
   useEffect(cargar, [cargar])
   // Si alguno se está preparando, la lista se pone al día sola (si no, seguiría diciendo «Preparando…» hasta recargar).
-  const generando = !!lista?.some((p) => p.estado === 'generando')
+  const generando = !!lista?.some((p) => p.estado === 'generando' || p.estado === 'en_cola')
   useEffect(() => {
     if (!generando) return
     const t = window.setInterval(() => {
@@ -291,14 +291,15 @@ function ListaProyectos({ alAbrir }: { alAbrir: (id: number) => void }) {
             <li key={p.id}>
               <button type="button" className="proyecto-tarjeta" onClick={() => alAbrir(p.id)}>
                 <strong>{p.nombre}</strong>
-                {p.estado === 'generando' ? (
-                  <span className="nota">Preparando el roadmap…</span>
+                {(p.estado === 'generando' || p.estado === 'en_cola') && !p.progreso.niveles ? (
+                  <span className="nota">{p.estado === 'en_cola' ? 'En cola para preparar el roadmap…' : 'Preparando el roadmap…'}</span>
                 ) : p.estado === 'error' ? (
                   <span className="nota">No se pudo preparar: ábrelo para reintentar</span>
                 ) : (
                   <>
                     <span className="nota">
                       Nivel {p.progreso.nivel ?? 1} de {p.progreso.niveles} · {p.progreso.hechos}/{p.progreso.pasos} pasos
+                      {p.estado === 'en_cola' ? ' · en cola' : p.estado === 'generando' ? ' · trabajando en él' : ''}
                     </span>
                     <Barra p={p.progreso} />
                   </>
@@ -388,9 +389,13 @@ function NuevoProyecto({ alCrear, alCancelar }: { alCrear: (id: number) => void;
 function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   const [p, setP] = useState<Proyecto | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Un enlace a un proyecto borrado o que nunca existió: pantalla vacía, sin reintentar.
+  const [noExiste, setNoExiste] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   // «Rehacer el roadmap» abierto: antes de gastar cuota, lo que va a pasar con lo hecho.
   const [rehaciendo, setRehaciendo] = useState(false)
+  // Mientras se envía «Detallar» o «Rehacer», sus botones no se pueden pulsar otra vez (un doble clic).
+  const [enviando, setEnviando] = useState(false)
   // Un fallo suelto mientras se mira cómo va la generación no tapa el proyecto: la siguiente vuelta lo reintenta.
   const cargar = useCallback(
     () =>
@@ -399,7 +404,10 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
           setP(x)
           setError(null)
         })
-        .catch((e) => setError(mensajeDe(e))),
+        .catch((e) => {
+          if (e instanceof ErrorApi && e.codigo === 404) setNoExiste(true)
+          else setError(mensajeDe(e))
+        }),
     [id],
   )
   useEffect(() => {
@@ -430,13 +438,24 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
     window.addEventListener(EVENTO_CAMBIO_APLICADO, al)
     return () => window.removeEventListener(EVENTO_CAMBIO_APLICADO, al)
   }, [id, cargar])
-  // Mientras se genera, se mira cada pocos segundos en qué va.
+  // Mientras se genera (o espera en la cola), se mira cada pocos segundos en qué va.
   useEffect(() => {
-    if (p?.estado !== 'generando') return
-    const t = window.setInterval(() => void cargar(), 3000)
+    if (p?.estado !== 'generando' && p?.estado !== 'en_cola') return
+    const t = window.setInterval(() => void cargar(), p.estado === 'en_cola' ? 5000 : 3000)
     return () => window.clearInterval(t)
   }, [p?.estado, cargar])
 
+  if (!p && noExiste)
+    return (
+      <div className="panel">
+        <Vacio
+          etiqueta="Proyectos"
+          titulo="Este proyecto no existe"
+          texto="Puede que lo borraras o que el enlace esté mal."
+          acciones={[{ texto: 'Ver tus proyectos', principal: true, alPulsar: alVolver }]}
+        />
+      </div>
+    )
   if (!p) return <div className="panel">{error ? <Cargando error={error} reintentar={() => void cargar()} /> : <Pensando />}</div>
   const r = p.roadmap
   const hechos = new Set(p.hechos)
@@ -473,17 +492,34 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
       setAviso(`No he podido guardar el paso: ${mensajeDe(e)}`)
     }
   }
+  // Detallar y rehacer: un envío cada vez (el servidor tampoco encola dos, pero así ni lo intenta).
+  const enviar = async (hacer: () => Promise<unknown>, que: string) => {
+    if (enviando) return
+    setEnviando(true)
+    try {
+      await accion(hacer, que)
+    } finally {
+      setEnviando(false)
+    }
+  }
   const detallar = (numero: number) =>
-    accion(async () => {
+    enviar(async () => {
       await pedir(`/api/proyectos/${id}/niveles/${numero}/detallar`, { method: 'POST' })
       await cargar()
     }, 'detallar el nivel')
   const rehacer = () =>
-    accion(async () => {
+    enviar(async () => {
       await pedir(`/api/proyectos/${id}/rehacer`, enviarJson({ confirmado: true }))
       setRehaciendo(false)
       await cargar()
     }, 'rehacer el roadmap')
+  // Con un trabajo en la cola o en marcha no se pide otro (el servidor diría 409): se cancela antes.
+  const ocupado = enviando || p.estado === 'generando' || p.estado === 'en_cola'
+  const cancelarTrabajo = () =>
+    accion(async () => {
+      await pedir(`/api/trabajos/${p.trabajo!.id}/cancelar`, { method: 'POST' })
+      await cargar()
+    }, 'cancelar')
   const volverAnterior = async () => {
     if (!window.confirm('¿Volver al roadmap anterior? El de ahora se guarda por si quieres regresar a él.')) return
     await accion(async () => {
@@ -491,7 +527,9 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
       await cargar()
     }, 'volver al roadmap anterior')
   }
-  const rehecho = r ? resumenRehecho(r.conservados, r.ya_no_estan ?? []) : null
+  const rehecho = r ? resumenRehecho(r.conservados, r.ya_no_estan ?? [], r.no_conservados) : null
+  const perdidos = r ? perdidosAlRehacer(r.no_conservados, r.ya_no_estan ?? []) : []
+  const software = r?.software !== false
 
   return (
     <div className="panel proyecto">
@@ -517,28 +555,40 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
       )}
       {p.estado === 'generando' && (
         <div className="proyecto-generando">
-          <Pensando texto={FASES[p.trabajo?.nodo ?? ''] ?? (r ? 'Detallando el nivel…' : 'Preparando el roadmap…')} />
+          <Pensando texto={queHace(p.trabajo, !!r)} />
           {p.trabajo?.trabajador_vivo === false ? (
             <p className="nota" role="alert">
               No hay ningún trabajador en marcha, así que esto no avanzará. Arranca Magister con los trabajos activados (o lanza
               «uv run magister-trabajador») y seguirá solo.
             </p>
           ) : (
-            <p className="nota">Tarda unos minutos. Puedes irte: sigue en segundo plano.</p>
+            <p className="nota">
+              {p.trabajo?.tipo === 'proyecto_nivel' ? 'Suele tardar menos de un minuto.' : 'Tarda unos minutos.'} Puedes irte: sigue en segundo plano.
+              {r ? ' Mientras, puedes marcar pasos y apuntar decisiones.' : ''}
+            </p>
           )}
           {error && <p className="nota">Sin conexión con el servidor; sigo intentándolo.</p>}
           {p.trabajo?.id != null && (
-            <button
-              type="button"
-              className="boton-mini"
-              onClick={() =>
-                accion(async () => {
-                  await pedir(`/api/trabajos/${p.trabajo!.id}/cancelar`, { method: 'POST' })
-                  await cargar()
-                }, 'cancelar')
-              }
-            >
+            <button type="button" className="boton-mini" onClick={() => void cancelarTrabajo()}>
               Cancelar
+            </button>
+          )}
+        </div>
+      )}
+      {/* En cola: aún no ha empezado. El proyecto se usa igual; solo se espera para lo que choca con el trabajo. */}
+      {p.estado === 'en_cola' && (
+        <div className="proyecto-generando proyecto-en-cola" role="status">
+          <p>{textoEnCola(p.trabajo, !!r)}</p>
+          {p.trabajo?.trabajador_vivo === false && (
+            <p className="nota" role="alert">
+              No hay ningún trabajador en marcha, así que no empezará. Arranca Magister con los trabajos activados (o lanza
+              «uv run magister-trabajador»).
+            </p>
+          )}
+          {error && <p className="nota">Sin conexión con el servidor; sigo intentándolo.</p>}
+          {p.trabajo?.id != null && (
+            <button type="button" className="boton-mini" onClick={() => void cancelarTrabajo()}>
+              Cancelar {p.trabajo.tipo === 'proyecto_nivel' ? 'el detalle' : r ? 'el rehacer' : ''}
             </button>
           )}
         </div>
@@ -548,8 +598,9 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
           <p role="alert">No se pudo preparar: {p.error}</p>
           <button
             className="boton"
+            disabled={enviando}
             onClick={() =>
-              accion(async () => {
+              void enviar(async () => {
                 await pedir(`/api/proyectos/${id}/rehacer`, { method: 'POST' })
                 await cargar()
               }, 'volver a intentarlo')
@@ -562,7 +613,7 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
 
       {r && (
         <>
-          <Retomar p={p} ultimaDecision={ultimaDecision} alDetallar={(n) => void detallar(n)} ocupado={p.estado === 'generando'} />
+          <Retomar p={p} ultimaDecision={ultimaDecision} alDetallar={(n) => void detallar(n)} ocupado={ocupado} />
           <section className="proyecto-priming">
             <h2>Antes de empezar</h2>
             <p>{r.resumen}</p>
@@ -575,7 +626,7 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
               <p>{r.por_que}</p>
             </details>
             <details>
-              <summary>Arquitectura</summary>
+              <summary>{software ? 'Arquitectura' : 'Cómo se organiza'}</summary>
               {p.arquitectura_svg && <Diagrama svg={p.arquitectura_svg} completo />}
               <p>{r.arquitectura}</p>
             </details>
@@ -591,7 +642,9 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
               </dl>
             </details>
             <details>
-              <summary>Riesgos y seguridad · {r.riesgos.length}</summary>
+              <summary>
+                {software ? 'Riesgos y seguridad' : 'Riesgos'} · {r.riesgos.length}
+              </summary>
               <ul>
                 {r.riesgos.map((x) => (
                   <li key={x.riesgo}>
@@ -639,8 +692,17 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
             </p>
           )}
           {rehecho && (
-            <div className="proyecto-rehecho">
+            <div className="proyecto-rehecho" role="status">
               <p className="nota">{rehecho}</p>
+              {/* Lo que este rehacer no conservó, a la vista; y volver al de antes, sin bajar al pie. */}
+              {perdidos.length > 0 && p.anterior && (
+                <p className="nota">
+                  Si lo prefieres como estaba, puedes{' '}
+                  <button type="button" className="boton-mini" disabled={ocupado} onClick={() => void volverAnterior()}>
+                    Volver al roadmap anterior
+                  </button>
+                </p>
+              )}
               {(r.ya_no_estan ?? []).length > 0 && (
                 <details>
                   <summary>Hechos que ya no están · {r.ya_no_estan!.length}</summary>
@@ -657,7 +719,7 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
             </div>
           )}
           {r.niveles.map((n) => (
-            <NivelVista key={n.id} n={n} hechos={hechos} proyecto={p} alMarcar={marcar} alDetallar={() => detallar(n.numero)} ocupado={p.estado === 'generando'} />
+            <NivelVista key={n.id} n={n} hechos={hechos} proyecto={p} alMarcar={marcar} alDetallar={() => void detallar(n.numero)} ocupado={ocupado} />
           ))}
 
           <Diario id={id} pasos={r.niveles.flatMap((n) => n.bloques.flatMap((b) => b.pasos))} yaNoEstan={r.ya_no_estan ?? []} alCambiar={setUltimaDecision} />
@@ -670,8 +732,8 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
           <p className="nota">Gasta cuota, como hacerlo la primera vez:</p>
           <BarraCuota accion={{ accion: 'proyecto' }} />
           <div className="botones">
-            <button className="boton boton-principal" onClick={() => void rehacer()}>
-              Rehacer el roadmap
+            <button className="boton boton-principal" disabled={enviando} onClick={() => void rehacer()}>
+              {enviando ? 'Encolando…' : 'Rehacer el roadmap'}
             </button>
             <button type="button" className="boton" onClick={() => setRehaciendo(false)}>
               Cancelar
@@ -718,7 +780,8 @@ function NivelVista({ n, hechos, proyecto, alMarcar, alDetallar, ocupado }: {
   const pasos = n.bloques.flatMap((b) => b.pasos)
   const hechosAqui = pasos.filter((x) => hechos.has(x.id)).length
   return (
-    <section className={`proyecto-nivel ${n.detallado ? '' : 'esbozado'}`}>
+    // data-id y data-titulo: el asesor los lee para ver el roadmap entero y para cambiar ids por títulos en su texto.
+    <section className={`proyecto-nivel ${n.detallado ? '' : 'esbozado'}`} data-id={n.id} data-titulo={`el nivel ${n.numero} «${n.titulo}»`}>
       <header>
         <span className="proyecto-nivel-num">Nivel {n.numero}</span>
         <h2>
@@ -733,7 +796,7 @@ function NivelVista({ n, hechos, proyecto, alMarcar, alDetallar, ocupado }: {
       <p className="proyecto-objetivo">{n.objetivo}</p>
       <p className="proyecto-priming-nivel">{n.priming}</p>
       {n.bloques.map((b) => (
-        <div key={b.id} className="proyecto-bloque">
+        <div key={b.id} className="proyecto-bloque" data-id={b.id} data-titulo={`«${b.titulo}»`}>
           <h3>{b.titulo}</h3>
           <p className="proyecto-priming-bloque">{b.priming}</p>
           {b.pasos.length > 0 && (
@@ -824,6 +887,11 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
         <p>
           <span className="proyecto-etiqueta">Hecho si</span> {x.hecho_si}
         </p>
+        {x.aviso && (
+          <p className="nota" role="note">
+            {x.aviso}
+          </p>
+        )}
         {atasco === null ? (
           <button type="button" className="boton-mini" onClick={() => setAtasco('')}>
             Me he atascado

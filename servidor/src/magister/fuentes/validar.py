@@ -32,6 +32,8 @@ def _f(x: float) -> str:
 def validar(e: Extraido) -> list[Problema]:
     problemas: list[Problema] = []
     texto = e.texto.strip()
+    if not texto and not e.crudo.strip():
+        return [Problema("vacio", "el fichero está vacío")]
     sin_enlaces = re.sub(r"https?://\S+", "", texto).strip()
     if len(sin_enlaces) < LONGITUD_MIN:
         problemas.append(Problema("sin_contenido", f"solo {len(sin_enlaces)} caracteres de texto (mínimo {LONGITUD_MIN})"))

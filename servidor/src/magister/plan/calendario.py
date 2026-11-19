@@ -11,6 +11,7 @@ from datetime import date, datetime, time, timedelta
 
 from magister.plan.dependencias import orden
 from magister.plan.esquemas import Plan
+from magister.plan.reglas import fmt
 
 MAX_DIAS = 3 * 365  # tope de seguridad sin plazo
 
@@ -68,9 +69,64 @@ class NoCabe:
 
     def mensaje(self) -> str:
         return (
-            f"No cabe: hacen falta {self.horas_necesarias:g} h y hay {self.horas_disponibles:g} h; "
-            f"faltan {self.horas_faltan:g} h."
+            f"No cabe: hacen falta {fmt(self.horas_necesarias)} h y hay {fmt(self.horas_disponibles)} h; "
+            f"faltan {fmt(self.horas_faltan)} h."
         )
+
+
+MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre",
+         "diciembre")
+
+
+def fecha_larga(d: date) -> str:
+    """Una fecha como se dice: «5 de enero de 2027» (lo que lee el alumno; las claves y la API siguen en ISO)."""
+    return f"{d.day} de {MESES[d.month - 1]} de {d.year}"
+
+
+HORAS_MAX_SESION = 12.0  # el mismo tope que las horas por día de «Mi horario»
+
+
+def error_en_sesiones(sesiones: list[Sesion], claves: set[str], hoy: date) -> str | None:
+    """Por qué unas sesiones que llegan de fuera (el reajuste que aceptas) no se pueden guardar, o None si se pueden:
+    al menos una, de lecciones del plan, con horas de más de 0 y como mucho `HORAS_MAX_SESION`, desde hoy (y no más
+    allá del tope del calendarizador) y sin pasar de 24 h en un día."""
+    if not sesiones:
+        return "No hay ninguna sesión que guardar: así se borrarían todas las pendientes."
+    desconocidas = sorted({x.clave for x in sesiones} - claves)
+    if desconocidas:
+        return f"Estas lecciones no están en el plan: {', '.join(desconocidas)}."
+    for x in sesiones:
+        if not 0 < x.horas <= HORAS_MAX_SESION:
+            return f"Cada sesión dura más de 0 h y como mucho {fmt(HORAS_MAX_SESION)} h; la de {x.clave} tiene {fmt(x.horas)} h."
+        if x.fecha < hoy:
+            return f"La sesión de {x.clave} es del {fecha_larga(x.fecha)}, anterior a hoy."
+        if (x.fecha - hoy).days > MAX_DIAS:
+            return f"La sesión de {x.clave} es del {fecha_larga(x.fecha)}: demasiado lejos."
+    por_dia: dict[date, float] = {}
+    for x in sesiones:
+        por_dia[x.fecha] = por_dia.get(x.fecha, 0.0) + x.horas
+    for d, h in sorted(por_dia.items()):
+        if h > 24:
+            return f"El {fecha_larga(d)} suma {fmt(h)} h: un día no tiene tantas."
+    return None
+
+
+def error_en_desde(desde: date, hoy: date) -> str | None:
+    """Recalcular desde una fecha: no antes de hoy (lo pasado no se vuelve a repartir) ni más allá del tope."""
+    if desde < hoy:
+        return f"No se puede recalcular desde el {fecha_larga(desde)}: es anterior a hoy."
+    if (desde - hoy).days > 365:
+        return f"No se puede recalcular desde el {fecha_larga(desde)}: como mucho, desde dentro de un año."
+    return None
+
+
+def minutos_pasados(inicio: time | None, ahora: time | None, capacidad: int) -> int:
+    """Minutos de la franja de hoy que ya han pasado a la hora `ahora` (de 0 a `capacidad`). Sin hora de inicio o sin
+    `ahora` no se sabe qué ha pasado: 0. Lo que se reparte hoy empieza detrás, en la siguiente franja libre de verdad."""
+    if inicio is None or ahora is None:
+        return 0
+    pasados = (ahora.hour * 60 + ahora.minute) - (inicio.hour * 60 + inicio.minute)
+    return max(0, min(pasados, capacidad))
 
 
 def _min(h: float) -> int:
@@ -111,13 +167,18 @@ def calendarizar(
     hechas: dict[str, float],
     reglas: ReglasCalendario,
     usado_inicial: int = 0,
+    ahora: time | None = None,
 ) -> Calendario | NoCabe:
-    """`usado_inicial`: minutos de `desde` ya ocupados (lo que ya has estudiado hoy); lo siguiente empieza detrás."""
+    """`usado_inicial`: minutos de `desde` ya ocupados (lo que ya has estudiado hoy); lo siguiente empieza detrás.
+    `ahora`: la hora de ahora, solo si `desde` es hoy. La parte de la franja de hoy que ya ha pasado tampoco se usa: un
+    plan aceptado a las 20:50 no pone su primera sesión hoy a las 18:00."""
     pendientes = {
         lec.clave: max(0, _min(lec.horas) - _min(hechas.get(lec.clave, 0.0))) for lec in plan.lecciones
     }
     total = sum(pendientes.values())
     capacidades = _capacidades(disponibilidad, inicio_por_dia)
+    inicio_hoy = inicio_por_dia[desde.weekday()] if desde.weekday() < len(inicio_por_dia) else None
+    usado_inicial = max(usado_inicial, minutos_pasados(inicio_hoy, ahora, capacidades[desde.weekday()]))
     if plazo is not None:
         cap = -min(usado_inicial, capacidades[desde.weekday()])
         d = desde

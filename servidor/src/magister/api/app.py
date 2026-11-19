@@ -267,9 +267,10 @@ async def poner_sobre(request: Request, call_next):
             "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; "
             "script-src 'self' 'unsafe-inline'; frame-ancestors 'self'")
     else:
-        # font-src data:: las fuentes de KaTeX van incrustadas en su CSS.
+        # font-src data:: las fuentes de KaTeX van incrustadas en su CSS. media-src blob:: la voz (leer en voz alta,
+        # el tutor y el vídeo narrado) se descarga y suena desde un blob.
         respuesta.headers["Content-Security-Policy"] = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
-                                                         "font-src 'self' data:; frame-ancestors 'none'")
+                                                         "font-src 'self' data:; media-src 'self' blob: data:; frame-ancestors 'none'")
     respuesta.headers["X-Content-Type-Options"] = "nosniff"
     respuesta.headers["X-Magister-Version"] = VERSION_CONTRATO
     respuesta.headers["X-Request-Id"] = id_peticion

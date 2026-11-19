@@ -13,6 +13,7 @@ import {
   type SesionVista,
 } from '../api.ts'
 import { agruparPorTema, alternarTema, colorDeTema, nombreCorto } from '../componentes/colorTema.ts'
+import { numero } from '../componentes/formato.ts'
 
 type Tipo = 'deber' | 'examen' | 'clase' | 'nota'
 
@@ -380,7 +381,7 @@ export default function PanelCalendario() {
                                 }}
                               />{' '}
                               {x.inicio ? `${x.inicio.slice(0, 5)} · ` : ''}
-                              <strong>{x.clave}</strong> {x.titulo} <span className="nota">· {x.horas} h</span>
+                              <strong>{x.clave}</strong> {x.titulo} <span className="nota">· {numero(x.horas, 2)} h</span>
                             </label>
                             <button className="boton-mini" onClick={() => abrirLeccion(x)} title={x.tema}>
                               Abrir →

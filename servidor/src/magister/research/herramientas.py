@@ -71,6 +71,27 @@ def dominio(url: str) -> str:
     return urlparse(url).netloc.lower().removeprefix("www.")
 
 
+# Segundo nivel de un país («bbc.co.uk», «uba.com.ar», «educacion.gob.es») y sitios donde cada subdominio es de otro
+# dueño (un blog de GitHub Pages no es «el mismo sitio» que otro).
+_SEGUNDO_NIVEL = {"co", "com", "org", "net", "gob", "gov", "edu", "ac", "nom", "mil"}
+_ALOJAMIENTOS = {"github.io", "gitlab.io", "blogspot.com", "wordpress.com", "netlify.app", "vercel.app", "pages.dev",
+                 "substack.com", "wixsite.com", "medium.com", "readthedocs.io"}
+
+
+def dominio_base(url: str) -> str:
+    """El sitio, sin subdominios: «es.khanacademy.org», «en.khanacademy.org» y «life.khanacademy.org» son
+    «khanacademy.org». Para el tope de lecturas y de propuestas por sitio (antes, cada subdominio contaba aparte y se
+    leyó cinco veces la misma página). Sin lista de sufijos públicos: la regla corta de arriba y sus excepciones."""
+    d = dominio(url).split(":")[0]
+    partes = d.split(".")
+    for alojamiento in _ALOJAMIENTOS:
+        if d.endswith("." + alojamiento):
+            return ".".join(partes[-(alojamiento.count(".") + 2):])
+    if len(partes) >= 3 and partes[-2] in _SEGUNDO_NIVEL and len(partes[-1]) == 2:
+        return ".".join(partes[-3:])
+    return ".".join(partes[-2:])
+
+
 # Filtros gratis, antes de leer y antes del juez.
 
 _SEGUIMIENTO = {"hl", "srsltid", "ref", "fbclid", "gclid"}
@@ -251,6 +272,13 @@ class Herramientas:
             self.leidas[url] = lectura
             return lectura
         sha = await asyncio.to_thread(_guardar_crudo, crudo)
+        # El mismo contenido por otra dirección (Khan Academy sirve la misma página en cada subdominio): ni se vuelve a
+        # sacar el texto ni llega otra vez al juez.
+        igual = next((x.url for x in self.leidas.values() if x.crudo_sha == sha), None)
+        if igual is not None:
+            lectura = Lectura(url, error=f"error: es el mismo contenido que {igual}, ya leído", crudo_sha=sha)
+            self.leidas[url] = lectura
+            return lectura
         try:
             # Un PDF patológico puede atascar pymupdf: se deja de esperar (el hilo puede seguir, pero la tarea avanza).
             lectura = await asyncio.wait_for(asyncio.to_thread(_extraer, url, crudo), ajustes.research_plazo_extraer_s)

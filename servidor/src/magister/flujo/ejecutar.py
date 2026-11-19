@@ -6,7 +6,7 @@ Eventos que salen: {"tipo": "fase", "nodo"}, {"tipo": "delta", "t"} y
 
 import logging
 from collections.abc import AsyncIterator
-from datetime import date
+from datetime import date, time
 
 from langgraph.types import Command
 
@@ -31,6 +31,12 @@ async def propuesta_pendiente(cid: int) -> dict | None:
         for interrupcion in tarea.interrupts:
             return interrupcion.value
     return None
+
+
+async def plan_guardado(cid: int) -> int | None:
+    """El plan que guardó esta conversación al aceptar (None si no ha guardado ninguno)."""
+    estado = await grafo().aget_state(_config(cid))
+    return (estado.values or {}).get("plan_id")
 
 
 async def fase_actual(cid: int) -> str | None:
@@ -71,16 +77,18 @@ async def _correr(entrada: dict | Command, cid: int) -> AsyncIterator[dict]:
 
 
 async def mensaje(
-    cid: int, texto: str, turnos: list[dict], hoy: date, fase_inicial: str, voz: bool = False, extra: dict | None = None
+    cid: int, texto: str, turnos: list[dict], hoy: date, fase_inicial: str, voz: bool = False, extra: dict | None = None,
+    ahora: time | None = None,
 ) -> AsyncIterator[dict]:
     """Un mensaje del alumno. Si había un plan propuesto, el mensaje cuenta como «cambiar», salvo que lo deje
-    («déjalo», «sin plan»): entonces lo descarta."""
+    («déjalo», «sin plan»): entonces lo descarta. `ahora`: la hora de hoy, para no repartir en la franja que ya pasó."""
     if await pendiente_de_decision(cid):
         accion = "descartar" if rechaza_plan(texto) else "cambiar"
-        async for ev in decision(cid, {"accion": accion, "texto": texto}, hoy, turnos):
+        async for ev in decision(cid, {"accion": accion, "texto": texto}, hoy, turnos, ahora):
             yield ev
         return
-    entrada: dict = {"conversacion_id": cid, "mensaje": texto, "turnos": turnos, "hoy": hoy.isoformat(), "voz": voz,
+    entrada: dict = {"conversacion_id": cid, "mensaje": texto, "turnos": turnos, "hoy": hoy.isoformat(),
+                     "ahora": ahora.strftime("%H:%M") if ahora else None, "voz": voz,
                      # Siempre se escriben todas: así un mensaje no hereda la llamada o el modo del anterior.
                      "llamada": False, "modo": None, "plan_id_leccion": None, "leccion_clave": None, "contexto": None, "nota_guardada": False,
                      "corregir": False, "asesor": False,
@@ -91,8 +99,10 @@ async def mensaje(
         yield ev
 
 
-async def decision(cid: int, cuerpo: dict, hoy: date, turnos: list[dict] | None = None) -> AsyncIterator[dict]:
-    actualizar: dict = {"hoy": hoy.isoformat()}
+async def decision(
+    cid: int, cuerpo: dict, hoy: date, turnos: list[dict] | None = None, ahora: time | None = None
+) -> AsyncIterator[dict]:
+    actualizar: dict = {"hoy": hoy.isoformat(), "ahora": ahora.strftime("%H:%M") if ahora else None}
     if turnos is not None:
         actualizar["turnos"] = turnos
     async for ev in _correr(Command(resume=cuerpo, update=actualizar), cid):

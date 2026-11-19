@@ -4,16 +4,22 @@ import {
   crearConversacion,
   decidir,
   enviar,
+  ErrorApi,
   lanzarResearch,
   listarMensajes,
+  listarPlanes,
   propuestaPendiente,
   verPlan,
   type Propuesta,
 } from './api.ts'
-import Cuestionario from './componentes/Cuestionario.tsx'
+import Cuestionario, { borrarCuestionario } from './componentes/Cuestionario.tsx'
 import BarraCuota from './componentes/BarraCuota.tsx'
 import { avisoAlAceptar, clavesParaBuscar } from './componentes/bibliotecaLeccion.ts'
-import { irARuta } from './componentes/Vacio.tsx'
+import Vacio, { irARuta } from './componentes/Vacio.tsx'
+import { TextoError } from './componentes/Cargando.tsx'
+import { cortarTitulo } from './componentes/formato.ts'
+import { recordarPlan } from './componentes/planActivo.ts'
+import { MENSAJE_SIN_CONEXION } from './componentes/errores.ts'
 import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
 import { aBurbuja, usarConversacion } from './componentes/usarConversacion.ts'
@@ -30,10 +36,14 @@ interface Props {
   alCambiar: () => void
 }
 
+// Las respuestas del cuestionario del plan, mientras lo rellenas (recargar no las pierde).
+const CLAVE_CUESTIONARIO = 'magister-cuestionario-plan'
+
 // Estudio libre (preguntas lo que quieres) y la conversación de diagnóstico que acaba en un plan.
 export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar }: Props) {
   const [noCuenta, setNoCuenta] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [noExiste, setNoExiste] = useState(false)
   const [propuesta, setPropuesta] = useState<Propuesta | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [aMano, setAMano] = useState(false)
@@ -56,10 +66,22 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     },
     [conversacionId, noCuenta],
   )
+  // Aceptaste un plan que ya estaba aceptado (dos clics, otra pestaña): no es un fallo, te lleva a ese plan en Roadmap.
+  const alYaDecidido = useCallback((planId: number | null) => {
+    setPropuesta(null)
+    listarPlanes()
+      .then((ps) => {
+        const p = ps.find((x) => x.plan_id === planId)
+        if (p) recordarPlan(p.tema_id)
+      })
+      .catch(() => undefined)
+      .finally(() => window.setTimeout(() => irARuta('#/roadmap'), 1200))
+  }, [])
   const { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar: mandar, correr, parar, soltar } = usarConversacion(
     abrir,
     setPropuesta,
     alGuardado,
+    alYaDecidido,
   )
   const [pendiente, setPendiente] = useState<string | null>(null)
   const { adjuntos, subir, quitar } = usarAdjuntos()
@@ -70,6 +92,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   useEffect(() => {
     let vigente = true
     setError(null)
+    setNoExiste(false)
     setPropuesta(null)
     recienCreada.current = recienCreadaTras(recienCreada.current, conversacionId)
     if (conversacionId == null) {
@@ -96,7 +119,12 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     }
     listarMensajes(conversacionId)
       .then((ms) => vigente && setBurbujas(ms.map(aBurbuja)))
-      .catch((e) => vigente && setError(String(e.message ?? e)))
+      .catch((e) => {
+        if (!vigente) return
+        // Un enlace a una conversación borrada o que nunca existió: pantalla vacía, no el error del servidor.
+        if (e instanceof ErrorApi && e.codigo === 404) setNoExiste(true)
+        else setError(String(e.message ?? e))
+      })
     propuestaPendiente(conversacionId)
       .then((p) => vigente && setPropuesta(p))
       .catch(() => undefined)
@@ -118,13 +146,15 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     setPropuesta(null)
     if (conversacionId == null) {
       try {
-        const titulo = tipo === 'plan' ? `Plan: ${texto.slice(0, 50)}` : texto.slice(0, 60)
+        // El título, cortado por palabra (no a media palabra) y con «…» si no cabe entero.
+        const titulo = tipo === 'plan' ? `Plan: ${cortarTitulo(texto, 50)}` : cortarTitulo(texto, 60)
         const c = await crearConversacion(titulo, null, tipo)
+        if (tipo === 'plan') borrarCuestionario(CLAVE_CUESTIONARIO)
         recienCreada.current = c.id
         setPendiente(texto)
         alCrear(c.id)
       } catch (e) {
-        setError(String((e as Error).message))
+        setError(e instanceof ErrorApi && e.codigo === 0 ? MENSAJE_SIN_CONEXION : String((e as Error).message))
         escribirEnChat(texto) // lo que escribiste vuelve a la caja
       }
       return
@@ -191,6 +221,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           boton="Prepárame el plan"
           alTerminar={(r) => alEnviar(mensajePlan(r))}
           alSaltar={() => setAMano(true)}
+          guardarComo={CLAVE_CUESTIONARIO}
         />
         <BarraCuota accion={{ accion: 'plan' }} />
       </div>
@@ -227,9 +258,22 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     )
   }
 
+  if (noExiste)
+    return (
+      <div className="libre">
+        <Vacio
+          etiqueta="Estudio libre"
+          titulo="Esta conversación no existe"
+          texto="Puede que la borraras o que el enlace esté mal. Tus conversaciones están en la barra lateral."
+          acciones={[{ texto: 'Empezar una nueva', principal: true, alPulsar: () => irARuta('#/libre') }]}
+        />
+        <Hilo burbujas={[]} escribiendo={false} alEnviar={() => undefined} alParar={parar} placeholder="Esta conversación no existe" deshabilitado />
+      </div>
+    )
+
   return (
     <div className="vista-hilo">
-      {error && <p role="alert">{error}</p>}
+      {error && <TextoError texto={error} />}
       <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} fase={fase} espera={espera} guardable={tipo === 'libre'} {...conAdjuntos} />
     </div>
   )

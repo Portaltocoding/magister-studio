@@ -7,6 +7,7 @@ import Calentamiento, { ApuestasRevisadas, guardarCalentamiento, leerCalentamien
 import Markdown from '../componentes/Markdown.tsx'
 import {
   EVENTO_CAMBIO_APLICADO,
+  ErrorApi,
   enviarJson,
   flujo,
   hoyIso,
@@ -23,6 +24,8 @@ import {
 import { colorDeTema, nombreCorto } from '../componentes/colorTema.ts'
 import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
 import { varianteFicha } from '../componentes/varianteFicha.ts'
+import { semanaDeTodos } from '../componentes/semana.ts'
+import { plural } from '../componentes/formato.ts'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Mascota from '../Mascota.tsx'
@@ -1705,20 +1708,29 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
   const [ultimasConversaciones, setUltimasConversaciones] = useState<UltimaConversacion[]>([])
   const [descartados, setDescartados] = useState<string[]>(leerDescartados)
   const [fallo, setFallo] = useState<string | null>(null)
+  const [leccionPerdida, setLeccionPerdida] = useState(false)
   const [intento, setIntento] = useState(0)
   const reintentar = useCallback(() => {
     setFallo(null)
     setIntento((x) => x + 1)
   }, [])
+  const avisoPerdida = leccionPerdida && (
+    <p className="nota" role="status">
+      Esa lección ya no existe: puede que borraras su plan o que el enlace esté mal. Elige otra.
+    </p>
+  )
 
   const abrir = useCallback(async (mid: number, idea: number | null = null) => {
     // Lo que llevabas de la lección que abres va aparte del avance de la de hoy (la tarjeta): si no, la respuesta
     // de /api/hoy que llega después lo pisaría y empezarías arriba.
     setInicialFoco(aplicarIdea(leerAvance(mid), idea))
+    setLeccionPerdida(false)
     try {
       setLeccion(await cargarLeccion(mid))
     } catch (e) {
-      setFallo(`No he podido abrir la lección. ${mensajeDe(e)}`)
+      // Un enlace a unos apuntes que ya no están (#/foco/99999): se dice y se queda la lista, sin reintentar.
+      if (e instanceof ErrorApi && e.codigo === 404) setLeccionPerdida(true)
+      else setFallo(`No he podido abrir la lección. ${mensajeDe(e)}`)
     }
   }, [])
 
@@ -1752,28 +1764,24 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
         ps.map((p) =>
           Promise.all([
             verPlan(p.tema_id),
-            pedir<Record<string, { apuntes_id?: number; tipos?: Record<string, string>; ids?: Record<string, number> }>>(`/api/planes/${p.plan_id}/materiales`),
+            pedir<Record<string, { apuntes_id?: number; apuntes_listos?: boolean; tipos?: Record<string, string>; ids?: Record<string, number> }>>(
+              `/api/planes/${p.plan_id}/materiales`,
+            ),
           ]),
         ),
       )
-      // Esta semana: horas y sesiones hechas frente a las previstas (lunes a domingo).
-      if (vistas[0]) {
-        const v = vistas[0][0]
-        const dia = hoyIso()
-        const s = v.semanas.find((w) => w.dias.some((d) => d.fecha === dia)) ?? v.semanas[0]
-        const ses = s ? s.dias.flatMap((d) => d.sesiones) : []
-        setSemana({
-          total: ses.reduce((a, x) => a + x.horas, 0),
-          hechas: ses.filter((x) => x.estado === 'hecha').reduce((a, x) => a + x.horas, 0),
-          sesiones: ses.length,
-          hechasN: ses.filter((x) => x.estado === 'hecha').length,
-        })
-      }
+      // Esta semana: horas y sesiones hechas frente a las previstas (lunes a domingo), de todos los planes, como
+      // «Lo que toca» (antes solo contaba el primero y no cuadraba con la lista).
+      if (vistas.length) setSemana(semanaDeTodos(vistas.map(([v]) => v), hoyIso()))
       const lista: Opcion[] = []
       ps.forEach((p, i) => {
         const [v, estados] = vistas[i]
         for (const l of v.lecciones) {
-          lista.push({ clave: l.clave, titulo: l.titulo, material_id: estados[l.clave]?.apuntes_id ?? null, plan_id: p.plan_id, tema_id: p.tema_id })
+          // «Empezar» solo con apuntes que se pueden estudiar (listos o por revisar): unos a medias o bloqueados llevan a
+          // prepararlos. `apuntes_listos` lo da el servidor; uno de antes, por el estado del tipo.
+          const e = estados[l.clave]
+          const listos = e?.apuntes_listos ?? ['listo', 'revisar'].includes(e?.tipos?.apuntes ?? '')
+          lista.push({ clave: l.clave, titulo: l.titulo, material_id: listos ? e?.apuntes_id ?? null : null, plan_id: p.plan_id, tema_id: p.tema_id })
         }
       })
       setOtras(lista)
@@ -1848,6 +1856,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     return (
       <>
         {fallo && <Cargando error={fallo} reintentar={reintentar} />}
+        {avisoPerdida}
         <ElegirFoco hoy={hoy} otras={otras} empezar={empezar} />
       </>
     )
@@ -1895,6 +1904,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
         </div>
       </header>
       {fallo && <Cargando error={fallo} reintentar={reintentar} />}
+      {avisoPerdida}
       <div className="hoy-resumen">
         <button className="hoy-cifra" onClick={() => irA('repaso')} disabled={!hoy.repasos}>
           <strong>{hoy.repasos}</strong>
@@ -1915,7 +1925,8 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
               <span style={{ width: `${semana.total ? (semana.hechas / semana.total) * 100 : 0}%` }} />
             </span>
             <small>
-              {semana.hechasN} de {semana.sesiones} sesiones
+              {semana.hechasN} de {plural(semana.sesiones, 'sesión', 'sesiones')}
+              {planes.length > 1 ? ` · ${planes.length} planes` : ''}
             </small>
           </div>
         )}

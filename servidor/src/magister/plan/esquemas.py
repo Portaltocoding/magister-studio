@@ -112,7 +112,8 @@ Alcance = Literal["procedimiento", "concepto", "tema", "tema_amplio", "tema_mast
 class Plan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    razonamiento: str = Field(description="Primero: qué alcance tiene lo que pide, y por qué este orden y este reparto de horas.")
+    razonamiento: str = Field(description="Primero: qué alcance tiene lo que pide, y por qué este orden y este reparto de horas. "
+                              "Para el alumno: tuteando, sin nombres de campos ni cifras de horas.")
     alcance: Alcance | None = Field(
         None,
         description="Qué es lo que pide: procedimiento (despejar x), concepto (una idea concreta, aunque tenga requisitos, "

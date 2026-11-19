@@ -1,6 +1,7 @@
 """Tablas y consultas del plan (ADR-0006): planes versionados, lecciones, conceptos,
 dependencias y sesiones."""
 
+from collections.abc import Callable
 from datetime import date, datetime, time
 
 from sqlalchemy import (
@@ -134,21 +135,111 @@ class SesionFila(Base):
 
 
 def nombre_corto(nombre: str, maximo: int = 60) -> str:
-    """El nombre de un tema cabe en una línea: sin lo que va entre paréntesis ni tras dos puntos, y cortado en palabra."""
-    corto = nombre.split("(")[0].split(":")[0].strip(" .,;-") or nombre.strip()
+    """El nombre de un tema cabe en una línea. Si ya cabe, entero: «Inglés B2: condicionales y phrasal verbs» no es
+    «Inglés B2» (antes se cortaba siempre tras los dos puntos y dos temas distintos con el mismo prefijo acababan en uno).
+    Si no cabe, sin lo que va entre paréntesis; si aún no, sin lo que va tras dos puntos; y si aún no, cortado en palabra.
+    Los temas ya guardados con el nombre cortado se quedan como están."""
+    entero = nombre.strip().strip(" .,;-") or nombre.strip()
+    if len(entero) <= maximo:
+        return entero
+    corto = entero.split("(")[0].strip(" .,;-") or entero
+    if len(corto) > maximo:
+        corto = corto.split(":")[0].strip(" .,;-") or corto
     if len(corto) <= maximo:
         return corto
     return corto[:maximo].rsplit(" ", 1)[0].rstrip(" .,;-")
 
 
-async def tema_por_nombre_o_nuevo(s: AsyncSession, nombre: str) -> Tema:
+async def tema_por_nombre(s: AsyncSession, nombre: str) -> Tema | None:
+    """El tema que tendría un plan de ese nombre (el mismo nombre corto, sin mirar mayúsculas), sin crearlo."""
     nombre = nombre_corto(nombre)
-    tema = await s.scalar(select(Tema).where(func.lower(Tema.nombre) == nombre.strip().lower()))
+    return await s.scalar(select(Tema).where(func.lower(Tema.nombre) == nombre.strip().lower()))
+
+
+async def tema_de_conversacion(s: AsyncSession, conversacion_id: int | None) -> Tema | None:
+    """El tema que ya tiene la conversación (creada desde un tema, o con un plan aceptado antes), si lo tiene."""
+    if conversacion_id is None:
+        return None
+    tema_id = await s.scalar(select(Conversacion.tema_id).where(Conversacion.id == conversacion_id))
+    return await s.get(Tema, tema_id) if tema_id is not None else None
+
+
+async def tema_para_plan(s: AsyncSession, nombre: str, conversacion_id: int | None) -> Tema | None:
+    """Dónde va un plan, sin crear nada: el tema de la conversación si lo tiene (el modelo puede llamar al tema de otra
+    forma, «SQL desde cero para principiantes», y las fuentes que subiste están en el de la conversación); si no, el del
+    mismo nombre."""
+    return await tema_de_conversacion(s, conversacion_id) or await tema_por_nombre(s, nombre)
+
+
+async def tema_por_nombre_o_nuevo(s: AsyncSession, nombre: str) -> Tema:
+    tema = await tema_por_nombre(s, nombre)
     if tema is None:
-        tema = Tema(nombre=nombre.strip()[:200])
+        tema = Tema(nombre=nombre_corto(nombre).strip()[:200])
         s.add(tema)
         await s.flush()
     return tema
+
+
+Emparejar = Callable[[list[tuple[str, str]], list[tuple[str, str]]], dict[str, str]]
+
+
+async def resumen_sustituido(s: AsyncSession, plan_id: int, emparejadas: dict[str, str]) -> dict:
+    """Lo que tiene el plan aceptado que se va a sustituir y lo que pasaría al nuevo (`emparejadas`: {clave vieja: clave
+    nueva}): sus horas hechas y lecciones, y de las lecciones que siguen, las horas hechas y las fuentes del research."""
+    fila = await s.get(PlanFila, plan_id)
+    hechas: dict[str, float] = {}
+    for x in await sesiones(s, plan_id):
+        if x.estado == "hecha":
+            hechas[x.leccion_clave] = hechas.get(x.leccion_clave, 0.0) + x.horas
+    n_lecciones = len(await lecciones(s, plan_id))
+    fuentes = 0
+    if emparejadas:
+        fuentes = int(await s.scalar(text(
+            "select count(*) from propuestas where plan_id = :p and estado <> 'rechazada' and leccion_clave = any(:c)"
+        ), {"p": plan_id, "c": list(emparejadas)}) or 0)
+    return {
+        "plan_id": plan_id,
+        "version": fila.version if fila else None,
+        "horas_hechas": round(sum(hechas.values()), 2),
+        "lecciones": n_lecciones,
+        "conserva": {
+            "lecciones": sorted(emparejadas.values(), key=lambda c: (len(c), c)),
+            "horas_hechas": round(sum(hechas.get(v, 0.0) for v in emparejadas), 2),
+            "fuentes": fuentes,
+        },
+    }
+
+
+async def _conservar(s: AsyncSession, viejo: int, nuevo: int, emparejadas: dict[str, str], objetivos_iguales: set[str]) -> None:
+    """Pasa al plan nuevo lo anclado a las lecciones que siguen (`emparejadas`: {clave vieja: clave nueva}): las fuentes
+    que trajo el research (`propuestas`), el apoyo calculado y las sesiones hechas. La última búsqueda de la lección
+    (`tareas_research`) y qué objetivos cubre cada fuente solo pasan si los objetivos no han cambiado: con otros
+    objetivos, los números de la ficha señalarían a otro objetivo."""
+    for vieja, nueva in emparejadas.items():
+        p = {"v": viejo, "n": nuevo, "cv": vieja, "cn": nueva}
+        tarea_nueva = None
+        if vieja in objetivos_iguales:
+            tarea_nueva = await s.scalar(text(
+                "insert into tareas_research (plan_id, leccion_clave, sistema, estado, estado_agente, trayectoria, pasos, "
+                "llamadas_modelo, motivo_fin, creada_en, acabada_en) "
+                "select :n, :cn, sistema, estado, estado_agente, trayectoria, pasos, llamadas_modelo, motivo_fin, creada_en, "
+                "acabada_en from tareas_research where plan_id = :v and leccion_clave = :cv and estado <> 'en_curso' "
+                "order by id desc limit 1 returning id"), p)
+        ficha = "ficha" if vieja in objetivos_iguales else "case when ficha is null then null else ficha - 'objetivos' end"
+        await s.execute(text(
+            "insert into propuestas (tarea_id, url, titulo, plan_id, leccion_clave, motivo, estado, version_id, ficha, creada_en) "
+            f"select coalesce(:t, tarea_id), url, titulo, :n, :cn, motivo, estado, version_id, {ficha}, creada_en "
+            "from propuestas where plan_id = :v and leccion_clave = :cv order by id"), {**p, "t": tarea_nueva})
+        await s.execute(text(
+            "insert into lecciones_apoyo (plan_id, leccion_clave, n_fragmentos, sin_material, calculado_en) "
+            "select :n, :cn, n_fragmentos, sin_material, calculado_en from lecciones_apoyo where plan_id = :v and leccion_clave = :cv"), p)
+        await s.execute(text(
+            "insert into lecciones_fragmentos (plan_id, leccion_clave, fragmento_id, rango, puntuacion) "
+            "select :n, :cn, fragmento_id, rango, puntuacion from lecciones_fragmentos where plan_id = :v and leccion_clave = :cv"), p)
+        await s.execute(text(
+            "insert into sesiones (plan_id, leccion_clave, fecha, inicio, horas, estado) "
+            "select :n, :cn, fecha, inicio, horas, estado from sesiones where plan_id = :v and leccion_clave = :cv "
+            "and estado = 'hecha' order by fecha, inicio, id"), p)
 
 
 async def guardar_plan(
@@ -159,11 +250,20 @@ async def guardar_plan(
     sesiones: list[dict],
     version_prompt: str | None,
     modelo: str | None,
+    emparejar: Emparejar | None = None,
 ) -> tuple[int, int]:
-    """En una transacción: sustituye el aceptado anterior e inserta el nuevo. Devuelve (tema, plan)."""
+    """En una transacción: sustituye el aceptado anterior e inserta el nuevo. Devuelve (tema, plan).
+
+    Con `emparejar` ([(clave, título)] viejas y nuevas -> {clave vieja: clave nueva}, plan/sustituir.py), lo anclado a
+    las lecciones que siguen en el plan nuevo pasa a él: fuentes, apoyo y sesiones hechas (`_conservar`)."""
     async with nueva_sesion() as s, s.begin():
-        tema = await tema_por_nombre_o_nuevo(s, nombre_tema)
+        # El tema de la conversación manda (antes se buscaba solo por el nombre recortado: se creaba otro tema, la
+        # conversación se iba a él y el tuyo, con sus fuentes, se quedaba vacío). Sin tema, por nombre o nuevo.
+        tema = await tema_de_conversacion(s, conversacion_id) or await tema_por_nombre_o_nuevo(s, nombre_tema)
+        # El tema bloqueado: dos «Aceptar» a la vez del mismo tema se guardan uno detrás de otro, no dos aceptados.
+        await s.execute(select(Tema.id).where(Tema.id == tema.id).with_for_update())
         previa = await s.scalar(select(func.max(PlanFila.version)).where(PlanFila.tema_id == tema.id))
+        anterior = await plan_aceptado(s, tema.id)
         await s.execute(
             update(PlanFila)
             .where(PlanFila.tema_id == tema.id, PlanFila.estado == "aceptado")
@@ -210,6 +310,15 @@ async def guardar_plan(
                     horas=ses["horas"],
                 )
             )
+        if anterior is not None and emparejar is not None:
+            viejas = await lecciones(s, anterior.id)
+            emparejadas = emparejar([(x.clave, x.titulo) for x in viejas],
+                                    [(lec["clave"], lec["titulo"]) for lec in plan["lecciones"]])
+            objetivos_viejos = {x.clave: list(x.objetivos or []) for x in viejas}
+            nuevas = {lec["clave"]: list(lec["objetivos"]) for lec in plan["lecciones"]}
+            iguales = {v for v, n in emparejadas.items() if objetivos_viejos.get(v) == nuevas.get(n)}
+            await s.flush()
+            await _conservar(s, anterior.id, fila.id, emparejadas, iguales)
         if conversacion_id is not None:
             await s.execute(update(Conversacion).where(Conversacion.id == conversacion_id).values(tema_id=tema.id))
         return tema.id, fila.id

@@ -98,3 +98,16 @@ async def test_cuerpo_de_mas_de_64_kib_da_413() -> None:
     assert grande.status_code == 413
     assert grande.json() == {"detail": "el cuerpo pasa del máximo de 64 KiB"}
     assert justo.status_code == 405  # pasa el límite y llega a la ruta, que solo acepta GET
+
+
+@pytest.mark.anyio
+async def test_un_fichero_subido_no_se_queda_en_los_64_kib() -> None:
+    """Subir un PDF es multipart: el tope de un mensaje de chat no le toca (lo limita la ruta, a 50 MiB)."""
+    tipo = {"Content-Type": "multipart/form-data; boundary=x"}
+    async with cliente() as c:
+        fichero = await c.post("/api/salud", content=b"x" * (200 * 1024), headers=tipo)
+        enorme = await c.post("/api/salud", content=b"", headers={**tipo, "Content-Length": str(52 * 1024 * 1024)})
+
+    assert fichero.status_code == 405  # pasa el límite y llega a la ruta, que solo acepta GET
+    assert enorme.status_code == 413
+    assert enorme.json() == {"detail": "el fichero pasa del máximo de 50 MiB"}

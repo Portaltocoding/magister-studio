@@ -2,10 +2,11 @@
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.sse import EventSourceResponse, ServerSentEvent
@@ -27,14 +28,42 @@ from magister.api.rutas_asesor import tras_respuesta
 from magister.config import ajustes
 from magister.datos import conversaciones as dc
 from magister.datos.sesion import nueva_sesion, sesion_por_peticion
-from magister.flujo import ejecutar
+from magister.flujo import ejecutar, planes
 from magister.flujo.intencion import pide_guardar
 
 rutas = APIRouter(prefix="/api")
+registro = logging.getLogger("magister.api")
 
 
 def hoy() -> date:
     return date.today()
+
+
+def hora_actual() -> time | None:
+    """La hora de ahora, si es el mismo día que `hoy()`: el plan no se reparte en la franja de hoy que ya pasó. En las
+    pruebas, que fijan el día, no hay hora y el reparto no depende del reloj."""
+    ahora = datetime.now()
+    return ahora.time().replace(second=0, microsecond=0) if ahora.date() == hoy() else None
+
+
+async def con_sustitucion(propuesta: dict, cid: int) -> dict:
+    """La propuesta con `sustituye`: si ya hay un plan aceptado del tema donde iría (el de la conversación o el del
+    mismo nombre), lo que tiene y lo que pasa al nuevo si lo aceptas (flujo/planes.py, sustitucion); null si no lo hay.
+    Si no se puede leer, null y queda en el registro."""
+    try:
+        async with nueva_sesion() as s:
+            sustituye = await planes.sustitucion(s, propuesta.get("tema") or "", propuesta.get("lecciones") or [], cid)
+    except Exception:  # noqa: BLE001  (la propuesta sale igual)
+        registro.warning("no se pudo ver si la propuesta sustituye a otro plan", exc_info=True)
+        sustituye = None
+    return {**propuesta, "sustituye": sustituye}
+
+
+async def _propuestas_con_sustitucion(eventos: AsyncIterator[dict], cid: int) -> AsyncIterator[dict]:
+    async for ev in eventos:
+        if ev.get("tipo") == "plan":
+            ev = await con_sustitucion(ev, cid)
+        yield ev
 
 
 @rutas.post("/temas", status_code=201)
@@ -115,9 +144,13 @@ async def listar_mensajes(cid: int, s: AsyncSession = Depends(sesion_por_peticio
 
 
 @rutas.get("/conversaciones/{cid}/propuesta")
-async def propuesta_pendiente(cid: int) -> dict | None:
-    """El plan propuesto que espera tu decisión, o null. Sirve para recuperarlo al recargar."""
-    return await ejecutar.propuesta_pendiente(cid)
+async def propuesta_pendiente(cid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict | None:
+    """El plan propuesto que espera tu decisión (con `sustituye`), o null si no hay ninguno. Sirve para recuperarlo al
+    recargar. Una conversación que no existe da 404."""
+    if await dc.obtener_conversacion(s, cid) is None:
+        raise HTTPException(404, "conversación no encontrada")
+    propuesta = await ejecutar.propuesta_pendiente(cid)
+    return await con_sustitucion(propuesta, cid) if propuesta is not None else None
 
 
 @dataclass
@@ -236,12 +269,17 @@ async def enviar_mensaje(
                                            "leccion_clave": cuerpo.leccion_clave, "contexto": cuerpo.contexto,
                                            "corregir": cuerpo.corregir and cuerpo.llamada,
                                            "asesor": cuerpo.asesor,
-                                           "nota_guardada": p.nota is not None})
+                                           "nota_guardada": p.nota is not None},
+                                    ahora=hora_actual())
+        eventos = _propuestas_con_sustitucion(eventos, cid)
         if p.nota is not None:
             eventos = _con_nota(p.nota, eventos)
         eventos = turno.eventos(eventos)
         texto, mensaje_id = [], None
-        async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid}):
+        # «Parar» antes de la primera palabra deja la respuesta vacía como «interrumpido» (tu pregunta no queda suelta
+        # al recargar); en la llamada no, que interrumpir es lo normal y no debe llenar el hilo de vacíos.
+        async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid},
+                                        guardar_corte_vacio=not cuerpo.llamada):
             if evento.event == "delta":
                 texto.append(evento.data["t"])
             elif evento.event == "fin":
@@ -261,18 +299,40 @@ async def _con_nota(nota: dict, eventos: AsyncIterator[dict]) -> AsyncIterator[d
         yield ev
 
 
-async def preparar_decision(cid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> list[dict]:
+async def preparar_decision(
+    cid: int, cuerpo: DecisionEntrada, s: AsyncSession = Depends(sesion_por_peticion)
+) -> list[dict]:
+    """Lo que escribes con la decisión («Cambiar algo: menos horas») es un mensaje tuyo más: se guarda en el hilo antes
+    de llamar al modelo, como cualquier pregunta (antes se perdía al recargar)."""
     if await dc.obtener_conversacion(s, cid) is None:
         raise HTTPException(404, "conversación no encontrada")
     if not await ejecutar.pendiente_de_decision(cid):
         raise HTTPException(409, "no hay ningún plan pendiente de decisión")
+    if cuerpo.accion in ("cambiar", "descartar") and cuerpo.texto and cuerpo.texto.strip():
+        await dc.guardar_pregunta(s, cid, cuerpo.texto.strip(), True)
     return [{"rol": m.rol, "contenido": m.contenido} for m in await dc.historial_completo(s, cid)]
+
+
+# Una decisión cada vez por conversación: dos «Aceptar» a la vez (doble clic, dos pestañas) guardaban el plan dos veces
+# y la segunda petición moría sin `fin` ni `error`. La segunda espera a la primera y, como ya no hay nada pendiente,
+# acaba con un `error` claro.
+_decisiones: dict[int, asyncio.Lock] = {}
+YA_DECIDIDO = "Este plan ya estaba aceptado: lo tienes en Roadmap."
+YA_NO_PENDIENTE = "Esta propuesta ya no está pendiente: se ha decidido en otra petición."
 
 
 @rutas.post("/conversaciones/{cid}/plan/decision", response_class=EventSourceResponse)
 async def decidir_plan(
     cid: int, cuerpo: DecisionEntrada, turnos: list[dict] = Depends(preparar_decision)
 ) -> AsyncIterator[ServerSentEvent]:
-    eventos = ejecutar.decision(cid, cuerpo.model_dump(), hoy(), turnos)
-    async for evento in flujo_tutor(eventos, guardador(cid, True), {"conversacion_id": cid}):
-        yield evento
+    candado = _decisiones.setdefault(cid, asyncio.Lock())
+    async with candado:
+        if not await ejecutar.pendiente_de_decision(cid):
+            guardado = await ejecutar.plan_guardado(cid)
+            yield ServerSentEvent(data={"conversacion_id": cid}, event="inicio")
+            yield ServerSentEvent(data={"detalle": YA_DECIDIDO if guardado else YA_NO_PENDIENTE,
+                                        "ya_decidido": True, "plan_id": guardado}, event="error")
+            return
+        eventos = _propuestas_con_sustitucion(ejecutar.decision(cid, cuerpo.model_dump(), hoy(), turnos, hora_actual()), cid)
+        async for evento in flujo_tutor(eventos, guardador(cid, True), {"conversacion_id": cid}):
+            yield evento

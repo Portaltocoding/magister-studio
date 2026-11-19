@@ -51,7 +51,9 @@ ENTREVISTA = ("vale esto es importante guardemoslo como tal , ahora bien me gust
 
 @pytest.mark.parametrize("frase", [ENTREVISTA, "guárdalo", "Guárdame esto", "apúntamelo en mis notas", "esto a mis notas",
                                    "vale, guarda esto", "anota la respuesta", "Guarda lo anterior, porfa",
-                                   "guárdamelo para mañana", "apúntamelo en mis notas para el examen del lunes"])
+                                   "guárdamelo para mañana", "apúntamelo en mis notas para el examen del lunes",
+                                   "pásalo a mis notas", "añade esto a mis apuntes", "Añádelo a mis notas", "mételo en mis apuntes",
+                                   "guarda esto en mis apuntes", "vale, eso a mis notas", "copia la respuesta en mis notas"])
 def test_detecta_guardar(frase) -> None:
     from magister.flujo.intencion import pide_guardar
 
@@ -62,7 +64,12 @@ def test_detecta_guardar(frase) -> None:
                                    "cómo guarda React el estado", "explícame closures", "me gustaría entenderlo mejor",
                                    # Agenda, no «Mis notas».
                                    "Apúntalo para mañana a las 18:00", "apúntame el examen del jueves en el calendario",
-                                   "guárdame un hueco el 12 para repasar", "anótalo en la agenda"])
+                                   "guárdame un hueco el 12 para repasar", "anótalo en la agenda",
+                                   # Hablar de los apuntes no es guardar en ellos (lo encontró un probador).
+                                   "hazme un resumen de todo lo que pone en mis apuntes",
+                                   "¿qué dicen mis notas sobre la meiosis?", "según lo que tengo en mis apuntes, ¿cuándo hay quiasmas?",
+                                   "busca en mis apuntes la definición de diploteno", "lo que tengo guardado en mis notas",
+                                   "explícame lo que he apuntado en mis apuntes", "¿qué pasa en mis apuntes con la meiosis II?"])
 def test_no_confunde_guardar(frase) -> None:
     from magister.flujo.intencion import pide_guardar
 

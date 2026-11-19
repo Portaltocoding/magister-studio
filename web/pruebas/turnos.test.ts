@@ -1,7 +1,21 @@
 // El hilo del chat: qué flujo manda, qué queda si el envío falla, cuándo se recarga una conversación y cuánto cabe.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { crearTurnos, demasiadoLargo, largoMensaje, LIMITE_MENSAJE, recienCreadaTras, trasFalloAlEnviar } from '../src/componentes/turnos.ts'
+import {
+  crearTurnos,
+  demasiadoLargo,
+  largoMensaje,
+  LIMITE_MENSAJE,
+  recienCreadaTras,
+  trasFalloAlEnviar,
+  trasFalloSinConexion,
+} from '../src/componentes/turnos.ts'
+
+test('sin conexión tu mensaje sale del hilo (vuelve a la caja) y queda solo el aviso', () => {
+  assert.deepEqual(trasFalloSinConexion(['antiguo', 'tu mensaje', 'tutor vacío'], 'aviso', true), ['antiguo', 'aviso'])
+  // Al aceptar un plan no hay mensaje tuyo: solo se cambia la del tutor.
+  assert.deepEqual(trasFalloSinConexion(['antiguo', 'tutor vacío'], 'aviso', false), ['antiguo', 'aviso'])
+})
 
 test('al soltar, el flujo anterior deja de mandar y el siguiente sí manda', () => {
   const t = crearTurnos()

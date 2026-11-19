@@ -27,6 +27,12 @@ export function trasFalloAlEnviar<B>(previas: B[], error: B): B[] {
   return [...previas.slice(0, -1), error]
 }
 
+// Sin conexión el mensaje no ha salido: se quitan tu burbuja (si la había) y la del tutor, y queda solo el aviso. El texto
+// vuelve a la caja; si se quedara también en el hilo, al reenviarlo saldría dos veces.
+export function trasFalloSinConexion<B>(previas: B[], error: B, conPropia: boolean): B[] {
+  return [...previas.slice(0, conPropia ? -2 : -1), error]
+}
+
 // La conversación que se acaba de crear aquí no se recarga desde la API (borraría la respuesta que llega). En cuanto abres
 // otra, deja de serlo: si no, al volver a ella no se recargaría y verías los mensajes de la otra.
 export function recienCreadaTras(recienCreada: number | null, conversacionId: number | null): number | null {

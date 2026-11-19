@@ -39,6 +39,25 @@ def marcar_externo(fragmento: str, id_: str | int, origen: str) -> str:
     return f'<fuente_externa id="{id_}" origen="{origen}">\n{MARCADOR.join(palabras)}\n</fuente_externa>'
 
 
+# Algo con forma de etiqueta: un «<» (o su gemelo de ancho completo, o `&lt;`), quizá «/» y espacios, y un nombre.
+# Basta con que abra: `</respuesta_del_alumno` sin «>» también se lee como cierre.
+_ETIQUETA = re.compile(r"(?:[<＜﹤]|&lt;)\s*/?\s*[A-Za-z_][^<>＜＞﹤﹥\n]{0,200}?(?:[>＞﹥]|&gt;|$|(?=[<＜﹤]|&lt;))",
+                       re.M | re.I)
+
+
+def neutralizar_etiquetas(texto: str) -> str:
+    """Texto del alumno (u otro no confiable) que va entre etiquetas de un prompt: nada en él puede abrir ni cerrar
+    una etiqueta. Cambia los ángulos de lo que tiene forma de etiqueta por «‹ ›» (se sigue leyendo igual) y quita
+    los caracteres invisibles que podrían partir el nombre. Un «2 < 3» no se toca; un «a < b» pasa a «a ‹ b»."""
+    t = texto.translate(ANCHO_CERO)
+
+    def cambiar(m: re.Match) -> str:
+        s = re.sub(r"[<＜﹤]|&lt;", "‹", m.group(0), flags=re.I)
+        return re.sub(r"[>＞﹥]|&gt;", "›", s, flags=re.I)
+
+    return _ETIQUETA.sub(cambiar, t)
+
+
 @cache
 def patrones() -> tuple[re.Pattern, ...]:
     return tuple(re.compile(x.strip(), re.I) for x in PATRONES.read_text(encoding="utf-8").splitlines()

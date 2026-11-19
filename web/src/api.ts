@@ -1,5 +1,12 @@
 // El único fichero de la página que sabe cómo habla la API.
 // Todas las URL son relativas: el proxy (Vite, Caddy o Electron) las lleva a la API.
+import { textoValidacion } from './componentes/errores.ts'
+
+// Una petición no ha llegado al servidor: la cabecera (BarraSesion) lo comprueba ya, sin esperar a su minuto.
+export const EVENTO_SIN_RESPUESTA = 'magister-sin-respuesta'
+const avisarSinRespuesta = () => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(EVENTO_SIN_RESPUESTA))
+}
 
 export type Rol = 'usuario' | 'tutor'
 export type Estado = 'completo' | 'interrumpido' | 'error'
@@ -50,7 +57,8 @@ export type EventoTutor =
       traza_id?: string | null
       retirado?: string[]
     }
-  | { tipo: 'error'; detalle: string }
+  // `ya_decidido`: aceptaste dos veces el mismo plan; la segunda no es un fallo, el plan ya estaba aceptado.
+  | { tipo: 'error'; detalle: string; ya_decidido?: boolean; plan_id?: number | null }
   // Ha llegado otro turno en la misma conversación y este se ha cortado (lo ya escrito queda guardado).
   | { tipo: 'cortado'; mensaje_id: number | null; detalle?: string }
   | { tipo: 'fase'; nodo: string; detalle?: string }
@@ -103,6 +111,19 @@ export interface Propuesta {
   capacidad_horas: number
   sesiones: SesionPlan[]
   fin: string | null
+  // Ya hay un plan aceptado de este tema y aceptar este lo sustituye (null si no); lo pinta PropuestaPlan.tsx.
+  sustituye?: PlanSustituido | null
+}
+
+export interface PlanSustituido {
+  plan_id: number
+  version: number
+  tema_id: number
+  tema: string
+  horas_hechas: number
+  lecciones: number
+  // Lo que hereda el plan nuevo: sus lecciones que siguen (claves del NUEVO), las horas y las fuentes que conservan.
+  conserva: { lecciones: string[]; horas_hechas: number; fuentes: number }
 }
 
 export class ErrorApi extends Error {
@@ -118,7 +139,8 @@ async function detalleDe(r: Response): Promise<string> {
   try {
     const j = JSON.parse(cuerpo)
     if (typeof j.detail === 'string') return j.detail
-    if (Array.isArray(j.detail)) return j.detail.map((d: { msg: string }) => d.msg).join('; ')
+    // Los fallos de validación (422), en castellano y sin repetir.
+    if (Array.isArray(j.detail)) return textoValidacion(j.detail)
   } catch {
     /* no era JSON */
   }
@@ -144,6 +166,7 @@ async function leerUnaVez(ruta: string, opciones: RequestInit): Promise<Response
   } catch (e) {
     if (opciones.signal?.aborted) throw e
     if (corte.signal.aborted) throw new ErrorApi(0, 'El servidor tarda demasiado en contestar.')
+    if (ruta !== '/api/salud') avisarSinRespuesta()
     throw new ErrorApi(0, 'No hay conexión con Magister: ¿está en marcha el servidor?')
   } finally {
     clearTimeout(reloj)
@@ -192,6 +215,7 @@ export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promis
     r = await fetch(ruta, { ...opciones, headers: cabeceras })
   } catch (e) {
     if (opciones.signal?.aborted) throw e
+    avisarSinRespuesta()
     throw new ErrorApi(0, 'No hay conexión con Magister: ¿está en marcha el servidor?')
   }
   if (!r.ok) throw new ErrorApi(r.status, await detalleDe(r))
@@ -237,12 +261,20 @@ export async function* flujo<E extends { tipo: string }>(
   cuerpo: unknown,
   signal?: AbortSignal,
 ): AsyncGenerator<E> {
-  const r = await fetch(ruta, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(cuerpo),
-    signal,
-  })
+  let r: Response
+  try {
+    r = await fetch(ruta, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+      signal,
+    })
+  } catch (e) {
+    // Parar no es un fallo; sin red, un ErrorApi con código 0 (el chat devuelve el texto a la caja).
+    if (signal?.aborted) throw e
+    avisarSinRespuesta()
+    throw new ErrorApi(0, 'No hay conexión con Magister.')
+  }
   yield* leerSSE<E>(r)
 }
 
@@ -476,6 +508,9 @@ export interface DocumentoInfo {
   version: VersionInfo | null
   fragmentos: number
   incompleta?: string | null
+  // Qué pasó, en claro, y si «Reintentar» puede servir (un fichero vacío o con otra extensión, no).
+  que_paso?: string | null
+  reintentable?: boolean
 }
 
 export interface FragmentoInfo {

@@ -1,7 +1,10 @@
 """La cola de trabajos en Postgres: idempotente por clave, con lease y latido.
 
-Coger usa `FOR UPDATE SKIP LOCKED`: dos trabajadores nunca cogen el mismo trabajo. Un
-trabajo `en_curso` cuyo lease caducó vuelve a estar disponible (el trabajador murió).
+Coger pone las reservas en fila con un candado de Postgres y usa `FOR UPDATE SKIP LOCKED`: dos trabajadores nunca
+cogen el mismo trabajo, dos de la misma lección nunca corren a la vez, los cortos pasan antes y los largos dejan un
+hueco libre
+(MAGISTER_TRABAJOS_A_LA_VEZ trabajadores por proceso). Un trabajo `en_curso` cuyo lease caducó vuelve a estar
+disponible (el trabajador murió).
 Cada cambio avisa con `NOTIFY trabajos, '<id>'`.
 """
 
@@ -9,8 +12,9 @@ import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import or_, select, text, update
+from sqlalchemy import exists, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import aliased
 
 from magister.config import ajustes
 from magister.datos.material import Trabajador, Trabajo
@@ -53,15 +57,79 @@ async def encolar(tipo: str, plan_id: int | None, leccion_clave: str | None, par
         return t.id, False
 
 
+# Los trabajos cortos (segundos o un minuto): bajar fuentes (8 s), montar un MP4 (23 s), detallar un nivel de un
+# proyecto (28 s), un juez, y las diapositivas o el guion de unos apuntes que ya están (sin apuntes ni preguntas).
+# Pasan delante de los largos (preparar una lección, 5-20 min; el roadmap de un proyecto con research) y, con varios
+# trabajadores, los largos ocupan como mucho `a_la_vez - 1` huecos: siempre queda uno para un corto. Los largos no se
+# mueren de hambre: los cortos acaban en segundos y solo llegan cuando los pides.
+CORTOS = ("incorporar", "video_mp4", "proyecto_nivel", "juez_online")
+SOLO_APUNTES = ["apuntes", "preguntas"]  # un trabajo de material con alguno de estos es largo
+# La llave del candado de Postgres que pone en fila las reservas (un número cualquiera, fijo).
+CANDADO_COGER = 2026111901
+
+
+def a_la_vez() -> int:
+    return max(1, ajustes.trabajos_a_la_vez)
+
+
+def _corto(t) -> object:
+    """1 si el trabajo es corto, 0 si es largo (en SQL, para ordenar y contar). Un material sin «tipos» es largo:
+    el trabajador lo toma por unos apuntes."""
+    from sqlalchemy import case
+    from sqlalchemy.dialects.postgresql import array
+
+    extras = (t.tipo == "material") & ~func.coalesce(t.parametros["tipos"].has_any(array(SOLO_APUNTES)), True)
+    return case((t.tipo.in_(CORTOS), 1), (extras, 1), else_=0)
+
+
+def es_corto(tipo: str, parametros: dict | None) -> bool:
+    """Lo mismo que `_corto`, en Python."""
+    if tipo in CORTOS:
+        return True
+    tipos = (parametros or {}).get("tipos")
+    return tipo == "material" and tipos is not None and not set(tipos) & set(SOLO_APUNTES)
+
+
+def _vivo(t) -> object:
+    """Un trabajo que de verdad está corriendo: en curso y con el lease al día (si caducó, su trabajador murió)."""
+    return (t.estado == "en_curso") & (t.lease_hasta >= ahora())
+
+
+def _choca(t, o) -> object:
+    """Dos trabajos que no pueden correr a la vez: los de la misma lección (escriben en la misma carpeta y en los
+    mismos materiales), los «incorporar» entre sí (bajan las mismas URL) y los del mismo proyecto."""
+    return or_(
+        t.leccion_clave.is_not(None) & (o.plan_id == t.plan_id) & (o.leccion_clave == t.leccion_clave),
+        (t.tipo == "incorporar") & (o.tipo == "incorporar"),
+        t.parametros["proyecto_id"].astext.is_not(None)
+        & (o.parametros["proyecto_id"].astext == t.parametros["proyecto_id"].astext),
+    )
+
+
 async def coger(trabajador: str) -> Trabajo | None:
+    """Reserva el primer trabajo disponible que no choque con uno que ya corre: antes los cortos y, entre iguales,
+    el más antiguo; si los largos ya ocupan `a_la_vez - 1` huecos, solo un corto.
+
+    Atómico entre trabajadores (de este proceso o de otros): las reservas pasan de una en una por un candado de
+    transacción de Postgres (`pg_advisory_xact_lock`), así que cada una ve ya confirmadas las anteriores al comprobar
+    qué corre; `FOR UPDATE SKIP LOCKED` sigue por si alguien toca la fila a la vez. Reservar tarda milisegundos:
+    ponerlas en fila no frena nada."""
+    o = aliased(Trabajo)
     async with nueva_sesion() as s, s.begin():
+        await s.execute(select(func.pg_advisory_xact_lock(CANDADO_COGER)))
+        disponible = or_(
+            (Trabajo.estado == "pendiente") & or_(Trabajo.lease_hasta.is_(None), Trabajo.lease_hasta < ahora()),
+            (Trabajo.estado == "en_curso") & (Trabajo.lease_hasta < ahora()),
+        )
+        sin_choque = ~exists().where(_vivo(o), o.id != Trabajo.id, _choca(Trabajo, o))
+        condiciones = [disponible, sin_choque]
+        if a_la_vez() > 1:
+            largos_vivos = await s.scalar(select(func.count()).select_from(o).where(_vivo(o), _corto(o) == 0))
+            if largos_vivos >= a_la_vez() - 1:
+                condiciones.append(_corto(Trabajo) == 1)
         t = await s.scalar(
-            select(Trabajo)
-            .where(or_(
-                (Trabajo.estado == "pendiente") & or_(Trabajo.lease_hasta.is_(None), Trabajo.lease_hasta < ahora()),
-                (Trabajo.estado == "en_curso") & (Trabajo.lease_hasta < ahora()),
-            ))
-            .order_by(Trabajo.id).limit(1).with_for_update(skip_locked=True)
+            select(Trabajo).where(*condiciones).order_by(_corto(Trabajo).desc(), Trabajo.id).limit(1)
+            .with_for_update(skip_locked=True)
         )
         if t is None:
             return None
@@ -135,10 +203,26 @@ async def leer(trabajo_id: int) -> dict | None:
         from magister.datos.material import Material
 
         mats = (await s.scalars(select(Material.id).where(Material.trabajo_id == trabajo_id))).all()
-    return {"id": t.id, "tipo": t.tipo, "plan_id": t.plan_id, "leccion_clave": t.leccion_clave, "estado": t.estado,
+        en_cola = await _en_cola(s, t) if t.estado == "pendiente" else None
+    return {"cola": en_cola,"id": t.id, "tipo": t.tipo, "plan_id": t.plan_id, "leccion_clave": t.leccion_clave, "estado": t.estado,
             "intentos": t.intentos, "nodo": t.nodo, "paso": t.paso, "total": t.total, "avisos": t.avisos, "error": t.error,
             "materiales": list(mats), "creado_en": t.creado_en.isoformat(),
             "acabado_en": t.acabado_en.isoformat() if t.acabado_en else None}
+
+
+async def _en_cola(s, t: Trabajo) -> dict:
+    """Dónde está un trabajo pendiente: cuántos pendientes van antes que él, cuántos corren ahora y en cuántos
+    huecos (para que la web diga «En cola: 3 por delante»), y si espera un reintento, desde cuándo puede volver."""
+    # En el mismo orden que `coger`: un corto solo tiene delante a los cortos más antiguos; un largo, a todos los
+    # cortos pendientes y a los largos más antiguos.
+    corto = es_corto(t.tipo, t.parametros)
+    antes = (Trabajo.id < t.id) & (_corto(Trabajo) == 1) if corto else or_(_corto(Trabajo) == 1, Trabajo.id < t.id)
+    por_delante = await s.scalar(select(func.count()).select_from(Trabajo).where(
+        Trabajo.estado == "pendiente", Trabajo.id != t.id, antes))
+    en_marcha = await s.scalar(select(func.count()).select_from(Trabajo).where(_vivo(Trabajo)))
+    reintento = t.lease_hasta.isoformat() if t.lease_hasta and t.lease_hasta > ahora() else None
+    return {"por_delante": int(por_delante or 0), "en_marcha": int(en_marcha or 0), "a_la_vez": a_la_vez(),
+            "corto": corto, "reintento_desde": reintento}
 
 
 async def trabajador_vivo(segundos: int = 90) -> bool:

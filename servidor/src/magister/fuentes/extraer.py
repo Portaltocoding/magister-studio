@@ -93,7 +93,8 @@ def inicio_del_cuerpo(paginas: list[str]) -> int:
     for i, pagina in enumerate(paginas):
         lineas = [" ".join(x.split()) for x in pagina.splitlines()]
         lineas = [x for x in lineas if x]
-        if not lineas or sum(len(x) + 1 for x in lineas) < PROSA_MIN or _PRELIMINARES.match(lineas[0]):
+        # « Índice» con una viñeta delante (un carácter privado de Word, «») también es el índice.
+        if not lineas or sum(len(x) + 1 for x in lineas) < PROSA_MIN or _PRELIMINARES.match(re.sub(r"^\W+", "", lineas[0])):
             continue
         de_indice = sum(1 for x in pagina.splitlines() if x.strip() and _LINEA_DE_INDICE.search(x.rstrip()))
         if de_indice >= max(3, len(lineas) // 5):
@@ -129,6 +130,23 @@ def _pdf(crudo: bytes, nombre: str) -> Extraido:
     return extraer_pdf(crudo, nombre)
 
 
+# LibreTexts (y otras páginas con MathJax) empiezan con decenas de líneas «$ \newcommand{\vecs}[1]{...} $»: en el
+# research llenaban los 2.500 caracteres del extracto y el juez veía una página sin contenido (profundidad 0).
+_MACRO = re.compile(r"[\s$()\\]*\\(?:re)?newcommand\b.*|[\s$()\\]*\\(?:def|DeclareMathOperator)\b.*")
+
+
+def sin_macros(texto: str) -> str:
+    """Sin las líneas que solo definen macros de LaTeX (el preámbulo de MathJax), ni los huecos que dejan. Solo si son
+    al menos 3: una página que enseña LaTeX y pone un `\\newcommand` de ejemplo se queda como está."""
+    if "newcommand" not in texto and "\\def" not in texto and "DeclareMathOperator" not in texto:
+        return texto
+    lineas = texto.split("\n")
+    quedan = [x for x in lineas if not _MACRO.fullmatch(x)]
+    if len(lineas) - len(quedan) < 3:
+        return texto
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(quedan))
+
+
 def _html(crudo: bytes, nombre: str) -> Extraido:
     import trafilatura
 
@@ -136,7 +154,7 @@ def _html(crudo: bytes, nombre: str) -> Extraido:
 
     original = crudo.decode("utf-8", "replace")
     html = html_a_texto(original)
-    texto = trafilatura.extract(html, include_tables=True, output_format="markdown") or ""
+    texto = sin_macros(trafilatura.extract(html, include_tables=True, output_format="markdown") or "")
     meta_obj = trafilatura.extract_metadata(html)
     meta: dict = {}
     titulo = nombre
@@ -267,8 +285,46 @@ def _txt(crudo: bytes, nombre: str) -> Extraido:
     return Extraido(crudo, texto, {}, "texto plano", Path(nombre).stem)
 
 
+class FormatoEquivocado(FormatoNoAdmitido):
+    """El fichero no es lo que dice su extensión (un .pdf que es texto no lo es: ese se lee como texto). Reintentar
+    no lo arregla: el motivo empieza por `PREFIJO_EQUIVOCADO`."""
+
+
+PREFIJO_EQUIVOCADO = "formato equivocado: "
+
+
+def es_pdf(crudo: bytes) -> bool:
+    # La firma «%PDF-» puede ir tras unos bytes de basura: los lectores la buscan en el primer kilobyte.
+    return b"%PDF-" in crudo[:1024]
+
+
+def parece_texto(crudo: bytes) -> bool:
+    """Texto plano legible (UTF-8 o un latin-1 viejo), no un binario: sin bytes nulos y casi sin caracteres de
+    control en el principio."""
+    muestra = crudo[:8192]
+    if b"\x00" in muestra:
+        return False
+    control = sum(1 for b in muestra if b < 32 and b not in (9, 10, 12, 13))
+    return control <= len(muestra) * 0.01
+
+
 def extraer_bytes(crudo: bytes, nombre: str, tipo: str | None = None) -> Extraido:
     tipo = tipo or tipo_de(nombre)
+    if tipo == "pdf" and not es_pdf(crudo):
+        # Un .pdf que en realidad es texto (o está vacío) se lee como texto; si es otra cosa, se dice en castellano
+        # (antes salía «no se pudo extraer: Failed to open stream», y además ofrecía reintentar).
+        if not parece_texto(crudo):
+            raise FormatoEquivocado(f"{PREFIJO_EQUIVOCADO}no es un PDF aunque el nombre acabe en .pdf")
+        e = _txt(crudo, nombre)
+        e.metadatos["formato_real"] = "texto plano (el nombre acababa en .pdf)"
+        return e
+    if tipo != "pdf" and es_pdf(crudo[:16]):
+        e = _pdf(crudo, nombre)
+        e.metadatos["formato_real"] = f"PDF (el nombre acababa en .{tipo})"
+        return e
+    if tipo != "pdf" and not parece_texto(crudo):
+        raise FormatoEquivocado(f"{PREFIJO_EQUIVOCADO}no es texto aunque el nombre acabe en .{tipo} "
+                                "(¿un Word, una imagen o un comprimido con otro nombre?)")
     return {"pdf": _pdf, "md": _markdown, "html": _html, "txt": _txt}[tipo](crudo, nombre)
 
 

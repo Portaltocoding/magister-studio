@@ -1,5 +1,5 @@
 from magister.config import ajustes
-from magister.flujo.comun import fase, hoy_de, perfil_de
+from magister.flujo.comun import ahora_de, fase, hoy_de, perfil_de
 from magister.flujo.estado import Estado
 from magister.plan.calendario import NoCabe, ReglasCalendario, a_hora
 from magister.plan.calendario import calendarizar as repartir
@@ -21,7 +21,8 @@ async def calendarizar(estado: Estado) -> dict:
     plan = Plan.model_validate(estado["plan"])
     hoy = hoy_de(estado)
     inicios = [a_hora(h) for h in (perfil.inicio_por_dia or [None] * 7)]
-    resultado = repartir(plan, perfil.horas_por_dia or [0] * 7, inicios, hoy, perfil.plazo, {}, reglas_calendario())
+    resultado = repartir(plan, perfil.horas_por_dia or [0] * 7, inicios, hoy, perfil.plazo, {}, reglas_calendario(),
+                         ahora=ahora_de(estado))
     if isinstance(resultado, NoCabe):
         return {"salida": "negociar", "necesarias": plan.total_horas, "sesiones": []}
     return {"sesiones": [s.a_dict() for s in resultado.sesiones], "salida": "proponer"}

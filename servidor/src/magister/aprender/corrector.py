@@ -16,6 +16,9 @@ class Error(BaseModel):
     por_que: str
     cita: str = ""
     cita_descartada: bool = False
+    # La pone el código, no el modelo: la afirmación está tal cual en la respuesta. Si no, es un resumen del corrector
+    # y la interfaz no la pinta como cita tuya.
+    literal: bool = False
 
 
 class Correccion(BaseModel):
@@ -44,11 +47,27 @@ def fragmentos_marcados(fragmentos: list[str]) -> str:
                                         for n, f in enumerate(fragmentos, 1))
 
 
-def comprobar(c: Correccion, fragmentos: list[str]) -> Correccion:
+def respuesta_delimitada(respuesta: str) -> str:
+    """La respuesta del alumno tal como entra en el prompt, entre `<respuesta_del_alumno>`: no puede cerrar ese
+    bloque ni abrir otro (una «revisión del profesor» metida en la respuesta se queda dentro, como texto suyo)."""
+    from magister.seguridad.entrada import neutralizar_etiquetas
+
+    return neutralizar_etiquetas(respuesta)
+
+
+def _sin_comillas(t: str) -> str:
+    return t.strip().strip("«»\"'“”‘’").strip()
+
+
+def comprobar(c: Correccion, fragmentos: list[str], respuesta: str = "") -> Correccion:
     todo = _plano(" ".join(fragmentos))
+    # La afirmación se compara con la respuesta tal cual y con la que vio el modelo (con los ángulos cambiados).
+    dichas = (_plano(respuesta), _plano(respuesta_delimitada(respuesta))) if respuesta.strip() else ()
     for e in c.errores:
         if e.cita and _plano(e.cita) not in todo:
             e.cita, e.cita_descartada = "", True
+        a = _plano(_sin_comillas(e.afirmacion))
+        e.literal = bool(a) and any(a in d for d in dichas)
     if c.nota == "fallo" and not c.ideas_ausentes and not c.errores and c.tipo_error != "fuera_de_tema":
         c.nota = "parcial"  # un fallo tiene que decir qué falta o qué está mal
     return c
@@ -57,10 +76,10 @@ def comprobar(c: Correccion, fragmentos: list[str]) -> Correccion:
 async def corregir(pregunta: str, referencia: str, fragmentos: list[str], respuesta: str) -> tuple[Correccion, str]:
     """Devuelve la corrección y la versión del corrector."""
     p = cargar("corrector")
-    sistema = p.rellenar(pregunta=pregunta, referencia=referencia, respuesta=respuesta,
+    sistema = p.rellenar(pregunta=pregunta, referencia=referencia, respuesta=respuesta_delimitada(respuesta),
                          fragmentos=fragmentos_marcados(fragmentos))
     c = await estructurar(sistema, "Devuelve la corrección.", Correccion)
-    return comprobar(c, fragmentos), p.etiqueta
+    return comprobar(c, fragmentos, respuesta), p.etiqueta
 
 
 class CorreccionItem(Correccion):
@@ -77,12 +96,13 @@ async def corregir_examen(items: list[dict]) -> tuple[dict[str, CorreccionItem],
     p = cargar("corrector_examen")
     bloque = "\n\n".join(
         f'<item id="{x["id"]}">\n<pregunta>{x["pregunta"]}</pregunta>\n<referencia>{x["referencia"]}</referencia>\n'
-        f'<respuesta_del_alumno>{x["respuesta"]}</respuesta_del_alumno>\n</item>' for x in items)
+        f'<respuesta_del_alumno>\n{respuesta_delimitada(x["respuesta"])}\n</respuesta_del_alumno>\n</item>' for x in items)
     pedidos = {x["id"] for x in items}
+    respuestas = {x["id"]: x["respuesta"] for x in items}
 
     def reglas(r: CorreccionExamen) -> list[str]:
         return [f"falta la corrección de {i}" for i in sorted(pedidos - {c.id for c in r.correcciones})]
 
     r = await estructurar(p.rellenar(items=bloque), "Devuelve la corrección de cada respuesta.", CorreccionExamen,
                           reglas=reglas)
-    return {c.id: comprobar(c, []) for c in r.correcciones}, p.etiqueta
+    return {c.id: comprobar(c, [], respuestas.get(c.id, "")) for c in r.correcciones}, p.etiqueta

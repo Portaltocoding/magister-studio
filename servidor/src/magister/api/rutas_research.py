@@ -47,7 +47,10 @@ async def lanzar(cuerpo: ResearchEntrada) -> dict:
     async with nueva_sesion() as s:
         if await dp.plan_por_id(s, cuerpo.plan_id) is None:
             raise HTTPException(404, "plan no encontrado")
-    return await tareas.lanzar(cuerpo.plan_id, cuerpo.leccion_claves, cuerpo.sistema, cuerpo.objetivos, cuerpo.forzar)
+    try:
+        return await tareas.lanzar(cuerpo.plan_id, cuerpo.leccion_claves, cuerpo.sistema, cuerpo.objetivos, cuerpo.forzar)
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from None
 
 
 @rutas.get("/research/{tarea_id}")

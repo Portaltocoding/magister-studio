@@ -12,10 +12,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from magister.api.rutas_practica import registrar
+from magister.api.rutas_practica import explicacion_fija, registrar
 from magister.aprender import examen, practica
 from magister.aprender.corrector import corregir_examen
-from magister.datos.aprender import Examen
+from magister.datos.aprender import Examen, Intento
 from magister.datos.material import Pregunta, PreguntaConcepto
 from magister.datos.plan import LeccionFila
 from magister.datos.sesion import sesion_por_peticion
@@ -54,6 +54,11 @@ class Corregir(BaseModel):
 class Final(BaseModel):
     resultados: list[Resultado]
     segundos: int = Field(ge=0)
+
+
+def _clave(examen_id: int, pregunta_id: str) -> str:
+    """La clave de idempotencia de una respuesta de examen. La web usa la misma al corregir de una en una."""
+    return f"examen-{examen_id}-{pregunta_id}"
 
 
 def _resumen(e: Examen) -> dict:
@@ -153,11 +158,16 @@ async def corregir_entero(examen_id: int, cuerpo: Corregir, s: AsyncSession = De
     por_id = {r.pregunta_id: r for r in cuerpo.resultados if r.respuesta.strip()}
     filas = {p.id: p for p in (await s.scalars(select(Pregunta).where(Pregunta.id.in_([q["pregunta_id"] for q in e.preguntas])))).all()}
     notas: dict[str, tuple[str, str, dict, str]] = {}  # id -> nota, explicacion, correccion, version
+    # Lo que ya se corrigió y se guardó (una corrección anterior que se cortó, o la vuelta de una en una de la web):
+    # no se corrige otra vez, se repite lo guardado.
+    claves = {_clave(examen_id, q["pregunta_id"]): q["pregunta_id"] for q in e.preguntas}
+    for i in (await s.scalars(select(Intento).where(Intento.clave_idempotencia.in_(list(claves))))).all():
+        notas[claves[i.clave_idempotencia]] = (i.nota_corrector, i.explicacion or "", i.correccion or {}, i.version_corrector or "")
     abiertas = []
     for k, q in enumerate(e.preguntas):
         r = por_id.get(q["pregunta_id"])
         p = filas.get(q["pregunta_id"])
-        if r is None or p is None:
+        if r is None or p is None or q["pregunta_id"] in notas:
             continue
         if p.opciones:
             buena = next((o["texto"] for o in p.opciones if o.get("buena")), "")
@@ -177,7 +187,9 @@ async def corregir_entero(examen_id: int, cuerpo: Corregir, s: AsyncSession = De
             raise HTTPException(502, f"no se pudo corregir de una vez: faltan {', '.join(faltan)}")
         for a in abiertas:
             c = hechas[a["id"]]
-            notas[a["pregunta_id"]] = (c.nota, c.explicacion, c.model_dump(exclude={"id", "explicacion"}), version)
+            # Como en el repaso: un fallo sin errores citados lleva un texto fijo que no contradice la nota.
+            explicacion = (explicacion_fija(c, a["referencia"]) if c.nota == "fallo" and not c.errores else None) or c.explicacion
+            notas[a["pregunta_id"]] = (c.nota, explicacion, c.model_dump(exclude={"id", "explicacion"}), version)
     momento = datetime.now(timezone.utc)
     resultados = []
     for q in e.preguntas:
@@ -186,10 +198,12 @@ async def corregir_entero(examen_id: int, cuerpo: Corregir, s: AsyncSession = De
         intento_id = None
         if r is not None and n is not None:
             servida = await practica.ultima_servida(q["pregunta_id"])
+            # Clave estable por examen y pregunta: corregir dos veces (o la vuelta de una en una de la web, que usa la
+            # misma) no duplica el intento; `registrar` devuelve el que ya estaba.
             intento_id, _ = await registrar(
                 pregunta_id=q["pregunta_id"], concepto_id=q["concepto_id"], momento=momento, tipo="espaciado",
                 respuesta=r.respuesta, explicacion=n[1], confianza=r.confianza, latencia_ms=None, nota=n[0], correccion=n[2],
-                version_corrector=n[3], clave=f"examen-{examen_id}-{q['pregunta_id']}", servida=servida)
+                version_corrector=n[3], clave=_clave(examen_id, q["pregunta_id"]), servida=servida)
         resultados.append(Resultado(pregunta_id=q["pregunta_id"], respuesta=r.respuesta if r else "", nota=n[0] if n else None,
                                     intento_id=intento_id, explicacion=n[1] if n else "", confianza=r.confianza if r else None))
     return await terminar(examen_id, Final(resultados=resultados, segundos=cuerpo.segundos), s)

@@ -36,7 +36,8 @@ class EntradaMaterial(BaseModel):
 
 class Definicion(BaseModel):
     termino: str
-    ingles: str | None = Field(None, description="Término en inglés si se usa en la práctica, si no null")
+    ingles: str | None = Field(None, description="Término en inglés solo si el campo trabaja en inglés (informática, "
+                               "ciencias); si el término viene de otra lengua, el original; en lo demás, null")
     definicion: str = Field(description="Una frase")
 
 

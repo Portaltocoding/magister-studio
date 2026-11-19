@@ -14,6 +14,9 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from magister.config import ajustes
 
 MAXIMO_CUERPO = 64 * 1024  # 64 KiB: sobra para un mensaje de chat.
+# Un fichero subido (multipart) no es un mensaje: su tope de verdad lo pone la ruta (50 MiB en las fuentes); aquí solo
+# se deja pasar, con holgura para los campos del formulario.
+MAXIMO_SUBIDA = 51 * 1024 * 1024
 RUTAS_LIBRES = {"/api/salud"}
 
 
@@ -76,10 +79,13 @@ class Proteccion:
                 await _responder(send, 403, "petición desde otra web: no se acepta")
                 return
 
+        subida = tipo.startswith("multipart/form-data")
+        maximo = MAXIMO_SUBIDA if subida else MAXIMO_CUERPO
+        demasiado = "el fichero pasa del máximo de 50 MiB" if subida else "el cuerpo pasa del máximo de 64 KiB"
         longitud = cabeceras.get("content-length")
         if longitud is not None:
-            if not longitud.isdigit() or int(longitud) > MAXIMO_CUERPO:
-                await _responder(send, 413, "el cuerpo pasa del máximo de 64 KiB")
+            if not longitud.isdigit() or int(longitud) > maximo:
+                await _responder(send, 413, demasiado)
                 return
             await self.app(scope, receive, send)
             return
@@ -97,8 +103,8 @@ class Proteccion:
             if mensaje["type"] != "http.request":
                 break
             leido += len(mensaje.get("body", b""))
-            if leido > MAXIMO_CUERPO:
-                await _responder(send, 413, "el cuerpo pasa del máximo de 64 KiB")
+            if leido > maximo:
+                await _responder(send, 413, demasiado)
                 return
             if not mensaje.get("more_body", False):
                 break

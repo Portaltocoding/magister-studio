@@ -1,4 +1,5 @@
 import type { Pregunta, Respuestas } from './Cuestionario.tsx'
+import { fechaLarga } from './formato.ts'
 
 // Antes de un plan: lo que el diagnóstico necesita, en cuatro pasos. Con esto suele salir el plan a la primera.
 export const PREGUNTAS_PLAN: Pregunta[] = [
@@ -62,6 +63,23 @@ export function horasTotales(r: Respuestas): number {
   return Math.round((HORAS_BASE[String(r.profundidad)] ?? 25) * (AJUSTE_NIVEL[String(r.nivel)] ?? 1))
 }
 
+// La fecha local como ISO (AAAA-MM-DD), sin pasar por UTC.
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const masDias = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, 12)
+
+// La fecha límite más cercana que se admite (mañana) y la más lejana (dentro de cinco años): fuera de eso es un error al
+// escribirla, no un plan.
+export const fechaMinima = (hoy = new Date()) => iso(masDias(hoy, 1))
+export const fechaMaxima = (hoy = new Date()) => iso(masDias(hoy, 5 * 365))
+
+// Qué tiene de malo la fecha escrita, o null si vale (o si no es una fecha: «en un mes», «sin fecha límite»).
+export function errorFecha(v: string | string[] | undefined, hoy = new Date()): string | null {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null
+  if (v < fechaMinima(hoy)) return 'Esa fecha ya ha pasado o es hoy: elige una a partir de mañana.'
+  if (v > fechaMaxima(hoy)) return 'Esa fecha queda a más de cinco años: revisa el año o elige «Sin fecha».'
+  return null
+}
+
 // Días hasta la fecha límite; null si no hay.
 export function diasHasta(r: Respuestas, hoy = new Date()): number | null {
   const v = String(r.plazo ?? '')
@@ -79,9 +97,12 @@ const duracion = (h: number) => {
   return hh ? `${hh} h${mm ? ` ${mm} min` : ''}` : `${mm} min`
 }
 
-// Tramos que caben antes de la fecha: entre semana, todos los días o fines de semana, y uno con holgura.
-export function sugerirHoras(r: Respuestas): { valor: string; etiqueta: string; desc?: string }[] {
-  const dias = diasHasta(r)
+const horasPorSemana = (r: Respuestas, dias: number) => (horasTotales(r) * 1.15 * 7) / dias
+
+// Tramos que caben antes de la fecha: entre semana, todos los días o fines de semana, y uno con holgura. Solo los que
+// se pueden hacer: si la fecha no da para ninguno, no hay opciones (explicarHoras dice por qué).
+export function sugerirHoras(r: Respuestas, hoy = new Date()): { valor: string; etiqueta: string; desc?: string }[] {
+  const dias = diasHasta(r, hoy)
   if (dias == null)
     return [
       { valor: 'media hora al día entre semana', etiqueta: '30 min entre semana' },
@@ -105,25 +126,37 @@ export function sugerirHoras(r: Respuestas): { valor: string; etiqueta: string; 
       etiqueta: `${duracion(t.h)} ${t.corto}`,
       desc: i === 0 && t.corto === 'de lunes a viernes' ? 'Recomendado: constante y con el fin de semana libre' : undefined,
     }))
-  const holgura = duracion((necesarias / laborables) * 1.3)
-  ops.push({ valor: `${holgura} al día de lunes a viernes`, etiqueta: `${holgura} de lunes a viernes`, desc: 'Con holgura: acabas antes' })
+  // La holgura, solo si también cabe en el tope de lunes a viernes.
+  const hHolgura = (necesarias / laborables) * 1.3
+  if (hHolgura <= tramos[0].max) {
+    const holgura = duracion(hHolgura)
+    ops.push({ valor: `${holgura} al día de lunes a viernes`, etiqueta: `${holgura} de lunes a viernes`, desc: 'Con holgura: acabas antes' })
+  }
   return ops
 }
 
-export function explicarHoras(r: Respuestas): string {
+export function explicarHoras(r: Respuestas, hoy = new Date()): string {
   const total = horasTotales(r)
-  const dias = diasHasta(r)
+  const dias = diasHasta(r, hoy)
   if (dias == null) return `Para esta profundidad calculo unas ${total} h en total. Sin fecha, elige un ritmo que puedas mantener.`
-  const porSemana = (total * 1.15 * 7) / dias
+  const porSemana = horasPorSemana(r, dias)
+  const plazo = `${dias} ${dias === 1 ? 'día' : 'días'}`
+  if (!sugerirHoras(r, hoy).length)
+    return (
+      `Unas ${total} h en ${plazo} no caben: serían unas ${Math.ceil(porSemana)} h por semana. ` +
+      'Vuelve atrás y elige una fecha más lejana o menos profundidad, o escribe en «Otro» lo que de verdad puedes dedicarle.'
+    )
   const aviso = porSemana > 20 ? ' Va justo: alarga la fecha o baja la profundidad.' : ''
-  return `Unas ${total} h en ${dias} días: unas ${Math.ceil(porSemana)} h por semana, con margen para repasos.${aviso}`
+  return `Unas ${total} h en ${plazo}: unas ${Math.ceil(porSemana)} h por semana, con margen para repasos.${aviso}`
 }
 
 export function mensajePlan(r: Respuestas): string {
-  const plazo = /^\d{4}-\d{2}-\d{2}$/.test(String(r.plazo)) ? `antes del ${r.plazo}` : String(r.plazo ?? 'sin fecha límite')
+  const plazo = /^\d{4}-\d{2}-\d{2}$/.test(String(r.plazo)) ? `antes del ${fechaLarga(String(r.plazo))}` : String(r.plazo ?? 'sin fecha límite')
   const prof = ({ esencial: 'lo esencial', estandar: 'a nivel estándar', fondo: 'a fondo' } as Record<string, string>)[String(r.profundidad)] ?? 'a nivel estándar'
+  // El valor de la opción va sin tilde («basico»): en el mensaje, como se lee.
+  const nivel = ({ nada: 'empiezo de cero', basico: 'lo básico', intermedio: 'intermedio', avanzado: 'avanzado' } as Record<string, string>)[String(r.nivel)] ?? String(r.nivel)
   return (
-    `Quiero aprender ${r.tema}, para ${r.objetivo}. Mi nivel: ${r.nivel}. Lo quiero ${prof} (unas ${horasTotales(r)} h en total). ` +
+    `Quiero aprender ${r.tema}, para ${r.objetivo}. Mi nivel: ${nivel}. Lo quiero ${prof} (unas ${horasTotales(r)} h en total). ` +
     `Puedo dedicarle ${r.horas}, ${r.franja ?? 'a cualquier hora'}. Lo quiero ${plazo}.`
   )
 }

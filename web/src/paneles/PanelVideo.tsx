@@ -7,7 +7,15 @@ import Cargando, { DetalleTecnico, mayuscula, mensajeDe, TextoError } from '../c
 import { errorLegible } from '../componentes/errores.ts'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import ControlVoz, { usarAjustesVoz } from '../componentes/ControlVoz.tsx'
-import { pronunciar, vocesMagister, vocesMagisterListas, vozElegida, vozMagister } from '../componentes/voz.ts'
+import {
+  leerAjustesVoz,
+  pedirVozMagister,
+  pronunciar,
+  vocesMagister,
+  vocesMagisterListas,
+  vozElegida,
+  vozMagister,
+} from '../componentes/voz.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
 import { DEMO_IDEMPOTENCIA } from '../escena/demo.ts'
 import { DEMO_INDICES } from '../escena/indices.ts'
@@ -56,7 +64,24 @@ function rutaDemo(): { abierta: boolean; nombre: string; segundo: number } {
 // del equipo, con subtítulos y las diapositivas a la par. Cada vídeo lo pides tú: qué, con qué estilo y cuánto dura.
 
 interface Estados {
-  [clave: string]: { tipos: Record<string, string>; ids?: Record<string, number>; en_marcha?: boolean }
+  [clave: string]: {
+    tipos: Record<string, string>
+    ids?: Record<string, number>
+    en_marcha?: boolean
+    trabajo?: { id: number; estado: string; tipos: string[] } | null
+  }
+}
+
+// La lección cuyo vídeo (un trabajo con guion) está en marcha: al entrar o al recargar se sigue viendo «Haciendo el
+// vídeo de L3» en vez de «Aún no tienes vídeos».
+function videoEnMarcha(estados: Estados): string | null {
+  return Object.entries(estados).find(([, d]) => d.en_marcha && d.trabajo?.tipos?.includes('guion'))?.[0] ?? null
+}
+
+// #/video/<tema>: el plan elegido va también en la ruta, así recargar lo conserva aunque el navegador no guarde nada.
+function temaDeLaRuta(): number | null {
+  const n = Number(window.location.hash.split('?')[0].match(/^#\/video\/(\d+)(?:\/|$)/)?.[1])
+  return Number.isInteger(n) && n > 0 ? n : null
 }
 
 interface VideoInfo {
@@ -118,8 +143,43 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
   const [laVoz, setLaVoz] = useState<SpeechSynthesisVoice | null>(null)
   const marco = useRef<HTMLIFrameElement | null>(null)
   const turno = useRef(0)
+  // Con una voz de Magister (Piper) elegida, cada frase suena en un <audio>; antes la versión narrada solo usaba la del
+  // navegador, y además sin decirlo. Si Piper falla, suena la del navegador y se avisa.
+  const audio = useRef<HTMLAudioElement | null>(null)
+  const audios = useRef(new Map<string, Promise<string | null>>())
+  const [avisoVoz, setAvisoVoz] = useState<string | null>(null)
   // Un vídeo de un solo concepto no casa con las diapositivas de toda la lección: va con tarjetas de escena.
   const conDiapos = !!diaposId && !video.concepto
+
+  // Corta lo que suena (voz del navegador o audio de Magister) sin tocar dónde va.
+  const callar = () => {
+    window.speechSynthesis?.cancel()
+    const a = audio.current
+    if (a) {
+      a.onended = null
+      a.onerror = null
+      a.pause()
+      audio.current = null
+    }
+  }
+  const pedirAudio = (frase: string, vozId: string): Promise<string | null> => {
+    const clave = `${vozId}|${frase}`
+    let p = audios.current.get(clave)
+    if (!p) {
+      p = pedirVozMagister(frase, vozId)
+        .then((b) => (b ? URL.createObjectURL(b) : null))
+        .catch(() => null)
+      audios.current.set(clave, p)
+    }
+    return p
+  }
+  useEffect(() => {
+    const cache = audios.current
+    return () => {
+      for (const p of cache.values()) void p.then((u) => u && URL.revokeObjectURL(u))
+      cache.clear()
+    }
+  }, [video.material_id])
 
   useEffect(() => {
     setFalloLista(null)
@@ -139,7 +199,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
     const oculto = () => {
       if (document.visibilityState === 'hidden') {
         turno.current++
-        window.speechSynthesis?.cancel()
+        callar()
         setVoz((v) => (v === 'sonando' ? 'pausado' : v))
       }
     }
@@ -148,8 +208,9 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
       window.speechSynthesis?.removeEventListener('voiceschanged', cargarVoz)
       document.removeEventListener('visibilitychange', oculto)
       turno.current++
-      window.speechSynthesis?.cancel()
+      callar()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [video.material_id, diaposId, conDiapos, intento])
 
   const pagina = lista && paginas ? 1 + Math.round((e * (paginas - 1)) / Math.max(1, lista.length - 1)) : 1
@@ -163,20 +224,14 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
   const decir = useCallback(
     (ie: number, jf: number) => {
       if (!lista) return
-      const sintesis = window.speechSynthesis
-      sintesis.cancel()
+      callar()
       const mio = ++turno.current
       const frase = lista[ie]?.frases[jf]
       if (!frase) {
         setVoz('parado')
         return
       }
-      const u = new SpeechSynthesisUtterance(frase)
-      u.lang = 'es-ES'
-      const elegida = vozElegida() ?? laVoz
-      if (elegida) u.voice = elegida
-      u.rate = velocidad
-      u.onend = () => {
+      const siguiente = () => {
         if (mio !== turno.current) return
         const sigF = jf + 1 < lista[ie].frases.length ? jf + 1 : 0
         const sigE = sigF === 0 ? ie + 1 : ie
@@ -190,8 +245,44 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
         setF(sigF)
         decir(sigE, sigF)
       }
-      sintesis.speak(u)
+      const conNavegador = () => {
+        if (mio !== turno.current) return
+        const u = new SpeechSynthesisUtterance(frase)
+        u.lang = 'es-ES'
+        const elegida = vozElegida() ?? laVoz
+        if (elegida) u.voice = elegida
+        u.rate = velocidad
+        u.onend = siguiente
+        window.speechSynthesis.speak(u)
+      }
+      const magister = vozMagister()
+      if (!magister) {
+        // Elegiste una voz de Magister y no está (el servidor no la tiene): se dice, no se cambia en silencio.
+        if (leerAjustesVoz().voz?.startsWith('piper:'))
+          setAvisoVoz('La voz de Magister que elegiste no está disponible ahora: suena la del navegador.')
+        conNavegador()
+        return
+      }
+      // Las dos frases siguientes se piden ya, mientras suena esta: sin huecos entre frases.
+      const resto = lista.slice(ie).flatMap((x, k) => (k === 0 ? x.frases.slice(jf + 1) : x.frases))
+      for (const x of resto.slice(0, 2)) void pedirAudio(x, magister)
+      const caer = () => {
+        setAvisoVoz('No he podido usar la voz de Magister: suena la del navegador.')
+        conNavegador()
+      }
+      void pedirAudio(frase, magister).then((url) => {
+        if (mio !== turno.current) return
+        if (!url) return caer()
+        const a = new Audio(url)
+        a.playbackRate = velocidad
+        a.onended = siguiente
+        a.onerror = caer
+        audio.current = a
+        setAvisoVoz(null)
+        a.play().catch(caer)
+      })
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [lista, laVoz, velocidad, nombreVoz],
   )
 
@@ -206,10 +297,15 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
   // Pausa de verdad: se detiene a mitad de frase y sigue desde ahí.
   const tocar = () => {
     const s = window.speechSynthesis
+    const a = audio.current
     if (voz === 'sonando') {
-      s.pause()
+      if (a) a.pause()
+      else s.pause()
       setVoz('pausado')
-    } else if (voz === 'pausado' && s.paused) {
+    } else if (voz === 'pausado' && a && a.paused) {
+      void a.play().catch(() => decir(e, f))
+      setVoz('sonando')
+    } else if (voz === 'pausado' && !a && s.paused) {
       s.resume()
       setVoz('sonando')
     } else {
@@ -219,7 +315,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
   }
   const parar = () => {
     turno.current++
-    window.speechSynthesis.cancel()
+    callar()
     setVoz('parado')
     setE(0)
     setF(0)
@@ -302,7 +398,14 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
         <ControlVoz compacto />
       </div>
       <DescargarVideo video={video} lista={lista} paginas={conDiapos ? paginas : 0} />
-      {!laVoz && <p className="nota">No encuentro una voz en español instalada en tu equipo: se usará la que tenga el navegador.</p>}
+      {avisoVoz && (
+        <p className="nota" role="status">
+          {avisoVoz}
+        </p>
+      )}
+      {!laVoz && !vozMagister() && (
+        <p className="nota">No encuentro una voz en español instalada en tu equipo: se usará la que tenga el navegador.</p>
+      )}
       <div className="video-info">
         <h2>
           <span className="bloques-clave">{video.clave}</span> {video.concepto ?? video.titulo}
@@ -452,8 +555,13 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
           )}
         </>
       ) : (
-        <button type="button" className="boton" onClick={() => void pedirMp4()} title="Diapositivas o tarjetas, la voz de Magister y subtítulos">
-          ⬇ Descargar vídeo
+        <button
+          type="button"
+          className="boton"
+          onClick={() => void pedirMp4()}
+          title="Esta versión narrada en MP4: diapositivas o tarjetas, la voz de Magister y subtítulos (no la animación)"
+        >
+          ⬇ Descargar esta versión en MP4
         </button>
       )}
       {t?.estado === 'fallido' && !enMarcha && (
@@ -498,9 +606,18 @@ function VistaVideo({ video, diaposId }: { video: VideoInfo; diaposId?: number }
       })
   }, [video.material_id, video.animado])
   const cambiar = video.animado && !fallo && (
-    <button className="boton boton-suave video-version" onClick={() => setSencilla((x) => !x)}>
-      {sencilla ? 'Ver animado' : 'Versión narrada (y MP4)'}
-    </button>
+    <>
+      <button className="boton boton-suave video-version" onClick={() => setSencilla((x) => !x)}>
+        {sencilla ? 'Ver animado' : 'Versión narrada (y descarga en MP4)'}
+      </button>
+      {/* El MP4 se monta con las diapositivas (o tarjetas) y la voz: no es esta animación. Se dice aquí, donde se busca. */}
+      {!sencilla && (
+        <p className="nota">
+          Para descargar: el MP4 es la versión narrada (diapositivas o tarjetas con la voz de Magister y subtítulos), no
+          esta animación. Está en «Versión narrada».
+        </p>
+      )}
+    </>
   )
   if (sencilla)
     return (
@@ -532,13 +649,18 @@ function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; e
   const [estilo, setEstilo] = useState('clase')
   const [minutos, setMinutos] = useState(6)
   const [error, setError] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
   const leccion = plan.lecciones.find((l) => l.clave === clave)
+  // Con un trabajo de esa lección en marcha no se pide otro: con `forzar`, el servidor creaba uno nuevo en cada clic.
+  const ocupada = !!estados[clave]?.en_marcha
 
   if (!preparadas.length)
     return <p className="nota">Para hacer un vídeo, primero prepara alguna lección en Lecciones: el guion sale de sus apuntes.</p>
 
   const hacer = async () => {
+    if (enviando || ocupada) return
     setError(null)
+    setEnviando(true)
     const tipos = concepto || estados[clave]?.ids?.diapositivas ? ['guion'] : ['guion', 'diapositivas']
     try {
       await pedir(
@@ -548,6 +670,8 @@ function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; e
       alHecho(clave)
     } catch (e) {
       setError(String((e as Error).message))
+    } finally {
+      setEnviando(false)
     }
   }
 
@@ -594,9 +718,10 @@ function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; e
       </div>
       <BarraCuota accion={{ accion: 'video', minutos }} />
       {error && <TextoError texto={error} />}
+      {ocupada && <p className="nota">Ya se está preparando algo de {clave}: espera a que acabe para pedir otro vídeo.</p>}
       <div className="botones">
-        <button className="boton boton-principal" onClick={hacer}>
-          Hacer el vídeo
+        <button className="boton boton-principal" onClick={hacer} disabled={enviando || ocupada}>
+          {enviando ? 'Pidiendo…' : 'Hacer el vídeo'}
         </button>
         <button className="boton" onClick={alCancelar}>
           Cancelar
@@ -638,11 +763,13 @@ export default function PanelVideo() {
     listarPlanes()
       .then(async (ps) => {
         setPlanes(ps)
-        const activo = planActivo(ps)
+        // El mismo plan activo que el resto de la app (y, si la ruta lo dice, el de la ruta).
+        const activo = planActivo(ps, temaDeLaRuta())
         if (!activo) return setPlan(null)
         const v = await verPlan(activo.tema_id)
         setPlan(v)
-        await cargar(v)
+        const { e } = await cargar(v)
+        setHaciendo((h) => h ?? videoEnMarcha(e))
       })
       .catch((e) => setFalloCarga(mensajeDe(e)))
   }, [cargar, intento])
@@ -656,8 +783,9 @@ export default function PanelVideo() {
       const r = await cargar(plan).catch(() => null)
       if (!r) return
       const { e, v } = r
-      if (v.length > antes && !e[haciendo]?.en_marcha) {
-        setElegido(v[0].material_id)
+      // Acabado (o fallado): se deja de esperar; si salió un vídeo nuevo, se abre.
+      if (!e[haciendo]?.en_marcha) {
+        if (v.length > antes) setElegido(v[0].material_id)
         setHaciendo(null)
       }
     }, 5000)
@@ -733,10 +861,11 @@ export default function PanelVideo() {
               verPlan(Number(e.target.value))
                 .then(async (v) => {
                   recordarPlan(v.tema_id)
+                  window.history.replaceState(null, '', `#/video/${v.tema_id}`)
                   setPlan(v)
                   setElegido(null)
                   setNuevo(false)
-                  await cargar(v)
+                  setHaciendo(videoEnMarcha((await cargar(v)).e))
                 })
                 .catch((err) => setFalloCarga(mensajeDe(err)))
             }
@@ -786,7 +915,7 @@ export default function PanelVideo() {
       {actual ? (
         <VistaVideo key={actual.material_id} video={actual} diaposId={estados[actual.clave]?.ids?.diapositivas} />
       ) : (
-        !nuevo && (
+        !nuevo && !haciendo && (
           <Vacio
             etiqueta="Aún no tienes vídeos"
             titulo="Haz el primero"

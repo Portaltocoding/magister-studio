@@ -1,10 +1,10 @@
 """El plan aceptado, el recálculo tras un atraso y el calendario (v0.2)."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from magister.datos import plan as dp
@@ -12,18 +12,42 @@ from magister.datos.sesion import sesion_por_peticion
 from magister.flujo import planes
 from magister.config import ajustes
 from magister.plan.apoyo import necesidad_efectiva
+from magister.plan.calendario import Sesion, error_en_desde
 from magister.plan.horizonte import motivo_automatico, texto_automatico
 from magister.plan.esquemas import Necesidad
 
 rutas = APIRouter(prefix="/api")
 
 
+def hoy() -> date:
+    return date.today()
+
+
+def hora_actual() -> time | None:
+    """La hora de ahora si es el mismo día que `hoy()` (en las pruebas, que fijan el día, no hay hora)."""
+    ahora = datetime.now()
+    return ahora.time().replace(second=0, microsecond=0) if ahora.date() == hoy() else None
+
+
 class Recalcular(BaseModel):
     desde: date
 
 
+class SesionReajuste(BaseModel):
+    """Una sesión del reajuste que aceptas, tal como la propuso `POST /plan/reajuste` (`sesiones`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    clave: str = Field(min_length=1, max_length=20)
+    fecha: date
+    inicio: time | None = None
+    horas: float
+
+
 class Reajuste(BaseModel):
-    sesiones: list[dict]
+    model_config = ConfigDict(extra="forbid")
+
+    sesiones: list[SesionReajuste] = Field(max_length=2000)
 
 
 class EstadoSesion(BaseModel):
@@ -62,12 +86,12 @@ async def con_necesidad(s: AsyncSession, vista: dict) -> dict:
 
 @rutas.get("/planes")
 async def listar_planes(s: AsyncSession = Depends(sesion_por_peticion)) -> list[dict]:
-    return await planes.resumen_planes(s, date.today())
+    return await planes.resumen_planes(s, hoy())
 
 
 @rutas.get("/temas/{tema_id}/plan")
 async def ver_plan(tema_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
-    vista = await planes.vista_plan(s, tema_id, date.today())
+    vista = await planes.vista_plan(s, tema_id, hoy())
     if vista is None:
         raise HTTPException(404, "este tema no tiene plan aceptado")
     return await con_necesidad(s, vista)
@@ -86,7 +110,10 @@ async def cambiar_necesidad(plan_id: int, clave: str, cuerpo: NecesitaFuentes,
 
 @rutas.post("/temas/{tema_id}/plan/recalcular")
 async def recalcular(tema_id: int, cuerpo: Recalcular, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
-    r = await planes.recalcular(s, tema_id, cuerpo.desde)
+    error = error_en_desde(cuerpo.desde, hoy())
+    if error:
+        raise HTTPException(422, error)
+    r = await planes.recalcular(s, tema_id, cuerpo.desde, hora_actual() if cuerpo.desde == hoy() else None)
     if r is None:
         raise HTTPException(404, "este tema no tiene plan aceptado")
     if isinstance(r, str):
@@ -103,8 +130,6 @@ class Horario(BaseModel):
 @rutas.put("/temas/{tema_id}/plan/horario")
 async def cambiar_horario(tema_id: int, cuerpo: Horario, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     """Cambia cuántas horas y a qué hora estudias cada día, y recoloca lo pendiente desde hoy."""
-    from datetime import date
-
     if any(h < 0 or h > 12 for h in cuerpo.horas_por_dia) or sum(cuerpo.horas_por_dia) <= 0:
         raise HTTPException(422, "Pon entre 0 y 12 horas por día, y al menos un día con horas.")
     fila = await dp.plan_aceptado(s, tema_id)
@@ -112,7 +137,7 @@ async def cambiar_horario(tema_id: int, cuerpo: Horario, s: AsyncSession = Depen
         raise HTTPException(404, "este tema no tiene plan aceptado")
     fila.perfil = {**(fila.perfil or {}), "horas_por_dia": cuerpo.horas_por_dia, "inicio_por_dia": cuerpo.inicio_por_dia}
     await s.flush()
-    r = await planes.recalcular(s, tema_id, date.today())
+    r = await planes.recalcular(s, tema_id, hoy(), hora_actual())
     if isinstance(r, str):
         await s.rollback()
         raise HTTPException(409, r)
@@ -131,6 +156,8 @@ async def marcar_sesion(sesion_id: int, cuerpo: EstadoSesion, s: AsyncSession = 
 @rutas.patch("/planes/{plan_id}/lecciones/{clave}/hecha")
 async def marcar_leccion(plan_id: int, clave: str, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     """Cerrar una lección: todas sus sesiones pendientes pasan a hechas, también las de otros días."""
+    if await s.get(dp.LeccionFila, (plan_id, clave)) is None:
+        raise HTTPException(404, "lección no encontrada")
     return {"plan_id": plan_id, "clave": clave, "marcadas": await dp.marcar_leccion_hecha(s, plan_id, clave)}
 
 
@@ -138,7 +165,7 @@ async def marcar_leccion(plan_id: int, clave: str, s: AsyncSession = Depends(ses
 async def ver_calendario(
     desde: date | None = None, hasta: date | None = None, s: AsyncSession = Depends(sesion_por_peticion)
 ) -> list[dict]:
-    inicio = desde or date.today() - timedelta(days=date.today().weekday())
+    inicio = desde or hoy() - timedelta(days=hoy().weekday())
     return await planes.calendario(s, inicio, hasta or inicio + timedelta(days=27))
 
 
@@ -154,7 +181,13 @@ async def proponer_reajuste(tema_id: int, s: AsyncSession = Depends(sesion_por_p
 
 @rutas.post("/temas/{tema_id}/plan/reajuste/aceptar")
 async def aceptar_reajuste(tema_id: int, cuerpo: Reajuste, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
-    r = await planes.aplicar_reajuste(s, tema_id, cuerpo.sesiones, date.today())
+    """Guarda el reajuste propuesto. Se comprueba antes de borrar nada: una lista vacía, una lección que no está en el
+    plan, horas fuera de (0, 12] o una fecha anterior a hoy dan 422 con el motivo."""
+    sesiones = [Sesion(x.fecha, x.inicio, x.clave, x.horas) for x in cuerpo.sesiones]
+    try:
+        r = await planes.aplicar_reajuste(s, tema_id, sesiones, hoy())
+    except planes.SesionesNoValidas as e:
+        raise HTTPException(422, str(e)) from None
     if r is None:
         raise HTTPException(404, "este tema no tiene plan aceptado")
     return r

@@ -7,6 +7,7 @@ import { mensajeDe } from '../componentes/Cargando.tsx'
 import Pensando from '../componentes/Pensando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
+import { repasosDelPlan, siguienteLeccion } from '../componentes/repaso.ts'
 
 type EstadoConcepto = 'nuevo' | 'flojo' | 'aprendiendo' | 'dominado'
 
@@ -21,6 +22,8 @@ interface Concepto {
   fallos: number
   proxima: string | null
   repasos: { momento: string; nota: string }[]
+  // Preguntas activas: con 0 nunca entra en el repaso; con 1, la vuelta de un fallo repite la misma.
+  preguntas?: number
 }
 
 interface Resumen {
@@ -33,14 +36,6 @@ interface Resumen {
   racha: number
   minutos_practica: number
   intentos?: number
-}
-
-interface Hoy {
-  estado: string
-  leccion_clave?: string
-  titulo?: string
-  repasos: number
-  material_id?: number | null
 }
 
 interface EstadoMaterial {
@@ -313,7 +308,8 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
   const [carga, setCarga] = useState<{ fecha: string; repasos: number; minutos: number }[]>([])
   const [tuya, setTuya] = useState<Tramo[]>([])
   const [modelo, setModelo] = useState<Tramo[]>([])
-  const [hoy, setHoy] = useState<Hoy | null>(null)
+  // La cola de repaso es de todos los planes; aquí se cuentan los de este.
+  const [cola, setCola] = useState<{ plan_id: number }[]>([])
   const [abierta, setAbierta] = useState<string | null>(null)
   const [elegido, setElegido] = useState<Concepto | null>(null)
   const { sobre, nodo: aviso } = usarAviso()
@@ -324,11 +320,12 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
     setFalloPlan(null)
     setNombre(p.tema)
     // Si falla, se queda el plan que estaba (y vuelve a poner su nombre) en vez de dejar la pantalla a medias.
-    Promise.all([verPlan(p.tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${p.plan_id}/materiales`)])
-      .then(([v, m]) => {
+    Promise.all([verPlan(p.tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${p.plan_id}/materiales`), cifrasDe(p.plan_id)])
+      .then(([v, m, cifras]) => {
         recordarPlan(p.tema_id)
         setPlan(v)
         setMateriales(m)
+        ponerCifras(cifras)
       })
       .catch(() => {
         setNombre((n) => (plan ? (planes?.find((x) => x.plan_id === plan.plan_id)?.tema ?? n) : n))
@@ -339,35 +336,46 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
   const [fallo, setFallo] = useState(false)
   const [intento, setIntento] = useState(0)
 
+  // Las cifras de un plan: con un plan elegido, todo lo que se enseña es de ese plan (la racha no: es de todos).
+  const cifrasDe = (planId: number | null) => {
+    const q = planId != null ? `plan_id=${planId}` : ''
+    return Promise.all([
+      pedir<Resumen>(`/api/progreso/resumen${q ? `?${q}` : ''}`),
+      pedir<typeof carga>(`/api/progreso/carga?dias=14${q ? `&${q}` : ''}`),
+      pedir<Tramo[]>(`/api/progreso/calibracion?fuente=usuario${q ? `&${q}` : ''}`),
+      pedir<Tramo[]>(`/api/progreso/calibracion?fuente=modelo${q ? `&${q}` : ''}`),
+    ])
+  }
+  const ponerCifras = ([r, cg, tu, mo]: Awaited<ReturnType<typeof cifrasDe>>) => {
+    setResumen(r)
+    setCarga(cg)
+    setTuya(tu)
+    setModelo(mo)
+  }
+
   // Todo llega junto y se pinta de una vez: así la pantalla no da saltos mientras carga.
   useEffect(() => {
     setFallo(false)
-    Promise.all([
-      listarPlanes(),
-      pedir<Resumen>('/api/progreso/resumen'),
-      pedir<Concepto[]>('/api/progreso/conceptos'),
-      pedir<typeof carga>('/api/progreso/carga?dias=14'),
-      pedir<Tramo[]>('/api/progreso/calibracion?fuente=usuario'),
-      pedir<Tramo[]>('/api/progreso/calibracion?fuente=modelo'),
-      pedir<Hoy>('/api/hoy'),
-    ])
-      .then(async ([ps, r, c, cg, tu, mo, h]) => {
+    Promise.all([listarPlanes(), pedir<Concepto[]>('/api/progreso/conceptos'), pedir<{ plan_id: number }[]>('/api/practica/cola')])
+      .then(async ([ps, c, co]) => {
         const activo = planActivo(ps)
         if (activo) {
-          const [v, m] = await Promise.all([verPlan(activo.tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${activo.plan_id}/materiales`)])
+          const [v, m, cifras] = await Promise.all([
+            verPlan(activo.tema_id),
+            pedir<Record<string, EstadoMaterial>>(`/api/planes/${activo.plan_id}/materiales`),
+            cifrasDe(activo.plan_id),
+          ])
           setNombre(activo.tema)
           setPlan(v)
           setMateriales(m)
-        }
-        setResumen(r)
+          ponerCifras(cifras)
+        } else ponerCifras(await cifrasDe(null))
         setConceptos(c)
-        setCarga(cg)
-        setTuya(tu)
-        setModelo(mo)
-        setHoy(h)
+        setCola(co)
         setPlanes(ps)
       })
       .catch(() => setFallo(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intento])
 
   const delPlan = useMemo(() => conceptos.filter((c) => !plan || c.plan_id === plan.plan_id), [conceptos, plan])
@@ -410,6 +418,10 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
   const maxCarga = Math.max(1, ...carga.map((c) => c.repasos))
   const respuestas = tuya.reduce((a, t) => a + t.n, 0)
   const hoyIso = carga[0]?.fecha
+  // Lo siguiente de ESTE plan: su primera lección sin hacer y sus repasos pendientes (antes salía la de otro plan).
+  const proxima = plan ? siguienteLeccion(lecciones) : null
+  const repasosPlan = plan ? repasosDelPlan(cola, plan.plan_id) : 0
+  const conMaterial = (clave: string) => !!materiales[clave]?.tipos.apuntes
 
   return (
     <div className="panel progreso-panel">
@@ -471,22 +483,22 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
               {plan.fin ? ` · acabas el ${fechaCorta(plan.fin)}` : ''}
             </p>
           </div>
-          {hoy && (hoy.titulo || hoy.repasos > 0) && (
+          {(proxima || repasosPlan > 0) && (
             <div className="pg-siguiente">
               <span className="pg-etq">Lo siguiente</span>
-              {hoy.titulo && (
+              {proxima && (
                 <>
                   <strong>
-                    {hoy.leccion_clave} · {hoy.titulo}
+                    {proxima.clave} · {proxima.titulo}
                   </strong>
-                  <button className="boton boton-principal" onClick={() => (hoy.material_id ? irARuta('#/foco/hoy') : irA('tutor'))}>
-                    {hoy.material_id ? 'Estudiarla en modo foco' : 'Prepararla'}
+                  <button className="boton boton-principal" onClick={() => irARuta(`#/fichas/${plan.tema_id}/${proxima.clave}`)}>
+                    {conMaterial(proxima.clave) ? 'Estudiarla' : 'Prepararla'}
                   </button>
                 </>
               )}
-              {hoy.repasos > 0 && (
-                <button className="boton" onClick={() => irA('repaso')}>
-                  {plural(hoy.repasos, 'repaso pendiente', 'repasos pendientes')}
+              {repasosPlan > 0 && (
+                <button className="boton" onClick={() => irA('repaso')} title="En Repaso salen junto a los de tus otros planes">
+                  {plural(repasosPlan, 'repaso pendiente', 'repasos pendientes')} de este plan
                 </button>
               )}
             </div>
@@ -511,11 +523,17 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
           </div>
           <div className="pg-cifra">
             <strong>{plural(resumen.racha, 'día', 'días')}</strong>
-            <span>seguidos estudiando · {resumen.dias_estudiados} en total</span>
+            <span>
+              seguidos estudiando{plan ? ' (cualquier plan)' : ''} · {plural(resumen.dias_estudiados, 'día', 'días')}
+              {plan ? ' con este plan' : ' en total'}
+            </span>
           </div>
           <div className="pg-cifra">
             <strong>{resumen.minutos_practica} min</strong>
-            <span>de repaso{resumen.intentos ? ` · ${plural(resumen.intentos, 'respuesta', 'respuestas')}` : ''}</span>
+            <span>
+              de repaso{plan ? ' en este plan' : ''}
+              {resumen.intentos ? ` · ${plural(resumen.intentos, 'respuesta', 'respuestas')}` : ''}
+            </span>
             {resumen.minutos_practica === 0 && <em>Aún no has repasado. Diez minutos al día bastan.</em>}
           </div>
         </div>
@@ -533,6 +551,10 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
             ))}
           </ul>
         </div>
+        <p className="pg-explica">
+          Los aciertos y fallos de cada concepto cuentan un repaso por día: el primer intento del día. Lo que repites ese mismo
+          día, los reintentos y las vueltas de «otra vez» no suman, aunque sí los veas en Repaso.
+        </p>
         <ol className="pg-lecciones">
           {lecciones.map((l) => {
             const suyos = delPlan.filter((c) => c.leccion_clave === l.clave)
@@ -584,8 +606,13 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
                       <p className="pg-concepto-info">
                         <strong>{elegido.nombre}</strong>: {NOMBRE_ESTADO[elegido.estado].toLowerCase()}, {pct(elegido.p)} de
                         probabilidad de recordarlo ahora · {plural(elegido.aciertos, 'acierto', 'aciertos')},{' '}
-                        {plural(elegido.fallos, 'fallo', 'fallos')}
+                        {plural(elegido.fallos, 'fallo', 'fallos')} (un repaso por día)
                         {elegido.proxima ? ` · próximo repaso el ${fechaCorta(elegido.proxima)}` : ''}
+                        {conMaterial(l.clave) && elegido.preguntas === 0
+                          ? ' · no tiene preguntas, así que no entra en el repaso: regenera el material de la lección'
+                          : conMaterial(l.clave) && elegido.preguntas === 1
+                            ? ' · solo tiene una pregunta: si la fallas, vuelve la misma'
+                            : ''}
                       </p>
                     )}
                     <div className="botones">

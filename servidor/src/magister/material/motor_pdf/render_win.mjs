@@ -122,6 +122,8 @@ try {
   const print = async () => {
     const { data } = await send('Page.printToPDF', {
       preferCSSPageSize: true, printBackground: true, displayHeaderFooter: true,
+      // Marcadores del PDF (el índice lateral del visor) con los títulos h1-h6: necesitan el PDF etiquetado.
+      generateTaggedPDF: true, generateDocumentOutline: true,
       headerTemplate: '<span></span>',
       footerTemplate: `<div style="font-family:Inter,Segoe UI,sans-serif;font-size:7.5px;color:#6b6b6b;width:100%;padding:0 17mm 0 17mm;display:flex;justify-content:space-between"><span>${esc(footer)}</span><span>p. <span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`,
     });

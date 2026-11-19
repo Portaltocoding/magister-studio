@@ -429,3 +429,16 @@ button.grupo-titulo:hover { color: var(--texto); }
 .espera-guion p, .espera-guion ol { margin: 2px 0; }
 .espera-colgada { margin: 0; font-size: 0.88rem; }
 @media (prefers-reduced-motion: reduce) { .espera-pulso.late { animation: none; opacity: 0.8; } }
+
+/* Mientras el texto aún aparece (Revelar pinta el cursor), los botones de debajo esperan: «Me sirve», guardar, las
+   acciones y las respuestas rápidas no salen antes de que se pueda leer lo que valoran. */
+.burbuja:has(.cursor-lectura) :is(.valorar, .guardar-nota, .acciones-arnes),
+.hilo:has(.cursor-lectura) > :is(.respuestas-rapidas, .propuesta) { display: none; }
+
+/* «Saltar al contenido»: el primer Tab de la página; solo se ve con el foco. */
+.saltar-contenido { position: fixed; top: 8px; left: 8px; z-index: 1000; padding: 8px 14px; border-radius: 8px; background: var(--texto); color: var(--fondo); font: inherit; border: 0; transform: translateY(-200%); }
+.saltar-contenido:focus-visible { transform: none; }
+main.central:focus { outline: none; }
+
+/* La propuesta de plan sustituye a uno que ya tienes: se dice antes de los botones. */
+.aviso-sustituye { margin: 8px 0; padding: 8px 12px; border-left: 3px solid var(--acento); border-radius: 6px; background: var(--activo); font-size: 0.92rem; }

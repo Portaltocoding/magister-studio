@@ -54,8 +54,15 @@ def pide_plan(mensaje: str) -> bool:
 # Las formas con pronombre («guárdalo», «guárdame esto») siempre son una petición.
 GUARDAR = re.compile(r"\b(guardalo|guardala|guardame|guardamelo|guardamela|guardemos|guardemoslo|guardemosla|guardarlo|guardarla|"
                      r"guardatelo|guardatela|salvalo|salvala|apuntalo|apuntala|apuntame|apuntamelo|apuntamela|apuntemos|apuntemoslo|"
-                     r"apuntarlo|anotalo|anotala|anotame|anotamelo|anotamela|anotemos|anotemoslo|anotarlo|"
-                     r"(a|en) mis (notas|apuntes))\b")
+                     r"apuntarlo|anotalo|anotala|anotame|anotamelo|anotamela|anotemos|anotemoslo|anotarlo)\b")
+# «A mis notas» solo es guardar con un verbo de llevar delante («pásalo a mis notas», «añade esto a mis apuntes») o con
+# lo que se guarda («esto a mis notas»). «Hazme un resumen de lo que pone en mis apuntes» habla de los apuntes, no guarda.
+_N = "(?:ñ|ñ)"
+_LLEVAR = rf"(guarda|apunta|anota|pasa|a{_N}ade|mete|copia|lleva|sube|incluye)"
+_ESTO = r"(esto|eso|lo anterior|lo de antes|todo|todo esto|esta respuesta|esa respuesta|la respuesta|este resumen|ese resumen)"
+A_MIS_NOTAS = re.compile(rf"\b({_LLEVAR}(lo|la|los|las|me|melo|mela|noslo)|a{_N}ad(amos|amoslo|irlo)|ponlo|ponla|ponmelo|ponmela|"
+                         rf"{_LLEVAR}\s+{_ESTO}|pon\s+{_ESTO})\b[^.?!]{{0,40}}\b(a|en) mis (notas|apuntes)\b"
+                         rf"|(^|[.!?,;:]\s*|\b(y|vale|venga|ok|pues)\s+){_ESTO}\s+(a|en|para) mis (notas|apuntes)\b")
 # «Guarda», «apunta» o «anota» a secas también es «él guarda» («localStorage guarda los datos»): solo cuenta
 # al empezar la frase o con lo que se guarda detrás («guarda esto», «anota la respuesta»).
 SUELTO = re.compile(r"(^|[.!?,;:]\s*|\b(vale|venga|ok|pues|bien|y)\s+)(guarda|apunta|anota)\b"
@@ -75,7 +82,7 @@ def pide_guardar(mensaje: str) -> bool:
     t = _norm(mensaje).strip()
     if not MIS_NOTAS.search(t) and ((APUNTAR.search(t) and AGENDA.search(t)) or CALENDARIO.search(t)):
         return False
-    return bool(GUARDAR.search(t) or SUELTO.search(t)) and not NO_GUARDAR.search(t)
+    return bool(GUARDAR.search(t) or SUELTO.search(t) or A_MIS_NOTAS.search(t)) and not NO_GUARDAR.search(t)
 
 
 def deja_plan(mensaje: str) -> bool:

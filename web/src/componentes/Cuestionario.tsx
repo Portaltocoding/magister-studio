@@ -1,4 +1,6 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useEffect, useState, type KeyboardEvent } from 'react'
+import { errorFecha, fechaMaxima, fechaMinima } from './cuestionarios.ts'
+import { fechaLarga } from './formato.ts'
 
 export interface Opcion {
   valor: string
@@ -31,15 +33,53 @@ interface Props {
   alTerminar: (r: Respuestas) => void
   alSaltar?: () => void
   textoSaltar?: string
+  // Con clave, lo respondido se guarda en sessionStorage: recargar a mitad no lo pierde (borrarCuestionario, al enviarlo).
+  guardarComo?: string
+}
+
+interface Guardado {
+  paso: number
+  r: Respuestas
+  otro: Record<string, string>
+}
+
+function leerGuardado(clave: string | undefined): Guardado | null {
+  if (!clave) return null
+  try {
+    const g = JSON.parse(sessionStorage.getItem(clave) ?? 'null') as Guardado | null
+    return g && typeof g.paso === 'number' && g.r && typeof g.r === 'object' ? { paso: g.paso, r: g.r, otro: g.otro ?? {} } : null
+  } catch {
+    return null
+  }
+}
+
+// Ya enviado: lo guardado con `guardarComo` deja de hacer falta.
+export function borrarCuestionario(clave: string) {
+  try {
+    sessionStorage.removeItem(clave)
+  } catch {
+    /* sin almacenamiento */
+  }
 }
 
 // Unas pocas preguntas antes de crear algo, de una en una: pulsas una opción y avanza.
-export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alSaltar, textoSaltar }: Props) {
-  const [paso, setPaso] = useState(0)
-  const [r, setR] = useState<Respuestas>(() =>
-    Object.fromEntries(preguntas.filter((p) => p.porDefecto !== undefined).map((p) => [p.id, p.porDefecto!])),
+export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alSaltar, textoSaltar, guardarComo }: Props) {
+  const [guardado] = useState(() => leerGuardado(guardarComo))
+  const [paso, setPaso] = useState(() => Math.min(guardado?.paso ?? 0, preguntas.length))
+  const [r, setR] = useState<Respuestas>(
+    () =>
+      guardado?.r ??
+      Object.fromEntries(preguntas.filter((p) => p.porDefecto !== undefined).map((p) => [p.id, p.porDefecto!])),
   )
-  const [otro, setOtro] = useState<Record<string, string>>({})
+  const [otro, setOtro] = useState<Record<string, string>>(() => guardado?.otro ?? {})
+  useEffect(() => {
+    if (!guardarComo) return
+    try {
+      sessionStorage.setItem(guardarComo, JSON.stringify({ paso, r, otro }))
+    } catch {
+      /* sin almacenamiento: vale mientras no recargues */
+    }
+  }, [guardarComo, paso, r, otro])
   const resumen = paso >= preguntas.length
   const p = preguntas[paso]
 
@@ -48,6 +88,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
   const lista = (id: string) => (Array.isArray(r[id]) ? (r[id] as string[]) : [])
   const valida = (q: Pregunta) => {
     const v = r[q.id]
+    if (q.tipo === 'fecha' && errorFecha(v)) return false
     if (q.opcional) return true
     if (Array.isArray(v)) return v.length > 0
     if (v === '__otro') return !!otro[q.id]?.trim()
@@ -74,9 +115,12 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
     const v = r[q.id]
     if (v === undefined || v === '') return '·'
     if (v === '__otro') return otro[q.id]
-    const nombre = (x: string) => opcionesDe(q).find((o) => o.valor === x)?.etiqueta ?? x
+    const nombre = (x: string) => opcionesDe(q).find((o) => o.valor === x)?.etiqueta ?? (q.tipo === 'fecha' ? fechaLarga(x) : x)
     return Array.isArray(v) ? v.map(nombre).join(', ') : nombre(v)
   }
+  // Lo guardado no se borra aquí: si el envío falla, recargar lo sigue teniendo. Lo borra quien lo envía (borrarCuestionario).
+  const terminar = () => alTerminar(final())
+  const fallaFecha = p?.tipo === 'fecha' ? errorFecha(valor(p.id)) : null
 
   return (
     <section className="cuestionario" aria-label={titulo}>
@@ -100,13 +144,20 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
           {p.tipo === 'fecha' && (
             <div className="opciones">
               <input type="date" className="campo-fecha" value={(valor(p.id) as string) ?? ''}
-                onChange={(e) => setR({ ...r, [p.id]: e.target.value })} />
+                min={fechaMinima()} max={fechaMaxima()} aria-label="Fecha límite" aria-invalid={!!fallaFecha}
+                aria-describedby={fallaFecha ? `error-${p.id}` : undefined}
+                onChange={(e) => setR({ ...r, [p.id]: e.target.value })} onKeyDown={enter} />
               {opcionesDe(p).map((o) => (
                 <button key={o.valor} className={`opcion ${valor(p.id) === o.valor ? 'elegida' : ''}`} onClick={() => elegir(p, o.valor)}>
                   {o.etiqueta}
                 </button>
               ))}
             </div>
+          )}
+          {fallaFecha && (
+            <p className="nota" role="alert" id={`error-${p.id}`}>
+              {fallaFecha}
+            </p>
           )}
           {(p.tipo === 'una' || p.tipo === 'varias') && (
             <div className="opciones">
@@ -171,7 +222,11 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
             <button className="boton" onClick={() => setPaso(paso - 1)}>
               Atrás
             </button>
-            <button className="boton boton-principal" onClick={() => alTerminar(final())}>
+            <button
+              className="boton boton-principal"
+              onClick={terminar}
+              disabled={preguntas.some((q) => q.tipo === 'fecha' && errorFecha(r[q.id]))}
+            >
               {boton}
             </button>
           </div>

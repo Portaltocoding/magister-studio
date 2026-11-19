@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
+import { mensajeDe } from './Cargando.tsx'
+import { errorLegible } from './errores.ts'
+
+// El tope del servidor para la pregunta (rutas_estudio.Parrafo.pregunta): el campo no deja escribir más.
+const MAX_PREGUNTA = 500
 import Mascota, { type GestoMascota } from '../Mascota.tsx'
 
 // La mascota como compañera de lectura en el modo foco. Se queda quieta en el margen, a media altura, junto al párrafo
@@ -131,7 +136,8 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
       }
       setPregunta('')
     } catch (e) {
-      setRespuesta(`No he podido: ${(e as Error).message}`)
+      // Nunca el texto técnico en inglés («String should have at most 500 characters»).
+      setRespuesta(`No he podido: ${errorLegible(mensajeDe(e)).mensaje}`)
     } finally {
       setCargando(false)
       // El botón pulsado se desactiva mientras piensa y el foco del teclado se cae al cuerpo: se devuelve al
@@ -234,10 +240,25 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
             <form
               onSubmit={(e) => {
                 e.preventDefault()
-                if (pregunta.trim()) pedirAyuda('pregunta', pregunta)
+                if (cargando) return
+                // Vacía, Intro no se queda mudo con el error de antes delante: lo quita y dice qué falta.
+                if (!pregunta.trim()) return setRespuesta('Escribe tu pregunta y pulsa Intro, o elige una de las opciones de arriba.')
+                pedirAyuda('pregunta', pregunta.slice(0, MAX_PREGUNTA))
               }}
             >
-              <input value={pregunta} onChange={(e) => setPregunta(e.target.value)} placeholder="Pregúntame sobre este párrafo" aria-label="Tu pregunta sobre el párrafo" />
+              <input
+                value={pregunta}
+                maxLength={MAX_PREGUNTA}
+                onChange={(e) => setPregunta(e.target.value.slice(0, MAX_PREGUNTA))}
+                placeholder="Pregúntame sobre este párrafo"
+                aria-label="Tu pregunta sobre el párrafo"
+                aria-describedby={pregunta.length > MAX_PREGUNTA - 80 ? 'companera-cuenta' : undefined}
+              />
+              {pregunta.length > MAX_PREGUNTA - 80 && (
+                <small id="companera-cuenta" className="companera-cuenta" aria-live="polite">
+                  {pregunta.length} de {MAX_PREGUNTA} caracteres
+                </small>
+              )}
             </form>
           </div>
         )}

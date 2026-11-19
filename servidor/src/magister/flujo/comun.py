@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from datetime import date
+from datetime import time as dt_time
 
 from langgraph.config import get_stream_writer
 from pydantic import BaseModel, Field
@@ -120,6 +121,12 @@ def decir(texto: str) -> str:
 
 def hoy_de(estado: Estado) -> date:
     return date.fromisoformat(estado["hoy"])
+
+
+def ahora_de(estado: Estado) -> dt_time | None:
+    """La hora de ahora (la pone quien invoca, como «hoy»), o None si no la ha puesto."""
+    texto = estado.get("ahora")
+    return dt_time.fromisoformat(texto) if texto else None
 
 
 def perfil_de(estado: Estado) -> Perfil:
@@ -383,8 +390,41 @@ def _palabras(t: str) -> set[str]:
     return {w for w in re.findall(r"[a-z0-9]+", plano) if len(w) > 3 and w not in _GENERICAS}
 
 
-async def leccion_relacionada(mensaje: str) -> dict | None:
-    """La lección de sus planes que más se parece a lo que pregunta (por palabras de título y conceptos), sin modelo."""
+PARTE_DEL_TITULO = 0.6  # fuera del plan de la conversación, qué parte de las palabras del título tiene que estar
+
+
+def coincide_con_titulo(buscadas: set[str], titulo: str) -> bool:
+    """Lo que pregunta nombra de verdad la lección: están la mayoría de las palabras con contenido de su título (las
+    dos de «Tu primer SELECT», no solo «primer»). Una palabra suelta en común no basta."""
+    del_titulo = _palabras(titulo)
+    comunes = buscadas & del_titulo
+    return bool(comunes) and len(comunes) / len(del_titulo) >= PARTE_DEL_TITULO
+
+
+def elegir_leccion(buscadas: set[str], filas: list[tuple], tema_conversacion: int | None) -> dict | None:
+    """Entre las lecciones de los planes aceptados (plan_id, tema_id, clave, título, conceptos, apuntes_id, preguntas),
+    la que sale de lo que pregunta. En el plan de esta conversación (su tema) basta una palabra del título o de los
+    conceptos; en los demás planes, el título tiene que coincidir de verdad (`coincide_con_titulo`): antes, una palabra
+    de más de tres letras en común sacaba «Preparar L5: Meiosis II» en una charla de phrasal verbs."""
+    def mejor_de(candidatas, puntuar) -> dict | None:
+        mejor, puntos = None, 0
+        for plan_id, tema_id, clave, titulo, conceptos, apuntes_id, preguntas in candidatas:
+            n = puntuar(titulo, conceptos)
+            if n > puntos:
+                mejor, puntos = {"plan_id": plan_id, "tema_id": tema_id, "clave": clave, "titulo": titulo,
+                                 "apuntes_id": apuntes_id, "preguntas": preguntas}, n
+        return mejor
+
+    propias = [f for f in filas if tema_conversacion is not None and f[1] == tema_conversacion]
+    elegida = mejor_de(propias, lambda t, c: len(buscadas & _palabras(f"{t} {c}")))
+    if elegida is not None:
+        return elegida
+    ajenas = [f for f in filas if f not in propias and coincide_con_titulo(buscadas, f[3])]
+    return mejor_de(ajenas, lambda t, c: len(buscadas & _palabras(t)))
+
+
+async def leccion_relacionada(mensaje: str, conversacion_id: int | None = None) -> dict | None:
+    """La lección de sus planes que sale de lo que pregunta (`elegir_leccion`), sin modelo."""
     from sqlalchemy import text
 
     from magister.datos.sesion import nueva_sesion
@@ -396,15 +436,11 @@ async def leccion_relacionada(mensaje: str) -> dict | None:
             "(select count(*) from preguntas q where q.plan_id = l.plan_id and q.leccion_clave = l.clave and q.estado = 'activa') "
             "from lecciones l join planes p on p.id = l.plan_id and p.estado = 'aceptado' "
             "left join conceptos c on c.plan_id = l.plan_id and c.leccion_clave = l.clave "
-            "group by l.plan_id, p.tema_id, l.clave, l.titulo"))).all()
-    buscadas = _palabras(mensaje)
-    mejor, puntos = None, 0
-    for plan_id, tema_id, clave, titulo, conceptos, apuntes_id, preguntas in filas:
-        n = len(buscadas & _palabras(f"{titulo} {conceptos}"))
-        if n > puntos:
-            mejor, puntos = {"plan_id": plan_id, "tema_id": tema_id, "clave": clave, "titulo": titulo,
-                             "apuntes_id": apuntes_id, "preguntas": preguntas}, n
-    return mejor
+            "group by l.plan_id, p.tema_id, l.clave, l.titulo, l.orden order by l.plan_id, l.orden"))).all()
+        tema = None
+        if conversacion_id is not None:
+            tema = await s.scalar(text("select tema_id from conversaciones where id = :c"), {"c": conversacion_id})
+    return elegir_leccion(_palabras(mensaje), [tuple(f) for f in filas], tema)
 
 
 async def acciones_de_estudio(estado: dict, sin_fuentes: bool) -> None:
@@ -415,7 +451,7 @@ async def acciones_de_estudio(estado: dict, sin_fuentes: bool) -> None:
     consulta = estado.get("consulta") or mensaje
     acciones: list[dict] = []
     try:
-        leccion = await leccion_relacionada(f"{mensaje} {consulta}")
+        leccion = await leccion_relacionada(f"{mensaje} {consulta}", estado.get("conversacion_id"))
     except Exception:  # noqa: BLE001
         leccion = None
     if leccion:

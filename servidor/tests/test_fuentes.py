@@ -417,7 +417,8 @@ async def test_cada_busqueda_del_chat_anota_su_escalon(base, monkeypatch) -> Non
     from magister.datos.fuentes import Busqueda
     from magister.flujo.nodos.rag import hacer_recuperar
 
-    fid = await crear_fuente()
+    # Fuente web: un acierto léxico completo en una fuente tuya ya es «hay fuentes» (lo mira el test de abajo).
+    fid = await crear_fuente("web", "web", 1)
     await ingesta.ingerir_ruta(fid, str(DATOS))
     await ingesta.procesar_pendientes()
     recuperar = hacer_recuperar(BuscadorHibrido())
@@ -432,6 +433,22 @@ async def test_cada_busqueda_del_chat_anota_su_escalon(base, monkeypatch) -> Non
     assert await escalon(0.0, 1.5) == ("densa", True)
     assert await escalon(1.01, -1.0) == ("reranker", True)  # el reranker falso cuenta palabras en común (>= 0)
     assert await escalon(1.01, 1000.0) == ("nada", False)
+
+
+async def test_en_tus_apuntes_un_acierto_lexico_completo_es_hay_fuentes(base, monkeypatch) -> None:
+    from magister.config import ajustes
+    from magister.datos.fuentes import Busqueda
+    from magister.flujo.nodos.rag import hacer_recuperar
+
+    fid = await crear_fuente()
+    await ingesta.ingerir_ruta(fid, str(DATOS))
+    await ingesta.procesar_pendientes()
+    monkeypatch.setattr(ajustes, "umbral_fuentes", 1.01)
+    monkeypatch.setattr(ajustes, "umbral_reranker", 1000.0)
+    r = await hacer_recuperar(BuscadorHibrido())({"mensaje": "índice parcial", "consulta": "índice parcial"})
+    async with nueva_sesion() as s:
+        assert (await s.get(Busqueda, r["busqueda_id"])).escalon == "lexica"
+    assert r["recuperados"]
 
 
 async def test_indexar_en_seco_no_escribe_y_explica(base) -> None:
@@ -464,3 +481,123 @@ async def test_indexar_en_seco_no_escribe_y_explica(base) -> None:
     total = int(nueva.split("unos ")[1].split(" ")[0])
     assert total > 0
     assert await foto() == antes  # nada escrito
+
+
+# Relleno y vía léxica (lo encontró un probador)
+
+RELLENO = "La meiosis reduce a la mitad el número de cromosomas. " * 400
+MEIOSIS = ("# Meiosis\n\n## Meiosis I\nSe divide en leptoteno, cigoteno, paquiteno, diploteno y diacinesis. "
+           "En el paquiteno ocurre el sobrecruzamiento; los quiasmas se ven en el diploteno.\n")
+
+
+def test_relleno_cuenta_como_un_fragmento() -> None:
+    trozos = trocear(dup.normalizar(RELLENO), "Relleno", "pdf", {"tokens": 40, "solape": 8})
+    assert len(trozos) > 10
+    textos = [t.texto for t in trozos]
+    # Al indexar: los trozos con las mismas palabras que otro no entran (sin tocar ninguno).
+    assert len(dup.sin_repetir(textos)) <= 2
+    # Al buscar: las copias casi iguales cuentan como una, aunque cada una empiece en otro punto de la frase.
+    assert dup.colapsar(textos) == [0]
+    distintos = ["Una clave primaria identifica cada fila.", "Un índice B-tree acelera las búsquedas por rango.",
+                 "Un JOIN combina filas de dos tablas."]
+    assert dup.colapsar(distintos + [distintos[0].upper() + "  "]) == [0, 1, 2]
+    # Dos trozos que se solapan un poco (el solape del chunker) no son copias.
+    assert dup.colapsar(["uno dos tres cuatro cinco seis siete ocho nueve diez", "nueve diez once doce trece catorce quince"]) == [0, 1]
+
+
+def test_consulta_o() -> None:
+    from magister.fuentes.buscar import consulta_o
+
+    assert consulta_o("¿Qué es el complejo sinaptonémico?") == "Qué | es | el | complejo | sinaptonémico"
+    assert consulta_o("árbol -mitosis") == ""  # con exclusiones solo vale el AND
+    assert consulta_o("x' | !y & (z) or z") == "x | y | z"
+
+
+def test_escalon_lexico_solo_con_todas_las_palabras_y_fuente_propia() -> None:
+    from magister.cerebro.contratos import Recuperado, ResultadoBusqueda
+
+    mio = Recuperado(1, 1, 0.01, "los quiasmas se ven en el diploteno", "Meiosis", "m.md", "vault", 1)
+    web = Recuperado(2, 1, 0.01, "los quiasmas se ven en el diploteno", "Web", "https://x", "web", 2)
+    assert ResultadoBusqueda([mio], None, {1: 0.80}, "hibrida", {}, {1}).escalon(0.85, 1.5) == "lexica"
+    assert ResultadoBusqueda([mio], None, {1: 0.80}, "hibrida", {}, set()).escalon(0.85, 1.5) == "nada"
+    assert ResultadoBusqueda([web], None, {2: 0.80}, "hibrida", {}, {2}).escalon(0.85, 1.5) == "nada"
+    # Sola, la vía léxica solo da fuentes con un acierto completo; los del OR no.
+    assert ResultadoBusqueda([mio], None, {}, "lexica", {}, set()).mejor_similitud == 0.0
+    assert ResultadoBusqueda([mio], None, {}, "lexica", {}, {1}).mejor_similitud == 1.0
+
+
+async def test_la_via_lexica_no_sale_vacia_con_una_pregunta_larga(base, tmp_path, monkeypatch) -> None:
+    from magister.config import ajustes
+
+    fid = await crear_fuente()
+    (tmp_path / "meiosis.md").write_text(MEIOSIS, encoding="utf-8")
+    await ingesta.ingerir_ruta(fid, str(tmp_path))
+    await ingesta.procesar_pendientes()
+    b = BuscadorHibrido()
+    larga = "¿Qué es el complejo sinaptonémico y en qué subfase aparecen los quiasmas?"
+    r = await b.buscar(larga, 5, Filtros(), Consulta(via="lexica"))
+    # Antes, el AND de las cinco palabras dejaba la vía léxica vacía.
+    assert r.recuperados and "quiasmas" in r.recuperados[0].texto
+    assert r.lexica_completa == set() and not r.hay_fuentes(0.85, 1000.0)
+    corta = await b.buscar("¿Los quiasmas se ven en el diploteno?", 5, Filtros(), Consulta(via="lexica"))
+    assert corta.lexica_completa == {corta.recuperados[0].fragmento_id}
+    # En la híbrida, con el coseno sin llegar, un acierto completo en tus apuntes cuenta como «hay fuentes».
+    monkeypatch.setattr(ajustes, "umbral_fuentes", 1.01)
+    monkeypatch.setattr(ajustes, "umbral_reranker", 1000.0)
+    h = await b.buscar("quiasmas diploteno", 5, Filtros())
+    assert h.escalon(ajustes.umbral_fuentes, ajustes.umbral_reranker) == "lexica"
+
+
+async def test_un_fichero_de_relleno_no_llena_la_busqueda(base, tmp_path) -> None:
+    fid = await crear_fuente("Adjuntos", "pdf", 3)
+    (tmp_path / "relleno.txt").write_text(RELLENO, encoding="utf-8")
+    (tmp_path / "meiosis.md").write_text(MEIOSIS, encoding="utf-8")
+    await ingesta.ingerir_ruta(fid, str(tmp_path))
+    await ingesta.procesar_pendientes()
+    assert await _cuantos_fragmentos() <= 4  # el relleno, uno o dos; la nota, uno o dos
+    r = await BuscadorHibrido().buscar("La meiosis reduce el número de cromosomas", 8, Filtros())
+    textos = [x.texto for x in r.recuperados]
+    assert sum("reduce a la mitad" in t for t in textos) == 1
+    assert [x.rango for x in r.recuperados] == list(range(1, len(r.recuperados) + 1))
+
+
+# Ficheros que no entran: un mensaje propio y «Reintentar» solo si sirve (lo encontró un probador)
+
+TEXTO = "La meiosis consta de dos divisiones sucesivas tras una sola replicación del ADN, y da cuatro células haploides."
+
+
+async def test_fichero_vacio_o_que_no_es_lo_que_dice(cliente) -> None:
+    fid = await crear_fuente("Adjuntos del chat", "pdf", 3)
+    vacio = await ingesta.recibir(fid, b"  \n", "vacio.txt", "subida/vacio.txt", None, "txt")
+    texto_pdf = await ingesta.recibir(fid, TEXTO.encode("utf-8"), "apuntes.pdf", "subida/apuntes.pdf", None, "pdf")
+    roto = await ingesta.recibir(fid, b"PK\x03\x04\x00\x00binario" * 50, "word.pdf", "subida/word.pdf", None, "pdf")
+    word = await ingesta.recibir(fid, b"PK\x03\x04\x00\x00binario" * 50, "word.txt", "subida/word.txt", None, "txt")
+    corto = await ingesta.recibir(fid, b"Hola.", "corto.md", "subida/corto.md", None, "md")
+    await ingesta.procesar_pendientes()
+    async with nueva_sesion() as s:
+        from magister.datos.fuentes import Version
+
+        estados = {v: (await s.get(Version, v)) for v in (vacio, texto_pdf, roto, word, corto)}
+    assert (estados[vacio].estado, estados[vacio].motivo) == ("cuarentena", "el fichero está vacío")
+    # Un .pdf que es texto plano se lee como texto.
+    assert estados[texto_pdf].estado == "lista" and estados[texto_pdf].texto == TEXTO
+    assert estados[texto_pdf].metadatos["formato_real"].startswith("texto plano")
+    assert estados[roto].motivo.startswith("formato equivocado: no es un PDF")
+    assert estados[word].motivo.startswith("formato equivocado: no es texto")
+    problemas = {p["version_id"]: p for p in (await cliente.get("/api/fuentes/resumen")).json()["problemas"]}
+    assert problemas[vacio]["que_paso"].startswith("El fichero está vacío") and not problemas[vacio]["reintentable"]
+    assert "no es un PDF" in problemas[roto]["que_paso"] and not problemas[roto]["reintentable"]
+    assert "JavaScript" not in problemas[corto]["que_paso"] and not problemas[corto]["reintentable"]
+    assert "Failed" not in " ".join(p["que_paso"] for p in problemas.values())
+    assert (await cliente.post(f"/api/versiones/{vacio}/reintentar")).status_code == 409
+    # La pantalla de Fuentes recibe lo mismo: qué pasó y si «Reintentar» sirve.
+    docs = {d["version"]["id"]: d for d in (await cliente.get(f"/api/fuentes/{fid}/documentos")).json()}
+    assert docs[vacio]["que_paso"].startswith("El fichero está vacío") and docs[vacio]["reintentable"] is False
+    assert docs[texto_pdf]["que_paso"] is None and docs[texto_pdf]["reintentable"] is False
+
+
+def test_una_pagina_corta_sigue_diciendo_javascript() -> None:
+    motivo = "solo 12 caracteres de texto (mínimo 80)"
+    assert "JavaScript" in ingesta.explicar_problema("cuarentena", motivo, True, 0, "https://x.org/a")[0]
+    assert "JavaScript" in ingesta.explicar_problema("cuarentena", motivo, True, 0)[0]
+    assert "JavaScript" not in ingesta.explicar_problema("cuarentena", motivo, True, 0, "subida/a.txt")[0]

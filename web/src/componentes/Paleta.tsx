@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarPlanes, verPlan, type Conversacion } from '../api.ts'
 import { MODOS } from '../modos.ts'
 import { usarPomodoro } from './pomodoro.ts'
+import { filtrarPaleta } from './buscarPaleta.ts'
 
 // Ctrl+K: escribe y salta. Pantallas, lecciones, conversaciones y acciones, sin tocar el ratón.
 
@@ -11,12 +12,6 @@ interface Entrada {
   detalle?: string
   hacer: () => void
 }
-
-const plano = (t: string) =>
-  t
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
 
 let cacheLecciones: { clave: string; titulo: string; tema_id: number; tema: string }[] | null = null
 
@@ -93,11 +88,8 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
     [lecciones, conversaciones, pomo.p.fase],
   )
 
-  const filtradas = useMemo(() => {
-    const palabras = plano(q).split(/\s+/).filter(Boolean)
-    if (!palabras.length) return entradas.filter((e) => e.grupo !== 'Conversaciones').slice(0, 14)
-    return entradas.filter((e) => palabras.every((w) => plano(`${e.texto} ${e.detalle ?? ''} ${e.grupo}`).includes(w))).slice(0, 14)
-  }, [q, entradas])
+  // El nombre que coincide gana a la descripción: «roadmap» lleva a Roadmap, no a Proyectos (buscarPaleta.ts).
+  const filtradas = useMemo(() => filtrarPaleta(entradas, q), [q, entradas])
 
   if (!abierta) return null
 

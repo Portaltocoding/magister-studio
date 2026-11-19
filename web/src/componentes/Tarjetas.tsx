@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Markdown from './Markdown.tsx'
 import { enviarJson, pedir } from '../api.ts'
 import { reaccionar } from './animo.ts'
+import { barajar } from '../barajar.ts'
 
 export interface Ficha {
   id: string
@@ -130,6 +131,13 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
               <div className="ficha-enunciado">
                 <Markdown>{x.enunciado}</Markdown>
               </div>
+              {x.opciones && x.opciones.length > 0 && (
+                <ol className="ficha-opciones">
+                  {barajar(x.opciones, x.id).map((o) => (
+                    <li key={o.texto}>{o.texto}</li>
+                  ))}
+                </ol>
+              )}
               <details>
                 <summary>Ver la respuesta</summary>
                 <div className="ficha-respuesta">
@@ -194,7 +202,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
               </div>
               {f.opciones && f.opciones.length > 0 && (
                 <ol className="ficha-opciones">
-                  {f.opciones.map((o) => (
+                  {barajar(f.opciones, f.id).map((o) => (
                     <li key={o.texto} className={girada && o.buena ? 'buena' : ''}>
                       {o.texto}
                     </li>

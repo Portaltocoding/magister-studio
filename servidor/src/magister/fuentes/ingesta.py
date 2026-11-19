@@ -21,7 +21,8 @@ from magister.datos.fuentes import Documento, Fragmento, Fuente, Version
 from magister.datos.sesion import nueva_sesion
 from magister.fuentes import duplicados as dup
 from magister.fuentes.embeber import embeber
-from magister.fuentes.extraer import FORMATOS, FormatoNoAdmitido, extraer_bytes, tipo_de
+from magister.fuentes.extraer import (FORMATOS, PREFIJO_EQUIVOCADO, FormatoEquivocado, FormatoNoAdmitido, extraer_bytes,
+                                      tipo_de)
 from magister.fuentes.trocear import trocear
 from magister.fuentes.validar import validar
 
@@ -258,10 +259,12 @@ async def procesar_recibida(version_id: int) -> None:
         crudo = await asyncio.to_thread(leer_crudo, crudo_hash)
         e, h, problemas, firma = await asyncio.to_thread(_preparar, crudo, nombre, tipo)
     except Exception as ex:  # noqa: BLE001
+        # Un fichero que no es lo que dice su extensión lleva su motivo propio, en castellano y sin «Reintentar».
+        motivo = str(ex) if isinstance(ex, FormatoEquivocado) else f"no se pudo extraer: {ex}"
         async with nueva_sesion() as s, s.begin():
             await s.execute(
                 update(Version).where(Version.id == version_id, Version.estado == "recibida")
-                .values(estado="cuarentena", motivo=f"no se pudo extraer: {ex}")
+                .values(estado="cuarentena", motivo=motivo)
             )
         return
     async with nueva_sesion() as s, s.begin():
@@ -304,6 +307,9 @@ async def indexar_version(version_id: int, nombre_config: str | None = None) -> 
             raise RuntimeError("no hay configuración del índice activa")
         texto, titulo, tipo, params, config_id = v.texto, doc.titulo, fuente.tipo, conf.params, conf.id
     trozos = await asyncio.to_thread(trocear, texto, titulo, tipo, params)
+    # Un trozo que repite las palabras de otro del mismo documento no se indexa: un fichero de relleno no ocupa
+    # todos los huecos de una búsqueda (el `orden` sigue siendo el del documento, con huecos).
+    trozos = [trozos[i] for i in dup.sin_repetir([t.texto for t in trozos])]
     vectores = await asyncio.to_thread(embeber, [t.texto_indexado for t in trozos], "pasaje", params) if trozos else []
     async with nueva_sesion() as s, s.begin():
         # La fila se bloquea y se vuelve a mirar: si otro la indexó mientras troceábamos, no se repite.
@@ -336,18 +342,29 @@ async def indexar_version(version_id: int, nombre_config: str | None = None) -> 
 # Lo que se queda a medias: qué pasó, dicho en claro, y si «Reintentar» puede arreglarlo.
 
 
-def explicar_problema(estado: str, motivo: str | None, con_texto: bool, fragmentos: int) -> tuple[str, str | None]:
-    """(qué pasó, a qué estado vuelve con Reintentar; None si reintentar no lo arregla). ("", None) si no hay problema."""
+def explicar_problema(estado: str, motivo: str | None, con_texto: bool, fragmentos: int,
+                      uri: str | None = None) -> tuple[str, str | None]:
+    """(qué pasó, a qué estado vuelve con Reintentar; None si reintentar no lo arregla). ("", None) si no hay problema.
+    `uri` dice si era una página web (http) o un fichero: «se carga con JavaScript» solo vale para una página (sin
+    `uri`, como el trabajo de incorporar, que solo trae páginas, se supone web)."""
     m = motivo or ""
+    web = uri is None or uri.startswith(("http://", "https://"))
     if estado == "lista" and fragmentos == 0:
         return "Está guardado pero sin ningún trozo indexado: el tutor no lo encuentra.", "pendiente" if con_texto else None
     if estado != "cuarentena":
         return "", None
+    if m.startswith("el fichero está vacío"):
+        return "El fichero está vacío: no hay nada que leer. Sube uno con texto.", None
+    if m.startswith(PREFIJO_EQUIVOCADO):
+        return f"El fichero {m.removeprefix(PREFIJO_EQUIVOCADO)}. Guárdalo con su formato de verdad y súbelo otra vez.", None
     if m.startswith("no se pudo indexar") and con_texto:
         return "Se descargó y se leyó, pero falló al trocearlo e indexarlo.", "pendiente"
     if m.startswith("no se pudo extraer") or not con_texto:
-        return "No se pudo sacar el texto.", "recibida"
+        # Con los mismos bytes, el extractor suele fallar igual; se deja reintentar por si el fallo era nuestro.
+        return "No se pudo sacar el texto (el fichero puede estar dañado).", "recibida"
     if "caracteres de texto" in m:
+        if not web:
+            return "Casi no tiene texto: no hay bastante para buscar en él.", None
         return "Casi no tiene texto: la página se carga con JavaScript o pide registrarse.", None
     if "escaneado" in m:
         return "Parece un PDF escaneado, sin texto. Sube una copia con texto.", None
@@ -363,7 +380,8 @@ async def reintentar_version(version_id: int) -> str:
         if v is None:
             raise LookupError("versión no encontrada")
         n = await s.scalar(select(func.count()).select_from(Fragmento).where(Fragmento.version_id == version_id)) or 0
-        claro, destino = explicar_problema(v.estado, v.motivo, v.texto is not None, n)
+        doc = await s.get(Documento, v.documento_id)
+        claro, destino = explicar_problema(v.estado, v.motivo, v.texto is not None, n, doc.uri if doc else None)
         if destino is None:
             raise ValueError(f"{claro} Reintentar no lo arregla." if claro else "Este documento no tiene nada que reintentar.")
         mas_nueva = await s.scalar(select(Version.id).where(

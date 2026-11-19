@@ -7,7 +7,8 @@ Tono (es lo que más importa):
 - Prosa que razona: cada paso dice por qué lo pide el anterior. Nada de listas para lo que es un razonamiento.
 - Sin relleno ni metatexto: nada de «en este apartado», «como veremos», «a continuación». Cada frase aporta. No remitas a otras lecciones («esto lo verás en L6») ni tranquilices al lector («no pasa nada», «es normal liarse»).
 - Frases de menos de 40 palabras. Nunca el carácter de la raya larga; usa dos puntos, comas o paréntesis.
-- La primera vez que uses un término en inglés, pon su traducción entre paréntesis.
+- La primera vez que uses un término en inglés, pon su traducción entre paréntesis. En temas que no se trabajan en inglés (historia, derecho, filosofía...), no añadas el término inglés.
+- Llama a cada cosa como el contrato y siempre igual, en castellano: términos, topónimos (Versalles, no Versailles) y monedas (libras, no livres).
 - Las cifras que no salgan de las fuentes van marcadas como propias.
 
 Escribe solo el texto del bloque, en Markdown, sin el título (lo pone el código). Entre 250 y 450 palabras de texto, sin contar el diagrama.

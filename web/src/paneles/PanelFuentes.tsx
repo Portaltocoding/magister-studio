@@ -253,7 +253,7 @@ export default function PanelFuentes() {
                     <td title={d.uri}>{d.titulo}</td>
                     <td className={`estado-${d.version?.estado}`}>
                       {d.version ? ESTADOS[d.version.estado] : '·'}
-                      {d.version?.motivo ? ` · ${d.version.motivo}` : ''}
+                      {d.que_paso ? ` · ${d.que_paso}` : d.version?.motivo ? ` · ${d.version.motivo}` : ''}
                       {d.version?.duplicado_de ? ` · duplicado de ${d.version.duplicado_de}` : ''}
                       {d.version?.origen === 'research'
                         ? ` · del research${d.version.leccion_clave ? ` para ${d.version.leccion_clave}` : ''}${d.version.automatica ? ', entró solo' : ''}`
@@ -277,7 +277,8 @@ export default function PanelFuentes() {
                           </label>
                         </span>
                       )}
-                      {d.version?.estado === 'cuarentena' && (
+                      {/* Un servidor de antes no trae `reintentable`: entonces, como siempre, en toda cuarentena. */}
+                      {(d.reintentable ?? d.version?.estado === 'cuarentena') && (
                         <>
                           {' '}
                           <button
