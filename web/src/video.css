@@ -62,7 +62,12 @@
 @media (max-width: 820px) { .nuevo-video-campos, .nuevo-video-estilos { grid-template-columns: minmax(0, 1fr); } }
 
 /* ===== Vídeo animado (Remotion): la escena y el esqueleto de tesis ===== */
-.escena { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; align-items: start; margin-top: 12px; }
+/* En pantallas anchas el reproductor crece con el sitio (16:9), hasta 1800 px y sin pasar del alto de la ventana
+   (descontada la cabecera del panel, para que se vea entero con sus controles); el panel se ensancha lo justo para
+   él y las tesis al lado. */
+.video-panel { --escena-max: min(1800px, max(560px, calc((100vh / var(--zoom-ui, 1) - 360px) * 16 / 9))); }
+.video-panel:has(.escena) { max-width: calc(var(--escena-max) + 322px); }
+.escena { display: grid; grid-template-columns: minmax(0, var(--escena-max, 1fr)) 300px; gap: 22px; align-items: start; margin-top: 12px; }
 .escena-pantalla { min-width: 0; }
 .escena-ajustes { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 10px; }
 .escena-ajustes label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -77,6 +82,8 @@
 .escena-concepto { font-family: Georgia, serif; font-size: 1.02rem; }
 .escena-tesis { font-family: Georgia, serif; font-size: 0.92rem; color: var(--suave); }
 @media (max-width: 900px) { .escena { grid-template-columns: minmax(0, 1fr); } }
+/* La ayuda de las teclas, solo donde hay teclado. */
+@media (hover: none) { .escena-teclas { display: none; } }
 
 /* ===== Taller → Pronunciación ===== */
 .pronunciacion { max-width: 980px; }

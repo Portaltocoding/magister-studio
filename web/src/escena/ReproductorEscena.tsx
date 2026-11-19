@@ -6,9 +6,9 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as Pulsacion, type SyntheticEvent } from 'react'
 import { Player, type PlayerRef } from '@remotion/player'
 import Pensando from '../componentes/Pensando.tsx'
-import { leerAjustesVoz, Locutor, VELOCIDADES } from '../componentes/voz.ts'
+import { guardarAjustesVoz, leerAjustesVoz, Locutor, VELOCIDADES } from '../componentes/voz.ts'
 import { Composicion, type PropsComposicion } from './Composicion.tsx'
-import { teclaDelReproductor } from './teclas.ts'
+import { accionDeTecla, AYUDA_TECLAS, fotogramaTrasTecla } from './teclas.ts'
 import { ALTO, ANCHO, FPS, lineaDeTiempo, tramoEn, trozoEn, verTramo, type GuionGrafico } from './tipos.ts'
 import { avisoSinMagister, prepararVoz, type VozPreparada } from './vozVideo.ts'
 
@@ -95,12 +95,19 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
     return () => p.removeEventListener('frameupdate', alFotograma)
   }, [desde])
 
-  // Con la voz de Magister: la velocidad la lleva el Player (su menú o el ajuste de voz de otro panel).
+  // Con la voz de Magister: la velocidad la lleva el Player (su menú o el ajuste de voz de otro panel). La que eliges
+  // en su menú se guarda en el ajuste de voz, el mismo que usan la versión narrada y la lectura en voz alta: el
+  // siguiente vídeo (y la siguiente sesión) empieza a esa velocidad.
   useEffect(() => {
     const p = player.current
     if (!p || !conMagister) return
     const alAjuste = () => setVelocidad(leerAjustesVoz().velocidad)
-    const alRitmo = (e: { detail: { playbackRate: number } }) => setVelocidad(e.detail.playbackRate)
+    const alRitmo = (e: { detail: { playbackRate: number } }) => {
+      const v = e.detail.playbackRate
+      setVelocidad(v)
+      const ajustes = leerAjustesVoz()
+      if (VELOCIDADES.includes(v) && ajustes.velocidad !== v) guardarAjustesVoz({ ...ajustes, velocidad: v })
+    }
     window.addEventListener('magister-voz', alAjuste)
     p.addEventListener('ratechange', alRitmo)
     return () => {
@@ -214,21 +221,6 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
     player.current.pause()
   }
 
-  // Espacio pausa y sigue con el foco en cualquier sitio de la página (no solo en el botón del Player), salvo al
-  // escribir o sobre otro botón. El de Remotion no vale: para funcionar mueve el foco a su botón cada vez que el
-  // vídeo arranca o se para, y se lo quitaba a la caja en la que estuvieras escribiendo.
-  useEffect(() => {
-    const tecla = (e: KeyboardEvent) => {
-      if (e.key !== ' ' || !teclaDelReproductor(e, e.target as Element | null)) return
-      e.preventDefault()
-      if (e.repeat) return
-      // Con el evento, el Player toma la pulsación como gesto y desbloquea sus audios (como con su botón).
-      player.current?.toggle(e as unknown as SyntheticEvent)
-    }
-    window.addEventListener('keydown', tecla)
-    return () => window.removeEventListener('keydown', tecla)
-  }, [])
-
   const props: PropsComposicion = useMemo(() => ({ guion, subtitulos, ritmo: ritmoLinea, medidas, audios }), [guion, subtitulos, ritmoLinea, medidas, audios])
 
   const cambiarVoz = (si: boolean) => {
@@ -238,6 +230,46 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
     } else player.current?.mute()
     ponerVoz(si)
   }
+  const cambiarVozRef = useRef(cambiarVoz)
+  useEffect(() => {
+    cambiarVozRef.current = cambiarVoz
+  })
+
+  // Las teclas de cualquier reproductor (teclas.ts), con el foco en cualquier sitio de la página, salvo al escribir o
+  // si la tecla es del botón que tiene el foco. Las de Remotion no valen: para funcionar mueve el foco a su botón
+  // cada vez que el vídeo arranca o se para, y se lo quitaba a la caja en la que estuvieras escribiendo.
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      const p = player.current
+      const accion = accionDeTecla(e, e.target as Element | null)
+      if (!p || !accion) return
+      e.preventDefault()
+      // Mantener pulsada ← o → sigue saltando; lo demás va de una en una.
+      if (e.repeat && accion !== 'atras' && accion !== 'adelante') return
+      if (accion === 'tocar') p.toggle(e as unknown as SyntheticEvent) // con el evento, el Player lo toma como gesto y desbloquea sus audios
+      else if (accion === 'silencio') cambiarVozRef.current(!conVozRef.current)
+      else if (accion === 'pantalla') {
+        if (p.isFullscreen()) p.exitFullscreen()
+        else p.requestFullscreen()
+      } else {
+        const destino = fotogramaTrasTecla(accion, p.getCurrentFrame(), desde, total, FPS)
+        if (destino === null) return
+        p.seekTo(destino)
+        setActual(tramoEn(desde, destino))
+      }
+    }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [desde, total])
+
+  // Al ocultar la pestaña (o minimizar la ventana), se pausa; al volver no sigue sola.
+  useEffect(() => {
+    const oculto = () => {
+      if (document.visibilityState === 'hidden') player.current?.pause()
+    }
+    document.addEventListener('visibilitychange', oculto)
+    return () => document.removeEventListener('visibilitychange', oculto)
+  }, [])
 
   return (
     <div className="escena">
@@ -271,7 +303,8 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
           <label>
             <input type="checkbox" checked={subtitulos} onChange={(e) => setSubtitulos(e.target.checked)} /> Subtítulos
           </label>
-          <span className="nota">Espacio para pausar. Con el vídeo parado, los botones de la escena se pueden pulsar.</span>
+          <span className="nota escena-teclas">{AYUDA_TECLAS}.</span>
+          <span className="nota">Parado, la escena se puede tocar.</span>
           {voz.modo === 'navegador' && <span className="nota">{avisoSinMagister(voz.motivo)}</span>}
         </div>
       </div>
