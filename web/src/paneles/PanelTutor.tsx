@@ -22,6 +22,7 @@ import {
 } from '../api.ts'
 import { colorDeTema, nombreCorto } from '../componentes/colorTema.ts'
 import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
+import { varianteFicha } from '../componentes/varianteFicha.ts'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Mascota from '../Mascota.tsx'
@@ -1491,7 +1492,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
               } else setSeleccion(null)
             }}
           >
-            <TextoLibro markdown={b.texto} className="foco-papel" />
+            <TextoLibro markdown={b.texto} className="foco-papel" variante={varianteFicha(leccion.leccion_clave, leccion.plan_id)} />
             {marca && <div className={`foco-marca ${seguias ? 'seguias' : ''}`} aria-hidden="true" style={{ top: marca.top, height: marca.height }} />}
             {marca && seguias && (
               <span className="foco-seguias" role="status" style={{ top: marca.top - 26 }}>

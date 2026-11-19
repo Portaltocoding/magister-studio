@@ -14,6 +14,7 @@ import { colorDeTema } from '../componentes/colorTema.ts'
 import Cuestionario, { type Respuestas } from '../componentes/Cuestionario.tsx'
 import { PREGUNTAS_MATERIAL } from '../componentes/cuestionarios.ts'
 import LectorLibro, { TextoLibro } from '../componentes/LectorLibro.tsx'
+import { varianteFicha } from '../componentes/varianteFicha.ts'
 import Tarjetas, { type Ficha } from '../componentes/Tarjetas.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Colores from '../componentes/Colores.tsx'
@@ -554,6 +555,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
             {pestana === 'apuntes' && textos.apuntes && (
               <LectorLibro
                 markdown={textos.apuntes}
+                variante={clave ? varianteFicha(clave, plan?.plan_id) : undefined}
                 raiz={raiz.current?.closest('.central')}
                 rehacer={
                   datos?.materiales.apuntes

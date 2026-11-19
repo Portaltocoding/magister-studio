@@ -5,6 +5,7 @@ import remarkMath from 'remark-math'
 import { Diagrama } from './Interactivo.tsx'
 import { conKatex, tieneMates, usarKatex } from './katexPerezoso.ts'
 import 'katex/dist/katex.min.css'
+import type { VarianteFicha } from './varianteFicha.ts'
 
 // Lee el markdown del motor del libro (cajas `::: nombre`, etiquetas `{etq="..."}`, `[x]{.clase}`)
 // y lo pinta en pantalla con la misma maqueta: portada negra, teoría amarilla, práctica verde.
@@ -200,10 +201,11 @@ export function secciones(md: string): Seccion[] {
 }
 
 // El mismo papel y las mismas cajas, sin índice: para el guion y el modo foco.
-export function TextoLibro({ markdown, className = '' }: { markdown: string; className?: string }) {
+// `variante`: el estilo de la ficha (limpia, cuaderno o mixta, ver varianteFicha.ts); sin ella, el de siempre (mixta).
+export function TextoLibro({ markdown, className = '', variante }: { markdown: string; className?: string; variante?: VarianteFicha }) {
   const nodos = useMemo(() => arbol(markdown.replace(/^---\n[\s\S]*?\n---\n/, '')), [markdown])
   return (
-    <article className={`lector-texto ${className}`}>
+    <article className={`lector-texto ${className}`} data-ficha={variante}>
       <Pintar nodo={nodos} />
     </article>
   )
@@ -214,9 +216,10 @@ interface Props {
   // Contenedor que se desplaza (para saber qué sección estás leyendo).
   raiz?: Element | null
   rehacer?: Rehacer
+  variante?: VarianteFicha
 }
 
-export default function LectorLibro({ markdown, raiz, rehacer }: Props) {
+export default function LectorLibro({ markdown, raiz, rehacer, variante }: Props) {
   const cuerpo = useMemo(() => markdown.replace(/^---\n[\s\S]*?\n---\n/, ''), [markdown])
   const nodos = useMemo(() => arbol(cuerpo), [cuerpo])
   const indice = useMemo(() => secciones(cuerpo), [cuerpo])
@@ -254,7 +257,7 @@ export default function LectorLibro({ markdown, raiz, rehacer }: Props) {
           ))}
         </ol>
       </nav>
-      <article className="lector-texto">
+      <article className="lector-texto" data-ficha={variante}>
         <RehacerContexto.Provider value={rehacer ?? null}>
           <Pintar nodo={nodos} />
         </RehacerContexto.Provider>

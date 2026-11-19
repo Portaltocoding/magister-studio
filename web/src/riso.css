@@ -201,6 +201,8 @@ html[data-tema="riso"] :is(.lb-caja, .lector-texto pre) { background: #fbf6ec; c
 /* Los recuadros de los apuntes (definiciones, frases clave, cajas): borde crema y redondos, no raya negra. */
 html[data-tema="riso"] :is(.lb-marco, .lb-box) { border: 2px solid var(--borde); border-radius: 18px; box-shadow: none; }
 html[data-tema="riso"] .lb-frase { border: 2px solid color-mix(in srgb, var(--azul) 35%, #fff); background: var(--azul-pastel); border-radius: 18px; }
+/* En la ficha limpia la frase ya va en su recuadro azul: sin la raya corta de encima. */
+html[data-tema="riso"] .lector-texto[data-ficha="limpia"] .lb-frase::before { display: none; }
 html[data-tema="riso"] :is(.ficha .chip, .fichas-lista .chip, .vacio-num) { background: var(--pastel); color: var(--tinta-letra); }
 html[data-tema="riso"] .ficha { border-radius: 24px; box-shadow: var(--sombra-caja); border: 2px solid var(--borde); border-top: 8px solid var(--tinta); }
 html[data-tema="riso"] .fichas-lista li { border-radius: 18px; border: 2px solid var(--borde); border-left: 6px solid var(--tinta); }

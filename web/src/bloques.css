@@ -134,21 +134,63 @@
 .lb-fantasma[open] { color: var(--suave); }
 .lector-texto.guion { max-width: 720px; }
 
-/* Con sitio a la derecha del texto, el error típico sale al margen, junto al párrafo que tiene delante (como en D).
-   El bloque de teoría pasa a rejilla de dos columnas: el texto en la primera y la nota en la segunda. */
+/* ===== Tres variantes de la misma ficha (data-ficha en .lector-texto; la elige varianteFicha.ts) =====
+   Sin atributo o «mixta»: lo de arriba (C con el resaltador y las notas al margen de D).
+   «limpia»: C pura. La frase clave, sin resaltador, con una raya corta encima; el error típico, siempre en la columna.
+   «cuaderno»: D. En Lecciones, la hoja con su margen rojo y las etiquetas en él; el error típico, en un recuadro de
+   trazos (o al margen derecho si hay sitio). En el foco, sin hoja ni margen: el resaltador y el recuadro de trazos. */
+.lector-texto[data-ficha="limpia"] { --lb-resaltador: transparent; }
+.lector-texto[data-ficha="limpia"] .lb-frase::before { content: ''; display: block; width: 40px; height: 2px; background: currentColor; margin-bottom: 14px; }
+.lector-texto[data-ficha="limpia"] .lb-frase p:only-child { display: block; padding: 0; background: none; }
+
+.lector-texto[data-ficha="cuaderno"] .lb-aviso {
+  border: 1.5px dashed color-mix(in srgb, var(--lb-nota) 70%, transparent); border-radius: 12px; padding: 12px 16px; margin: 20px 0;
+}
+.lector .lector-texto[data-ficha="cuaderno"] {
+  --lb-margen: 92px; /* la columna de las etiquetas, a la izquierda de la raya roja */
+  --lb-raya: color-mix(in srgb, var(--examen, #c2453a) 30%, transparent);
+  position: relative; max-width: calc(var(--lb-col) + 64px); padding: 30px 24px 36px;
+  background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 16px; box-shadow: var(--sombra-suave);
+}
+/* Con sitio, el margen de cuaderno: la raya y, junto a ella, la etiqueta de cada bloque (Teoría · 1 de 5...). */
+@container vista (min-width: 760px) {
+  .lector .lector-texto[data-ficha="cuaderno"] {
+    max-width: calc(var(--lb-margen) + 20px + var(--lb-col) + 24px); padding-left: calc(var(--lb-margen) + 20px);
+    background-image: linear-gradient(to right, transparent calc(var(--lb-margen) - 1.5px), var(--lb-raya) calc(var(--lb-margen) - 1.5px), var(--lb-raya) var(--lb-margen), transparent var(--lb-margen));
+  }
+  .lector .lector-texto[data-ficha="cuaderno"] .lb-etq {
+    position: absolute; left: 10px; width: calc(var(--lb-margen) - 22px); margin-top: 0.5em; text-align: right;
+    font-size: 0.64rem; line-height: 1.35; letter-spacing: 0.03em; text-wrap: balance;
+  }
+}
+
+/* Con sitio a la derecha del texto, el error típico sale al margen, junto al párrafo que tiene delante (como en D),
+   salvo en la limpia. El bloque de teoría pasa a rejilla de dos columnas: el texto en la primera y la nota en la segunda.
+   El cuaderno, que además lleva el margen izquierdo, estrecha su columna lo justo para que quepa la nota. */
 @container vista (min-width: 1040px) {
-  .lector .lector-texto { max-width: calc(var(--lb-col) + 218px); }
-  .lector .lector-texto > :not(.lb-teoria):not(.lb-planteamiento) { max-width: var(--lb-col); }
-  .lector :is(.lb-teoria, .lb-planteamiento) { display: grid; grid-template-columns: minmax(0, var(--lb-col)) 190px; column-gap: 28px; align-items: start; }
-  .lector :is(.lb-teoria, .lb-planteamiento) > * { grid-column: 1; min-width: 0; }
-  .lector :is(.lb-teoria, .lb-planteamiento) > .lb-aviso {
-    grid-column: 2; grid-row: span 3; margin: 4px 0 0; padding: 1px 0 1px 10px; border-left-color: color-mix(in srgb, var(--lb-nota) 45%, transparent);
+  .lector .lector-texto[data-ficha="cuaderno"] {
+    --lb-col: min(37.5rem, 100cqw - 210px - var(--lb-margen) - 20px - 24px - 204px);
+    max-width: calc(var(--lb-margen) + 20px + var(--lb-col) + 204px + 24px);
+  }
+  .lector .lector-texto:not([data-ficha]), .lector .lector-texto[data-ficha="mixta"] { max-width: calc(var(--lb-col) + 218px); }
+  .lector .lector-texto:not([data-ficha="limpia"]) > :not(.lb-teoria):not(.lb-planteamiento) { max-width: var(--lb-col); }
+  .lector .lector-texto:not([data-ficha="limpia"]) :is(.lb-teoria, .lb-planteamiento) {
+    display: grid; grid-template-columns: minmax(0, var(--lb-col)) 190px; column-gap: 28px; align-items: start;
+  }
+  .lector .lector-texto[data-ficha="cuaderno"] :is(.lb-teoria, .lb-planteamiento) { grid-template-columns: minmax(0, var(--lb-col)) 180px; column-gap: 24px; }
+  .lector .lector-texto:not([data-ficha="limpia"]) :is(.lb-teoria, .lb-planteamiento) > * { grid-column: 1; min-width: 0; }
+  .lector .lector-texto[data-ficha="cuaderno"] > .lb-rejilla { max-width: none; }
+  /* El margen de abajo negativo hace que la nota no estire las filas del texto (si no, deja huecos entre párrafos):
+     si es más alta que lo que tiene al lado, sigue hacia abajo por la columna de las notas, que está vacía. */
+  .lector .lector-texto:not([data-ficha="limpia"]) :is(.lb-teoria, .lb-planteamiento) > .lb-aviso {
+    grid-column: 2; grid-row: span 3; margin: 4px 0 -2000px; padding: 1px 0 1px 10px;
+    border: 0; border-radius: 0; border-left: 2px solid color-mix(in srgb, var(--lb-nota) 45%, transparent);
     font-size: 0.84rem; line-height: 1.5; color: var(--suave);
   }
-  .lector .lb-aviso p { margin: 0 0 6px; }
-  .lector .lb-aviso strong { color: var(--texto); }
-  .lector .lb-aviso code { font-size: 0.9em; padding: 0 3px; }
-  .lector .lb-aviso p:first-child strong:first-child { font-size: 0.68rem; margin-bottom: 2px; color: var(--lb-nota); }
+  .lector .lector-texto:not([data-ficha="limpia"]) .lb-aviso p { margin: 0 0 6px; }
+  .lector .lector-texto:not([data-ficha="limpia"]) .lb-aviso strong { color: var(--texto); }
+  .lector .lector-texto:not([data-ficha="limpia"]) .lb-aviso code { font-size: 0.9em; padding: 0 3px; }
+  .lector .lector-texto:not([data-ficha="limpia"]) .lb-aviso p:first-child strong:first-child { font-size: 0.68rem; margin-bottom: 2px; color: var(--lb-nota); }
 }
 
 /* Fichas de una en una */
