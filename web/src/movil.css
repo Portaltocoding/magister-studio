@@ -19,11 +19,10 @@
   .central { padding: 18px 16px; }
   .bloques { grid-template-columns: minmax(0, 1fr); }
   .bloques-lista { position: static; max-height: none; }
-  .bloque-cabecera { flex-direction: column; gap: 10px; padding: 20px; }
-  .bloque-num { font-size: 3rem; align-self: flex-start; }
+  .bloque-cabecera { padding: 4px 0 0; }
+  .bloque-cabecera h1 { font-size: 1.7rem; }
   .lector { grid-template-columns: minmax(0, 1fr); }
   .lector-indice { display: none; }
-  .lector-texto { padding: 26px 20px; }
   .pg-hero { grid-template-columns: minmax(0, 1fr); padding: 20px; }
   .pg-cifras { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .pg-fila { grid-template-columns: auto minmax(0, 1fr) 18px; }

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import Colores from './Colores.tsx'
 import { acentoDe, usarColores, variables } from './colores.ts'
+import { barraAsoma, CINTA_MS, OCULTAR_BARRA_MS } from './zen.ts'
 
 interface Props {
   titulo: string
@@ -22,7 +23,79 @@ interface Props {
   // La zona que se desplaza, para quien la necesite (el párrafo activo de una lección).
   alCuerpo?: (el: HTMLDivElement | null) => void
   alSalir: () => void
+  // Modo zen: la barra y el pie se apartan (la barra asoma con el ratón arriba) y queda una línea de progreso.
+  zen?: boolean
+  // De 0 a 1, para la línea de progreso del zen.
+  progreso?: number
+  // En zen, si el pie se ve ahora (lo decide quien sabe dónde estás leyendo). Sin zen no cuenta.
+  pieVisible?: boolean
   children: ReactNode
+}
+
+// La barra en zen: asoma al acercar el ratón (o tocar) arriba y se va al poco. Devuelve si se ve.
+function usarBarraZen(zen: boolean, raiz: RefObject<HTMLDivElement | null>, barra: RefObject<HTMLElement | null>, menu: boolean): boolean {
+  const [asomada, setAsomada] = useState(false)
+  const menuRef = useRef(menu)
+  useEffect(() => {
+    menuRef.current = menu
+  }, [menu])
+  useEffect(() => {
+    if (!zen) {
+      setAsomada(false)
+      return
+    }
+    let visible = false
+    let espera = 0
+    const poner = (v: boolean) => {
+      visible = v
+      setAsomada(v)
+    }
+    const irseLuego = (ms: number) => {
+      if (!visible || espera) return
+      espera = window.setTimeout(() => {
+        espera = 0
+        if (!menuRef.current) poner(false)
+      }, ms)
+    }
+    const decidir = (clientY: number, objetivo: EventTarget | null, msOcultar: number) => {
+      const r = raiz.current?.getBoundingClientRect()
+      const b = barra.current?.getBoundingClientRect()
+      const si = barraAsoma(clientY - (r?.top ?? 0), {
+        asomada: visible,
+        altoBarra: b && r ? b.bottom - r.top : 0,
+        sobreBarra: !!(objetivo as Element | null)?.closest?.('.foco-barra'),
+        menuAbierto: menuRef.current,
+      })
+      if (si) {
+        window.clearTimeout(espera)
+        espera = 0
+        if (!visible) poner(true)
+        // Con el dedo no hay «alejarse»: se va sola al rato.
+        if (msOcultar > OCULTAR_BARRA_MS) irseLuego(msOcultar)
+      } else irseLuego(msOcultar)
+    }
+    // Un toque también manda ratón de compatibilidad justo después: ese no cuenta.
+    let ultimoToque = 0
+    const raton = (e: MouseEvent) => {
+      if (Date.now() - ultimoToque > 800) decidir(e.clientY, e.target, OCULTAR_BARRA_MS)
+    }
+    const toque = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return
+      ultimoToque = Date.now()
+      decidir(e.clientY, e.target, 4000)
+    }
+    const fuera = () => irseLuego(OCULTAR_BARRA_MS)
+    window.addEventListener('mousemove', raton, { passive: true })
+    window.addEventListener('pointerdown', toque, { passive: true })
+    document.documentElement.addEventListener('mouseleave', fuera)
+    return () => {
+      window.clearTimeout(espera)
+      window.removeEventListener('mousemove', raton)
+      window.removeEventListener('pointerdown', toque)
+      document.documentElement.removeEventListener('mouseleave', fuera)
+    }
+  }, [zen, raiz, barra])
+  return zen && (asomada || menu)
 }
 
 // «Atenuar lo demás»: se guarda con la clave de la antigua lupa, con el mismo significado (encendido por defecto).
@@ -58,6 +131,21 @@ export default function MarcoFoco(p: Props) {
   const caja = useRef<HTMLSpanElement | null>(null)
   const botonAjustes = useRef<HTMLButtonElement | null>(null)
   const cuerpo = useRef<HTMLDivElement | null>(null)
+  const raiz = useRef<HTMLDivElement | null>(null)
+  const barra = useRef<HTMLElement | null>(null)
+  const zen = !!p.zen
+  const barraAsomada = usarBarraZen(zen, raiz, barra, menu)
+  // Al entrar en zen, un aviso corto de cómo salir.
+  const [cinta, setCinta] = useState(false)
+  useEffect(() => {
+    if (!zen) {
+      setCinta(false)
+      return
+    }
+    setCinta(true)
+    const t = window.setTimeout(() => setCinta(false), CINTA_MS)
+    return () => window.clearTimeout(t)
+  }, [zen])
   useEffect(() => {
     if (!menu) return
     const fuera = (e: MouseEvent) => caja.current && !caja.current.contains(e.target as Node) && setMenu(false)
@@ -152,13 +240,26 @@ export default function MarcoFoco(p: Props) {
 
   return createPortal(
     <div
-      className={`foco ${atenuar ? 'atenuar' : ''}`}
+      ref={raiz}
+      className={`foco ${atenuar ? 'atenuar' : ''} ${zen ? 'zen' : ''}`}
       style={variables(acentoDe(ajuste, p.leccion))}
       role="dialog"
       aria-modal="true"
       aria-label={`Modo foco: ${p.titulo}`}
     >
-      <header className="foco-barra">
+      {zen && (
+        <div
+          className="foco-zen-linea"
+          role="progressbar"
+          aria-label="Avance de la lección"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round((p.progreso ?? 0) * 100)}
+        >
+          <i style={{ transform: `scaleX(${p.progreso ?? 0})` }} />
+        </div>
+      )}
+      <header ref={barra} className={`foco-barra ${barraAsomada ? 'asoma' : ''}`}>
         <div className="foco-titulo">
           {p.placa && <span className="bloques-clave">{p.placa}</span>}
           <span className="recorte">{p.titulo}</span>
@@ -194,8 +295,13 @@ export default function MarcoFoco(p: Props) {
       <div className="foco-cuerpo" ref={refCuerpo} tabIndex={-1}>
         {p.children}
       </div>
-      {p.pie && <footer className="foco-pie">{p.pie}</footer>}
+      {p.pie && <footer className={`foco-pie ${zen && p.pieVisible !== false ? 'asoma' : ''}`}>{p.pie}</footer>}
       {p.lateral}
+      {cinta && (
+        <span className="foco-zen-cinta" role="status">
+          Modo zen · Z o Esc para salir
+        </span>
+      )}
     </div>,
     document.body,
   )

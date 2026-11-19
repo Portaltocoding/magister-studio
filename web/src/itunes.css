@@ -94,22 +94,11 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
   :root { --viz-ord-1: #4e4c47; --viz-ord-2: #9a968f; --viz-ord-3: #ece9e3; --viz-serie: #cfccc5; }
 }
 /* Verde de «ver la respuesta» con contraste suficiente sobre el papel. */
-.lb-fantasma summary, .fichas-lista summary { color: #1f6e3a; }
-/* Cabecera de lección: el botón principal se ve como principal, no como apagado. */
-.bloque-cabecera .boton-principal { background: #f2f0eb; color: #141414; border-color: #f2f0eb; }
-.bloque-cabecera .peligro { border-color: transparent; background: transparent; color: #e0786d; }
-@media (prefers-color-scheme: light) {
-  .bloque-cabecera { background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); box-shadow: var(--sombra-suave); }
-  .bloque-cabecera h1 { color: var(--texto); }
-  .bloque-num { color: var(--suave); opacity: 0.55; }
-  .bloque-datos .lb-etq { color: var(--suave); }
-  .bloque-objetivos { background: color-mix(in srgb, var(--texto) 5%, transparent); color: var(--texto); border-left-color: var(--borde); }
-  .bloque-cabecera .boton:not(.boton-principal) { color: var(--texto); border-color: var(--borde); }
-  .bloque-cabecera .boton-principal { background: var(--texto); color: var(--fondo); border-color: var(--texto); }
-  .bloque-cabecera .peligro { color: #b5524a; }
-  .estilo-pdf { color: var(--suave); }
-  .estilo-pdf select { background: var(--fondo); color: var(--texto); border-color: var(--borde); }
-}
+.fichas-lista summary { color: #1f6e3a; }
+/* Cabecera de lección: estilo C («Limpio», en bloques.css), sin tarjeta, en claro y en oscuro con los colores del tema.
+   Aquí solo lo que tiene que ganar a chat.css y examen.css (botones de «Más»). */
+.bloque-cabecera .boton:not(.boton-principal), .bloque-cabecera .colores > .boton { background: transparent; color: var(--texto); border: 1px solid var(--borde); }
+.bloque-cabecera .boton.peligro { border-color: transparent; background: transparent; color: var(--examen); }
 /* Roadmap: cada lección, una tarjeta. */
 .lecciones { list-style: none; padding-left: 0; }
 .lecciones > li { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); padding: 14px 18px; box-shadow: var(--sombra-suave); margin-bottom: 10px; }

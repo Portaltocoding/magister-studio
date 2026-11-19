@@ -51,7 +51,17 @@ export default function BarraLateral({
     }
   }
   return (
-    <aside className="lateral" inert={oculta}>
+    <aside
+      className="lateral"
+      inert={oculta}
+      // Pulsar en un hueco de la barra (no en un botón, un enlace ni un campo) la pliega, igual que su botón.
+      onClick={(e) => {
+        if (fija || !alCerrar) return
+        const el = e.target as HTMLElement
+        if (el.closest('button, a, input, textarea, select, label, [role="button"], [contenteditable="true"]')) return
+        alCerrar()
+      }}
+    >
       <div className="marca">
         <button type="button" className="marca-nombre" onClick={() => alElegir('libre')} title="Estudio libre">
           Magister

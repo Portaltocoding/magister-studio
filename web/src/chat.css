@@ -112,7 +112,8 @@
   --dg-bien: #62c47c;
 }
 @media (prefers-color-scheme: light) { .diagrama-vivo { --dg-realce: #b9770e; --dg-mal: #c0392b; --dg-bien: #2e8b57; } }
-.lector-texto .diagrama-vivo { --dg-realce: #b9770e; --dg-mal: #c0392b; --dg-bien: #2e8b57; }
+/* Los apuntes ya no van en papel crema: el diagrama sigue al tema; en el foco, siempre oscuro. */
+.foco .lector-texto .diagrama-vivo { --dg-realce: #e0a23c; --dg-mal: #e8615b; --dg-bien: #62c47c; }
 /* Los diagramas ricos (mapas de argumentos, de posiciones, de ideas) son más grandes. */
 .diagrama-rico .diagrama-lienzo svg { max-height: 640px; }
 .diagrama-encargo { margin: 18px 0; padding: 10px 14px; border: 1px dashed var(--borde); border-radius: 12px; font-size: 0.9rem; white-space: pre-wrap; opacity: 0.85; }

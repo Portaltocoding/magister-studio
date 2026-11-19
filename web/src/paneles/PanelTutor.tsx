@@ -29,6 +29,7 @@ import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import type { IdModo } from '../modos.ts'
 import { aCss } from '../componentes/escala.ts'
 import { debeIgnorar, desplazarA, usarParrafoActivo, type Pantalla } from '../componentes/parrafos.ts'
+import { guardarZen, leerZen, PIE_ASOMA_MS, pieVisible, progresoLeccion, relojZen } from '../componentes/zen.ts'
 import {
   aMedias,
   claveListo,
@@ -514,6 +515,17 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
     guardarAncho(n)
   }
   const [verMapa, setVerMapa] = useState(false)
+  // Modo zen (Z): se recuerda; por defecto, apagado.
+  const [zen, setZen] = useState(() => leerZen(typeof localStorage === 'undefined' ? null : localStorage))
+  const cambiarZen = useCallback((v?: boolean) => {
+    setZen((z) => {
+      const n = v ?? !z
+      guardarZen(typeof localStorage === 'undefined' ? null : localStorage, n)
+      return n
+    })
+  }, [])
+  // En zen, el pie asoma un momento al cambiar de idea.
+  const [pieAsoma, setPieAsoma] = useState(false)
   // Abrir el mapa no gasta nada: hacerlo leyendo la página es un botón dentro.
   const { mapa, cambiar: cambiarMapa, anadir: anadirAlMapa, generar: generarMapa, generando: generandoMapa, errorMapa } = usarMapa(mid)
   const [papel, setPapel] = useState<HTMLDivElement | null>(null)
@@ -541,6 +553,19 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
   useEffect(() => {
     if (lista.length) uInicial.current = null
   }, [lista])
+
+  const ideaVista = useRef(i)
+  useEffect(() => {
+    if (ideaVista.current === i) return
+    ideaVista.current = i
+    if (!zen) return
+    setPieAsoma(true)
+    const t = window.setTimeout(() => setPieAsoma(false), PIE_ASOMA_MS)
+    return () => {
+      window.clearTimeout(t)
+      setPieAsoma(false)
+    }
+  }, [i, zen])
 
   // Reloj: solo cuenta con la pestaña a la vista, sin pausa y sin descanso.
   useEffect(() => {
@@ -651,7 +676,14 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
           window.getSelection()?.removeAllRanges()
         } else if (verMapa) setVerMapa(false)
         else if (glosario) setGlosario(false)
+        else if (zen) cambiarZen(false)
         else return false
+        return true
+      }
+      // Z: modo zen, en cualquier pantalla de la lección (menos escribiendo).
+      if ((e.key === 'z' || e.key === 'Z') && !debeIgnorar(e, { pantalla: 'idea', menuAbierto: false })) {
+        e.preventDefault()
+        cambiarZen()
         return true
       }
       if (cerrada || descanso != null || calentando || reexplicando) return false
@@ -677,7 +709,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       e.preventDefault()
       return true
     },
-    [ir, glosario, cerrada, descanso, calentando, reexplicando, hayGlosario, chuleta, seleccion, verMapa, pantalla, lista, u, pendiente, reclamar, mover, irUnidad],
+    [ir, glosario, cerrada, descanso, calentando, reexplicando, hayGlosario, chuleta, seleccion, verMapa, pantalla, lista, u, pendiente, reclamar, mover, irUnidad, zen, cambiarZen],
   )
 
   const cerrar = async () => {
@@ -720,6 +752,16 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       alSalir={alSalir}
       teclas={teclas}
       alCuerpo={setCuerpo}
+      zen={zen}
+      progreso={cerrada ? 1 : calentando ? 0 : progresoLeccion(i, bloques.length, u, lista.length)}
+      pieVisible={pieVisible({
+        zen,
+        pantalla,
+        ultimoParrafo: !lista.length || u >= lista.length - 1,
+        asomando: pieAsoma,
+        chuleta,
+        error: !!errorCierre,
+      })}
       pasos={
         <ol className="foco-pasos" aria-label="Ideas de la lección">
           {bloques.map((x, k) => (
@@ -737,8 +779,8 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       }
       reloj={
         <button className={`foco-reloj ${pausado ? 'pausado' : ''}`} onClick={() => setPausado(!pausado)} title={pausado ? 'Seguir' : 'Pausar el reloj'}>
-          {pausado ? 'En pausa ▶' : '❚❚'} {reloj(segundos)}
-          {previsto > 0 && <small> / {reloj(previsto)}</small>}
+          {pausado ? 'En pausa ▶' : '❚❚'} {zen ? relojZen(segundos) : reloj(segundos)}
+          {previsto > 0 && !zen && <small> / {reloj(previsto)}</small>}
         </button>
       }
       herramientas={
@@ -779,6 +821,10 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         )
       }
       ajustes={
+        <>
+        <button className="foco-boton" aria-pressed={zen} onClick={() => cambiarZen()} title="Esconder la barra y el pie mientras lees (Z)">
+          {zen ? '✓ ' : ''}Modo zen (Z)
+        </button>
         <span className="foco-ritmo-ajustes">
           <span className="foco-ancho">
             Ancho de la página
@@ -822,6 +868,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             </select>
           </label>
         </span>
+        </>
       }
       lateral={
         glosario ? (
@@ -905,6 +952,8 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
                   <dd>La mascota te ayuda con el párrafo</dd>
                   <dt>L</dt>
                   <dd>Atenuar lo demás</dd>
+                  <dt>Z</dt>
+                  <dd>Modo zen: solo la página</dd>
                   {hayGlosario && (
                     <>
                       <dt>G</dt>
@@ -916,7 +965,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
                   <dt>?</dt>
                   <dd>Esta lista</dd>
                   <dt>Esc</dt>
-                  <dd>Cerrar lo abierto o salir</dd>
+                  <dd>Cerrar lo abierto, salir del zen o salir</dd>
                 </dl>
               </div>
             )}

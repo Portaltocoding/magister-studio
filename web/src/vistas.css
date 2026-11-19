@@ -200,7 +200,8 @@ body.en-foco { overflow: hidden; }
 .foco-etq { color: var(--t-acento, #f2c200); }
 .foco-idea h1 { font-size: calc(1.75rem / var(--zoom-ui, 1)); line-height: 1.15; letter-spacing: -0.5px; margin: 6px 0 22px; color: #fff; }
 /* La letra del papel es suya: no la encoge el tamaño compacto de la interfaz (19 px en pantalla con la M). */
-.foco-papel.lector-texto { max-width: none; font-size: calc(var(--foco-letra, 1.1875rem) / var(--zoom-ui, 1)); line-height: 1.62; padding: 40px 48px; }
+/* Sin papel (estilo C de las fichas): el texto alinea con el título de la idea; la marca queda a 18 px a su izquierda. */
+.foco-papel.lector-texto { max-width: none; font-size: calc(var(--foco-letra, 1.1875rem) / var(--zoom-ui, 1)); line-height: 1.62; padding: 4px 0 0; }
 .foco-papel.lector-texto p + p { margin-top: 0.85em; }
 .foco-papel pre { max-width: 100%; overflow-x: auto; }
 .foco-papel .katex-display { font-size: 1.15em; margin: 0.8em 0; overflow-x: auto; overflow-y: hidden; }
@@ -275,7 +276,7 @@ body.en-foco { overflow: hidden; }
   .foco-pasos { justify-content: center; }
   .foco-atajos { display: none; }
   .foco-herramientas { flex-wrap: wrap; justify-content: center; }
-  .foco-papel.lector-texto { padding: 26px 22px; }
+  .foco-papel.lector-texto { padding: 4px 0 0; }
 }
 .foco-pregunta p { margin: 0; }
 .foco-pregunta code { background: #3a3520; color: #f3e6b0; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
@@ -283,6 +284,10 @@ body.en-foco { overflow: hidden; }
 /* ===== Atenuar: el párrafo activo a plena luz y lo demás, un poco apagado (sin moverse ni crecer) ===== */
 .foco.atenuar .foco-papel [data-u] { opacity: 0.6; transition: opacity var(--foco-medio) var(--foco-curva); }
 .foco.atenuar .foco-papel [data-u].activo { opacity: 1; }
+/* El párrafo activo crece un pelín, despacio (los bloques anchos no: se saldrían del papel). */
+.foco .foco-papel [data-u] { transform-origin: left center; transition: transform var(--foco-lento) var(--foco-curva), opacity var(--foco-medio) var(--foco-curva); }
+.foco .foco-papel [data-u].activo:not(pre):not(table):not(.katex-display) { transform: scale(1.02); }
+@media (prefers-reduced-motion: reduce) { .foco .foco-papel [data-u] { transition: none; } .foco .foco-papel [data-u].activo { transform: none !important; } }
 /* El párrafo activo recibe el foco del teclado, pero lo señala la marca del margen, no un recuadro. */
 .foco .foco-papel [data-u]:focus, .foco .foco-papel [data-u]:focus-visible { outline: none; }
 .foco-marca {
@@ -302,6 +307,90 @@ body.en-foco { overflow: hidden; }
 body.en-foco .tomate-boton .tomate-icono, body.en-foco .riel-hoy.con-aviso svg { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .foco * { transition-duration: 0s !important; animation: none !important; }
+}
+
+/* ===== Modo zen (Z): solo el papel, la marca, la mascota quieta y una línea de progreso =====
+   La barra asoma con el ratón arriba (clase .asoma) o con el teclado dentro; el pie, cuando toca (lo decide zen.ts).
+   Paleta propia que sigue al sistema; los colores van con :root delante para ganar también al tema Parchís. */
+:root .foco.zen {
+  --zen-marco: #f3f0ea; --zen-texto: #1f1e1c; --zen-suave: #6b675f; --zen-linea: #e2ddd2;
+  --zen-boton-borde: #d0cabd; --zen-boton-texto: #3a3833; --zen-caja: #ebe7de; --zen-caja-borde: #dcd6c9; --zen-pista: #d9d4c8;
+  --zen-papel: #fbf9f4; --zen-tinta: #1f1e1c; --zen-papel-borde: #e4dfd4; --zen-sombra: 0 1px 6px rgb(0 0 0 / 0.06);
+  --zen-resalte: color-mix(in srgb, var(--t-acento, #f2c200) 30%, #fff);
+  --zen-acento-texto: color-mix(in srgb, var(--t-acento, #f2c200) 45%, #23211c);
+  --zen-marca: color-mix(in srgb, var(--t-acento, #f2c200) 70%, #1f1e1c);
+  --texto: #1f1e1c; --fondo: #fbf9f4; --tarjeta: #ffffff; --borde: #dcd6c9; --suave: #6b675f; --activo: #ebe7de;
+  color-scheme: light; color: var(--zen-texto); background: var(--zen-papel);
+}
+@media (prefers-color-scheme: dark) {
+  :root .foco.zen {
+    --zen-marco: #181716; --zen-texto: #e4e0d8; --zen-suave: #9a968f; --zen-linea: #2c2b28;
+    --zen-boton-borde: #3d3c39; --zen-boton-texto: #d9d9d9; --zen-caja: #242320; --zen-caja-borde: #36352f; --zen-pista: #3a3936;
+    --zen-papel: #1f1e1c; --zen-tinta: #e4e0d8; --zen-papel-borde: #2c2b28; --zen-sombra: none;
+    --zen-resalte: color-mix(in srgb, var(--t-acento, #f2c200) 22%, #1f1e1c);
+    --zen-acento-texto: var(--t-acento, #f2c200);
+    --zen-marca: var(--t-acento, #f2c200);
+    --texto: #e4e0d8; --fondo: #1a1917; --tarjeta: #242320; --borde: #3a3936; --suave: #9a968f; --activo: #33322e;
+    color-scheme: dark;
+  }
+}
+/* La línea de progreso, pegada arriba. */
+.foco-zen-linea { position: absolute; top: 0; left: 0; right: 0; height: 3px; z-index: 45; background: var(--zen-pista); pointer-events: none; }
+.foco-zen-linea i { display: block; height: 100%; background: var(--zen-marca); transform-origin: left center; transition: transform var(--foco-medio) var(--foco-curva); }
+/* La barra y el pie flotan encima y se apartan; el papel gana su sitio. */
+.foco.zen .foco-barra {
+  position: absolute; top: 3px; left: 0; right: 0; z-index: 40; opacity: 0; pointer-events: none;
+  transition: opacity var(--foco-lento) var(--foco-curva);
+}
+.foco.zen .foco-pie {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 40; opacity: 0; pointer-events: none;
+  transition: opacity var(--foco-lento) var(--foco-curva);
+}
+.foco.zen :is(.foco-barra, .foco-pie):is(.asoma, :has(:focus-visible)) { opacity: 1; pointer-events: auto; transition-duration: var(--foco-medio); }
+.foco.zen .foco-cuerpo { padding-top: 40px; padding-bottom: 96px; }
+.foco.zen .foco-glosario { top: 3px; }
+/* La mascota, quieta: sin globos ni puntos que llamen. */
+.foco.zen :is(.companera-globo, .companera-punto) { display: none; }
+.foco-zen-cinta {
+  position: absolute; right: 14px; bottom: 12px; z-index: 45; font-size: 0.75rem; padding: 4px 10px; border-radius: 999px; pointer-events: none;
+  background: color-mix(in srgb, var(--zen-texto) 10%, transparent); color: var(--zen-texto); animation: idea-entra var(--foco-medio) var(--foco-curva);
+}
+/* Colores del zen en lo de alrededor del papel. */
+:root .foco.zen :is(.foco-barra, .foco-pie) { background: var(--zen-marco); border-color: var(--zen-linea); box-shadow: none; }
+:root .foco.zen :is(.foco-boton, .foco-reloj) { color: var(--zen-boton-texto); border: 1px solid var(--zen-boton-borde); border-radius: 8px; background: transparent; }
+:root .foco.zen :is(.foco-boton, .foco-reloj):hover { color: var(--zen-texto); border-color: var(--zen-acento-texto); background: transparent; }
+:root .foco.zen .foco-boton[aria-pressed="true"], :root .foco.zen .foco-reloj.pausado { color: var(--zen-acento-texto); border-color: var(--zen-acento-texto); }
+:root .foco.zen .foco-paso:not(.vista):not(.actual):not([class*="nota-"]) { background: var(--zen-pista); }
+:root .foco.zen :is(.foco-idea h1, .foco-cierre h1, .foco-pregunta, .foco-glosario dt) { color: var(--zen-texto); }
+:root .foco.zen .foco-etq { color: var(--zen-acento-texto); }
+:root .foco.zen .boton:not(.boton-principal), :root .foco.zen .boton-mini { background: transparent; color: var(--zen-texto); border-color: var(--zen-boton-borde); }
+:root .foco.zen :is(.foco-chuleta, .foco-glosario, .foco-ajustes-caja, .foco-ritmo-caja, .foco-cifras div) {
+  background: var(--zen-caja); color: var(--zen-texto); border-color: var(--zen-caja-borde); box-shadow: 0 12px 30px rgb(0 0 0 / 0.18);
+}
+:root .foco.zen .foco-ritmo-ajustes { background: none; border: 0; border-top: 1px solid var(--zen-caja-borde); box-shadow: none; color: var(--zen-texto); }
+:root .foco.zen :is(.foco-ritmo-ajustes, .foco-ritmo-caja) select { background: var(--zen-papel); color: var(--zen-texto); border: 1px solid var(--zen-boton-borde); }
+:root .foco.zen :focus-visible { outline-color: var(--zen-acento-texto); }
+:root .foco.zen .foco-marca { background: var(--zen-marca); }
+/* En zen toda la pantalla es la página: el fondo, del tono del papel; la barra y el pie, del marco.
+   El texto toma --texto y compañía (ya puestos arriba); de cada bloque solo se pasan las variables, el aspecto no se toca. */
+:root .foco.zen .foco-papel {
+  --t-papel: var(--zen-papel); --t-tinta: var(--zen-tinta); --t-resalte: var(--zen-resalte); --t-acento-tinta: var(--zen-acento-texto);
+}
+/* La comprobación, en la misma página: sin tarjeta, debajo del texto y separada por una línea. */
+:root .foco.zen .foco-comprobar {
+  margin-top: 32px; padding: 26px 0 8px; border-radius: 0; background: transparent; color: var(--zen-tinta); box-shadow: none;
+  border: 0; border-top: 1px solid color-mix(in srgb, var(--zen-tinta) 18%, transparent);
+}
+:root .foco.zen .foco-comprobar .foco-pregunta { color: var(--zen-tinta); }
+:root .foco.zen .foco-comprobar .foco-pregunta code { background: var(--zen-resalte); color: var(--zen-tinta); }
+:root .foco.zen .foco-comprobar textarea { background: transparent; color: var(--zen-tinta); border: 1px solid color-mix(in srgb, var(--zen-tinta) 25%, transparent); border-radius: 10px; }
+:root .foco.zen .foco-confianza .opcion:not([data-elegida="true"]) { color: var(--zen-tinta); border-color: color-mix(in srgb, var(--zen-tinta) 25%, transparent); background: transparent; }
+:root .foco.zen .foco-confianza .opcion[data-elegida="true"] { color: var(--zen-tinta); }
+:root .foco.zen .foco-comprobar .correccion { background: color-mix(in srgb, var(--zen-tinta) 6%, var(--zen-papel)); color: var(--zen-tinta); border: 0; }
+@media (prefers-color-scheme: light) {
+  :root .foco.zen .foco-hecho.nota-bien, :root .foco.zen .foco-hecho.nota-perfecta { color: #1f8a4c; }
+  :root .foco.zen .foco-hecho.nota-fallo { color: #c8463c; }
+  :root .foco.zen .foco-hecho.nota-parcial { color: #b0700a; }
 }
 
 /* ===== Barra lateral por secciones ===== */

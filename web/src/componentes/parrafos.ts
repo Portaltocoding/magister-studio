@@ -152,6 +152,9 @@ export interface Marca {
 
 // El párrafo activo de una idea. `papel`: la envoltura del papel (dentro está .foco-papel y ahí va la marca);
 // `cuerpo`: la zona que se desplaza. `inicial`: la unidad por la que empezar (la que guardaste al salir).
+// Lo que el ratón tiene que quedarse en un párrafo para activarlo.
+const ESPERA_RATON_MS = 400
+
 export function usarParrafoActivo(papel: HTMLElement | null, cuerpo: HTMLElement | null, claveIdea: string, inicial?: number | null) {
   const [u, setU] = useState(0)
   const [lista, setLista] = useState<HTMLElement[]>([])
@@ -290,8 +293,39 @@ export function usarParrafoActivo(papel: HTMLElement | null, cuerpo: HTMLElement
       const k = el ? listaRef.current.indexOf(el) : -1
       if (k >= 0) setU(k)
     }
+    // El ratón también la activa, pero solo si se queda en la misma unidad un momento: cruzar el papel no cambia nada.
+    let espera = 0
+    let candidata: HTMLElement | null = null
+    const soltar = () => {
+      window.clearTimeout(espera)
+      candidata = null
+    }
+    const mover = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null
+      const el = t?.closest<HTMLElement>('[data-u]') ?? null
+      if (el === candidata) return
+      soltar()
+      if (!el || el.classList.contains('activo')) return
+      candidata = el
+      espera = window.setTimeout(() => {
+        const k = listaRef.current.indexOf(el)
+        const quieto = Date.now() - ultimoScroll.current > ESPERA_RATON_MS
+        if (candidata === el && k >= 0 && quieto && !(window.getSelection()?.toString() ?? '').trim()) setU(k)
+        candidata = null
+      }, ESPERA_RATON_MS)
+    }
+    const conRaton = typeof window.matchMedia !== 'function' || window.matchMedia('(hover: hover)').matches
     papel.addEventListener('click', clic)
-    return () => papel.removeEventListener('click', clic)
+    if (conRaton) {
+      papel.addEventListener('mousemove', mover, { passive: true })
+      papel.addEventListener('mouseleave', soltar)
+    }
+    return () => {
+      soltar()
+      papel.removeEventListener('click', clic)
+      papel.removeEventListener('mousemove', mover)
+      papel.removeEventListener('mouseleave', soltar)
+    }
   }, [papel])
 
   const ir = useCallback(
