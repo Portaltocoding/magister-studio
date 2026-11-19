@@ -9,4 +9,5 @@ salidas/
 checkpoints.sqlite*
 evals/resultados/
 evals/olvido/
+registros/
 __pycache__

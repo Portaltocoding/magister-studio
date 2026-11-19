@@ -6,7 +6,11 @@ Hablas con él de lo que quieres aprender y te propone un plan y un calendario e
 
 > Las cajas «Decide tú» del libro están resueltas aquí, casi siempre con la propuesta del propio libro, y apuntadas en [`docs/decisiones.md`](docs/decisiones.md). Si no quieres destripar un capítulo, no mires su código antes de construir el tuyo.
 
-## Arrancar (Windows)
+## Instalar (Mac, Windows y Linux)
+
+Con Docker y un arrancador de doble clic (`Magister.command` en Mac, `Magister-docker.bat` en Windows, `magister.sh` en Linux). Cada persona usa su propia cuenta de Claude. Paso a paso, actualizar y problemas frecuentes: **[docs/instalar.md](docs/instalar.md)**.
+
+## Arrancar (Windows, para desarrollar)
 
 Necesitas Docker Desktop, [uv](https://docs.astral.sh/uv/), Node 22 y el CLI de Claude Code con tu sesión iniciada (el tutor usa `claude -p` con tu suscripción).
 

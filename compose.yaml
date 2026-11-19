@@ -2,18 +2,26 @@
 #
 #   docker compose up -d                      solo la base (Postgres 16 con pgvector): para usarlo desde Windows
 #   docker compose --profile docker up -d     todo dentro de Docker: base, API y web en http://localhost:8080
+#                                             (lo lanzan Magister.command, magister.sh y Magister-docker.bat)
 #
 # Puerto 5433 y nombres propios para no chocar con el Postgres del repo magister.
+# `name` fija el nombre del proyecto: los volúmenes se llaman siempre magister-studio_..., aunque la carpeta se llame
+# magister-studio-main (el zip de GitHub) o la vuelvas a descargar en otro sitio. Así actualizar no pierde tus datos.
+# Las variables MAGISTER_DOCKER_* solo sirven para probar una instalación aparte (otros puertos y otro contenedor);
+# sin ellas, todo queda como siempre.
+name: magister-studio
+
 services:
   db:
     image: pgvector/pgvector:pg16
-    container_name: magister-studio-db
+    container_name: ${MAGISTER_DOCKER_CONTENEDOR_DB:-magister-studio-db}
     environment:
       POSTGRES_USER: magister
-      POSTGRES_PASSWORD: magister
+      # Solo cuenta la primera vez (volumen vacío). Los arrancadores le pasan la de secretos/postgres_password.
+      POSTGRES_PASSWORD: ${MAGISTER_DOCKER_DB_CLAVE:-magister}
       POSTGRES_DB: magister
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:${MAGISTER_DOCKER_PUERTO_DB:-5433}:5432"
     volumes:
       - magister-studio-datos:/var/lib/postgresql/data
       - ./servidor/scripts/crear_bases.sql:/docker-entrypoint-initdb.d/10-crear_bases.sql:ro
@@ -27,8 +35,11 @@ services:
     build: ./servidor
     env_file: .env.compose
     secrets: [claude_token, postgres_password, canario]
+    # tini como PID 1: recoge los procesos que deja claude al cortarlo (en Linux kill() no llega a los hijos).
+    init: true
     volumes:
       - magister-studio-api:/datos
+      - magister-studio-copias:/copias
     depends_on:
       db:
         condition: service_healthy
@@ -36,12 +47,13 @@ services:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/salud')\""]
       interval: 10s
       retries: 10
+      start_period: 180s
 
   web:
     profiles: ["docker"]
     build: ./web
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:${MAGISTER_DOCKER_PUERTO_WEB:-8080}:80"
     depends_on:
       api:
         condition: service_healthy
@@ -57,3 +69,4 @@ secrets:
 volumes:
   magister-studio-datos:
   magister-studio-api:
+  magister-studio-copias:

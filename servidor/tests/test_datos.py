@@ -129,6 +129,35 @@ async def test_si_la_copia_previa_falla_no_se_restaura(tmp_path, monkeypatch) ->
     assert ordenes == []
 
 
+async def test_las_ordenes_de_postgres_van_por_docker_o_directas_sin_contenedor() -> None:
+    assert td.orden_pg("magister-studio-db", "pg_dump", "-Fc", "m") == ["docker", "exec", "magister-studio-db", "pg_dump", "-Fc", "m"]
+    assert td.orden_pg("c", "psql", "-f", "-", entrada=True) == ["docker", "exec", "-i", "c", "psql", "-f", "-"]
+    assert td.orden_pg("", "pg_restore", "-f", "-", entrada=True) == ["pg_restore", "-f", "-"]
+
+
+async def test_la_rotacion_deja_7_diarias_4_semanales_y_12_mensuales(tmp_path) -> None:
+    from datetime import date, timedelta
+
+    raiz = tmp_path / "copias"
+    for i in range(10):
+        dia = date(2026, 11, 1) + timedelta(days=i)
+        _escribir(raiz / "diarias" / f"magister-{dia.isoformat()}.dump", b"d")
+        _escribir(raiz / "diarias" / f"checkpoints-{dia.isoformat()}.sqlite", b"c")
+    for i in range(6):
+        _escribir(raiz / "semanales" / f"magister-2026-0{i + 1}-05.dump", b"s")
+    lunes = date(2026, 11, 9)  # 9-11-2026 es lunes: su copia pasa también a semanales
+    td.rotar(raiz, lunes)
+    diarias = sorted(f.name for f in (raiz / "diarias").glob("magister-*.dump"))
+    assert diarias == [f"magister-2026-11-{d:02d}.dump" for d in range(4, 11)]
+    assert not (raiz / "diarias" / "checkpoints-2026-11-03.sqlite").exists()
+    assert (raiz / "diarias" / "checkpoints-2026-11-04.sqlite").exists()
+    semanales = sorted(f.name for f in (raiz / "semanales").glob("*.dump"))
+    assert len(semanales) == 4 and semanales[-1] == "magister-2026-11-09.dump"
+    assert not (raiz / "mensuales").exists()
+    td.rotar(raiz, date(2026, 11, 1))  # día 1, sin copia de ese día: no se inventa nada
+    assert not (raiz / "mensuales").exists()
+
+
 # --- De punta a punta, contra una base temporal del contenedor hecha con una copia de la base de PRUEBAS ---
 
 PRUEBA = "magister_restaurar_prueba"

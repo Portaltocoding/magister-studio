@@ -1,7 +1,8 @@
 # Caddy dentro de Docker: /api/* a la API, lo demás ficheros estáticos con vuelta a index.html.
+# Las respuestas de /api llevan la CSP que pone la API (las diapositivas se ven en un iframe con su script): Caddy no
+# la pisa. La página lleva la misma que la API le pone cuando la sirve ella (http://localhost:8000).
 :80 {
 	header {
-		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
 	}
@@ -11,6 +12,7 @@
 		}
 	}
 	handle {
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-ancestors 'none'"
 		root * /srv
 		try_files {path} /index.html
 		file_server

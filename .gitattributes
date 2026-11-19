@@ -1,0 +1,8 @@
+# Lo que se ejecuta en Mac, Linux o dentro de Docker va siempre con LF (con CRLF, sh falla en la primera línea),
+# también al clonar en Windows con core.autocrlf=true. Los .bat, con CRLF.
+*.sh       text eol=lf
+*.command  text eol=lf
+servidor/Dockerfile  text eol=lf
+web/Dockerfile       text eol=lf
+web/Caddyfile        text eol=lf
+*.bat      text eol=crlf

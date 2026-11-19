@@ -11,8 +11,15 @@ const [htmlPath, outArg, footer = ''] = process.argv.slice(2);
 const html = pathToFileURL(resolve(htmlPath)).href;
 const out = resolve(outArg);
 const profile = mkdtempSync(join(tmpdir(), 'ficha-chrome-'));
-const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-  '--no-first-run', '--disable-gpu', '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
+// El navegador llega de MAGISTER_CHROME (FICHA_CHROME); en Docker es Chromium con --no-sandbox (FICHA_CHROME_ARGS).
+const exe = process.env.FICHA_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const extra = (process.env.FICHA_CHROME_ARGS || '').split(/\s+/).filter(Boolean);
+const chrome = spawn(exe, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  '--no-first-run', '--disable-gpu', '--allow-file-access-from-files', ...extra, 'about:blank'], { stdio: 'ignore' });
+chrome.on('error', (e) => {
+  console.error(`No encuentro el navegador para pintar el PDF (${exe}): ${e.message}. Ajusta MAGISTER_CHROME.`);
+  process.exit(2);
+});
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 

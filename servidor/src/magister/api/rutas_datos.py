@@ -5,6 +5,7 @@ un cuerpo JSON con la palabra RESTAURAR, y antes guarda una copia de cómo está
 """
 
 import asyncio
+import logging
 import shutil
 import tempfile
 from datetime import datetime
@@ -67,6 +68,37 @@ async def copia_ahora() -> dict:
                                         Path(ajustes.checkpoints))
         except td.ErrorCopia as e:
             raise HTTPException(500, f"No se ha podido hacer la copia: {e}") from e
+
+
+COPIA_CADA_S = 3600
+_registro = logging.getLogger("uvicorn.error")
+
+
+async def copia_del_dia() -> bool:
+    """Si aún no está la copia de hoy, la hace y rota (7 diarias, 4 semanales, 12 mensuales). True si la ha hecho."""
+    raiz = Path(ajustes.copias)
+    ahora = _ahora()
+    if (raiz / "diarias" / f"magister-{ahora.date().isoformat()}.dump").is_file() or _ocupado.locked():
+        return False
+    async with _ocupado:
+        base, usuario = _base()
+        await td.hacer_copia(ahora, raiz, base, usuario, ajustes.contenedor_db, Path(ajustes.checkpoints))
+        await asyncio.to_thread(td.rotar, raiz, ahora.date())
+    return True
+
+
+async def bucle_copia_diaria() -> None:
+    """MAGISTER_COPIA_DIARIA (el modo Docker): al arrancar y cada hora, la copia del día si falta. Un fallo se apunta
+    en el registro y se reintenta a la hora siguiente; nunca tumba la API."""
+    while True:
+        try:
+            if await copia_del_dia():
+                _registro.info("copia del día hecha en %s", ajustes.copias)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - la copia no puede tumbar la API
+            _registro.exception("la copia del día ha fallado; se reintenta en una hora")
+        await asyncio.sleep(COPIA_CADA_S)
 
 
 class PedirRestaurar(BaseModel):

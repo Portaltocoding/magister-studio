@@ -7,8 +7,11 @@ Convenciones del markdown en GUIA.md.
 import os, re, sys, subprocess, html as H, glob, shutil
 from PIL import Image
 
+from pathlib import Path
+
 MOTOR = os.path.dirname(os.path.abspath(__file__))
 KATEX = os.path.join(MOTOR, "katex")
+KATEX_URL = Path(KATEX).as_uri()  # file:///C:/... en Windows y file:///app/... en Linux
 
 def meta(md):
     m = re.match(r"---\n(.*?)\n---\n", md, re.S)
@@ -107,8 +110,8 @@ def to_html(md, m):
         # El acento que elegiste en la app: números, etiquetas y resaltes del PDF.
         css += f"\n:root {{ --amarillo: {acento}; --amarillo-claro: color-mix(in srgb, {acento} 30%, #fff); }}\n"
     return f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><title>{H.escape(m['titulo'])}</title>
-<link rel="stylesheet" href="file:///{KATEX.replace(chr(92), "/")}/katex.min.css"><style>{css}</style>
-<script src="file:///{KATEX.replace(chr(92), "/")}/katex.min.js"></script></head><body>{body}
+<link rel="stylesheet" href="{KATEX_URL}/katex.min.css"><style>{css}</style>
+<script src="{KATEX_URL}/katex.min.js"></script></head><body>{body}
 <script>
 try {{
   document.querySelectorAll('span.math').forEach(e => {{

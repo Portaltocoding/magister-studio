@@ -1,9 +1,17 @@
+import sys
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _archivo_env = Path(__file__).resolve().parents[2] / ".env"
 RAIZ_SERVIDOR = Path(__file__).resolve().parents[2]
+
+# Lo que depende del sistema: el ejecutable de Piper y el Chrome con el que se pinta el PDF (en Docker, Chromium).
+_PIPER = "piper.exe" if sys.platform == "win32" else "piper"
+_CHROME = {
+    "win32": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+    "darwin": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+}.get(sys.platform, "chromium")
 
 
 class Ajustes(BaseSettings):
@@ -66,6 +74,9 @@ class Ajustes(BaseSettings):
     salidas: str = str(RAIZ_SERVIDOR.parent / "salidas")
     pandoc: str = str(Path.home() / "AppData" / "Local" / "Pandoc")  # carpeta de pandoc si no está en el PATH
     marp: str = "@marp-team/marp-cli@4.5.1"
+    # El navegador del motor de PDF (MAGISTER_CHROME) y sus argumentos de más (en Docker, --no-sandbox).
+    chrome: str = _CHROME
+    chrome_args: str = ""
     trabajos_en_api: bool = True  # el trabajador corre dentro de la API (o aparte con magister-trabajador)
     trabajos_lease_s: int = 120
     trabajos_intentos: int = 5
@@ -101,17 +112,21 @@ class Ajustes(BaseSettings):
     simulado: bool = False  # si es verdadero, la sesión usa la base de simulación
 
     # Voz local del tutor (Piper) y registro de las llamadas
-    voz_piper: str = str(RAIZ_SERVIDOR.parent / "herramientas" / "piper" / "piper" / "piper.exe")
+    voz_piper: str = str(RAIZ_SERVIDOR.parent / "herramientas" / "piper" / "piper" / _PIPER)
     voz_dir: str = str(RAIZ_SERVIDOR.parent / "herramientas" / "piper" / "voces")
     # ffmpeg para descargar los vídeos en MP4 (MAGISTER_FFMPEG: el ejecutable, o su ruta si no está en el PATH)
     ffmpeg: str = "ffmpeg"
     registros: str = str(RAIZ_SERVIDOR / "registros")
 
     # Tus datos desde Ajustes: tope de los ficheros (salidas y crudo) que entran en «Descargar mis datos», y dónde
-    # están las copias de la base (las de scripts/copia_db.sh) y el contenedor de Docker que tiene pg_dump.
+    # están las copias de la base (las de scripts/copia_db.sh) y el contenedor de Docker que tiene pg_dump. Con
+    # contenedor_db vacío (todo en Docker), pg_dump, pg_restore y psql se lanzan aquí mismo y van a la base por PGHOST.
     exportar_max_mb: float = 500
     copias: str = str(RAIZ_SERVIDOR.parent / "copias")
     contenedor_db: str = "magister-studio-db"
+    # La API hace sola la copia del día (y la rotación 7/4/12, como scripts/copia_db.sh). En Windows la hace la tarea
+    # programada y arrancar.ps1; en Docker, esto (MAGISTER_COPIA_DIARIA=true).
+    copia_diaria: bool = False
 
     # El asesor que propone cambios (ADR-0017): cuántas vueltas como mucho (la última solo puede proponer) y cuántas
     # lecturas por vuelta. Con 3 vueltas: leer, leer y proponer.

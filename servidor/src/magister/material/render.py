@@ -54,7 +54,8 @@ def _entorno(estilo: str = "libro", acento: str | None = None) -> dict:
     extra = [ajustes.pandoc, str(GIT_BIN)]
     # La maqueta del libro (practica.css), no la de las fichas generales.
     entorno = {**os.environ, "PATH": os.pathsep.join([*extra, os.environ.get("PATH", "")]), "PYTHONUTF8": "1",
-               "FICHA_CSS": ESTILOS.get(estilo, "practica.css")}
+               "FICHA_CSS": ESTILOS.get(estilo, "practica.css"),
+               "FICHA_CHROME": ajustes.chrome, "FICHA_CHROME_ARGS": ajustes.chrome_args}
     entorno.pop("FICHA_ACENTO", None)
     if acento and _HEX.fullmatch(acento):
         entorno["FICHA_ACENTO"] = acento

@@ -178,10 +178,14 @@ async def ciclo_de_vida(_: FastAPI):
     automatizaciones = asyncio.create_task(bucle_automatizaciones()) if ajustes.trabajos_en_api else None
     # Las fuentes de lo que vas a estudiar pronto se buscan solas (MAGISTER_RESEARCH_AUTO), también sin pulsar nada.
     horizonte = asyncio.create_task(bucle_horizonte(buscador)) if ajustes.research_auto else None
+    # La copia del día dentro de la API (modo Docker); en Windows la hacen la tarea programada y arrancar.ps1.
+    from magister.api.rutas_datos import bucle_copia_diaria
+
+    copias = asyncio.create_task(bucle_copia_diaria()) if ajustes.copia_diaria else None
     async with AsyncSqliteSaver.from_conn_string(ajustes.checkpoints) as saver:
         iniciar_grafo(saver, buscador)
         yield
-    for tarea in (fondo, trabajador, vigia, horizonte):
+    for tarea in (fondo, trabajador, vigia, horizonte, copias):
         if tarea is not None:
             tarea.cancel()
     iniciar_grafo(None)

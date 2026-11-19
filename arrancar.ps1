@@ -16,10 +16,16 @@ if (Responde) {
     exit 0
 }
 
-if (-not (docker info 2>$null)) {
+# `docker info` escribe los datos del cliente aunque el motor esté parado: lo que dice si está en marcha es el código de salida.
+function DockerEnMarcha {
+    docker info *> $null
+    $LASTEXITCODE -eq 0
+}
+
+if (-not (DockerEnMarcha)) {
     Write-Host "Abriendo Docker Desktop..."
     Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-    while (-not (docker info 2>$null)) { Start-Sleep -Seconds 2 }
+    while (-not (DockerEnMarcha)) { Start-Sleep -Seconds 2 }
 }
 Set-Location $raiz
 docker compose up -d db | Out-Null

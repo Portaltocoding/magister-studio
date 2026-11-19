@@ -238,6 +238,36 @@ async def _proceso(*orden: str, entrada=None, salida=None) -> str:
     return "" if proc.returncode == 0 else (err.decode("utf-8", "replace").strip()[-500:] or f"código {proc.returncode}")
 
 
+def orden_pg(contenedor: str, *orden: str, entrada: bool = False) -> list[str]:
+    """pg_dump, pg_restore o psql dentro del contenedor de la base (`docker exec`) o, con el contenedor vacío (todo en
+    Docker: la API ya trae los clientes de Postgres), aquí mismo, yendo a la base por PGHOST y PGPASSWORD."""
+    if not contenedor:
+        return list(orden)
+    return ["docker", "exec", *(["-i"] if entrada else []), contenedor, *orden]
+
+
+ROTACION = {"diarias": 7, "semanales": 4, "mensuales": 12}
+
+
+def rotar(raiz: Path, dia: date) -> list[Path]:
+    """Lo de scripts/copia_db.sh: la copia de `dia` pasa también a semanales (lunes) y mensuales (día 1), y en cada
+    carpeta se quedan las 7, 4 y 12 últimas. Devuelve lo que ha borrado."""
+    hoy = raiz / "diarias" / f"magister-{dia.isoformat()}.dump"
+    if hoy.is_file():
+        for carpeta, toca in (("semanales", dia.isoweekday() == 1), ("mensuales", dia.day == 1)):
+            if toca:
+                (raiz / carpeta).mkdir(parents=True, exist_ok=True)
+                shutil.copy2(hoy, raiz / carpeta / hoy.name)
+    borrados = []
+    for carpeta, quedan in ROTACION.items():
+        copias = sorted((raiz / carpeta).glob("magister-*.dump"), key=lambda f: f.name, reverse=True)
+        for f in copias[quedan:]:
+            f.unlink(missing_ok=True)
+            (f.parent / f.name.replace("magister-", "checkpoints-").replace(".dump", ".sqlite")).unlink(missing_ok=True)
+            borrados.append(f)
+    return borrados
+
+
 async def volcar(base: str, usuario: str, destino: Path, contenedor: str) -> int:
     """pg_dump -Fc de la base a `destino` (lo mismo que scripts/copia_db.sh). Se escribe aparte y se mueve al final:
     una copia que falla no pisa la que había. Devuelve los bytes."""
@@ -245,7 +275,7 @@ async def volcar(base: str, usuario: str, destino: Path, contenedor: str) -> int
     parcial = destino.with_name(destino.name + ".parcial")
     fichero = await asyncio.to_thread(open, parcial, "wb")
     try:
-        error = await _proceso("docker", "exec", contenedor, "pg_dump", "-U", usuario, "-Fc", base, salida=fichero)
+        error = await _proceso(*orden_pg(contenedor, "pg_dump", "-U", usuario, "-Fc", base), salida=fichero)
     finally:
         await asyncio.to_thread(fichero.close)
     tam = (await asyncio.to_thread(parcial.stat)).st_size
@@ -295,7 +325,7 @@ async def restaurar(copia: Path, momento: datetime, raiz: Path, base: str, usuar
         origen = await asyncio.to_thread(open, copia, "rb")
         destino = await asyncio.to_thread(open, sql, "ab")
         try:
-            error = await _proceso("docker", "exec", "-i", contenedor, "pg_restore", "--no-owner", "--no-privileges", "-f", "-",
+            error = await _proceso(*orden_pg(contenedor, "pg_restore", "--no-owner", "--no-privileges", "-f", "-", entrada=True),
                                    entrada=origen, salida=destino)
         finally:
             await asyncio.to_thread(origen.close)
@@ -304,8 +334,9 @@ async def restaurar(copia: Path, momento: datetime, raiz: Path, base: str, usuar
             raise ErrorCopia(f"La copia no se puede leer y no he cambiado nada: {error}")
         entrada = await asyncio.to_thread(open, sql, "rb")
         try:
-            error = await _proceso("docker", "exec", "-i", contenedor, "psql", "-X", "-q", "-U", usuario, "-d", base,
-                                   "-v", "ON_ERROR_STOP=1", "--single-transaction", "-f", "-", entrada=entrada)
+            error = await _proceso(*orden_pg(contenedor, "psql", "-X", "-q", "-U", usuario, "-d", base,
+                                             "-v", "ON_ERROR_STOP=1", "--single-transaction", "-f", "-", entrada=True),
+                                   entrada=entrada)
         finally:
             await asyncio.to_thread(entrada.close)
         if error:
