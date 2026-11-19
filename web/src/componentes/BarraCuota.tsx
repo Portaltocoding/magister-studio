@@ -26,6 +26,8 @@ export type Accion =
   | { accion: 'proyecto' }
   | { accion: 'nivel' }
   | { accion: 'plan' }
+  // Buscar fuentes para una lección: dos llamadas (las consultas y el juez que lee lo encontrado).
+  | { accion: 'research' }
 
 const pct = (x: number) => Math.round(x * 100)
 const POCO = 0.05 // menos del 5 % de la sesión: una línea en vez de las barras

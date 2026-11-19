@@ -60,6 +60,9 @@ class MensajeEntrada(BaseModel):
     asesor: bool = False
     # El proyecto que tiene en pantalla: sobre él prepara el asesor los cambios que ofrece (los aplicas tú).
     proyecto_id: int | None = None
+    # El plan activo de la app (el de Roadmap, Calendario y Hoy): sobre él prepara el asesor los cambios del calendario.
+    # No es `plan_id`, que es el de la lección de la que se habla.
+    plan_activo_id: int | None = None
     # Cabe el banco entero del examen oral (unas 20 preguntas pasan de 3000 caracteres).
     contexto: str | None = Field(None, max_length=12_000)
 

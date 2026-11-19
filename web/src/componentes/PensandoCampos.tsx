@@ -3,23 +3,27 @@ import { Trazo, presencia, quieto, tramo, usarCiclo } from './PensandoDibujos.ts
 // Animaciones de espera de otros campos: arte, geometría, arquitectura, astronomía, música y biología.
 // Mismo trazo fino y gris; ciclos cortos que vuelven a empezar.
 
-// ---------- El hombre de Vitruvio: el círculo, el cuadrado y la figura en sus dos posturas ----------
+// ---------- El hombre de Vitruvio: el círculo y el cuadrado, y el cuerpo con sus dos posturas superpuestas ----------
+// Las medidas son las del dibujo: la altura es el lado del cuadrado y la envergadura de los brazos en cruz; el
+// ombligo es el centro del círculo, que toca al cuadrado por abajo; la cabeza es un octavo de la altura.
 
 export function Vitruvio() {
-  const f = usarCiclo(10)
+  const f = usarCiclo(11)
   return (
-    <svg className="anim-svg" viewBox="0 0 60 58" width={60} height={58} aria-hidden style={{ opacity: presencia(f) }}>
-      <Trazo clase="guia" d="M56.5 28.5 A26.5 26.5 0 1 0 3.5 28.5 A26.5 26.5 0 1 0 56.5 28.5" f={f} desde={0} hasta={0.18} />
-      <Trazo clase="guia" d="M9 13 H51 V55 H9 Z" f={f} desde={0.14} hasta={0.32} />
-      {/* La cabeza y el tronco. */}
-      <Trazo d="M33.2 17.4 A3.2 3.2 0 1 0 26.8 17.4 A3.2 3.2 0 1 0 33.2 17.4 M30 20.6 V36" f={f} desde={0.3} hasta={0.42} />
-      {/* Primera postura: brazos en cruz hasta el cuadrado, pies juntos. */}
-      <Trazo d="M9 23 H51" f={f} desde={0.4} hasta={0.5} />
-      <Trazo d="M30 36 L28 55 M30 36 L32 55" f={f} desde={0.48} hasta={0.58} />
-      {/* Segunda postura: brazos y piernas abiertos hasta el círculo. */}
-      <Trazo d="M30 23 L7.8 14 M30 23 L52.2 14" f={f} desde={0.6} hasta={0.74} />
-      <Trazo d="M30 36 L16 51 M30 36 L44 51" f={f} desde={0.72} hasta={0.86} />
-      {tramo(f, 0.84, 0.9) > 0 && <circle cx={30} cy={28.5} r={1.1} fill="currentColor" opacity={tramo(f, 0.84, 0.9)} />}
+    <svg className="anim-svg" viewBox="0 0 64 60" width={70} height={66} aria-hidden style={{ opacity: presencia(f) }}>
+      <Trazo clase="guia" d="M59 30 A27 27 0 1 0 5 30 A27 27 0 1 0 59 30" f={f} desde={0} hasta={0.16} />
+      <Trazo clase="guia" d="M9 11 H55 V57 H9 Z" f={f} desde={0.12} hasta={0.28} />
+      {/* La cabeza con su melena, el cuello y el tronco, de hombros a cadera. */}
+      <Trazo d="M34.7 14 A2.7 3 0 1 0 29.3 14 A2.7 3 0 1 0 34.7 14 M29.2 13 Q28 16.5 29.6 18.4 M34.8 13 Q36 16.5 34.4 18.4" f={f} desde={0.26} hasta={0.36} />
+      <Trazo d="M30.8 17 V18.8 M33.2 17 V18.8 M26 20 Q32 18.2 38 20 L36 28.6 L36.9 33.6 L32 36.2 L27.1 33.6 L28 28.6 Z" f={f} desde={0.33} hasta={0.47} />
+      {/* Postura del cuadrado: brazos en cruz hasta sus lados y pies juntos sobre su base. */}
+      <Trazo d="M26 20 Q17 19.4 9.4 20.6 M38 20 Q47 19.4 54.6 20.6" f={f} desde={0.45} hasta={0.55} />
+      <Trazo d="M28.4 34.4 Q29.6 46 30.2 56 L27.8 57 M35.6 34.4 Q34.4 46 33.8 56 L36.2 57" f={f} desde={0.52} hasta={0.63} />
+      {/* Postura del círculo: brazos alzados a la altura de la coronilla y piernas abiertas, hasta tocarlo. */}
+      <Trazo d="M26.4 19.8 Q19 15 12.8 11 M37.6 19.8 Q45 15 51.2 11" f={f} desde={0.64} hasta={0.75} />
+      <Trazo d="M28 34.6 Q23.5 45 19.8 53.6 L17.6 53.4 M36 34.6 Q40.5 45 44.2 53.6 L46.4 53.4" f={f} desde={0.72} hasta={0.84} />
+      {/* El ombligo: el centro de todo. */}
+      {tramo(f, 0.83, 0.88) > 0 && <circle cx={32} cy={30} r={0.9} fill="currentColor" opacity={tramo(f, 0.83, 0.88)} />}
     </svg>
   )
 }

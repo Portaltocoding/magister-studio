@@ -10,6 +10,7 @@ Como mucho un trabajo por vuelta y nunca si ya hay uno en marcha: la cola no se 
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import text
@@ -27,6 +28,15 @@ PREDETERMINADAS = {
     "solo_de_noche": False,
 }
 INTERVALO_S = 600
+
+# Las (plan_id, clave) que el research automático lanzaría ahora (api/app.py lo engancha al arrancar): sus apuntes
+# esperan como si sus fuentes ya estuvieran llegando. Sin gancho, no se espera a nada más.
+_por_investigar: Callable[[date], Awaitable[set[tuple[int, str]]]] | None = None
+
+
+def registrar_por_investigar(funcion: Callable[[date], Awaitable[set[tuple[int, str]]]] | None) -> None:
+    global _por_investigar
+    _por_investigar = funcion
 
 
 async def leer() -> dict:
@@ -103,10 +113,12 @@ async def _marcar_videos(lecciones: list[dict]) -> None:
 
 
 def elegir_tarea(config: dict, lecciones: list[dict], hoy: date,
-                 descartadas: frozenset[tuple[int, str, str]] = frozenset()) -> tuple[dict, list[str], dict] | None:
+                 descartadas: frozenset[tuple[int, str, str]] = frozenset(),
+                 esperando: frozenset[tuple[int, str]] = frozenset()) -> tuple[dict, list[str], dict] | None:
     """La primera cosa que toca hacer según las reglas encendidas, o None. Sin efectos: se puede probar.
 
-    `descartadas` son las (plan_id, clave, tipo principal) que ya se intentaron hoy y no salieron: se saltan."""
+    `descartadas` son las (plan_id, clave, tipo principal) que ya se intentaron hoy y no salieron: se saltan.
+    `esperando` son las (plan_id, clave) cuyas fuentes están llegando: sus apuntes esperan (solo los de preparar)."""
 
     def fuera(lec: dict, tipo: str) -> bool:
         return (lec["plan_id"], lec["clave"], tipo) in descartadas
@@ -115,6 +127,8 @@ def elegir_tarea(config: dict, lecciones: list[dict], hoy: date,
     if regla.get("activa"):
         limite = hoy + timedelta(days=int(regla.get("dias_antes", 1)))
         for lec in lecciones:
+            if (lec["plan_id"], lec["clave"]) in esperando:
+                continue
             if lec["fecha"] and lec["fecha"] <= limite and "apuntes" not in lec["tipos"] and not fuera(lec, "apuntes"):
                 return lec, ["apuntes", "preguntas"], {}
     if config["diapositivas_al_preparar"].get("activa"):
@@ -132,8 +146,31 @@ def elegir_tarea(config: dict, lecciones: list[dict], hoy: date,
     return None
 
 
+async def _esperando_fuentes(minutos: int) -> dict[tuple[int, str], datetime]:
+    """Las lecciones cuyas fuentes están llegando, con hasta cuándo se las espera: una búsqueda de research en curso, un
+    trabajo «incorporar» por hacer o propuestas aprobadas cuya versión aún se indexa. Solo lo empezado hace menos de
+    `minutos`: pasado el plazo, los apuntes se preparan igual."""
+    async with nueva_sesion() as s:
+        filas = (await s.execute(text(
+            "select plan_id, leccion_clave, creada_en from tareas_research "
+            "where estado = 'en_curso' and creada_en > now() - make_interval(mins => :m) "
+            "union all select plan_id, leccion_clave, creado_en from trabajos "
+            "where tipo = 'incorporar' and estado in ('pendiente', 'en_curso') and leccion_clave is not null "
+            "and creado_en > now() - make_interval(mins => :m) "
+            "union all select p.plan_id, p.leccion_clave, v.ingerida_en from propuestas p join versiones v on v.id = p.version_id "
+            "where p.estado = 'aprobada' and v.estado in ('recibida', 'pendiente') and v.ingerida_en > now() - make_interval(mins => :m)"
+        ), {"m": minutos})).all()
+    salida: dict[tuple[int, str], datetime] = {}
+    for plan_id, clave, desde in filas:
+        hasta = desde + timedelta(minutes=minutos)
+        salida[(plan_id, clave)] = max(salida.get((plan_id, clave), hasta), hasta)
+    return salida
+
+
 async def una_vuelta(ahora: datetime | None = None) -> str | None:
     """Revisa las reglas y, si toca, encola un trabajo. Devuelve qué hizo (o None)."""
+    from magister.config import ajustes
+
     ahora = ahora or datetime.now()
     config = await leer()
     if config.get("solo_de_noche") and not es_de_noche(ahora):
@@ -143,10 +180,28 @@ async def una_vuelta(ahora: datetime | None = None) -> str | None:
     lecciones = await _lecciones(ahora.date(), 7)
     if config["video_al_preparar"].get("activa"):
         await _marcar_videos(lecciones)
+    # Los apuntes de una lección cuyas fuentes están llegando esperan (hasta MAGISTER_MATERIAL_ESPERA_FUENTES minutos):
+    # hechos ahora, saldrían a ciegas y habría que rehacerlos.
+    hasta = await _esperando_fuentes(ajustes.material_espera_fuentes) if config["preparar_siguiente"].get("activa") else {}
+    if config["preparar_siguiente"].get("activa") and _por_investigar is not None:
+        # También lo que el research automático va a lanzar ya (tras reiniciar, su primera vuelta tarda unos minutos).
+        try:
+            proxima = ahora.astimezone() + timedelta(seconds=ajustes.research_intervalo_s)
+            for leccion in await _por_investigar(ahora.date()):
+                hasta.setdefault(leccion, proxima)
+        except Exception:  # noqa: BLE001 si no se sabe, se prepara como antes
+            registro.exception("qué va a buscar el research automático")
+    esperando = frozenset(hasta)
     # Lo que ya se intentó hoy (hecho, fallido o cancelado) no se reabre: se pasa a lo siguiente. Mañana se reintenta.
     descartadas: set[tuple[int, str, str]] = set()
+    sin_esperar = elegir_tarea(config, lecciones, ahora.date()) if esperando else None
+    if sin_esperar is not None and (sin_esperar[0]["plan_id"], sin_esperar[0]["clave"]) in esperando:
+        lec = sin_esperar[0]
+        aviso = f"Espero a las fuentes de {lec['clave']} (hasta las {hasta[(lec['plan_id'], lec['clave'])].astimezone():%H:%M})"
+        if not any(x.get("texto") == aviso for x in await ver_registro()):
+            await anotar(aviso)
     for _ in range(3 * len(lecciones) + 1):
-        tarea = elegir_tarea(config, lecciones, ahora.date(), frozenset(descartadas))
+        tarea = elegir_tarea(config, lecciones, ahora.date(), frozenset(descartadas), esperando)
         if tarea is None:
             return None
         lec, tipos, preferencias = tarea

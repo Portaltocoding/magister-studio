@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
+  EVENTO_CAMBIO_APLICADO,
   enviarJson,
   hoyIso,
   listarPlanes,
@@ -101,6 +102,11 @@ export default function PanelCalendario() {
   }, [celdas])
 
   useEffect(cargar, [cargar])
+  // El asesor ha movido una sesión, marcado una lección o apuntado algo en tu agenda: se recarga el mes.
+  useEffect(() => {
+    window.addEventListener(EVENTO_CAMBIO_APLICADO, cargar)
+    return () => window.removeEventListener(EVENTO_CAMBIO_APLICADO, cargar)
+  }, [cargar])
 
   const abrir = (fecha: string) => {
     setDia(fecha)

@@ -30,6 +30,9 @@ def _filtros_sql(filtros: Filtros | None) -> tuple[str, dict]:
     if filtros and filtros.fuente_tipos:
         condiciones.append("fu.tipo = any(:tipos)")
         valores["tipos"] = list(filtros.fuente_tipos)
+    if filtros and filtros.version_ids is not None:
+        condiciones.append("v.id = any(:version_ids)")
+        valores["version_ids"] = list(filtros.version_ids)
     # Una copia marcada como duplicada no ocupa hueco en el top-k.
     condiciones.append("v.duplicado_de is null")
     return " and ".join(condiciones), valores

@@ -13,12 +13,15 @@ import json
 import logging
 import random
 import shutil
+import sys
 import tempfile
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+
+import anyio
 
 from magister.config import ajustes
 
@@ -91,36 +94,54 @@ def argumentos_claude(sistema: str, esquema: dict | None = None, modelo: str | N
 # Cada claude -p es un proceso de unos 390 MB que tarda unos 6 s (medido el 18-11-2026). Lo de segundo plano (generar
 # material, jueces) espera turno para no tumbar el equipo en un pico; lo tuyo en directo (chat, asesor, llamada) nunca.
 TAREAS_DE_FONDO = frozenset({"generar", "juez"})
-_turnos: dict[int, asyncio.Semaphore] = {}
+# Prompts con su propio tope de llamadas a la vez (el ajuste que lo da): los diagramas del chat se dibujan mientras lees
+# y no pueden quitarle sitio a la respuesta (el 18-11-2026 llegó a haber 16 a la vez compitiendo con el chat).
+TOPES_PROMPT = {"diagrama_chat": "diagramas_a_la_vez"}
+_turnos: dict[tuple[int, str], asyncio.Semaphore] = {}
 
 
 def _turno_de_fondo() -> asyncio.Semaphore | None:
+    """El semáforo en el que espera esta llamada antes de lanzar claude, o None si no espera (lo de en directo)."""
     from magister.cerebro.enrutador import tarea_de_prompt
 
     p = prompt_actual.get()
-    if tarea_de_prompt(p[0] if p else None) not in TAREAS_DE_FONDO:
+    nombre = p[0] if p else None
+    if nombre in TOPES_PROMPT:
+        clave, tope = nombre, getattr(ajustes, TOPES_PROMPT[nombre])
+    elif tarea_de_prompt(nombre) in TAREAS_DE_FONDO:
+        clave, tope = "fondo", ajustes.modelo_fondo_a_la_vez
+    else:
         return None
     # Un semáforo por bucle de eventos (las pruebas abren uno por prueba).
-    return _turnos.setdefault(id(asyncio.get_running_loop()), asyncio.Semaphore(max(1, ajustes.modelo_fondo_a_la_vez)))
+    return _turnos.setdefault((id(asyncio.get_running_loop()), clave), asyncio.Semaphore(max(1, tope)))
+
+
+# Quien quiera saber si su llamada ya ha salido de la cola (los diagramas: si te vas mientras espera, no se lanza) pone
+# aquí una función; se llama una vez, justo antes de lanzar claude.
+al_lanzar: contextvars.ContextVar[Callable[[], None] | None] = contextvars.ContextVar("al_lanzar", default=None)
 
 
 async def _lineas_claude(
     sistema: str, entrada: str, esquema: dict | None = None, modelo: str | None = None
 ) -> AsyncIterator[dict]:
-    """Como `_lanzar_claude`, pero lo de segundo plano espera su turno (TAREAS_DE_FONDO) y todo pasa por el freno."""
+    """Como `_lanzar_claude`, pero lo que tiene tope espera su turno (TAREAS_DE_FONDO, TOPES_PROMPT) y todo pasa por
+    el freno. El freno cuenta al salir de la cola: lo que espera y se cancela antes no ha gastado nada."""
     from magister.cerebro import freno
 
     p = prompt_actual.get()
-    try:
-        freno.comprobar(p[0] if p else None)
-    except freno.Frenado as e:
-        raise ErrorModelo(str(e)) from None
     from magister.cerebro.enrutador import plazo
 
     marca = _plazo_actual.set(plazo(tarea_actual.get(), p[0] if p else None))
     try:
         turno = _turno_de_fondo()
         async with turno if turno is not None else contextlib.nullcontext():
+            try:
+                freno.comprobar(p[0] if p else None)
+            except freno.Frenado as e:
+                raise ErrorModelo(str(e)) from None
+            if (aviso := al_lanzar.get()) is not None:
+                with contextlib.suppress(Exception):  # la instrumentación nunca rompe una petición
+                    aviso()
             async with contextlib.aclosing(_lanzar_claude(sistema, entrada, esquema, modelo)) as lineas:
                 async for evento in lineas:
                     yield evento
@@ -209,12 +230,33 @@ async def _proceso_claude(args: list[str], entrada: str) -> AsyncIterator[dict]:
     except TimeoutError:
         raise ErrorModelo("plazo agotado") from None
     finally:
-        if proc.returncode is None:
-            with contextlib.suppress(ProcessLookupError):
-                proc.kill()
-            await proc.wait()
+        await _matar(proc)
         if not tarea_err.done():
             tarea_err.cancel()
+
+
+ESPERA_MATAR_S = 5
+
+
+async def _matar(proc: asyncio.subprocess.Process) -> None:
+    """Mata claude si sigue vivo: te has ido a medias, ha llegado otra pregunta o se ha agotado el plazo.
+
+    En Windows, kill() es TerminateProcess y solo llega a ese proceso, no a lo que haya lanzado: taskkill /T recorre el
+    árbol (antes de matar al padre, que es por donde encuentra a los hijos). Blindado: una cancelación que llega mientras
+    se mata (el cliente se va) no lo deja a medias."""
+    if proc.returncode is not None:
+        return
+    with anyio.CancelScope(shield=True):
+        if sys.platform == "win32":
+            with anyio.move_on_after(ESPERA_MATAR_S), contextlib.suppress(OSError):
+                arbol = await asyncio.create_subprocess_exec(
+                    "taskkill", "/PID", str(proc.pid), "/T", "/F",
+                    stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+                await arbol.wait()
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+        with anyio.move_on_after(ESPERA_MATAR_S):
+            await proc.wait()
 
 
 

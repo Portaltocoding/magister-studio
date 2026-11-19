@@ -66,6 +66,10 @@ prompts:
   asesor_cambio: planificar
   juez_tono: juez
   juez_completitud: juez
+  # El research: el mismo modelo que antes de tener plantilla (sin nombre caía en conversar). El juez ve tu nivel, tu
+  # objetivo y tus preferencias: datos personales, nunca a un motor externo gratuito.
+  research_consultas: conversar
+  research_juez: conversar
 
 # Presupuesto diario por tarea en segundo plano (tokens de entrada más salida); al pasarlo se aplaza.
 presupuesto_dia_tokens:

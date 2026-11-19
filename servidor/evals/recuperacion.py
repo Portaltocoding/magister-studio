@@ -138,6 +138,12 @@ async def principal() -> None:
         if not n:
             print("No hay ningún fragmento indexado: no hay nada que medir. Indexa primero (uv run magister indexar).")
             sys.exit(2 if args.estricto else 0)
+        # Fuera de la API nadie carga los modelos: sin calentarlos, la búsqueda espera 5 s y cae a la vía léxica.
+        from magister.fuentes import reranker
+        from magister.fuentes.embeber import embeber
+
+        await asyncio.to_thread(embeber, ["calentar"], "consulta")
+        await asyncio.to_thread(reranker.calentar)
         filas = await correr(banco)
     finally:
         await cerrar()

@@ -1,7 +1,7 @@
 // Las preguntas frecuentes del asesor: reconocer las suyas y dejar pasar al modelo las demás.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buscarFaq, ofreceCambio, sugerenciasDe, SUGERENCIAS_PROYECTO } from '../src/componentes/faqs.ts'
+import { buscarFaq, esPantallaDePlan, ofreceCambio, sugerenciasDe, SUGERENCIAS_PLAN, SUGERENCIAS_PROYECTO } from '../src/componentes/faqs.ts'
 
 const casos: [string, string | null][] = [
   ['como creo un plan', 'plan'],
@@ -46,6 +46,21 @@ test('una sección con subruta usa la de arriba', () => {
   assert.deepEqual(sugerenciasDe('fichas/3', false), sugerenciasDe('fichas', false))
 })
 
+test('en las pantallas del plan, con plan, sugiere pedirle cambios del plan', () => {
+  assert.deepEqual(sugerenciasDe('hoy', false, true), ['Explícame esta pantalla', 'Mueve la sesión de hoy a mañana', 'Marca esta lección como hecha'])
+  assert.ok(sugerenciasDe('calendario', false, true).includes('Mueve la sesión de hoy a mañana'))
+  assert.deepEqual(sugerenciasDe('fichas/3/L2', false, true), SUGERENCIAS_PLAN.fichas)
+  // Sin plan, las frecuentes de siempre; y en un proyecto mandan las del proyecto.
+  assert.deepEqual(sugerenciasDe('hoy', false), sugerenciasDe('hoy', false, false))
+  assert.ok(!sugerenciasDe('hoy', false).includes('Mueve la sesión de hoy a mañana'))
+  assert.deepEqual(sugerenciasDe('proyectos/12', true, true), SUGERENCIAS_PROYECTO)
+  assert.ok(esPantallaDePlan('roadmap') && !esPantallaDePlan('repaso'))
+})
+
+// Las del plan también van al modelo: tampoco son frecuentes.
+for (const pregunta of new Set(Object.values(SUGERENCIAS_PLAN).flat().filter((x) => x !== 'Explícame esta pantalla')))
+  test(`«${pregunta}» no es una frecuente`, () => assert.equal(buscarFaq(pregunta), null))
+
 // ===== ¿Ha ofrecido un cambio sin prepararlo? =====
 
 const ofertas: [string, boolean][] = [
@@ -59,6 +74,9 @@ const ofertas: [string, boolean][] = [
   ['¿Le añado un paso de repaso al final?', true],
   ['¿Reordeno los pasos del nivel 2?', true],
   ['Te llevo allí. ¿Lo añado al nivel 1?\n\n```acciones\nIr al paso | paso:n1-b1-p3\n```', true],
+  // En el plan.
+  ['El viernes ya vas lleno. ¿La muevo al lunes?', true],
+  ['¿Te apunto el parcial en la agenda?', true],
   // Ya lo está preparando: trae su bloque `cambio`.
   ['Añado el paso.\n\n```cambio\nAñadir al nivel 1 un paso de pruebas\n```', false],
   ['¿Lo añado al nivel 1?\n```cambio\nAñadir un paso\n```', false],

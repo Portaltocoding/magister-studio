@@ -9,7 +9,7 @@ from magister.config import ajustes
 from magister.material import almacen
 from magister.material.conceptos import enriquecer
 from magister.material.diapositivas import auditar_diapositivas, generar_diapositivas, montar_marp, pintar_marp
-from magister.material.entrada import entrada_de_leccion
+from magister.material.entrada import con_que_se_hacen, entrada_de_leccion
 from magister.material.generador import Cancelado, generar_apuntes
 from magister.material.guion import ESTILOS_VIDEO, auditar_guion, generar_guion
 from magister.material.guion_grafico import generar_guion_grafico, por_escenas
@@ -72,6 +72,8 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], 
     materiales.append(mid)
     m = await almacen.material(mid)
     if m.estado == "generando":
+        # Con qué fragmentos y qué prompts se hacen (regla 2 de Material): el Roadmap avisa si luego llegan fuentes.
+        await almacen.actualizar(mid, versiones=await con_que_se_hacen(entrada))
         await generar_apuntes(mid, entrada, progreso, parar)
     m = await almacen.material(mid)
     claves = {b.clave for b in await almacen.bloques(mid)}

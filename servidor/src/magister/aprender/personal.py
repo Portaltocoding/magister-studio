@@ -4,9 +4,11 @@ Escalones (los de Anki/fsrs-rs, resumidos en engram docs/13 §2.6):
 - Menos de 8 conceptos con dos repasos o más: parámetros por defecto. Ajustar con menos datos es adivinar.
 - Desde 8: solo las cuatro estabilidades iniciales (cuánto aguanta un concepto tras el primer repaso, según la
   nota). Es lo que más pesa: recoge más de la mitad de la mejora de un ajuste completo.
-- Desde 64: el vector entero con el optimizador de `fsrs` (necesita `pandas`, que no está instalado; si falta,
-  se queda en el escalón inicial y lo dice).
+- Desde 64: el vector entero con el optimizador de `fsrs` (necesita `pandas`; si falta, se queda en el escalón
+  inicial y lo dice).
 Un ajuste solo se acepta si predice tus aciertos mejor que el anterior (pérdida logarítmica sobre tus repasos).
+Lo guardado lleva la marca del mapeo de notas (`programador.MARCA_NOTAS`): unos parámetros ajustados con otro mapeo
+no se usan, y el siguiente ajuste se compara con los de por defecto.
 El cálculo es CPU: va en un hilo aparte para no bloquear la API.
 """
 
@@ -18,6 +20,7 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 
 from magister.aprender.estado import es_acierto, nota_final
+from magister.aprender.programador import MARCA_NOTAS
 from magister.datos.sesion import nueva_sesion
 
 UMBRAL_INICIAL = 8
@@ -40,7 +43,12 @@ async def cargar() -> None:
     async with nueva_sesion() as s:
         fila = await s.get(Ajuste, CLAVE)
     v = (fila.valor if fila else None) or {}
-    _personal = v if v.get("activo") and v.get("parametros") else None
+    _personal = v if vigente(v) else None
+
+
+def vigente(valor: dict) -> bool:
+    """Si unos parámetros guardados se pueden usar: activos y ajustados con el mapeo de notas de ahora."""
+    return bool(valor.get("activo") and valor.get("parametros") and valor.get("notas") == MARCA_NOTAS)
 
 
 async def series(con_extras: bool = False) -> list[list[tuple]]:
@@ -154,7 +162,7 @@ async def ajustar() -> dict:
     previos = tuple(_personal["parametros"]) if _personal else None
     r = await asyncio.to_thread(_calcular, datos, previos)
     if r.get("hecho"):
-        valor = {**r, "activo": True, "fecha": datetime.now(timezone.utc).isoformat(timespec="minutes"),
+        valor = {**r, "activo": True, "notas": MARCA_NOTAS, "fecha": datetime.now(timezone.utc).isoformat(timespec="minutes"),
                  "huella": hashlib.sha256(repr(r["parametros"]).encode()).hexdigest()[:8]}
         async with nueva_sesion() as s, s.begin():
             await s.execute(insert(Ajuste).values(clave=CLAVE, valor=valor)
@@ -168,12 +176,54 @@ async def estado() -> dict:
     datos = await series()
     con_dos = sum(1 for x in datos if len(x) >= 2)
     repasos = sum(len(x) for x in datos)
+    activo = {k: _personal.get(k) for k in ("etapa", "fecha", "perdida_antes", "perdida_despues", "conceptos")} if _personal else None
+    red = _red_meta()
     return {
         "conceptos_con_repasos": len(datos), "conceptos_con_dos": con_dos, "repasos": repasos,
         "umbral_inicial": UMBRAL_INICIAL, "umbral_completo": UMBRAL_COMPLETO,
-        "activo": {k: _personal.get(k) for k in ("etapa", "fecha", "perdida_antes", "perdida_despues", "conceptos")} if _personal else None,
-        "red": _red_meta(),
+        "activo": activo, "red": red, "resumen": resumen(con_dos, activo, red),
     }
+
+
+def resumen(con_dos: int, activo: dict | None, red: dict | None) -> dict:
+    """En qué capa vas, qué falta para la siguiente y cómo decírtelo, en tres líneas. Pura: no lee la base ni la hora.
+    `con_dos`: conceptos con dos repasos o más; `activo`: el ajuste en uso (con su `etapa`) o None; `red`: `_red_meta()`."""
+    if not activo:
+        capa = "estandar"
+        primera = "Vas con el programador estándar, el mismo para todo el mundo."
+        if con_dos < UMBRAL_INICIAL:
+            faltan = UMBRAL_INICIAL - con_dos
+            segunda = f"Cuando tengas {UMBRAL_INICIAL} conceptos repasados al menos dos veces lo ajusto a ti: llevas {con_dos}."
+        else:
+            faltan = 0
+            segunda = f"Ya llevas {con_dos} conceptos repasados dos veces: lo ajusto a ti en cuanto el ajuste prediga mejor que él."
+    elif activo.get("etapa") == "completo":
+        capa, faltan = "completo", None
+        primera = "Ajustado del todo a tus repasos."
+        segunda = f"Con {activo.get('conceptos')} conceptos repasados dos veces o más; se reajusta solo cada día si mejora."
+    else:
+        capa = "inicial"
+        primera = "Ajustado a tus repasos (solo lo básico: cuánto aguanta un concepto tras verlo por primera vez)."
+        if con_dos < UMBRAL_COMPLETO:
+            faltan = UMBRAL_COMPLETO - con_dos
+            segunda = f"A los {UMBRAL_COMPLETO} conceptos afino el resto: llevas {con_dos}."
+        else:
+            faltan = 0
+            segunda = f"Ya llevas {con_dos} conceptos: afino el resto en cuanto prediga mejor que lo básico."
+    contra = "el ajuste" if activo else "el programador estándar"
+    r = red or {}
+    estado_red = r.get("estado") or "sin_datos"
+    if estado_red == "activa":
+        tercera = "Decide la red neuronal."
+        if r.get("perdida_fsrs") and r.get("perdida_red") is not None:
+            mejora = round(100 * (r["perdida_fsrs"] - r["perdida_red"]) / r["perdida_fsrs"])
+            tercera = f"Decide la red neuronal: en tus últimos repasos predice un {mejora} % mejor que {contra}."
+    elif estado_red == "sombra":
+        tercera = f"La red neuronal va en sombra: aún no predice mejor que {contra}."
+    else:
+        tercera = (f"La red neuronal se entrena a partir de {r.get('minimo', 0)} repasos (sin contar el primero de cada "
+                   f"concepto): llevas {r.get('repasos', 0)}.")
+    return {"capa": capa, "faltan": faltan, "red": estado_red, "lineas": [primera, segunda, tercera]}
 
 
 def _red_meta() -> dict | None:

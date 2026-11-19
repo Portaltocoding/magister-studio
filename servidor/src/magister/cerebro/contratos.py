@@ -34,6 +34,8 @@ class Recuperado:
 class Filtros:
     tema_id: int | None = None  # N devuelve los documentos del tema N y los que no tienen tema
     fuente_tipos: list[str] | None = None
+    # Solo estas versiones (las que el research trajo para una lección): misma consulta, distinto filtro.
+    version_ids: list[int] | None = None
 
 
 @dataclass(frozen=True)

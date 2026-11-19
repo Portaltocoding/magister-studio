@@ -11,10 +11,12 @@ import hashlib
 import logging
 import re
 import time
+from collections.abc import Awaitable, Callable
 
 from pydantic import BaseModel, Field
 
 from magister.cerebro.estructura import ErrorEstructura, estructurar
+from magister.cerebro.modelo import al_lanzar
 from magister.cerebro.prompts import cargar
 
 registro = logging.getLogger("magister.diagramas")
@@ -57,11 +59,15 @@ def excesos(svg: str) -> list[str]:
     return avisos
 
 
-# Freno: peticiones iguales a la vez comparten una sola llamada, y como mucho se dibujan dos diagramas a la vez. Un fallo
-# de la web (pedía un dibujo por cada trozo de la respuesta) lanzó 77 llamadas en siete minutos; esto lo habría cortado.
-A_LA_VEZ = 2
+# Freno: peticiones iguales a la vez comparten una sola llamada. Un fallo de la web (pedía un dibujo por cada trozo de la
+# respuesta) lanzó 77 llamadas en siete minutos; esto lo habría cortado. Cuántos se dibujan a la vez lo pone el cerebro
+# (MAGISTER_DIAGRAMAS_A_LA_VEZ, cerebro/modelo.py: TOPES_PROMPT), alrededor del proceso: lo que está en la caché no hace
+# cola, y lo que espera no ha lanzado nada. Si todos los que esperaban un dibujo se van antes de que salga de la cola,
+# no se lanza; si ya está dibujándose, se acaba (y queda en la caché para cuando vuelvas).
 _en_curso: dict[str, asyncio.Task] = {}
-_turnos: dict[int, asyncio.Semaphore] = {}
+_interesados: dict[str, int] = {}
+_lanzados: set[str] = set()
+SONDEO_S = 1.0  # cada cuánto se mira si quien lo pidió sigue ahí
 
 
 _recientes: dict[str, tuple[float, str]] = {}  # contexto -> (cuándo, encargo)
@@ -80,24 +86,45 @@ def _repetido(encargo: str, contexto: str, ahora: float) -> bool:
     return previo is not None and previo[1] != encargo
 
 
-async def dibujar(encargo: str, contexto: str) -> str | None:
-    """El SVG del encargo, o None si el modelo no da uno válido."""
+async def dibujar(encargo: str, contexto: str,
+                  desconectado: Callable[[], Awaitable[bool]] | None = None) -> str | None:
+    """El SVG del encargo, o None si el modelo no da uno válido o quien lo pidió se ha ido (`desconectado`, por
+    ejemplo `request.is_disconnected`: una ruta normal no se cancela sola cuando cierras la pestaña)."""
     if _repetido(encargo, contexto, time.monotonic()):
         registro.warning("encargo de diagrama descartado: otro distinto con el mismo texto delante hace menos de %s s", VENTANA_S)
         return None
     clave = hashlib.sha256(f"{encargo}\x00{contexto[-6000:]}".encode()).hexdigest()
     tarea = _en_curso.get(clave)
     if tarea is None:
-        tarea = asyncio.create_task(_dibujar(encargo, contexto))
+        tarea = asyncio.create_task(_dibujar(clave, encargo, contexto))
         _en_curso[clave] = tarea
-        tarea.add_done_callback(lambda _t: _en_curso.pop(clave, None))
-    return await asyncio.shield(tarea)
+        tarea.add_done_callback(lambda t: _en_curso.pop(clave) if _en_curso.get(clave) is t else None)
+    _interesados[clave] = _interesados.get(clave, 0) + 1
+    try:
+        if desconectado is None:
+            return await asyncio.shield(tarea)
+        while not tarea.done():
+            await asyncio.wait({tarea}, timeout=SONDEO_S)
+            if not tarea.done() and await desconectado():
+                return None
+        return tarea.result()
+    finally:
+        _interesados[clave] -= 1
+        if not _interesados[clave]:
+            del _interesados[clave]
+            if not tarea.done() and clave not in _lanzados:
+                tarea.cancel()  # nadie lo espera y aún está en la cola: no se lanza
+                if _en_curso.get(clave) is tarea:
+                    del _en_curso[clave]  # quien lo pida ahora empieza de cero, no recibe la cancelación
 
 
-async def _dibujar(encargo: str, contexto: str) -> str | None:
-    turno = _turnos.setdefault(id(asyncio.get_running_loop()), asyncio.Semaphore(A_LA_VEZ))
-    async with turno:
+async def _dibujar(clave: str, encargo: str, contexto: str) -> str | None:
+    # Esta tarea tiene su propio contexto: el aviso solo lo oye su llamada.
+    al_lanzar.set(lambda: _lanzados.add(clave))
+    try:
         return await _llamar(encargo, contexto)
+    finally:
+        _lanzados.discard(clave)
 
 
 async def _llamar(encargo: str, contexto: str) -> str | None:

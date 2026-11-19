@@ -10,7 +10,9 @@ def _plan(alcance: str | None, horas: list[float]) -> Plan:
     return Plan.model_validate({
         "razonamiento": "x", "alcance": alcance,
         "lecciones": [{"clave": f"L{i}", "titulo": "Una lección", "objetivos": ["Calcular algo"],
-                       "conceptos": [{"id": f"c-{i}", "nombre": "c"}], "horas": h} for i, h in enumerate(horas, start=1)],
+                       "conceptos": [{"id": f"c-{i}", "nombre": "c"}], "horas": h,
+                       "necesita_fuentes": "no", "fuentes_por_que": "Se explica bien sin fuentes."}
+                      for i, h in enumerate(horas, start=1)],
     })
 
 

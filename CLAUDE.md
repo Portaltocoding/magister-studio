@@ -42,7 +42,7 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 3. Ningún número de una eval lo calcula el modelo: la estadística está en `evals/estadistica.py`, con tests.
 4. Un juez que no devuelve JSON válido o cita algo que no está en el texto devuelve `FalloJuez`, nunca un suspenso.
 5. Todo trabajo largo va por la cola de `trabajos/`; los nodos son idempotentes (upsert, no insert).
-6. Las pruebas no llaman a `claude`; los harness (`evals.tono`, `evals.fidelidad`, `evals.asesor`) sí, y solo a mano.
+6. Las pruebas no llaman a `claude`; los harness (`evals.tono`, `evals.fidelidad`, `evals.asesor`, `evals.cuando_research`) sí, y solo a mano.
 
 ## Aprender (Parte V)
 

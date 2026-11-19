@@ -119,6 +119,36 @@ async def hoy() -> dict:
                       f"Lo siguiente de tu calendario es el {fecha:%d-%m}.")}
 
 
+def colocar_preguntas(preguntas, bloques_contrato: list[dict]) -> dict[str, dict]:
+    """La comprobación de cada bloque del modo foco: una pregunta sobre una idea de ESE bloque.
+
+    `preguntas` son filas (pregunta_id, donde, enunciado, concepto_id) en orden de id (una por concepto de la
+    pregunta); `bloques_contrato`, los bloques del contrato con sus `conceptos`. Una pregunta va a su `donde` si
+    alguno de sus conceptos está en ese bloque y, si no, al bloque de su concepto (si un concepto está en varios,
+    al que tiene menos conceptos). Si ninguno de sus conceptos está en ningún bloque (material sin contrato), se
+    queda en su `donde`. Cada pregunta ocupa un solo bloque y en cada bloque gana la primera que llega."""
+    conceptos_de: dict[str, set[str]] = {b["clave"]: set(b.get("conceptos") or []) for b in bloques_contrato if b.get("clave")}
+    bloque_de: dict[str, str] = {}
+    for clave, cs in conceptos_de.items():
+        for cid in cs:
+            if cid not in bloque_de or len(cs) < len(conceptos_de[bloque_de[cid]]):
+                bloque_de[cid] = clave  # a igualdad, el primero
+    filas: dict[str, tuple[str | None, str, list[str]]] = {}
+    for pid, donde, enunciado, cid in preguntas:
+        filas.setdefault(pid, (donde, enunciado, []))[2].append(cid)
+    por_bloque: dict[str, dict] = {}
+    for pid, (donde, enunciado, cids) in filas.items():
+        propio = next((c for c in cids if c in conceptos_de.get(donde or "", ())), None)
+        if propio is not None:
+            clave, cid = donde, propio
+        else:
+            cid = next((c for c in cids if c in bloque_de), None)
+            clave = bloque_de[cid] if cid is not None else (donde or "")
+            cid = cid if cid is not None else cids[0]
+        por_bloque.setdefault(clave, {"pregunta_id": pid, "enunciado": enunciado, "concepto_id": cid})
+    return por_bloque
+
+
 @rutas.get("/tutor/leccion/{material_id}")
 async def leccion(material_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     m = await s.get(Material, material_id)
@@ -131,11 +161,9 @@ async def leccion(material_id: int, s: AsyncSession = Depends(sesion_por_peticio
         .join(PreguntaConcepto, PreguntaConcepto.pregunta_id == Pregunta.id)
         .where(Pregunta.plan_id == m.plan_id, Pregunta.leccion_clave == m.leccion_clave, Pregunta.estado == "activa")
         .order_by(Pregunta.id))).all()
-    por_bloque: dict[str, dict] = {}
-    for pid, donde, enunciado, cid in preguntas:
-        por_bloque.setdefault(donde or "", {"pregunta_id": pid, "enunciado": enunciado, "concepto_id": cid})
     titulo, tema, _ = await almacen.datos_leccion(m.plan_id, m.leccion_clave)
     contrato = m.contrato or {}
+    por_bloque = colocar_preguntas(preguntas, contrato.get("bloques", []))
     return {"plan_id": m.plan_id, "leccion_clave": m.leccion_clave, "titulo": titulo, "tema": tema,
             "definiciones": contrato.get("definiciones", []), "formulas": contrato.get("formulas", []),
             "bloques": [{"clave": c, "titulo": t, "texto": x, "pregunta": por_bloque.get(c)} for c, t, x in bloques],

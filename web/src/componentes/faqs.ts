@@ -219,9 +219,21 @@ const EXPLICAME = 'Explícame esta pantalla'
 // En un proyecto abierto, el asesor puede cambiarlo: las sugerencias lo enseñan pidiéndole un cambio de verdad.
 export const SUGERENCIAS_PROYECTO = [EXPLICAME, '¿Qué pasos le faltan a este roadmap?', 'Reorganiza este nivel para que tenga más sentido']
 
-// Las tres sugerencias del chat vacío. `seccion` es la clave de la ruta ('repaso', 'proyectos/12'…).
-export function sugerenciasDe(seccion: string, enProyecto: boolean): string[] {
+// En las pantallas del plan, con un plan activo, el asesor puede cambiarlo (mover una sesión, marcar una lección,
+// preparar sus apuntes): las sugerencias lo enseñan pidiéndole un cambio de verdad.
+export const SUGERENCIAS_PLAN: Record<string, string[]> = {
+  hoy: [EXPLICAME, 'Mueve la sesión de hoy a mañana', 'Marca esta lección como hecha'],
+  calendario: [EXPLICAME, 'Mueve la sesión de hoy a mañana', 'Apúntame un examen el viernes'],
+  roadmap: [EXPLICAME, 'Mueve la sesión de hoy a mañana', 'Deja listos los apuntes de la próxima lección'],
+  fichas: [EXPLICAME, 'Marca esta lección como hecha', 'Mueve la sesión de hoy a mañana'],
+}
+export const esPantallaDePlan = (seccion: string) => seccion.split('/')[0] in SUGERENCIAS_PLAN
+
+// Las tres sugerencias del chat vacío. `seccion` es la clave de la ruta ('repaso', 'proyectos/12'…); `hayPlan`, si
+// tienes un plan activo.
+export function sugerenciasDe(seccion: string, enProyecto: boolean, hayPlan = false): string[] {
   if (enProyecto) return [...SUGERENCIAS_PROYECTO]
+  if (hayPlan && esPantallaDePlan(seccion)) return [...SUGERENCIAS_PLAN[seccion.split('/')[0]]]
   const otras = faqsDe(seccion.split('/')[0]).map((f) => f.pregunta)
   return [...new Set([EXPLICAME, ...otras])].slice(0, 3)
 }

@@ -10,9 +10,30 @@ from magister.config import ajustes
 from magister.datos import plan as dp
 from magister.datos import repositorio_fuentes as rf
 from magister.flujo.nodos.calendarizar import reglas_calendario
+from magister.plan.apoyo import estado_apuntes
 from magister.plan.calendario import NoCabe, a_hora, calendarizar
 from magister.plan.esquemas import Concepto, Leccion, Perfil, Plan
 from magister.plan.examenes import con_estado, hitos
+
+ESTADO_RESEARCH = {"en_curso": "buscando", "acabada": "acabada", "cortada": "cortada"}
+
+
+def biblioteca_de_leccion(objetivos: list[str], fuentes: list[dict], tarea: dict | None) -> dict:
+    """La pequeña biblioteca de una lección: sus fuentes, los objetivos (desde 1) sin fuente y cómo va la búsqueda.
+    Si alguna fuente trae la ficha del juez, lo que falta sale de ahí; si no, de lo que anotó la última búsqueda."""
+    # Cubre lo que ya está en tus fuentes (lista o indexándose); lo que falló o aún no ha entrado, no.
+    vivas = [f for f in fuentes if f["estado"] in ("lista", "indexando")]
+    con_ficha = any(f.get("tipo") or f.get("cubre") for f in fuentes)
+    anotado = (tarea or {}).get("sin_cubrir")
+    if con_ficha:
+        cubiertos = {i for f in vivas for i in f.get("cubre") or []}
+        sin_fuente = [i for i in range(1, len(objetivos) + 1) if i not in cubiertos]
+    else:
+        sin_fuente = [i for i in anotado or [] if 1 <= i <= len(objetivos)]
+    research = ESTADO_RESEARCH.get((tarea or {}).get("estado", ""), "sin_lanzar")
+    # Sin ficha ni anotación (las propuestas y búsquedas de antes), no se sabe qué objetivos cubre cada fuente.
+    return {"fuentes": fuentes, "sin_fuente": sin_fuente, "research": research,
+            "cobertura_conocida": con_ficha or anotado is not None}
 
 
 async def examenes_del_plan(s: AsyncSession, plan_id: int, lecs: list, ses: list) -> list[dict]:
@@ -76,6 +97,10 @@ async def vista_por_id(s: AsyncSession, plan_id: int, hoy: date) -> dict | None:
     deps = await dp.dependencias(s, plan_id)
     ses = await dp.sesiones(s, plan_id)
     apoyo = await rf.apoyo_de_plan(s, plan_id)
+    biblioteca = await rf.biblioteca_de_plan(s, plan_id)
+    apoyo_ids = await rf.apoyo_ids_de_plan(s, plan_id)
+    tareas = await dp.ultimas_tareas_research(s, plan_id)
+    apuntes = await dp.versiones_de_apuntes(s, plan_id)
     titulos = {lec.clave: lec.titulo for lec in lecs}
     hechas: dict[str, float] = defaultdict(float)
     programadas: dict[str, float] = defaultdict(float)
@@ -99,6 +124,10 @@ async def vista_por_id(s: AsyncSession, plan_id: int, hoy: date) -> dict | None:
                 "conceptos": [{"id": c.id, "nombre": c.nombre} for c in cons if c.leccion_clave == lec.clave],
                 "fuentes": apoyo.get(lec.clave, (0, True))[0],
                 "sin_material": apoyo.get(lec.clave, (0, True))[1],
+                "biblioteca": biblioteca_de_leccion(lec.objetivos, biblioteca.get(lec.clave, []), tareas.get(lec.clave)),
+                # Con qué fuentes se hicieron los apuntes frente a las que hay ahora (None: aún no hay apuntes).
+                "apuntes_fuentes": estado_apuntes(apuntes[lec.clave], apoyo_ids.get(lec.clave, []))
+                if lec.clave in apuntes else None,
             }
         )
     semanas: dict[date, dict[date, list]] = defaultdict(lambda: defaultdict(list))

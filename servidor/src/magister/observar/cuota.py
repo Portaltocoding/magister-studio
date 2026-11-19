@@ -137,6 +137,9 @@ async def coste_de(accion: str, minutos: int | None = None) -> float:
     # Un plan nuevo: el diagnóstico y el planificador.
     if accion == "plan":
         return (await _coste_medio(("planificar",)) or 0.05) + (await _coste_medio(("diagnostico",)) or 0.01) * 4
+    # Buscar fuentes para una lección (research/fijo): dos llamadas, las consultas y el juez que lee lo encontrado.
+    if accion == "research":
+        return (await _coste_medio(("research_consultas",)) or 0.02) + (await _coste_medio(("research_juez",)) or 0.05)
     raise ValueError(f"acción desconocida: {accion}")
 
 

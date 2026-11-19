@@ -191,6 +191,9 @@ class Propuesta(Base):
     motivo: Mapped[str] = mapped_column(Text)
     estado: Mapped[str] = mapped_column(String(10), server_default="pendiente")
     version_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("versiones.id", ondelete="SET NULL"))
+    # Lo que dijo el juez (ADR-0020): {objetivos, tipo, profundidad, autoridad, cita, resumen, dominio}. Nula en las
+    # propuestas de antes del juez por objetivos.
+    ficha: Mapped[dict | None] = mapped_column(JSONB)
     creada_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
 
 

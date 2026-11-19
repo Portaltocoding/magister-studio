@@ -75,6 +75,9 @@ class Ajustes(BaseSettings):
     plazo_primer_token_s: int = 60  # sin primer trozo en este plazo, se corta (y se reintenta si toca)
     canario: str = ""  # cadena secreta que nunca debe salir en una respuesta; se genera al instalar
     modelo_fondo_a_la_vez: int = 4  # cuántas llamadas al modelo en segundo plano a la vez (material, jueces); ~390 MB cada una
+    # Cuántos diagramas del chat (prompt diagrama_chat) se dibujan a la vez; los demás esperan en cola sin lanzar claude,
+    # para no competir con el chat (el 18-11-2026 llegó a haber 16 a la vez, de 30 a 230 s cada uno).
+    diagramas_a_la_vez: int = 2
     # El freno (cerebro/freno.py): tope de llamadas al modelo por prompt y en total en la ventana; al pasarlo, se para.
     freno_ventana_s: int = 600
     freno_por_prompt: int = 25
@@ -104,6 +107,12 @@ class Ajustes(BaseSettings):
     ffmpeg: str = "ffmpeg"
     registros: str = str(RAIZ_SERVIDOR / "registros")
 
+    # Tus datos desde Ajustes: tope de los ficheros (salidas y crudo) que entran en «Descargar mis datos», y dónde
+    # están las copias de la base (las de scripts/copia_db.sh) y el contenedor de Docker que tiene pg_dump.
+    exportar_max_mb: float = 500
+    copias: str = str(RAIZ_SERVIDOR.parent / "copias")
+    contenedor_db: str = "magister-studio-db"
+
     # El asesor que propone cambios (ADR-0017): cuántas vueltas como mucho (la última solo puede proponer) y cuántas
     # lecturas por vuelta. Con 3 vueltas: leer, leer y proponer.
     asesor_vueltas: int = 3
@@ -116,6 +125,43 @@ class Ajustes(BaseSettings):
     # Al acabar una tarea de research, sus propuestas entran solas en tus fuentes (trabajo «incorporar», sin modelo,
     # ADR-0019). Con false esperan tu aprobación, como antes.
     research_incorporar: bool = True
+    # El juez ve de cada página este principio (con 1.500 apenas veía la introducción).
+    research_extracto: int = 2500
+    # Menos texto que esto no da para estudiar: de 214 páginas guardadas, 27 se quedaban por debajo (menús, portadas).
+    research_min_texto: int = 1500
+    # Dominios que no se leen nunca (coma entre ellos): copias de documentos, cursos de pago y cuadernos sin texto.
+    research_fuera: str = "scribd.com,udemy.com,colab.research.google.com"
+    # El research lee PDF (apuntes universitarios, artículos), hasta este tamaño; con false, solo HTML.
+    research_pdf: bool = True
+    research_pdf_max_mb: int = 20
+    # Si un artículo está tras un muro de pago y tiene DOI, se busca su versión en abierto en Unpaywall, que pide un
+    # correo de contacto. Vacío (por defecto): no se consulta.
+    unpaywall_email: str = ""
+    # El research automático (plan/horizonte.py): cada 10 minutos busca fuentes, como mucho 2 lecciones por vuelta, para
+    # las que empiezan en los próximos días y aún no tienen; también en planes aceptados sin buscar. Nunca para las que
+    # el plan marca `necesita_fuentes = no`. Con false, solo se busca cuando lo pides.
+    research_auto: bool = True
+    research_horizonte_dias: int = 7
+    research_intervalo_s: int = 600  # cada cuánto da una vuelta el research automático
+    research_por_vuelta: int = 2  # lecciones que se investigan solas en cada vuelta, entre todos los planes
+    research_vieja_dias: int = 14  # una búsqueda acabada de hace más de esto, y la lección sigue sin material: se repite
+    # De un PDF, el juez ve estas páginas a partir de la primera con prosa (se salta portada, agradecimientos e índice).
+    research_paginas_pdf: int = 6
+    # Topes de tiempo del research: una página HTML, cualquier descarga (un PDF), sacar el texto de un PDF y la tarea
+    # entera del flujo fijo (al pasarlo, la tarea queda «cortada» y se puede reintentar).
+    research_plazo_html_s: int = 30
+    research_plazo_descarga_s: int = 60
+    research_plazo_extraer_s: int = 30
+    research_plazo_tarea_s: int = 900
+    # El apoyo de una lección: fragmentos anclados (los que trajo el research) por objetivo, y tope por lección.
+    apoyo_por_objetivo: int = 2
+    apoyo_tope: int = 12
+    # ¿Documento entero o un pedazo? Con menos caracteres de contenido que esto (fuera de bibliografía y notas), una
+    # señal de muro de pago pesa (fuentes/extraer.py, parece_incompleta).
+    incompleta_contenido_min: int = 6000
+    # Los apuntes automáticos de una lección esperan a que lleguen sus fuentes (research en curso, propuestas por
+    # incorporar o indexándose) como mucho estos minutos; pasado el plazo, se preparan igual.
+    material_espera_fuentes: int = 20
     # Researcher (el agente mejorado): novedad, juez, cobertura y coste
     research_novedad: float = 0.9  # similitud coseno >= esto: la fuente repite una ya propuesta (redundante)
     research_juez_min: float = 2.0  # media de la rúbrica (0-3) por debajo de la cual no se propone

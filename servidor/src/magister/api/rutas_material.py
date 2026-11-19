@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel, Field
@@ -62,12 +62,12 @@ class PedirMaterial(BaseModel):
 async def pedir_material(plan_id: int, clave: str, cuerpo: PedirMaterial, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     if await s.get(LeccionFila, (plan_id, clave)) is None:
         raise HTTPException(404, "lección no encontrada")
-    fuentes = (await s.execute(text(
-        "select coalesce(max(f.version_id), 0), count(*) from lecciones_fragmentos lf join fragmentos f on f.id = lf.fragmento_id "
-        "where lf.plan_id = :p and lf.leccion_clave = :c"), {"p": plan_id, "c": clave})).one()
+    from magister.material.entrada import huella_de_apoyo
+
     await s.close()
+    fuentes = await huella_de_apoyo(plan_id, clave)
     clave_trabajo = cola.clave_idempotencia(
-        plan_id=plan_id, leccion=clave, fuentes=list(fuentes), prompts={n: cargar(n).version for n in PROMPTS},
+        plan_id=plan_id, leccion=clave, fuentes=fuentes, prompts={n: cargar(n).version for n in PROMPTS},
         modelo=ajustes.modelo, tipos=sorted(cuerpo.tipos), preferencias=cuerpo.preferencias.model_dump(), forzar=datetime.now().isoformat() if cuerpo.forzar else None,
     )
     tid, nuevo = await cola.encolar("material", plan_id, clave,
@@ -100,11 +100,12 @@ class EncargoDiagrama(BaseModel):
 
 
 @rutas.post("/diagramas")
-async def diagrama_del_chat(cuerpo: EncargoDiagrama) -> dict:
-    """Un diagrama rico de una respuesta del tutor (bloque ```diagrama), dibujado aparte mientras se lee."""
+async def diagrama_del_chat(cuerpo: EncargoDiagrama, request: Request) -> dict:
+    """Un diagrama rico de una respuesta del tutor (bloque ```diagrama), dibujado aparte mientras se lee. Si cierras
+    la pestaña mientras espera en la cola, no se lanza: `dibujar` pregunta si sigues ahí."""
     from magister.material.diagramas import dibujar
 
-    return {"svg": await dibujar(cuerpo.encargo, cuerpo.contexto)}
+    return {"svg": await dibujar(cuerpo.encargo, cuerpo.contexto, desconectado=request.is_disconnected)}
 
 
 class PrefVideos(BaseModel):

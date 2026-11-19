@@ -20,6 +20,11 @@ bancos:
   - nombre: olvido
     tarea: null
     comando: python -m evals.olvido informe
+  # Sin modelo ni cuota (unos 30 s): las tres capas del programador sobre la base simulada; falla si manda algo peor que FSRS.
+  # Solo: `uv run python -m evals.suite --solo olvido_capas`.
+  - nombre: olvido_capas
+    tarea: null
+    comando: python -m evals.olvido capas --simulado
   - nombre: criterios_v05
     tarea: null
     comando: python -m evals.criterios_v05

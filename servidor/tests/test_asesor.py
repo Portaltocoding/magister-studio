@@ -1,5 +1,7 @@
 """El asesor que hace cosas: decide si lee o propone, el código valida las acciones y solo se aplican si las apruebas."""
 
+from datetime import date
+
 import pytest
 
 from magister.asesor import agente as ag
@@ -303,3 +305,209 @@ async def test_sin_bloque_cambio_no_se_prepara_nada(cliente) -> None:
     pid, cid = await _preparado(cliente)
     r = await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "Explícame esta pantalla", "asesor": True, "proyecto_id": pid})
     assert not any(e.startswith("cambio") for e, _ in eventos_sse(r.text))
+
+
+# --- El plan de estudio activo y la agenda --------------------------------------------------------------------------
+
+HOY = date(2026, 11, 19)  # jueves
+
+
+def _plan(**extra) -> dict:
+    """Dos horas de lunes a viernes desde las 17:00. L2 depende de L1 y L3 de L2."""
+    return {"plan_id": 1, "tema_id": 1, "tema": "Cálculo", "horas_por_dia": [2, 2, 2, 2, 2, 0, 0],
+            "inicio_por_dia": ["17:00"] * 5 + [None, None],
+            "lecciones": [{"clave": "L1", "titulo": "Límites", "horas": 1, "depende_de": [], "apuntes": "listos"},
+                          {"clave": "L2", "titulo": "Derivadas", "horas": 1, "depende_de": ["L1"], "apuntes": None},
+                          {"clave": "L3", "titulo": "Integrales", "horas": 2, "depende_de": ["L2"], "apuntes": None}],
+            "sesiones": [{"id": 10, "clave": "L1", "fecha": "2026-11-19", "inicio": "17:00", "horas": 1, "estado": "pendiente"},
+                         {"id": 11, "clave": "L2", "fecha": "2026-11-19", "inicio": "18:00", "horas": 1, "estado": "pendiente"},
+                         {"id": 12, "clave": "L3", "fecha": "2026-11-20", "inicio": "17:00", "horas": 2, "estado": "pendiente"}],
+            "eventos": [], **extra}
+
+
+def _en_plan(plan: dict | None, *acciones: dict) -> cb.Resultado:
+    return cb.simular(_cambios(*acciones), None, MOMENTO, plan, HOY)
+
+
+def _errores_plan(plan: dict | None, *acciones: dict) -> str:
+    return " ".join(_en_plan(plan, *acciones).errores)
+
+
+def test_mover_una_sesion_respeta_el_dia_la_medianoche_y_las_dependencias() -> None:
+    p = _plan()
+    r = _en_plan(p, {"tipo": "mover_sesion", "sesion_id": 12, "fecha": "2026-11-23"})
+    assert r.errores == [] and r.movidas == {12}
+    assert (r.plan["sesiones"][2]["fecha"], r.plan["sesiones"][2]["inicio"]) == ("2026-11-23", "17:00")  # a la hora de ese día
+    assert r.lineas[0].texto == ("Mover la sesión de L3 «Integrales» (2 h) del viernes 20 de noviembre a las 17:00 al "
+                                 "lunes 23 de noviembre a las 17:00")
+    assert p["sesiones"][2]["fecha"] == "2026-11-20"  # el original, intacto
+    # Sin hora, detrás de lo que ya hay ese día; y el día no pasa de sus horas.
+    assert "tendrías 3 h de este plan y ese día estudias 2 h" in _errores_plan(p, {"tipo": "mover_sesion", "sesion_id": 11, "fecha": "2026-11-20"})
+    assert "no tienes horas de estudio" in _errores_plan(p, {"tipo": "mover_sesion", "sesion_id": 12, "fecha": "2026-11-21"})
+    assert "pasaría de medianoche" in _errores_plan(p, {"tipo": "mover_sesion", "sesion_id": 11, "fecha": "2026-11-23", "hora": "23:30"})
+    assert "ya ha pasado" in _errores_plan(p, {"tipo": "mover_sesion", "sesion_id": 11, "fecha": "2026-11-18"})
+    assert "quedaría antes de L1 «Límites»" in _errores_plan(p, {"tipo": "mover_sesion", "sesion_id": 10, "fecha": "2026-11-23"})
+    assert "no existe la sesión" in _errores_plan(p, {"tipo": "mover_sesion", "sesion_id": 99, "fecha": "2026-11-23"})
+    hecha = _plan()
+    hecha["sesiones"][0]["estado"] = "hecha"
+    assert "solo se mueven las pendientes" in _errores_plan(hecha, {"tipo": "mover_sesion", "sesion_id": 10, "fecha": "2026-11-23"})
+    # Dos sesiones no se pisan (sin horario, solo cuenta eso).
+    libre = _plan(horas_por_dia=None)
+    assert "se pisaría con la de L1" in _errores_plan(libre, {"tipo": "mover_sesion", "sesion_id": 12, "fecha": "2026-11-19", "hora": "17:30"})
+    # Solo cuenta cómo queda al final: mover L2 y L3 juntas vale.
+    assert _errores_plan(p, {"tipo": "mover_sesion", "sesion_id": 11, "fecha": "2026-11-23"},
+                         {"tipo": "mover_sesion", "sesion_id": 12, "fecha": "2026-11-24"}) == ""
+    assert "no hay ningún plan" in _errores_plan(None, {"tipo": "mover_sesion", "sesion_id": 12, "fecha": "2026-11-23"})
+
+
+def test_marcar_preparar_y_apuntar_en_la_agenda() -> None:
+    p = _plan()
+    r = _en_plan(p, {"tipo": "marcar_leccion", "clave": "l1", "hecho": True},
+                 {"tipo": "preparar_leccion", "clave": "L2"},
+                 {"tipo": "apuntar_evento", "titulo": "Parcial de cálculo", "fecha": "2026-11-27", "hora": "10:00", "tipo_evento": "examen"})
+    assert r.errores == []
+    assert r.plan["sesiones"][0]["estado"] == "hecha" and r.marcar == [("L1", True)] and r.preparar == ["L2"]
+    assert r.eventos == [{"fecha": "2026-11-27", "hora": "10:00", "titulo": "Parcial de cálculo", "tipo": "examen"}]
+    assert [x.texto for x in r.lineas] == ["Marcar L1 «Límites» como hecha (1 sesión)", "Preparar los apuntes de L2 «Derivadas» (gasta cuota)",
+                                          "Apuntar en tu agenda: examen «Parcial de cálculo» el viernes 27 de noviembre a las 10:00"]
+    assert [x.deshace for x in r.lineas] == [True, False, True]
+    assert "ya tiene apuntes" in _errores_plan(p, {"tipo": "preparar_leccion", "clave": "L1"})
+    assert "ya está pendiente" in _errores_plan(p, {"tipo": "marcar_leccion", "clave": "L1", "hecho": False})
+    # La agenda no necesita plan; el plan sí.
+    assert _errores_plan(None, {"tipo": "apuntar_evento", "titulo": "Entregar la práctica", "fecha": "2026-11-20"}) == ""
+    assert "no hay ningún plan" in _errores_plan(None, {"tipo": "marcar_leccion", "clave": "L1", "hecho": True})
+    assert "ya ha pasado" in _errores_plan(None, {"tipo": "apuntar_evento", "titulo": "Entregar", "fecha": "2026-11-01"})
+    # «Deshacer» no sale para un cambio que solo prepara apuntes.
+    assert not cb.deshacible([{"texto": "Preparar…", "motivo": "…", "deshace": False}])
+    assert cb.deshacible([{"texto": "Preparar…", "motivo": "…", "deshace": False}, {"texto": "Mover…", "motivo": "…"}])
+
+
+def test_la_huella_cubre_el_plan_solo_si_el_cambio_lo_toca() -> None:
+    proyecto, p = _proyecto(), _plan()
+    nota = _cambios({"tipo": "guardar_nota", "nota": "Algo que guardar."})
+    mover = _cambios({"tipo": "mover_sesion", "sesion_id": 12, "fecha": "2026-11-23"})
+    assert cb.huella_de(nota, proyecto, p) == cb.huella(proyecto["roadmap"], proyecto["hechos"])  # como antes
+    otro = _plan()
+    otro["sesiones"][0]["estado"] = "hecha"
+    assert cb.huella_de(mover, None, p) != cb.huella_de(mover, None, otro)
+    assert cb.huella_de(nota, None, p) == cb.huella_de(nota, None, otro) is None
+
+
+def test_el_agente_ve_el_plan_y_lee_otros_dias() -> None:
+    p = _plan()
+    p["sesiones"].append({"id": 13, "clave": "L3", "fecha": "2026-12-20", "inicio": "17:00", "horas": 1, "estado": "pendiente"})
+    texto = ag.texto_plan(p, HOY)
+    assert '"id": 12' in texto and '"id": 13' not in texto and "viernes 20 de noviembre" in texto
+    assert "no hay ningún plan" in ag.texto_plan(None, HOY)
+
+    def reglas(**lectura) -> str:
+        paso = ag.Paso.model_validate({"falta": "…", "leer": [{"herramienta": "ver_calendario", **lectura}]})
+        return " ".join(ag.reglas_paso(paso, [], False, None, MOMENTO, p, HOY))
+
+    assert reglas(desde="2026-12-14", hasta="2026-12-20") == ""
+    assert "necesita `desde`" in reglas()
+    assert "como mucho" in reglas(desde="2026-12-01", hasta="2026-12-31")
+    from magister.asesor import herramientas as h
+
+    assert h.descripcion({"herramienta": "ver_calendario", "desde": "2026-11-28", "hasta": "2026-12-04"}) == \
+        "tu calendario del 28 de noviembre al 4 de diciembre"
+
+
+async def _plan_guardado() -> tuple[int, dict[str, int]]:
+    from magister.datos import plan as dp
+    from magister.datos.sesion import nueva_sesion
+
+    lecciones = [{"clave": c, "titulo": t, "objetivos": ["Explicar algo"], "conceptos": [{"id": f"c-{c.lower()}", "nombre": t}],
+                  "horas": h, "depende_de": d} for c, t, h, d in (("L1", "Límites", 1, []), ("L2", "Derivadas", 1, ["L1"]),
+                                                                  ("L3", "Integrales", 2, ["L2"]))]
+    sesiones = [{"clave": "L1", "fecha": "2026-11-19", "inicio": "17:00", "horas": 1},
+                {"clave": "L2", "fecha": "2026-11-19", "inicio": "18:00", "horas": 1},
+                {"clave": "L3", "fecha": "2026-11-20", "inicio": "17:00", "horas": 2}]
+    perfil = {"horas_por_dia": [2, 2, 2, 2, 2, 0, 0], "inicio_por_dia": ["17:00"] * 5 + [None, None]}
+    _, plan_id = await dp.guardar_plan("Cálculo", None, perfil, {"razonamiento": "x", "lecciones": lecciones}, sesiones, None, None)
+    async with nueva_sesion() as s:
+        ids = {x.leccion_clave: x.id for x in await dp.sesiones(s, plan_id)}
+    return plan_id, ids
+
+
+async def _sesiones(plan_id: int) -> dict[str, tuple[str, str | None, str]]:
+    from magister.datos import plan as dp
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s:
+        return {x.leccion_clave: (x.fecha.isoformat(), x.inicio.strftime("%H:%M") if x.inicio else None, x.estado)
+                for x in await dp.sesiones(s, plan_id)}
+
+
+@pytest.fixture
+def el_19_de_noviembre(monkeypatch) -> None:
+    from datetime import datetime, timezone
+
+    from magister.api import rutas_asesor, rutas_conversaciones
+
+    monkeypatch.setattr(rutas_asesor, "ahora", lambda: datetime(2026, 11, 19, 9, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(rutas_conversaciones, "hoy", lambda: HOY)
+
+
+async def _pedir_en_plan(cliente, plan_id: int, *acciones: dict) -> dict:
+    from magister.cerebro.estructura import eco
+
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "Asesor · Calendario", "tipo": "asesor"})).json()["id"]
+    eco.encolar(ag.Paso, [_propone(*acciones)])
+    pregunta = "Hecho.\n```cambio\nMover la sesión de L3 del viernes al lunes.\n```"
+    r = await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": pregunta, "asesor": True, "plan_activo_id": plan_id})
+    return next(d for e, d in eventos_sse(r.text) if e == "cambio")
+
+
+async def test_en_el_plan_se_aplica_y_se_deshace(cliente, el_19_de_noviembre) -> None:
+    from sqlalchemy import select
+
+    from magister.datos.agenda import Evento
+    from magister.datos.sesion import nueva_sesion
+
+    plan_id, ids = await _plan_guardado()
+    cambio = await _pedir_en_plan(cliente, plan_id, {"tipo": "mover_sesion", "sesion_id": ids["L3"], "fecha": "2026-11-23"},
+                                  {"tipo": "marcar_leccion", "clave": "L1", "hecho": True},
+                                  {"tipo": "apuntar_evento", "titulo": "Parcial de cálculo", "fecha": "2026-11-27", "tipo_evento": "examen"})
+    assert cambio["plan_id"] == plan_id and cambio["deshacible"] and len(cambio["lineas"]) == 3
+    antes = await _sesiones(plan_id)
+    assert antes["L3"] == ("2026-11-20", "17:00", "pendiente")  # nada cambia hasta que lo apruebas
+
+    assert (await cliente.post(f"/api/cambios/{cambio['id']}/aplicar")).json()["estado"] == "aplicada"
+    despues = await _sesiones(plan_id)
+    assert despues["L3"] == ("2026-11-23", "17:00", "pendiente") and despues["L1"][2] == "hecha"
+    async with nueva_sesion() as s:
+        assert [e.titulo for e in (await s.scalars(select(Evento))).all()] == ["Parcial de cálculo"]
+
+    assert (await cliente.post(f"/api/cambios/{cambio['id']}/deshacer")).json()["estado"] == "deshecha"
+    assert await _sesiones(plan_id) == antes
+    async with nueva_sesion() as s:
+        assert (await s.scalars(select(Evento))).all() == []
+
+
+async def test_si_el_calendario_cambia_antes_de_aplicarlo_caduca(cliente, el_19_de_noviembre) -> None:
+    plan_id, ids = await _plan_guardado()
+    cambio = await _pedir_en_plan(cliente, plan_id, {"tipo": "mover_sesion", "sesion_id": ids["L3"], "fecha": "2026-11-23"})
+    await cliente.patch(f"/api/sesiones/{ids['L1']}", json={"estado": "hecha"})
+    r = (await cliente.post(f"/api/cambios/{cambio['id']}/aplicar")).json()
+    assert r["estado"] == "caducada" and "calendario ha cambiado" in r["motivo_estado"]
+    assert (await _sesiones(plan_id))["L3"][0] == "2026-11-20"
+
+
+async def test_preparar_apuntes_encola_como_lecciones_y_no_se_deshace(cliente, el_19_de_noviembre) -> None:
+    from sqlalchemy import select
+
+    from magister.datos.material import Trabajo
+    from magister.datos.sesion import nueva_sesion
+
+    plan_id, _ = await _plan_guardado()
+    cambio = await _pedir_en_plan(cliente, plan_id, {"tipo": "preparar_leccion", "clave": "L2"})
+    assert cambio["lineas"][0]["texto"] == "Preparar los apuntes de L2 «Derivadas» (gasta cuota)" and not cambio["deshacible"]
+    assert (await cliente.post(f"/api/cambios/{cambio['id']}/aplicar")).json()["estado"] == "aplicada"
+    async with nueva_sesion() as s:
+        trabajos = (await s.scalars(select(Trabajo))).all()
+    assert [(t.tipo, t.plan_id, t.leccion_clave) for t in trabajos] == [("material", plan_id, "L2")]
+    # El mismo trabajo que pide el botón de Lecciones (misma clave): no se encola dos veces.
+    r = await cliente.post(f"/api/planes/{plan_id}/lecciones/L2/material", json={})
+    assert r.json() == {"trabajo_id": trabajos[0].id, "nuevo": False}
+    assert (await cliente.post(f"/api/cambios/{cambio['id']}/deshacer")).status_code == 409

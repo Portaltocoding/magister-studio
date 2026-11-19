@@ -22,9 +22,9 @@ def ahora() -> datetime:
 
 
 async def tras_respuesta(cid: int, proyecto_id: int | None, texto: str, mensaje_id: int | None, turnos: list[dict],
-                         hoy: date) -> AsyncIterator[ServerSentEvent]:
+                         hoy: date, plan_id: int | None = None) -> AsyncIterator[ServerSentEvent]:
     """Si la respuesta del asesor acaba en un bloque ```cambio, prepara ese cambio y lo manda como evento `cambio`
-    (o `cambio_fallido`, con el porqué). No aplica nada."""
+    (o `cambio_fallido`, con el porqué). No aplica nada. `plan_id`: el plan activo de la app, si hay."""
     encargo = encargo_de(texto)
     if not encargo:
         return
@@ -32,16 +32,17 @@ async def tras_respuesta(cid: int, proyecto_id: int | None, texto: str, mensaje_
     propuesta = None
     try:
         proyecto = await arnes.leer_proyecto(proyecto_id)
+        plan = await arnes.leer_plan(plan_id, hoy)
         conversacion = [*turnos, {"rol": "tutor", "contenido": sin_bloque_cambio(texto)}]
         async for que, dato in preparar(encargo, conversacion, proyecto, proyecto_id if proyecto else None, hoy,
-                                        ahora().isoformat(timespec="seconds")):
+                                        ahora().isoformat(timespec="seconds"), plan):
             if que == "leyendo":  # que se vea qué está mirando, no un «pensando» mudo
                 mirando = " y ".join(herramientas.descripcion(x) for x in dato)
                 yield ServerSentEvent(data={"nodo": "preparar_cambio", "detalle": f"Mirando {mirando}…"}, event="fase")
             else:
                 cambios, resultado, prompt, lecturas = dato
                 propuesta = await arnes.proponer(cid, mensaje_id, proyecto_id, encargo, cambios, resultado, proyecto,
-                                                 prompt, lecturas)
+                                                 prompt, lecturas, plan)
     except NoSePuede as e:
         # No es un fallo: el agente explica por qué no cabe en lo que puede hacer (se enseña tal cual).
         yield ServerSentEvent(data={"detalle": str(e), "explicado": True}, event="cambio_fallido")
@@ -70,9 +71,18 @@ async def _hacer(fn, cambio_id: int) -> dict:
         raise HTTPException(e.codigo, e.detalle) from None
 
 
+async def preparar_apuntes(plan_id: int, clave: str) -> int:
+    """Lo mismo que «Generar el material» en Lecciones (la misma ruta, con lo de siempre): encola apuntes y fichas."""
+    from magister.api.rutas_material import PedirMaterial, pedir_material
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s:
+        return (await pedir_material(plan_id, clave, PedirMaterial(), s))["trabajo_id"]
+
+
 @rutas.post("/cambios/{cambio_id}/aplicar")
 async def aplicar(cambio_id: int) -> dict:
-    return await _hacer(arnes.aplicar, cambio_id)
+    return await _hacer(lambda cid, momento: arnes.aplicar(cid, momento, preparar_apuntes), cambio_id)
 
 
 @rutas.post("/cambios/{cambio_id}/descartar")

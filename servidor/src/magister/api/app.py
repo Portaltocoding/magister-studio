@@ -40,6 +40,87 @@ VERSION_CONTRATO = "1.0"
 
 registro = logging.getLogger("uvicorn.error")
 
+def _a_investigar(p: dict, hoy, maximo: int) -> list[str]:
+    from magister.plan.horizonte import lecciones_a_investigar
+
+    return lecciones_a_investigar(p["lecciones"], p["tareas"], hoy, ajustes.research_horizonte_dias, maximo,
+                                  vieja_dias=ajustes.research_vieja_dias, material_propio=p.get("material_propio", False))
+
+
+async def por_investigar(hoy) -> set[tuple[int, str]]:
+    """Las (plan_id, clave) que el research automático lanzaría ahora: sus apuntes automáticos esperan
+    (trabajos/automatizar.py), para no hacerlos a ciegas justo antes de que lleguen sus fuentes."""
+    from magister.cerebro import freno
+    from magister.datos import plan as dp
+    from magister.datos.sesion import nueva_sesion
+
+    if not ajustes.research_auto or freno.estado()["parados"]:
+        return set()
+    async with nueva_sesion() as s:
+        planes = await dp.para_horizonte(s)
+    return {(p["plan_id"], c) for p in planes if not p["en_curso"] for c in _a_investigar(p, hoy, len(p["lecciones"]))}
+
+
+async def investigar_horizonte(buscador, hoy, hay_red=None) -> list[str]:
+    """Una vuelta del research automático (encargo 8): en cada plan aceptado, las lecciones que empiezan en los próximos
+    MAGISTER_RESEARCH_HORIZONTE_DIAS días y siguen sin fuentes, salvo las que el plan marca «no». Devuelve lo anotado.
+    No lanza nada si el freno está echado, si el plan ya tiene una búsqueda en curso o si `hay_red` (una búsqueda web
+    barata, sin modelo) dice que no hay red: sin ella, cada lección gastaría una consulta para nada."""
+    from magister.cerebro import freno
+    from magister.datos import plan as dp
+    from magister.datos.sesion import nueva_sesion
+    from magister.flujo.fuentes import calcular_apoyo
+    from magister.plan.horizonte import cuando_empiezas
+    from magister.research import tareas
+    from magister.trabajos.automatizar import anotar
+
+    if freno.estado()["parados"]:
+        return []
+    async with nueva_sesion() as s:
+        planes = await dp.para_horizonte(s)
+    hechos: list[str] = []
+    quedan = ajustes.research_por_vuelta
+    red_comprobada = False
+    for p in planes:
+        if quedan <= 0:
+            break
+        if p["en_curso"]:
+            continue
+        if not p["con_apoyo"] and buscador is not None:
+            # Un plan aceptado sin buscar puede no tener ni el cálculo del apoyo: sin él, todo parecería sin material.
+            await calcular_apoyo(buscador, p["plan_id"], p["tema_id"])
+            async with nueva_sesion() as s:
+                p = next((x for x in await dp.para_horizonte(s) if x["plan_id"] == p["plan_id"]), p)
+        claves = _a_investigar(p, hoy, quedan)
+        if not claves:
+            continue
+        if hay_red is not None and not red_comprobada:
+            if not await hay_red():
+                registro.warning("research automático: no hay red (la búsqueda web no responde); lo intento en la próxima vuelta")
+                return hechos
+            red_comprobada = True
+        tareas.lanzar_en_fondo(await tareas.crear(p["plan_id"], claves))
+        quedan -= len(claves)
+        primera = min(x["primera_sesion"] for x in p["lecciones"] if x["clave"] in claves)
+        texto = f"Buscando fuentes para {' y '.join(claves)} de {p['tema']} (empiezas {cuando_empiezas(primera, hoy)})"
+        await anotar(texto)
+        hechos.append(texto)
+    return hechos
+
+
+async def bucle_horizonte(buscador) -> None:
+    from datetime import date
+
+    from magister.research import tareas
+
+    while True:
+        # Primero se espera: al arrancar ya hay bastante (cargar e5, el reranker, cortar lo que quedó a medias).
+        await asyncio.sleep(ajustes.research_intervalo_s)
+        try:
+            await investigar_horizonte(buscador, date.today(), tareas.web_por_defecto.hay_red)
+        except Exception:  # noqa: BLE001  (si falla una vuelta, la siguiente lo vuelve a intentar)
+            registro.exception("research automático")
+
 
 @asynccontextmanager
 async def ciclo_de_vida(_: FastAPI):
@@ -89,14 +170,18 @@ async def ciclo_de_vida(_: FastAPI):
 
     # El trabajador de la cola corre dentro de la API salvo que se lance aparte (magister-trabajador).
     trabajador = asyncio.create_task(bucle_trabajos()) if ajustes.trabajos_en_api else None
-    from magister.trabajos.automatizar import bucle as bucle_automatizaciones
+    from magister.trabajos.automatizar import bucle as bucle_automatizaciones, registrar_por_investigar
 
+    # Los apuntes automáticos esperan también a lo que el research automático va a buscar ahora.
+    registrar_por_investigar(por_investigar)
     # Las automatizaciones que enciendes (preparar la próxima lección, vídeos...) se revisan cada pocos minutos.
     automatizaciones = asyncio.create_task(bucle_automatizaciones()) if ajustes.trabajos_en_api else None
+    # Las fuentes de lo que vas a estudiar pronto se buscan solas (MAGISTER_RESEARCH_AUTO), también sin pulsar nada.
+    horizonte = asyncio.create_task(bucle_horizonte(buscador)) if ajustes.research_auto else None
     async with AsyncSqliteSaver.from_conn_string(ajustes.checkpoints) as saver:
         iniciar_grafo(saver, buscador)
         yield
-    for tarea in (fondo, trabajador, vigia):
+    for tarea in (fondo, trabajador, vigia, horizonte):
         if tarea is not None:
             tarea.cancel()
     iniciar_grafo(None)
@@ -177,6 +262,9 @@ app.include_router(rutas_video)
 app.include_router(rutas_borrar)
 app.include_router(rutas_cuota)
 app.include_router(rutas_modelos)
+from magister.api.rutas_datos import rutas as rutas_datos  # noqa: E402
+
+app.include_router(rutas_datos)
 
 # La API sirve también la página (web/dist) si está construida: un solo puerto, http://localhost:8000.
 _dist = __import__("pathlib").Path(__file__).resolve().parents[4] / "web" / "dist"

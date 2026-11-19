@@ -59,3 +59,32 @@ async def test_una_llamada_frenada_no_lanza_claude_ni_se_reintenta(topes, monkey
     finally:
         modelo.prompt_actual.reset(marca)
     assert len(lanzados) == 3 and not modelo.transitorio(e.value)
+
+
+@pytest.mark.anyio
+async def test_lo_que_espera_en_cola_y_se_cancela_no_cuenta(topes, monkeypatch) -> None:
+    """El freno cuenta lo que se lanza: un diagrama que espera su turno y se cancela antes no ha gastado nada."""
+    import asyncio
+
+    suelta = asyncio.Event()
+
+    async def lanzar_falso(sistema, entrada, esquema=None, modelo_=None):
+        await suelta.wait()
+        yield {"type": "result"}
+
+    monkeypatch.setattr(modelo, "_lanzar_claude", lanzar_falso)
+    monkeypatch.setattr(modelo.ajustes, "diagramas_a_la_vez", 1)
+
+    async def dibujo() -> None:
+        marca = modelo.prompt_actual.set(("diagrama_chat", "v1"))
+        try:
+            [e async for e in modelo._lineas_claude("s", "x")]
+        finally:
+            modelo.prompt_actual.reset(marca)
+
+    primero, segundo = asyncio.create_task(dibujo()), asyncio.create_task(dibujo())
+    await asyncio.sleep(0.05)
+    segundo.cancel()
+    suelta.set()
+    await primero
+    assert freno.estado()["llamadas_en_ventana"] == 1

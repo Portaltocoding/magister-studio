@@ -35,6 +35,12 @@ def responder(peticion: httpx.Request) -> httpx.Response:
         return httpx.Response(200, headers={"content-type": "text/html"}, content=b"<html><body><p>hola</p></body></html>")
     if ruta == "/salta":
         return httpx.Response(302, headers={"location": "http://interna.test/secreto"})
+    if ruta == "/muro":  # un artículo de pago: el resumen, la bibliografía y el botón de comprar
+        resumen = "".join(f"<p>Delusions are deeply evidence-resistant, sentence {i}.</p>" for i in range(12))
+        refs = "".join(f"<li>Author {i} (2010). A book on delusion and belief. Press.</li>" for i in range(150))
+        html = (f"<html><head><title>Delusional evidence</title></head><body><article><h2>Abstract</h2>{resumen}"
+                f"<h2>References</h2><ul>{refs}</ul><button>Buy article PDF 39,95 €</button></article></body></html>")
+        return httpx.Response(200, headers={"content-type": "text/html"}, content=html.encode())
     return httpx.Response(404)
 
 
@@ -231,3 +237,18 @@ async def test_reintentar_no_arregla_lo_que_casi_no_tiene_texto(cliente) -> None
     assert r["con_problema"] == 1 and not r["problemas"][0]["reintentable"]
     res = await cliente.post(f"/api/versiones/{vid}/reintentar")
     assert res.status_code == 409 and "no lo arregla" in res.json()["detail"]
+
+
+async def test_un_pedazo_entra_pero_marcado(base, web_falsa) -> None:
+    """El resumen tras un muro de pago no se tira (algo sirve), pero se dice: la versión y el trabajo lo apuntan."""
+    plan_id, ids = await plan_con_propuestas(["https://a.example/muro", "https://a.example/buena"])
+    tid, _ = await incorporar.encolar(plan_id)
+    await incorporar.ejecutar(tid, {"ids": ids})
+    r = await incorporar.leer(tid)
+    assert r["entradas"] == 2 and [x["url"] for x in r["incompletas"]] == ["https://a.example/muro"]
+    assert r["incompletas"][0]["incompleta"].startswith("solo el resumen")
+    async with nueva_sesion() as s:
+        muro = await s.get(Version, (await s.get(Propuesta, ids[0])).version_id)
+        buena = await s.get(Version, (await s.get(Propuesta, ids[1])).version_id)
+    assert muro.estado == "pendiente" and "muro de pago" in muro.metadatos["incompleta"]
+    assert "incompleta" not in buena.metadatos

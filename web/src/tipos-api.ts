@@ -56,6 +56,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/materias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar Materias
+         * @description Los perfiles de explicación que se pueden asignar a un tema.
+         */
+        get: operations["listar_materias_api_materias_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/temas/{tema_id}/materia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cambiar Materia
+         * @description Cambia a mano el perfil de explicación del tema; null lo deja sin elegir y se vuelve a elegir al usarlo.
+         */
+        put: operations["cambiar_materia_api_temas__tema_id__materia_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversaciones": {
         parameters: {
             query?: never;
@@ -146,6 +186,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversaciones/{cid}/cambios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cambios De Conversacion */
+        get: operations["cambios_de_conversacion_api_conversaciones__cid__cambios_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cambios/{cambio_id}/aplicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aplicar */
+        post: operations["aplicar_api_cambios__cambio_id__aplicar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cambios/{cambio_id}/descartar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Descartar */
+        post: operations["descartar_api_cambios__cambio_id__descartar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cambios/{cambio_id}/deshacer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deshacer */
+        post: operations["deshacer_api_cambios__cambio_id__deshacer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/planes": {
         parameters: {
             query?: never;
@@ -174,10 +282,37 @@ export interface paths {
         get: operations["ver_plan_api_temas__tema_id__plan_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Borrar Plan
+         * @description El plan de un tema con todas sus versiones: lecciones, calendario, material, fichas, repasos y exámenes.
+         *
+         *     Las conversaciones se quedan (se borran aparte); el tema también, por si vuelves a planificarlo.
+         */
+        delete: operations["borrar_plan_api_temas__tema_id__plan_delete"];
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/lecciones/{clave}/fuentes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Cambiar Necesidad
+         * @description Cambias si esta lección necesita fuentes: con «no», el research automático y «Buscar fuentes» de todo el plan se
+         *     la saltan (pedirla a mano en su fila sigue buscando).
+         */
+        patch: operations["cambiar_necesidad_api_planes__plan_id__lecciones__clave__fuentes_patch"];
         trace?: never;
     };
     "/api/temas/{tema_id}/plan/recalcular": {
@@ -191,6 +326,26 @@ export interface paths {
         put?: never;
         /** Recalcular */
         post: operations["recalcular_api_temas__tema_id__plan_recalcular_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/temas/{tema_id}/plan/horario": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cambiar Horario
+         * @description Cambia cuántas horas y a qué hora estudias cada día, y recoloca lo pendiente desde hoy.
+         */
+        put: operations["cambiar_horario_api_temas__tema_id__plan_horario_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -212,6 +367,26 @@ export interface paths {
         head?: never;
         /** Marcar Sesion */
         patch: operations["marcar_sesion_api_sesiones__sesion_id__patch"];
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/lecciones/{clave}/hecha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Marcar Leccion
+         * @description Cerrar una lección: todas sus sesiones pendientes pasan a hechas, también las de otros días.
+         */
+        patch: operations["marcar_leccion_api_planes__plan_id__lecciones__clave__hecha_patch"];
         trace?: never;
     };
     "/api/calendario": {
@@ -389,6 +564,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fuentes/resumen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resumen Documentos
+         * @description Cuántos documentos hay listos, indexándose y con problema; los problemas, en claro; y lo que vino del research.
+         */
+        get: operations["resumen_documentos_api_fuentes_resumen_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/versiones/{vid}/reintentar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reintentar
+         * @description Vuelve a poner a indexar una versión que se quedó a medias (cuarentena por un fallo, o lista sin fragmentos).
+         */
+        post: operations["reintentar_api_versiones__vid__reintentar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research": {
         parameters: {
             query?: never;
@@ -398,7 +613,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Lanzar */
+        /**
+         * Lanzar
+         * @description Las lecciones que el plan marca con `necesita_fuentes` = «no» se saltan (salvo una sola o `forzar`): la
+         *     respuesta dice cuáles en `saltadas` y por qué en `aviso`.
+         */
         post: operations["lanzar_api_research_post"];
         delete?: never;
         options?: never;
@@ -415,6 +634,63 @@ export interface paths {
         };
         /** Ver */
         get: operations["ver_api_research__tarea_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/incorporar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Incorporar Pendientes
+         * @description Todas las propuestas pendientes (o las de un plan o una lección) entran en tus fuentes por la cola, sin modelo.
+         */
+        post: operations["incorporar_pendientes_api_incorporar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/incorporar/ultimo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ultima Incorporacion
+         * @description El último trabajo de incorporar (también los que lanzó solo el research) y si lo propuesto entra solo.
+         */
+        get: operations["ultima_incorporacion_api_incorporar_ultimo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/incorporar/{tid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Incorporacion */
+        get: operations["ver_incorporacion_api_incorporar__tid__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -451,9 +727,29 @@ export interface paths {
         put?: never;
         /**
          * Decidir
-         * @description Aprobar manda la URL a la ingesta entera (validación, duplicados, cuarentena) en la fuente `web`.
+         * @description Aprobar manda la URL a la ingesta entera (validación, duplicados, cuarentena) en la fuente del research.
          */
         post: operations["decidir_api_propuestas__pid__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/libre": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Research Libre
+         * @description Busca y puntúa páginas sobre un tema de Estudio libre. Devuelve las mejores; añadirlas a tus fuentes es aparte.
+         */
+        post: operations["research_libre_api_research_libre_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -472,6 +768,271 @@ export interface paths {
         put?: never;
         /** Pedir Material */
         post: operations["pedir_material_api_planes__plan_id__lecciones__clave__material_post"];
+        /**
+         * Borrar Material
+         * @description El material de una lección. «todo» quita también sus fichas y deja la lección sin preparar; tus repasos se quedan.
+         */
+        delete: operations["borrar_material_api_planes__plan_id__lecciones__clave__material_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/lecciones/{clave}/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Crear Tests
+         * @description Añade preguntas tipo test a una lección que ya tiene apuntes (una llamada al modelo); no toca las demás.
+         */
+        post: operations["crear_tests_api_planes__plan_id__lecciones__clave__tests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/diagramas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Diagrama Del Chat
+         * @description Un diagrama rico de una respuesta del tutor (bloque ```diagrama), dibujado aparte mientras se lee. Si cierras
+         *     la pestaña mientras espera en la cola, no se lanza: `dibujar` pregunta si sigues ahí.
+         */
+        post: operations["diagrama_del_chat_api_diagramas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/videos/recomendados": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Videos Recomendados
+         * @description Las lecciones del plan que llevan vídeo (las más duras, tantas como pidas) y tu preferencia.
+         */
+        get: operations["videos_recomendados_api_planes__plan_id__videos_recomendados_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/videos/preferencias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Preferencias Videos
+         * @description Cuántos vídeos quieres en tus planes («más» o «menos» mueve un paso), su duración y su estilo.
+         */
+        put: operations["preferencias_videos_api_videos_preferencias_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/videos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Videos
+         * @description Todos los vídeos (guiones) del plan, con su lección, estilo, concepto y duración.
+         */
+        get: operations["videos_api_planes__plan_id__videos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/materiales/{mid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Material */
+        get: operations["ver_material_api_materiales__mid__get"];
+        put?: never;
+        post?: never;
+        /** Borrar Un Material */
+        delete: operations["borrar_un_material_api_materiales__mid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/materiales/{mid}/bloques/{clave}/rehacer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rehacer
+         * @description Rehace un solo bloque de los apuntes a tu manera. Tarda lo que un bloque (unos 30 s); el PDF se repinta después.
+         */
+        post: operations["rehacer_api_materiales__mid__bloques__clave__rehacer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/indice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ver Indice
+         * @description El índice sencillo del plan, si ya está hecho (no gasta modelo).
+         */
+        get: operations["ver_indice_api_planes__plan_id__indice_get"];
+        put?: never;
+        /**
+         * Hacer Indice
+         * @description Temas con nombre llano, de qué trata cada uno y un título sencillo por lección (una llamada al modelo).
+         */
+        post: operations["hacer_indice_api_planes__plan_id__indice_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/indice/titulo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Poner Titulo
+         * @description Cambia el título que se enseña de una lección; vacío vuelve al original.
+         */
+        put: operations["poner_titulo_api_planes__plan_id__indice_titulo_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/libro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Libro */
+        get: operations["ver_libro_api_planes__plan_id__libro_get"];
+        put?: never;
+        /**
+         * Hacer Libro
+         * @description Junta los apuntes preparados en un libro (PDF). Va en segundo plano: consulta GET para saber cuándo está.
+         */
+        post: operations["hacer_libro_api_planes__plan_id__libro_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/libro/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Libro Pdf */
+        get: operations["libro_pdf_api_planes__plan_id__libro_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/materiales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Materiales Del Plan
+         * @description Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha.
+         */
+        get: operations["materiales_del_plan_api_planes__plan_id__materiales_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/materiales/{mid}/estilo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cambiar Estilo
+         * @description Vuelve a pintar los apuntes en otro estilo, sin llamar al modelo.
+         */
+        post: operations["cambiar_estilo_api_materiales__mid__estilo_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -529,15 +1090,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/materiales/{mid}": {
+    "/api/materiales/{mid}/guion_grafico": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Ver Material */
-        get: operations["ver_material_api_materiales__mid__get"];
+        /**
+         * Guion Grafico
+         * @description El vídeo animado: el guion gráfico que pinta el motor de escena de la web.
+         */
+        get: operations["guion_grafico_api_materiales__mid__guion_grafico_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -685,6 +1249,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practica/autoevaluacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Autoevaluar
+         * @description Una ficha marcada o un test respondido: cuenta para el repaso espaciado sin llamar al modelo.
+         *
+         *     Va sin seguridad apostada, así que no entra en la calibración.
+         */
+        post: operations["autoevaluar_api_practica_autoevaluacion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/practica/intentos/{intento_id}": {
         parameters: {
             query?: never;
@@ -770,6 +1356,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practica/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Responder Test
+         * @description Una pregunta tipo test: se corrige al momento, sin modelo, y cuenta para el repaso (y la calibración si apostaste).
+         */
+        post: operations["responder_test_api_practica_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/progreso/modelo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ver Modelo
+         * @description En qué escalón está tu modelo de olvido y con cuántos datos.
+         */
+        get: operations["ver_modelo_api_progreso_modelo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/progreso/modelo/ajustar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ajustar Modelo */
+        post: operations["ajustar_modelo_api_progreso_modelo_ajustar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hoy": {
         parameters: {
             query?: never;
@@ -824,6 +1467,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/apariencia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Guardar Apariencia
+         * @description El acento de la app, para que los PDF (apuntes y libro del tema) salgan con el mismo color.
+         */
+        put: operations["guardar_apariencia_api_apariencia_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferencias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Preferencias */
+        get: operations["ver_preferencias_api_preferencias_get"];
+        /**
+         * Guardar Preferencias
+         * @description Lo que ajustas desde la mascota: el tutor lo tiene en cuenta desde el siguiente mensaje.
+         */
+        put: operations["guardar_preferencias_api_preferencias_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automatizaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Automatizaciones */
+        get: operations["ver_automatizaciones_api_automatizaciones_get"];
+        /** Guardar Automatizaciones */
+        put: operations["guardar_automatizaciones_api_automatizaciones_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automatizaciones/ahora": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Automatizar Ahora
+         * @description Revisa las reglas ya, sin esperar a la siguiente vuelta (respeta «solo de noche»).
+         */
+        post: operations["automatizar_ahora_api_automatizaciones_ahora_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/trazas/{traza_id}/feedback": {
         parameters: {
             query?: never;
@@ -838,6 +1560,43 @@ export interface paths {
          * @description Votar dos veces la misma traza sobrescribe: una sola puntuación `feedback_usuario`.
          */
         post: operations["feedback_api_trazas__traza_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/afinado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ver Afinado
+         * @description Lo que Magister ha aprendido de tus valoraciones y cuánto revisa ya el juez.
+         */
+        get: operations["ver_afinado_api_afinado_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/afinado/reglas/{motivo}/quitar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quitar Regla */
+        post: operations["quitar_regla_api_afinado_reglas__motivo__quitar_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -885,7 +1644,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Candidatos */
+        /**
+         * Candidatos
+         * @description Los pendientes, con lo que preguntaste y lo que respondió el tutor (del hilo, por la traza) para leerlos a gusto.
+         *     La entrada guardada del juez es el prompt de sistema: no se envía.
+         */
         get: operations["candidatos_api_candidatos_get"];
         put?: never;
         post?: never;
@@ -906,6 +1669,26 @@ export interface paths {
         put?: never;
         /** Triar */
         post: operations["triar_api_candidatos__cid__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/candidatos/{cid}/deshacer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deshacer Triaje
+         * @description Vuelve a dejarlo pendiente; si estaba en el banco, quita su fichero.
+         */
+        post: operations["deshacer_triaje_api_candidatos__cid__deshacer_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -988,10 +1771,800 @@ export interface paths {
         patch: operations["cambiar_api_eventos__eid__patch"];
         trace?: never;
     };
+    "/api/estudio/{mid}/priming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Priming */
+        get: operations["priming_api_estudio__mid__priming_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estudio/{mid}/facil/{clave}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Facil */
+        get: operations["facil_api_estudio__mid__facil__clave__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estudio/{mid}/oral": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Oral */
+        get: operations["oral_api_estudio__mid__oral_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estudio/volcado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Volcado */
+        post: operations["volcado_api_estudio_volcado_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estudio/repasos-de-tema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Repasos De Tema */
+        get: operations["repasos_de_tema_api_estudio_repasos_de_tema_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/estilo-examen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Estilo */
+        get: operations["ver_estilo_api_planes__plan_id__estilo_examen_get"];
+        /** Poner Estilo */
+        put: operations["poner_estilo_api_planes__plan_id__estilo_examen_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estudio/{mid}/parrafo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parrafo
+         * @description La mascota ayuda con el párrafo que estás leyendo (respuesta corta).
+         */
+        post: operations["parrafo_api_estudio__mid__parrafo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estudio/{mid}/mapa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Mapa */
+        get: operations["ver_mapa_api_estudio__mid__mapa_get"];
+        /** Guardar Mapa */
+        put: operations["guardar_mapa_api_estudio__mid__mapa_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estudio/{mid}/diagrama/{clave}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Diagrama Apartado
+         * @description El diagrama de un apartado para la pizarra de la llamada ({"svg": null} si un dibujo no aclara nada).
+         */
+        get: operations["diagrama_apartado_api_estudio__mid__diagrama__clave__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estudio/{mid}/mapa/generar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generar Mapa
+         * @description El modelo lee la lección, elige los conceptos clave y los une. Sustituye el mapa que hubiera.
+         */
+        post: operations["generar_mapa_api_estudio__mid__mapa_generar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Notas */
+        get: operations["listar_notas_api_notas_get"];
+        put?: never;
+        /** Guardar Nota */
+        post: operations["guardar_nota_api_notas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notas/{nid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Borrar Nota */
+        delete: operations["borrar_nota_api_notas__nid__delete"];
+        options?: never;
+        head?: never;
+        /** Cambiar Nota */
+        patch: operations["cambiar_nota_api_notas__nid__patch"];
+        trace?: never;
+    };
+    "/api/voz/voces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Voces
+         * @description Las voces instaladas (vacío si Piper no está: la pantalla usa entonces la voz del navegador).
+         */
+        get: operations["voces_api_voz_voces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/voz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decir */
+        post: operations["decir_api_voz_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llamadas/registro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Guardar Registro */
+        post: operations["guardar_registro_api_llamadas_registro_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llamadas/registros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Registros */
+        get: operations["registros_api_llamadas_registros_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proyectos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar */
+        get: operations["listar_api_proyectos_get"];
+        put?: never;
+        /** Crear */
+        post: operations["crear_api_proyectos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proyectos/{pid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver */
+        get: operations["ver_api_proyectos__pid__get"];
+        put?: never;
+        post?: never;
+        /** Borrar */
+        delete: operations["borrar_api_proyectos__pid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proyectos/{pid}/rehacer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rehacer
+         * @description Vuelve a generar el roadmap entero (si falló, o si cambiaste la idea). Si ya había uno, al terminar se empareja
+         *     por contenido con el nuevo (`roadmap.conservar`): los pasos que siguen heredan su id, así que lo hecho, sus fechas y
+         *     el diario siguen valiendo; lo hecho de los que ya no están se apunta en «ya_no_estan» del roadmap, y el roadmap de
+         *     antes se guarda en `roadmap_anterior` para volver a él (`/volver`). Con pasos hechos, sin `confirmado` responde
+         *     428 con lo que va a pasar y no encola nada.
+         */
+        post: operations["rehacer_api_proyectos__pid__rehacer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proyectos/{pid}/volver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Volver
+         * @description Vuelve al roadmap de antes del último «rehacer», y el de ahora pasa a ser el anterior (se puede ir y volver).
+         *     Lo hecho no se toca: los pasos que están en los dos tienen el mismo id; lo hecho de los que no, se apunta aparte.
+         */
+        post: operations["volver_api_proyectos__pid__volver_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proyectos/{pid}/pasos/{paso_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Marcar */
+        put: operations["marcar_api_proyectos__pid__pasos__paso_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proyectos/{pid}/niveles/{numero}/detallar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Detallar */
+        post: operations["detallar_api_proyectos__pid__niveles__numero__detallar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proyectos/{pid}/decisiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Decisiones */
+        get: operations["decisiones_api_proyectos__pid__decisiones_get"];
+        put?: never;
+        /** Apuntar */
+        post: operations["apuntar_api_proyectos__pid__decisiones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proyectos/{pid}/decisiones/{did}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Borrar Decision */
+        delete: operations["borrar_decision_api_proyectos__pid__decisiones__did__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planes/{plan_id}/examen/opciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Opciones
+         * @description Las lecciones con preguntas activas: solo de esas puede salir un examen.
+         */
+        get: operations["opciones_api_planes__plan_id__examen_opciones_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/examenes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar */
+        get: operations["listar_api_examenes_get"];
+        put?: never;
+        /** Crear */
+        post: operations["crear_api_examenes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/examenes/{examen_id}/terminar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Terminar */
+        post: operations["terminar_api_examenes__examen_id__terminar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/examenes/{examen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver */
+        get: operations["ver_api_examenes__examen_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Borrar Examen
+         * @description Quita el examen del historial. Las respuestas ya contaron para tu repaso y ahí se quedan.
+         */
+        delete: operations["borrar_examen_api_examenes__examen_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/examenes/{examen_id}/corregir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Corregir Entero
+         * @description Corrige el examen entero de una vez: los test sin modelo y las abiertas en una sola llamada.
+         *
+         *     Cada respuesta queda como intento del repaso espaciado; después se cierra el examen como en `terminar`.
+         */
+        post: operations["corregir_entero_api_examenes__examen_id__corregir_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/materiales/{mid}/mp4": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado Mp4
+         * @description Si ya hay MP4 (y con qué voz y cuánto dura) y cómo va el último trabajo que lo monta.
+         */
+        get: operations["estado_mp4_api_materiales__mid__mp4_get"];
+        put?: never;
+        /** Pedir Mp4 */
+        post: operations["pedir_mp4_api_materiales__mid__mp4_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/materiales/{mid}/mp4/fichero": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fichero Mp4 */
+        get: operations["fichero_mp4_api_materiales__mid__mp4_fichero_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fuentes/{fid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Borrar Fuente
+         * @description Una fuente con sus documentos, versiones y fragmentos indexados; las citas a ella desaparecen de las respuestas.
+         */
+        delete: operations["borrar_fuente_api_fuentes__fid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fuentes/{fid}/documentos/{did}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Borrar Documento */
+        delete: operations["borrar_documento_api_fuentes__fid__documentos__did__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cuota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado */
+        get: operations["estado_api_cuota_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cuota/estimar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estimar */
+        get: operations["estimar_api_cuota_estimar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/modelos/mapa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver Mapa */
+        get: operations["ver_mapa_api_modelos_mapa_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datos/exportar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Descargar
+         * @description magister-AAAA-MM-DD.zip: un JSON por tabla, el LEEME y tus ficheros hasta MAGISTER_EXPORTAR_MAX_MB.
+         */
+        get: operations["descargar_api_datos_exportar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datos/copias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Copias */
+        get: operations["copias_api_datos_copias_get"];
+        put?: never;
+        /** Copia Ahora */
+        post: operations["copia_ahora_api_datos_copias_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datos/copias/restaurar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restaurar */
+        post: operations["restaurar_api_datos_copias_restaurar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Apariencia */
+        Apariencia: {
+            /**
+             * Modo
+             * @default fijo
+             * @enum {string}
+             */
+            modo: "auto" | "fijo";
+            /** Color */
+            color: string;
+            /** Paleta */
+            paleta?: string[];
+        };
+        /** Autoevaluacion */
+        Autoevaluacion: {
+            /** Pregunta Id */
+            pregunta_id: string;
+            /**
+             * Nota
+             * @enum {string}
+             */
+            nota: "fallo" | "parcial" | "bien" | "perfecta";
+            /** Clave */
+            clave: string;
+            /**
+             * Origen
+             * @default ficha
+             * @enum {string}
+             */
+            origen: "ficha" | "test";
+            /**
+             * Respuesta
+             * @default
+             */
+            respuesta: string;
+        };
+        /** Automatizaciones */
+        Automatizaciones: {
+            /**
+             * @default {
+             *       "activa": false,
+             *       "dias_antes": 1
+             *     }
+             */
+            preparar_siguiente: components["schemas"]["ReglaPreparar"];
+            /**
+             * @default {
+             *       "activa": false
+             *     }
+             */
+            diapositivas_al_preparar: components["schemas"]["ReglaSimple"];
+            /**
+             * @default {
+             *       "activa": false,
+             *       "estilo": "clase",
+             *       "minutos": 6
+             *     }
+             */
+            video_al_preparar: components["schemas"]["ReglaVideo"];
+            /**
+             * Solo De Noche
+             * @default false
+             */
+            solo_de_noche: boolean;
+        };
+        /** CambiarEstilo */
+        CambiarEstilo: {
+            /**
+             * Estilo
+             * @enum {string}
+             */
+            estilo: "libro" | "ficha";
+        };
         /** ConversacionEntrada */
         ConversacionEntrada: {
             /** Titulo */
@@ -1003,7 +2576,7 @@ export interface components {
              * @default libre
              * @enum {string}
              */
-            tipo: "libre" | "plan";
+            tipo: "libre" | "plan" | "asesor";
         };
         /** ConversacionSalida */
         ConversacionSalida: {
@@ -1026,6 +2599,13 @@ export interface components {
              */
             actualizada_en: string;
         };
+        /** Corregir */
+        Corregir: {
+            /** Resultados */
+            resultados: components["schemas"]["Entrega"][];
+            /** Segundos */
+            segundos: number;
+        };
         /** Decision */
         Decision: {
             /**
@@ -1034,15 +2614,39 @@ export interface components {
              */
             accion: "aprobar" | "rechazar";
         };
-        /** DecisionEntrada */
-        DecisionEntrada: {
+        /** EncargoDiagrama */
+        EncargoDiagrama: {
+            /** Encargo */
+            encargo: string;
             /**
-             * Accion
-             * @enum {string}
+             * Contexto
+             * @default
              */
-            accion: "aceptar" | "cambiar";
-            /** Texto */
-            texto?: string | null;
+            contexto: string;
+        };
+        /** Entrega */
+        Entrega: {
+            /** Pregunta Id */
+            pregunta_id: string;
+            /**
+             * Respuesta
+             * @default
+             */
+            respuesta: string;
+            /** Confianza */
+            confianza?: (0.25 | 0.5 | 0.75 | 0.95) | null;
+        };
+        /** EscenaVideo */
+        EscenaVideo: {
+            /**
+             * Marca
+             * @default
+             */
+            marca: string;
+            /** Frases */
+            frases: components["schemas"]["FraseVideo"][];
+            /** Pagina */
+            pagina?: number | null;
         };
         /** EstadoSesion */
         EstadoSesion: {
@@ -1051,6 +2655,14 @@ export interface components {
              * @enum {string}
              */
             estado: "pendiente" | "hecha" | "saltada";
+        };
+        /** Estilo */
+        Estilo: {
+            /**
+             * Estilo
+             * @enum {string}
+             */
+            estilo: "oral" | "desarrollo" | "test" | "cortas" | "sin_examen";
         };
         /** EtiquetaEntrada */
         EtiquetaEntrada: {
@@ -1073,6 +2685,17 @@ export interface components {
              * @enum {integer}
              */
             ronda: 1 | 2;
+        };
+        /** Evento */
+        Evento: {
+            /** T */
+            t: number;
+            /** E */
+            e: string;
+            /** D */
+            d?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** EventoCambio */
         EventoCambio: {
@@ -1121,6 +2744,46 @@ export interface components {
             bien: boolean;
             /** Comentario */
             comentario?: string | null;
+            /**
+             * Otra
+             * @default false
+             */
+            otra: boolean;
+            /** Motivos */
+            motivos?: string[];
+        };
+        /** Final */
+        Final: {
+            /** Resultados */
+            resultados: components["schemas"]["Resultado"][];
+            /** Segundos */
+            segundos: number;
+        };
+        /** Flecha */
+        Flecha: {
+            /** De */
+            de: string;
+            /** A */
+            a: string;
+            /**
+             * Etiqueta
+             * @default
+             */
+            etiqueta: string;
+        };
+        /** Frase */
+        Frase: {
+            /** Texto */
+            texto: string;
+            /** Voz */
+            voz: string;
+        };
+        /** FraseVideo */
+        FraseVideo: {
+            /** Texto */
+            texto: string;
+            /** Dicho */
+            dicho?: string | null;
         };
         /** FuenteEntrada */
         FuenteEntrada: {
@@ -1139,6 +2802,25 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** Hecho */
+        Hecho: {
+            /** Hecho */
+            hecho: boolean;
+        };
+        /** Horario */
+        Horario: {
+            /** Horas Por Dia */
+            horas_por_dia: number[];
+            /** Inicio Por Dia */
+            inicio_por_dia: (string | null)[];
+        };
+        /** Incorporar */
+        Incorporar: {
+            /** Plan Id */
+            plan_id?: number | null;
+            /** Leccion Clave */
+            leccion_clave?: string | null;
+        };
         /** IntentoEntrada */
         IntentoEntrada: {
             /** Pregunta Id */
@@ -1147,11 +2829,8 @@ export interface components {
             concepto_id: string;
             /** Respuesta */
             respuesta: string;
-            /**
-             * Confianza
-             * @enum {number}
-             */
-            confianza: 0.25 | 0.5 | 0.75 | 0.95;
+            /** Confianza */
+            confianza?: (0.25 | 0.5 | 0.75 | 0.95) | null;
             /** Clave */
             clave: string;
             /**
@@ -1163,6 +2842,21 @@ export interface components {
             /** Latencia Ms */
             latencia_ms?: number | null;
         };
+        /** Mapa */
+        Mapa: {
+            /** Nodos */
+            nodos?: components["schemas"]["Nodo"][];
+            /** Flechas */
+            flechas?: components["schemas"]["Flecha"][];
+        };
+        /** MateriaEntrada */
+        MateriaEntrada: {
+            /**
+             * Materia
+             * @description Un perfil de GET /api/materias, o null para que se vuelva a elegir solo
+             */
+            materia?: string | null;
+        };
         /** MensajeEntrada */
         MensajeEntrada: {
             /** Contenido */
@@ -1172,6 +2866,38 @@ export interface components {
              * @default true
              */
             cuenta: boolean;
+            /**
+             * Voz
+             * @default false
+             */
+            voz: boolean;
+            /**
+             * Llamada
+             * @default false
+             */
+            llamada: boolean;
+            /** Modo */
+            modo?: string | null;
+            /** Plan Id */
+            plan_id?: number | null;
+            /** Leccion Clave */
+            leccion_clave?: string | null;
+            /**
+             * Corregir
+             * @default false
+             */
+            corregir: boolean;
+            /**
+             * Asesor
+             * @default false
+             */
+            asesor: boolean;
+            /** Proyecto Id */
+            proyecto_id?: number | null;
+            /** Plan Activo Id */
+            plan_activo_id?: number | null;
+            /** Contexto */
+            contexto?: string | null;
         };
         /** MensajeSalida */
         MensajeSalida: {
@@ -1201,6 +2927,67 @@ export interface components {
             citas: {
                 [key: string]: unknown;
             }[];
+            /** Traza Id */
+            traza_id?: string | null;
+            /** Voto */
+            voto?: boolean | null;
+            /**
+             * Cuenta
+             * @default true
+             */
+            cuenta: boolean;
+        };
+        /** ModoPropio */
+        ModoPropio: {
+            /** Id */
+            id: string;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Para
+             * @default
+             */
+            para: string;
+            /** Reglas */
+            reglas?: string[];
+        };
+        /** NecesitaFuentes */
+        NecesitaFuentes: {
+            /**
+             * Necesita Fuentes
+             * @enum {string}
+             */
+            necesita_fuentes: "no" | "conviene" | "imprescindible";
+        };
+        /** Nodo */
+        Nodo: {
+            /** Id */
+            id: string;
+            /** Texto */
+            texto: string;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+        };
+        /** NotaCambio */
+        NotaCambio: {
+            /** Comentario */
+            comentario?: string | null;
+        };
+        /** NotaEntrada */
+        NotaEntrada: {
+            /** Texto */
+            texto: string;
+            /** Comentario */
+            comentario?: string | null;
+            /** Mensaje Id */
+            mensaje_id?: number | null;
+            /**
+             * Completa
+             * @default false
+             */
+            completa: boolean;
         };
         /** NotaUsuario */
         NotaUsuario: {
@@ -1210,23 +2997,181 @@ export interface components {
              */
             nota_usuario: "fallo" | "parcial" | "bien" | "perfecta";
         };
+        /** NuevoExamen */
+        NuevoExamen: {
+            /** Plan Id */
+            plan_id: number;
+            /** Lecciones */
+            lecciones: string[];
+            /** Cantidad */
+            cantidad: number;
+            /** Minutos */
+            minutos?: number | null;
+            /**
+             * Modo
+             * @default examen
+             * @enum {string}
+             */
+            modo: "examen" | "evaluacion";
+        };
+        /** Parrafo */
+        Parrafo: {
+            /** Clave */
+            clave: string;
+            /** Parrafo */
+            parrafo: string;
+            /**
+             * Accion
+             * @enum {string}
+             */
+            accion: "facil" | "ejemplo" | "porque" | "clave" | "codigo" | "pregunta" | "comprobar";
+            /** Pregunta */
+            pregunta?: string | null;
+        };
         /** PedirMaterial */
         PedirMaterial: {
-            /**
-             * Tipos
-             * @default [
-             *       "apuntes",
-             *       "preguntas",
-             *       "diapositivas",
-             *       "guion"
-             *     ]
-             */
-            tipos: ("apuntes" | "preguntas" | "diapositivas" | "guion")[];
+            /** Tipos */
+            tipos?: ("apuntes" | "preguntas" | "diapositivas" | "guion")[];
             /**
              * Forzar
              * @default false
              */
             forzar: boolean;
+            /**
+             * @default {
+             *       "profundidad": "estandar",
+             *       "preguntas": "mezcla",
+             *       "cantidad": "normal",
+             *       "estilo": "libro"
+             *     }
+             */
+            preferencias: components["schemas"]["Preferencias"];
+        };
+        /** PedirMp4 */
+        PedirMp4: {
+            /** Voz */
+            voz: string;
+            /**
+             * Titulo
+             * @default
+             */
+            titulo: string;
+            /** Escenas */
+            escenas: components["schemas"]["EscenaVideo"][];
+        };
+        /** PedirRestaurar */
+        PedirRestaurar: {
+            /** Copia */
+            copia: string;
+            /** Confirmacion */
+            confirmacion: string;
+        };
+        /** PrefVideos */
+        PrefVideos: {
+            /** Cuantos */
+            cuantos?: ("ninguno" | "pocos" | "normal" | "muchos") | null;
+            /** Hacia */
+            hacia?: ("mas" | "menos") | null;
+            /** Minutos */
+            minutos?: (3 | 6 | 10) | null;
+            /** Estilo */
+            estilo?: ("clase" | "resumen" | "analogias" | "examen") | null;
+        };
+        /** Preferencias */
+        Preferencias: {
+            /**
+             * Profundidad
+             * @default estandar
+             * @enum {string}
+             */
+            profundidad: "intro" | "estandar" | "fondo";
+            /**
+             * Preguntas
+             * @default mezcla
+             * @enum {string}
+             */
+            preguntas: "conceptuales" | "practicas" | "mezcla";
+            /**
+             * Cantidad
+             * @default normal
+             * @enum {string}
+             */
+            cantidad: "pocas" | "normal" | "muchas";
+            /** Enfoque */
+            enfoque?: string | null;
+            /**
+             * Estilo
+             * @default libro
+             * @enum {string}
+             */
+            estilo: "libro" | "ficha";
+            video?: components["schemas"]["Video"] | null;
+        };
+        /** PreferenciasTutor */
+        PreferenciasTutor: {
+            /**
+             * Longitud
+             * @default normal
+             * @enum {string}
+             */
+            longitud: "breve" | "normal" | "detallada";
+            /**
+             * Nivel
+             * @default normal
+             * @enum {string}
+             */
+            nivel: "cero" | "normal" | "experto";
+            /**
+             * Estilo
+             * @default directo
+             * @enum {string}
+             */
+            estilo: "directo" | "analogias" | "codigo";
+            /**
+             * Diagramas
+             * @default true
+             */
+            diagramas: boolean;
+            /**
+             * Tests
+             * @default true
+             */
+            tests: boolean;
+            /**
+             * Opciones
+             * @default true
+             */
+            opciones: boolean;
+            /**
+             * Idioma
+             * @default es
+             * @enum {string}
+             */
+            idioma: "es" | "en";
+            /** Instrucciones */
+            instrucciones?: string[];
+            /** Modos */
+            modos?: components["schemas"]["ModoPropio"][];
+            /** Modo */
+            modo?: string | null;
+        };
+        /** ProyectoEntrada */
+        ProyectoEntrada: {
+            /** Nombre */
+            nombre: string;
+            /** Idea */
+            idea: string;
+            /** Objetivo */
+            objetivo?: string | null;
+            /** Sabes */
+            sabes?: string | null;
+            /** Ritmo */
+            ritmo?: string | null;
+            /**
+             * Investigar
+             * @default true
+             */
+            investigar: boolean;
         };
         /** Reajuste */
         Reajuste: {
@@ -1243,6 +3188,68 @@ export interface components {
              */
             desde: string;
         };
+        /** Registro */
+        Registro: {
+            /** Conversacion Id */
+            conversacion_id?: number | null;
+            /** Tipo */
+            tipo: string;
+            /** Leccion */
+            leccion?: string | null;
+            /**
+             * Segundos
+             * @default 0
+             */
+            segundos: number;
+            /** Voz */
+            voz?: string | null;
+            /** Resumen */
+            resumen?: {
+                [key: string]: unknown;
+            } | null;
+            /** Eventos */
+            eventos?: components["schemas"]["Evento"][];
+        };
+        /** ReglaPreparar */
+        ReglaPreparar: {
+            /**
+             * Activa
+             * @default false
+             */
+            activa: boolean;
+            /**
+             * Dias Antes
+             * @default 1
+             */
+            dias_antes: number;
+        };
+        /** ReglaSimple */
+        ReglaSimple: {
+            /**
+             * Activa
+             * @default false
+             */
+            activa: boolean;
+        };
+        /** ReglaVideo */
+        ReglaVideo: {
+            /**
+             * Activa
+             * @default false
+             */
+            activa: boolean;
+            /**
+             * Estilo
+             * @default clase
+             * @enum {string}
+             */
+            estilo: "clase" | "resumen" | "analogias" | "examen";
+            /**
+             * Minutos
+             * @default 6
+             */
+            minutos: number;
+        };
         /** ResearchEntrada */
         ResearchEntrada: {
             /** Plan Id */
@@ -1255,6 +3262,47 @@ export interface components {
              * @enum {string}
              */
             sistema: "fijo" | "agente";
+            /** Objetivos */
+            objetivos?: number[] | null;
+            /** Forzar */
+            forzar?: boolean | null;
+        };
+        /** ResearchLibre */
+        ResearchLibre: {
+            /** Consulta */
+            consulta: string;
+        };
+        /** RespuestaTest */
+        RespuestaTest: {
+            /** Pregunta Id */
+            pregunta_id: string;
+            /** Opcion */
+            opcion: string;
+            /** Confianza */
+            confianza?: (0.25 | 0.5 | 0.75 | 0.95) | null;
+            /** Clave */
+            clave: string;
+        };
+        /** Resultado */
+        Resultado: {
+            /** Pregunta Id */
+            pregunta_id: string;
+            /**
+             * Respuesta
+             * @default
+             */
+            respuesta: string;
+            /** Nota */
+            nota?: ("fallo" | "parcial" | "bien" | "perfecta") | null;
+            /** Intento Id */
+            intento_id?: string | null;
+            /**
+             * Explicacion
+             * @default
+             */
+            explicacion: string;
+            /** Confianza */
+            confianza?: number | null;
         };
         /** Salud */
         Salud: {
@@ -1276,6 +3324,15 @@ export interface components {
             id: number;
             /** Nombre */
             nombre: string;
+            /** Materia */
+            materia?: string | null;
+        };
+        /** TituloPropio */
+        TituloPropio: {
+            /** Clave */
+            clave: string;
+            /** Titulo */
+            titulo?: string | null;
         };
         /** Triaje */
         Triaje: {
@@ -1288,6 +3345,12 @@ export interface components {
             banco?: string | null;
             /** Respuesta Buena */
             respuesta_buena?: string | null;
+            /** Comentario */
+            comentario?: string | null;
+            /** Motivos */
+            motivos?: string[];
+            /** Juez Acerto */
+            juez_acerto?: boolean | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1301,6 +3364,72 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * Video
+         * @description Qué vídeo hacer: estilo, un solo concepto (o la lección entera) y duración.
+         */
+        Video: {
+            /**
+             * Estilo
+             * @default clase
+             * @enum {string}
+             */
+            estilo: "clase" | "resumen" | "analogias" | "examen";
+            /** Concepto */
+            concepto?: string | null;
+            /**
+             * Minutos
+             * @default 6
+             */
+            minutos: number;
+        };
+        /** Volcado */
+        Volcado: {
+            /** Plan Id */
+            plan_id: number;
+            /** Leccion Clave */
+            leccion_clave: string;
+            /** Texto */
+            texto: string;
+            /** Alcance */
+            alcance?: string[] | null;
+        };
+        /** DecisionEntrada */
+        magister__api__esquemas__DecisionEntrada: {
+            /**
+             * Accion
+             * @enum {string}
+             */
+            accion: "aceptar" | "cambiar" | "descartar";
+            /** Texto */
+            texto?: string | null;
+        };
+        /** Rehacer */
+        magister__api__rutas_material__Rehacer: {
+            /** Como */
+            como: string;
+        };
+        /** DecisionEntrada */
+        magister__api__rutas_proyectos__DecisionEntrada: {
+            /** Titulo */
+            titulo: string;
+            /** Contexto */
+            contexto?: string | null;
+            /** Decision */
+            decision: string;
+            /** Consecuencias */
+            consecuencias?: string | null;
+            /** Paso Id */
+            paso_id?: string | null;
+        };
+        /** Rehacer */
+        magister__api__rutas_proyectos__Rehacer: {
+            /**
+             * Confirmado
+             * @default false
+             */
+            confirmado: boolean;
         };
     };
     responses: never;
@@ -1398,6 +3527,63 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemaSalida"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_materias_api_materias_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    cambiar_materia_api_temas__tema_id__materia_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tema_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MateriaEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1608,7 +3794,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DecisionEntrada"];
+                "application/json": components["schemas"]["magister__api__esquemas__DecisionEntrada"];
             };
         };
         responses: {
@@ -1619,6 +3805,138 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cambios_de_conversacion_api_conversaciones__cid__cambios_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    aplicar_api_cambios__cambio_id__aplicar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cambio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descartar_api_cambios__cambio_id__descartar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cambio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deshacer_api_cambios__cambio_id__deshacer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cambio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -1687,6 +4005,77 @@ export interface operations {
             };
         };
     };
+    borrar_plan_api_temas__tema_id__plan_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tema_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cambiar_necesidad_api_planes__plan_id__lecciones__clave__fuentes_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NecesitaFuentes"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     recalcular_api_temas__tema_id__plan_recalcular_post: {
         parameters: {
             query?: never;
@@ -1699,6 +4088,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Recalcular"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cambiar_horario_api_temas__tema_id__plan_horario_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tema_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Horario"];
             };
         };
         responses: {
@@ -1738,6 +4164,40 @@ export interface operations {
                 "application/json": components["schemas"]["EstadoSesion"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    marcar_leccion_api_planes__plan_id__lecciones__clave__hecha_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -2147,6 +4607,61 @@ export interface operations {
             };
         };
     };
+    resumen_documentos_api_fuentes_resumen_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    reintentar_api_versiones__vid__reintentar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     lanzar_api_research_post: {
         parameters: {
             query?: never;
@@ -2188,6 +4703,96 @@ export interface operations {
             header?: never;
             path: {
                 tarea_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    incorporar_pendientes_api_incorporar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Incorporar"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ultima_incorporacion_api_incorporar_ultimo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    ver_incorporacion_api_incorporar__tid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tid: number;
             };
             cookie?: never;
         };
@@ -2285,6 +4890,41 @@ export interface operations {
             };
         };
     };
+    research_libre_api_research_libre_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchLibre"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     material_de_leccion_api_planes__plan_id__lecciones__clave__material_get: {
         parameters: {
             query?: never;
@@ -2337,6 +4977,586 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_material_api_planes__plan_id__lecciones__clave__material_delete: {
+        parameters: {
+            query?: {
+                tipo?: "apuntes" | "diapositivas" | "guion" | "todo";
+            };
+            header?: never;
+            path: {
+                plan_id: number;
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    crear_tests_api_planes__plan_id__lecciones__clave__tests_post: {
+        parameters: {
+            query?: {
+                n?: number;
+            };
+            header?: never;
+            path: {
+                plan_id: number;
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diagrama_del_chat_api_diagramas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncargoDiagrama"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    videos_recomendados_api_planes__plan_id__videos_recomendados_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preferencias_videos_api_videos_preferencias_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefVideos"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    videos_api_planes__plan_id__videos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_material_api_materiales__mid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_un_material_api_materiales__mid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rehacer_api_materiales__mid__bloques__clave__rehacer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["magister__api__rutas_material__Rehacer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_indice_api_planes__plan_id__indice_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    } | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hacer_indice_api_planes__plan_id__indice_post: {
+        parameters: {
+            query?: {
+                rehacer?: boolean;
+            };
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    poner_titulo_api_planes__plan_id__indice_titulo_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TituloPropio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_libro_api_planes__plan_id__libro_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    } | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hacer_libro_api_planes__plan_id__libro_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    libro_pdf_api_planes__plan_id__libro_pdf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    materiales_del_plan_api_planes__plan_id__materiales_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cambiar_estilo_api_materiales__mid__estilo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiarEstilo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2454,7 +5674,7 @@ export interface operations {
             };
         };
     };
-    ver_material_api_materiales__mid__get: {
+    guion_grafico_api_materiales__mid__guion_grafico_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2471,9 +5691,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -2731,6 +5949,41 @@ export interface operations {
             };
         };
     };
+    autoevaluar_api_practica_autoevaluacion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Autoevaluacion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     corregir_nota_api_practica_intentos__intento_id__patch: {
         parameters: {
             query?: never;
@@ -2878,6 +6131,85 @@ export interface operations {
             };
         };
     };
+    responder_test_api_practica_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RespuestaTest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_modelo_api_progreso_modelo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    ajustar_modelo_api_progreso_modelo_ajustar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     hoy_api_hoy_get: {
         parameters: {
             query?: never;
@@ -2966,6 +6298,177 @@ export interface operations {
             };
         };
     };
+    guardar_apariencia_api_apariencia_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Apariencia"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_preferencias_api_preferencias_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    guardar_preferencias_api_preferencias_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferenciasTutor"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_automatizaciones_api_automatizaciones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    guardar_automatizaciones_api_automatizaciones_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Automatizaciones"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    automatizar_ahora_api_automatizaciones_ahora_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     feedback_api_trazas__traza_id__feedback_post: {
         parameters: {
             query?: never;
@@ -2980,6 +6483,61 @@ export interface operations {
                 "application/json": components["schemas"]["Feedback"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_afinado_api_afinado_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    quitar_regla_api_afinado_reglas__motivo__quitar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                motivo: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -3094,6 +6652,39 @@ export interface operations {
                 "application/json": components["schemas"]["Triaje"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deshacer_triaje_api_candidatos__cid__deshacer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -3271,6 +6862,1590 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["EventoCambio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    priming_api_estudio__mid__priming_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    facil_api_estudio__mid__facil__clave__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oral_api_estudio__mid__oral_get: {
+        parameters: {
+            query?: {
+                rehacer?: boolean;
+            };
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    volcado_api_estudio_volcado_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Volcado"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    repasos_de_tema_api_estudio_repasos_de_tema_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    ver_estilo_api_planes__plan_id__estilo_examen_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    poner_estilo_api_planes__plan_id__estilo_examen_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Estilo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parrafo_api_estudio__mid__parrafo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Parrafo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_mapa_api_estudio__mid__mapa_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guardar_mapa_api_estudio__mid__mapa_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Mapa"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diagrama_apartado_api_estudio__mid__diagrama__clave__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generar_mapa_api_estudio__mid__mapa_generar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_notas_api_notas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    guardar_nota_api_notas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotaEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_nota_api_notas__nid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cambiar_nota_api_notas__nid__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotaCambio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voces_api_voz_voces_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    decir_api_voz_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Frase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guardar_registro_api_llamadas_registro_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Registro"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    registros_api_llamadas_registros_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    listar_api_proyectos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    crear_api_proyectos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProyectoEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_api_proyectos__pid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_api_proyectos__pid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rehacer_api_proyectos__pid__rehacer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["magister__api__rutas_proyectos__Rehacer"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    volver_api_proyectos__pid__volver_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    marcar_api_proyectos__pid__pasos__paso_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+                paso_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Hecho"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detallar_api_proyectos__pid__niveles__numero__detallar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+                numero: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decisiones_api_proyectos__pid__decisiones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apuntar_api_proyectos__pid__decisiones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["magister__api__rutas_proyectos__DecisionEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_decision_api_proyectos__pid__decisiones__did__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: number;
+                did: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    opciones_api_planes__plan_id__examen_opciones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_api_examenes_get: {
+        parameters: {
+            query?: {
+                plan_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    crear_api_examenes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NuevoExamen"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    terminar_api_examenes__examen_id__terminar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                examen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Final"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_api_examenes__examen_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                examen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_examen_api_examenes__examen_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                examen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    corregir_entero_api_examenes__examen_id__corregir_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                examen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Corregir"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estado_mp4_api_materiales__mid__mp4_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pedir_mp4_api_materiales__mid__mp4_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PedirMp4"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fichero_mp4_api_materiales__mid__mp4_fichero_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_fuente_api_fuentes__fid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_documento_api_fuentes__fid__documentos__did__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fid: number;
+                did: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estado_api_cuota_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    estimar_api_cuota_estimar_get: {
+        parameters: {
+            query: {
+                accion: "video" | "diapositivas" | "material" | "mensaje" | "proyecto" | "nivel" | "plan" | "research";
+                minutos?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ver_mapa_api_modelos_mapa_get: {
+        parameters: {
+            query?: {
+                dias?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descargar_api_datos_exportar_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    copias_api_datos_copias_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    copia_ahora_api_datos_copias_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    restaurar_api_datos_copias_restaurar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PedirRestaurar"];
             };
         };
         responses: {

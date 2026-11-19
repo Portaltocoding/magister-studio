@@ -31,9 +31,14 @@ async def test_latencia_lo_que_ves_y_con_minimo(cliente) -> None:
         await s.execute(text("delete from mensajes"))
     await _mensajes([60000] + [7000] * 19)  # una sola lenta entre veinte no mueve el p95
     assert not [a for a in await alertas.evaluar() if a[0] == "latencia"]
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(text("delete from mensajes"))
+    # Lo del 19-11-2026: 14 respuestas, mediana de 8 s y dos de 70 s. El p95 pasa de 20 s, pero son dos casos sueltos.
+    await _mensajes([70000, 69000] + [8000] * 12)
+    assert not [a for a in await alertas.evaluar() if a[0] == "latencia"]
     await _mensajes([30000] * 10)
     (latencia,) = [a for a in await alertas.evaluar() if a[0] == "latencia"]
-    assert "primera palabra" in latencia[1]
+    assert "primera palabra" in latencia[1] and "mediana" in latencia[1] and "12 de más de 20 s" in latencia[1]
 
 
 @pytest.mark.anyio

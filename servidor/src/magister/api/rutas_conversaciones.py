@@ -1,6 +1,7 @@
 """Temas, conversaciones y mensajes. Los mensajes pasan por el grafo (`flujo`)."""
 
 import asyncio
+import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -21,7 +22,7 @@ from magister.api.esquemas import (
     TemaEntrada,
     TemaSalida,
 )
-from magister.api.flujo import flujo_tutor
+from magister.api.flujo import Turno, flujo_tutor
 from magister.api.rutas_asesor import tras_respuesta
 from magister.config import ajustes
 from magister.datos import conversaciones as dc
@@ -128,25 +129,28 @@ class Preparado:
     pregunta_id: int | None = None
 
 
-# Un turno cada vez por conversación: si llega otro (en la llamada, el dictado reenvía tu pregunta ampliada mientras la
-# anterior se está cortando), espera a que el anterior acabe o se corte, para que cada respuesta vea la anterior.
-_candados: dict[int, asyncio.Lock] = {}
-ESPERA_TURNO_S = 20
+# Un turno cada vez por conversación. Si llega otro con uno en marcha (lo reenvías, o en la llamada el dictado manda tu
+# pregunta ampliada), el anterior se corta de verdad (su tarea y su proceso claude: antes seguía razonando a la vez que
+# el nuevo, 111 s para nada) y se guarda como interrumpido; entonces corre el nuevo, con el anterior ya cerrado.
+# Solo en la misma conversación: si cambias a otra, la respuesta de la primera sigue y se guarda entera.
+_turnos: dict[int, Turno] = {}
+ESPERA_TURNO_S = 20  # si el anterior no acaba de cerrarse en esto, el nuevo contesta igual
 
 
 @asynccontextmanager
 async def turno_en_curso(cid: int):
-    candado = _candados.setdefault(cid, asyncio.Lock())
+    anterior = _turnos.get(cid)
+    turno = _turnos[cid] = Turno()
     try:
-        await asyncio.wait_for(candado.acquire(), timeout=ESPERA_TURNO_S)
-        tengo = True
-    except TimeoutError:
-        tengo = False  # el anterior se ha colgado: mejor contestar que dejar esperando
-    try:
-        yield
+        if anterior is not None:
+            anterior.cortar()
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(anterior.hecho.wait(), timeout=ESPERA_TURNO_S)
+        yield turno
     finally:
-        if tengo:
-            candado.release()
+        turno.hecho.set()
+        if _turnos.get(cid) is turno:
+            del _turnos[cid]
 
 
 async def historial_del_turno(cid: int, pregunta_id: int, llamada: bool) -> list[dict]:
@@ -225,7 +229,7 @@ async def enviar_mensaje(
     cid: int, cuerpo: MensajeEntrada, p: Preparado = Depends(preparar_mensaje)
 ) -> AsyncIterator[ServerSentEvent]:
     fase_inicial = "diagnostico" if p.tipo == "plan" else "estudio"
-    async with turno_en_curso(cid):
+    async with turno_en_curso(cid) as turno:
         turnos = await historial_del_turno(cid, p.pregunta_id, cuerpo.llamada) if p.pregunta_id else p.turnos
         eventos = ejecutar.mensaje(cid, cuerpo.contenido, turnos, hoy(), fase_inicial, voz=cuerpo.voz,
                                     extra={"llamada": cuerpo.llamada, "modo": cuerpo.modo, "plan_id_leccion": cuerpo.plan_id,
@@ -235,6 +239,7 @@ async def enviar_mensaje(
                                            "nota_guardada": p.nota is not None})
         if p.nota is not None:
             eventos = _con_nota(p.nota, eventos)
+        eventos = turno.eventos(eventos)
         texto, mensaje_id = [], None
         async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid}):
             if evento.event == "delta":
@@ -245,7 +250,7 @@ async def enviar_mensaje(
     # El asesor que hace cosas: si ofreció un cambio (bloque ```cambio), lo prepara para que lo apliques tú. Fuera del
     # turno: la respuesta ya está guardada y la siguiente pregunta no tiene que esperar a esto.
     if cuerpo.asesor and mensaje_id is not None:
-        async for evento in tras_respuesta(cid, cuerpo.proyecto_id, "".join(texto), mensaje_id, turnos, hoy()):
+        async for evento in tras_respuesta(cid, cuerpo.proyecto_id, "".join(texto), mensaje_id, turnos, hoy(), cuerpo.plan_activo_id):
             yield evento
 
 

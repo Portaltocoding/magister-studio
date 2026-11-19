@@ -5,9 +5,12 @@
     uv run python -m evals.olvido walkforward --simulado [--calibrar]
     uv run python -m evals.olvido informe
     uv run python -m evals.olvido escalera
+    uv run python -m evals.olvido capas --simulado
 
 Con --simulado lee la base de simulación (MAGISTER_DB_URL_SIM); sin él, tus intentos.
 Las predicciones fuera de muestra van a evals/olvido/predicciones-<fecha>.csv.
+`capas` mide las tres capas del programador (FSRS por defecto, FSRS ajustado, la red) en el último cuarto de los
+repasos, sin escribir nada: no guarda parámetros, ni la red, ni ficheros. Sale con código 1 si algo se rompe.
 """
 
 import argparse
@@ -183,9 +186,98 @@ def escalera() -> None:
             print(f"{modelo:<20} frente a {contra:<8}: Δ log-loss {dif:+.4f} [{lo:+.4f}, {hi:+.4f}] → {mejor}")
 
 
+def _metricas(p: list[float], y: list[int]) -> dict:
+    return {"log_loss": round(log_loss(p, y), 4), "brier": round(brier(p, y), 4), "auc": round(auc(p, y), 4),
+            "ece": round(ece(p, y), 4), "n": len(p)}
+
+
+def calcular_capas(series: list[list[tuple]], fraccion: float = 0.25) -> dict:
+    """Las tres capas, entrenadas con los repasos anteriores al corte y medidas con los posteriores (que no han visto).
+    `series`: por concepto, (momento, nota, confianza, latencia_ms) en orden, como `personal.series(con_extras=True)`."""
+    import torch
+
+    from magister.aprender import personal, red
+    from magister.aprender.estado import EstadoConcepto, es_acierto
+
+    momentos = sorted(r[0] for serie in series for r in serie)
+    corte = momentos[int(len(momentos) * (1 - fraccion))]
+    entreno = [s for s in ([r for r in serie if r[0] < corte] for serie in series) if s]
+    ajuste = personal._calcular([[(m, n) for m, n, *_ in s] for s in entreno], None)
+    defecto = FSRS()
+    ajustado = FSRS(parametros=ajuste["parametros"], etiqueta="eval") if ajuste.get("parametros") else None
+    base = ajustado if ajuste.get("hecho") else defecto
+
+    ys: list[int] = []
+    p: dict[str, list[float]] = {"fsrs_defecto": [], "fsrs_ajustado": []}
+    for serie in series:
+        for k in range(1, len(serie)):
+            momento, nota = serie[k][0], serie[k][1]
+            if momento < corte:
+                continue
+            e = EstadoConcepto("x", momento, [(m, n) for m, n, *_ in serie[:k]])
+            ys.append(int(es_acierto(nota)))
+            p["fsrs_defecto"].append(defecto.p_recordar(e, momento))
+            if ajustado:
+                p["fsrs_ajustado"].append(ajustado.p_recordar(e, momento))
+    datos = red.muestras(series, base)
+    tr = [d for d in datos if d[0] < corte]
+    te = [d for d in datos if d[0] >= corte]
+    modelo = red._entrenar([d[1] for d in tr], [d[2] for d in tr])
+    with torch.no_grad():
+        x = torch.tensor([d[1] for d in te], dtype=torch.float32)
+        p["red"] = torch.sigmoid(x[:, 0] + modelo(x).squeeze(-1)).tolist()
+    y_red = [int(d[2]) for d in te]
+    decision = {k: v for k, v in red.calcular(entreno, base).items() if not k.startswith("_")}
+    capas = {"fsrs_defecto": _metricas(p["fsrs_defecto"], ys), "red": _metricas(p["red"], y_red)}
+    if ajustado:
+        capas["fsrs_ajustado"] = _metricas(p["fsrs_ajustado"], ys)
+    elegida = "red" if decision["estado"] == "activa" else "fsrs_ajustado" if ajuste.get("hecho") else "fsrs_defecto"
+    p_e, y_e = (p["red"], y_red) if elegida == "red" else (p[elegida], ys)
+    return {"corte": corte.isoformat(timespec="minutes"), "repasos_entreno": len(tr), "repasos_prueba": len(ys),
+            "ajuste": {k: ajuste.get(k) for k in ("hecho", "etapa", "conceptos", "perdida_antes", "perdida_despues", "motivo")},
+            "red": decision, "capas": capas, "elegida": elegida, "calibracion_elegida": calibracion(p_e, y_e, 5)}
+
+
+def comprobar_capas(r: dict, tolerancia: float = 0.01) -> list[str]:
+    """Lo que no debe pasar: pérdidas no finitas, o que la capa que manda prediga peor que FSRS por defecto."""
+    problemas = [f"{k}: pérdida no finita" for k, m in r["capas"].items() if not np.isfinite(m["log_loss"])]
+    base = r["capas"]["fsrs_defecto"]["log_loss"]
+    elegida = r["capas"][r["elegida"]]["log_loss"]
+    if elegida > base + tolerancia:
+        problemas.append(f"manda {r['elegida']} con log-loss {elegida:.4f}, peor que FSRS por defecto ({base:.4f})")
+    return problemas
+
+
+async def capas(simulado: bool) -> None:
+    from magister.aprender import personal
+    from magister.config import ajustes
+    from magister.datos import sesion
+
+    if simulado:
+        sesion.configurar(ajustes.db_url_sim)
+    series = await personal.series(con_extras=True)
+    await sesion.cerrar()
+    if sum(len(s) for s in series) < 200:
+        raise SystemExit("Pocos repasos para medir las capas. Con --simulado, corre antes `python -m magister.aprender.simular`.")
+    r = calcular_capas(series)
+    print(f"Corte {r['corte']}: {r['repasos_entreno']} repasos para entrenar, {r['repasos_prueba']} para medir")
+    print("Ajuste personal:", r["ajuste"])
+    print("Red (su propia validación):", r["red"])
+    for nombre, m in r["capas"].items():
+        print(f"{nombre:<14} log-loss {m['log_loss']:.4f} · Brier {m['brier']:.4f} · AUC {m['auc']:.4f} · ECE {m['ece']:.4f} · n {m['n']}")
+    print(f"Manda: {r['elegida']}. Calibración (predicho, observado, n):")
+    for fila in r["calibracion_elegida"]:
+        print("   ", tuple(round(v, 3) if isinstance(v, float) else v for v in fila))
+    problemas = comprobar_capas(r)
+    for x in problemas:
+        print("MAL:", x)
+    if problemas:
+        raise SystemExit(1)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("orden", choices=["primera", "diagnostico", "walkforward", "informe", "escalera"])
+    ap.add_argument("orden", choices=["primera", "diagnostico", "walkforward", "informe", "escalera", "capas"])
     ap.add_argument("--simulado", action="store_true")
     ap.add_argument("--calibrar", action="store_true")
     a = ap.parse_args()
@@ -199,6 +291,8 @@ def main() -> None:
         asyncio.run(walkforward(a.simulado, a.calibrar))
     elif a.orden == "informe":
         informe()
+    elif a.orden == "capas":
+        asyncio.run(capas(a.simulado))
     else:
         escalera()
 

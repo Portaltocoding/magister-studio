@@ -1,11 +1,13 @@
 """Harness a mano del asesor que hace cosas (ADR-0017), con el modelo de verdad.
 
-    uv run python -m evals.asesor agente [N ...]    el agente que prepara cambios: 4 encargos, y qué decide en cada vuelta
+    uv run python -m evals.asesor agente [N ...]    el agente que prepara cambios: 7 encargos (3 del plan de estudio), y
+                                                    qué decide en cada vuelta
     uv run python -m evals.asesor chat              de punta a punta por la API: si el asesor sabe cuándo ofrecer un cambio
 
 Es un harness a mano, como `evals.tono` y `evals.fidelidad`: llama a `claude -p` de verdad y GASTA CUOTA.
 Usa la base de PRUEBAS (`ajustes.db_url_pruebas`), nunca la real, y la VACÍA antes de empezar: borra las
-tablas `notas` y `proyectos` (y `conversaciones` en el modo `chat`) y siembra un proyecto de ejemplo.
+tablas `notas` y `proyectos` (y `conversaciones` en el modo `chat`) y siembra un proyecto de ejemplo. En el modo
+`agente` borra también `temas` y `planes` (con lo que cuelga de ellos) y siembra un plan de Cálculo para el 19-11-2026.
 No decide aprobado o suspenso: imprime lo que hace el asesor para que lo leas tú.
 """
 
@@ -80,14 +82,40 @@ ESCENARIOS = [
     ("no se puede",
      "Borrar el proyecto entero y crear otro nuevo sobre Kubernetes.",
      [{"rol": "usuario", "contenido": "borra este proyecto y créame uno de kubernetes"}]),
+    # Los del plan de estudio (el 19-11-2026 es jueves; el sábado no tiene horas). El cuarto elemento: con el plan.
+    ("plan: mover una sesión",
+     "Mover la sesión de L3 (Integrales) del viernes 20 al lunes 23.",
+     [{"rol": "usuario", "contenido": "el viernes no puedo, pásame integrales al lunes"}], True),
+    ("plan: marcar, preparar y apuntar",
+     "Marcar L1 (Límites) como hecha, preparar los apuntes de L2 y apuntar el examen parcial de cálculo el viernes 27 a las 10:00.",
+     [{"rol": "usuario", "contenido": "límites ya lo tengo, prepárame derivadas y apúntame el parcial del viernes 27 a las 10"}], True),
+    ("plan: no cabe (el sábado no estudia y L3 depende de L2)",
+     "Mover la sesión de L2 (Derivadas) al sábado 21 por la mañana.",
+     [{"rol": "usuario", "contenido": "pásame derivadas al sábado por la mañana"}], True),
 ]
+
+
+async def sembrar_plan() -> dict | None:
+    """Un plan de Cálculo como el de los tests: 2 h de lunes a viernes desde las 17:00; L2 depende de L1 y L3 de L2."""
+    from magister.asesor import arnes
+    from magister.datos import plan as dp
+
+    lecciones = [{"clave": c, "titulo": t, "objetivos": ["Explicar algo"], "conceptos": [{"id": f"c-{c.lower()}", "nombre": t}],
+                  "horas": h, "depende_de": d} for c, t, h, d in (("L1", "Límites", 1, []), ("L2", "Derivadas", 1, ["L1"]),
+                                                                  ("L3", "Integrales", 2, ["L2"]))]
+    sesiones = [{"clave": "L1", "fecha": "2026-11-19", "inicio": "17:00", "horas": 1},
+                {"clave": "L2", "fecha": "2026-11-19", "inicio": "18:00", "horas": 1},
+                {"clave": "L3", "fecha": "2026-11-20", "inicio": "17:00", "horas": 2}]
+    perfil = {"horas_por_dia": [2, 2, 2, 2, 2, 0, 0], "inicio_por_dia": ["17:00"] * 5 + [None, None]}
+    _, plan_id = await dp.guardar_plan("Cálculo", None, perfil, {"razonamiento": "x", "lecciones": lecciones}, sesiones, None, None)
+    return await arnes.leer_plan(plan_id, date(2026, 11, 19))
 
 
 async def correr_agente(solo: list[str]) -> None:
     print(f"motor={ajustes.motor} modelo={ajustes.modelo} vueltas={ajustes.asesor_vueltas}")
     sesion.configurar(ajustes.db_url_pruebas)
     async with sesion.nueva_sesion() as s, s.begin():
-        await s.execute(text("TRUNCATE notas, proyectos RESTART IDENTITY CASCADE"))
+        await s.execute(text("TRUNCATE notas, proyectos, temas, planes RESTART IDENTITY CASCADE"))
         p = Proyecto(nombre="Copiloto cloud agéntico", idea="Un agente que audita AWS.", estado="listo", roadmap=roadmap())
         s.add(p)
         await s.flush()
@@ -97,6 +125,7 @@ async def correr_agente(solo: list[str]) -> None:
                          "fechas pasadas, y poner credenciales falsas (AWS_ACCESS_KEY_ID=testing) para que nada salga a AWS real."))
         s.add(Nota(texto="Receta de lentejas: sofrito, chorizo y 40 minutos."))
     proyecto = {"nombre": "Copiloto cloud agéntico", "roadmap": roadmap(), "hechos": [], "hechos_en": {}}
+    plan = await sembrar_plan()
 
     original = ag.estructurar
 
@@ -114,13 +143,14 @@ async def correr_agente(solo: list[str]) -> None:
 
     ag.estructurar = espiado
     try:
-        for i, (nombre, encargo, turnos) in enumerate(ESCENARIOS, 1):
+        for i, (nombre, encargo, turnos, *con_plan) in enumerate(ESCENARIOS, 1):
             if solo and str(i) not in solo:
                 continue
             print(f"\n=== {i}. {nombre}\n    encargo: {encargo}")
             t0 = time.perf_counter()
             try:
-                async for que, dato in ag.preparar(encargo, turnos, proyecto, pid, date(2026, 11, 19), MOMENTO):
+                async for que, dato in ag.preparar(encargo, turnos, proyecto, pid, date(2026, 11, 19), MOMENTO,
+                                                   plan if con_plan else None):
                     if que == "leyendo":
                         print(f"    LEE: {dato}")
                     else:
@@ -213,7 +243,7 @@ async def correr_chat() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Harness a mano del asesor con el modelo de verdad (gasta cuota; usa la base de pruebas).")
     sub = ap.add_subparsers(dest="modo", required=True)
-    pa = sub.add_parser("agente", help="el agente que prepara cambios, con 4 encargos")
+    pa = sub.add_parser("agente", help=f"el agente que prepara cambios, con {len(ESCENARIOS)} encargos")
     pa.add_argument("escenarios", nargs="*", choices=[str(i) for i in range(1, len(ESCENARIOS) + 1)], help="números de escenario (por defecto, todos)")
     sub.add_parser("chat", help="de punta a punta por la API")
     if len(sys.argv) == 1:

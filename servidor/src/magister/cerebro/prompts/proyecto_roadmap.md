@@ -15,7 +15,7 @@ El método:
    - `arquitectura`: las piezas del proyecto terminado (de 4 a 8) y cómo se conectan, en frases; cada pieza, con el nivel en que aparece.
    - `riesgos`: lo que puede salir mal (coste, seguridad, datos, atascos típicos) y cómo evitarlo, de 3 a 7.
    - `fuera_de_alcance`: lo que no se hace, o no todavía, para que no se disperse.
-7. Ajusta el tamaño a su ritmo: con pocas horas a la semana, menos pasos y más pequeños. Usa las referencias si sirven, pero no inventes enlaces ni nombres de herramientas que no existan.
+7. Ajusta el tamaño a su ritmo: con pocas horas a la semana, menos pasos y más pequeños. No inventes enlaces ni nombres de herramientas que no existan.
 
 Español de España, tuteo, sin el carácter de la raya larga.
 
@@ -28,5 +28,5 @@ Su ritmo: {ritmo}
 </proyecto>
 
 <referencias>
-{referencias}
+(las referencias se buscan después, para cada bloque del primer nivel)
 </referencias>

@@ -538,7 +538,7 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
               ← Anterior
             </button>
             <span className="foco-atajos">
-              {contestadas} de {preguntas.length} contestadas · Alt + ← → para moverte
+              {contestadas} de {preguntas.length} contestadas · ← → para moverte (fuera de la caja de texto)
             </span>
             {!evaluacion && (
               <button className="boton-mini" aria-pressed={r.marcada} onClick={() => poner({ marcada: !r.marcada })}>

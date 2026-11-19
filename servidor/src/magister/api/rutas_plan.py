@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from magister.datos import plan as dp
 from magister.datos.sesion import sesion_por_peticion
 from magister.flujo import planes
+from magister.plan.apoyo import necesidad_efectiva
+from magister.plan.esquemas import Necesidad
 
 rutas = APIRouter(prefix="/api")
 
@@ -26,6 +28,29 @@ class EstadoSesion(BaseModel):
     estado: Literal["pendiente", "hecha", "saltada"]
 
 
+class NecesitaFuentes(BaseModel):
+    necesita_fuentes: Necesidad
+
+
+POR_QUE_TUYO = "Lo has decidido tú."
+
+
+async def con_necesidad(s: AsyncSession, vista: dict) -> dict:
+    """Añade a cada lección de la vista si necesita fuentes y por qué (ADR-0021). Si tienes material tuyo del tema,
+    ninguna sale como «no»: tus apuntes mandan."""
+    filas = {lec.clave: lec for lec in await dp.lecciones(s, vista["plan_id"])}
+    propio = await dp.material_propio_de_tema(s, vista["tema_id"]) > 0
+    for lec in vista.get("lecciones", []):
+        fila = filas.get(lec["clave"])
+        guardada = fila.necesita_fuentes if fila else None
+        valor, por_que = necesidad_efectiva(guardada, fila.fuentes_por_que if fila else None, propio)
+        # `necesita_fuentes` es la que se usa; `necesita_fuentes_guardada`, la del plan o la tuya (el chip la enseña
+        # aparte cuando tu material la cambia, para que puedas elegir otra).
+        lec.update(necesita_fuentes=valor, fuentes_por_que=por_que, material_propio=propio,
+                   necesita_fuentes_guardada=guardada)
+    return vista
+
+
 @rutas.get("/planes")
 async def listar_planes(s: AsyncSession = Depends(sesion_por_peticion)) -> list[dict]:
     return await planes.resumen_planes(s, date.today())
@@ -36,7 +61,18 @@ async def ver_plan(tema_id: int, s: AsyncSession = Depends(sesion_por_peticion))
     vista = await planes.vista_plan(s, tema_id, date.today())
     if vista is None:
         raise HTTPException(404, "este tema no tiene plan aceptado")
-    return vista
+    return await con_necesidad(s, vista)
+
+
+@rutas.patch("/planes/{plan_id}/lecciones/{clave}/fuentes")
+async def cambiar_necesidad(plan_id: int, clave: str, cuerpo: NecesitaFuentes,
+                            s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    """Cambias si esta lección necesita fuentes: con «no», el research automático y «Buscar fuentes» de todo el plan se
+    la saltan (pedirla a mano en su fila sigue buscando)."""
+    fila = await dp.cambiar_necesidad(s, plan_id, clave, cuerpo.necesita_fuentes, POR_QUE_TUYO)
+    if fila is None:
+        raise HTTPException(404, "lección no encontrada")
+    return {"plan_id": plan_id, "clave": clave, "necesita_fuentes": fila.necesita_fuentes, "fuentes_por_que": fila.fuentes_por_que}
 
 
 @rutas.post("/temas/{tema_id}/plan/recalcular")
@@ -46,7 +82,7 @@ async def recalcular(tema_id: int, cuerpo: Recalcular, s: AsyncSession = Depends
         raise HTTPException(404, "este tema no tiene plan aceptado")
     if isinstance(r, str):
         raise HTTPException(409, r)
-    return r
+    return await con_necesidad(s, r)
 
 
 class Horario(BaseModel):
@@ -72,7 +108,7 @@ async def cambiar_horario(tema_id: int, cuerpo: Horario, s: AsyncSession = Depen
         await s.rollback()
         raise HTTPException(409, r)
     await s.commit()
-    return r
+    return await con_necesidad(s, r)
 
 
 @rutas.patch("/sesiones/{sesion_id}")

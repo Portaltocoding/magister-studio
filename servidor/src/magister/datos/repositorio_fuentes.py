@@ -92,13 +92,15 @@ async def ultimas_versiones(s: AsyncSession) -> list[dict]:
     """Cada documento de todas las fuentes con su última versión (sin las «retirada · sin cambios») y sus fragmentos."""
     filas = await s.execute(text(
         "select distinct on (d.id) d.id, d.titulo, d.uri, f.id, f.nombre, v.id, v.estado, v.motivo, v.metadatos, "
-        "v.texto is not null, (select count(*) from fragmentos g where g.version_id = v.id), v.ingerida_en "
+        "v.texto is not null, (select count(*) from fragmentos g where g.version_id = v.id), v.ingerida_en, "
+        "d.tema_id, t.nombre, coalesce(v.metadatos ->> 'incompleta', to_jsonb(d) ->> 'incompleta') "
         "from documentos d join fuentes f on f.id = d.fuente_id join versiones v on v.documento_id = d.id "
+        "left join temas t on t.id = d.tema_id "
         "where not (v.estado = 'retirada' and coalesce(v.motivo, '') = 'sin cambios') "
         "order by d.id, v.id desc"
     ))
     claves = ("documento_id", "titulo", "uri", "fuente_id", "fuente", "version_id", "estado", "motivo", "metadatos",
-              "con_texto", "fragmentos", "ingerida_en")
+              "con_texto", "fragmentos", "ingerida_en", "tema_id", "tema", "incompleta")
     return [dict(zip(claves, f, strict=True)) for f in filas.all()]
 
 
@@ -192,6 +194,74 @@ async def fragmentos_de_leccion(s: AsyncSession, plan_id: int, clave: str) -> li
         .order_by(LeccionFragmento.rango)
     )
     return list((await s.scalars(consulta)).all())
+
+
+async def versiones_de_leccion(s: AsyncSession, plan_id: int, clave: str) -> list[int]:
+    """Las versiones (ya `lista`) que el research trajo para esta lección y entraron en tus fuentes."""
+    from magister.datos.fuentes import Propuesta
+
+    consulta = (
+        select(Version.id).join(Propuesta, Propuesta.version_id == Version.id)
+        .where(Propuesta.plan_id == plan_id, Propuesta.leccion_clave == clave, Propuesta.estado == "aprobada",
+               Version.estado == "lista")
+        .distinct().order_by(Version.id)
+    )
+    return list((await s.scalars(consulta)).all())
+
+
+def estado_de_documento(estado: str | None, fragmentos: int) -> str:
+    """lista, indexando o problema: el mismo criterio que el resumen de la Biblioteca (lista sin trozos es problema)."""
+    if estado == "lista":
+        return "lista" if fragmentos > 0 else "problema"
+    if estado in ("recibida", "pendiente"):
+        return "indexando"
+    return "problema"
+
+
+async def biblioteca_de_plan(s: AsyncSession, plan_id: int) -> dict[str, list[dict]]:
+    """Por lección, lo que el research trajo para ella: las propuestas no rechazadas con su versión, si entró.
+    La ficha del juez (`propuestas.ficha`) y el aviso de documento incompleto (en los metadatos de la versión o en el
+    documento) se leen si existen: `to_jsonb` da null cuando la columna aún no está, así esta lectura no depende de
+    una migración. A la versión no se le aplica `to_jsonb`: arrastraría el texto entero."""
+    filas = (await s.execute(text(
+        "select p.leccion_clave, p.id, p.url, coalesce(d.titulo, p.titulo, p.url), p.estado, to_jsonb(p) -> 'ficha', "
+        "v.id, v.estado, d.id, d.fuente_id, "
+        "(select count(*) from fragmentos g where g.version_id = v.id), "
+        "coalesce(v.metadatos ->> 'incompleta', to_jsonb(d) ->> 'incompleta') "
+        "from propuestas p left join versiones v on v.id = p.version_id left join documentos d on d.id = v.documento_id "
+        "where p.plan_id = :p and p.estado <> 'rechazada' order by p.leccion_clave, p.id"
+    ), {"p": plan_id})).all()
+    salida: dict[str, list[dict]] = {}
+    for clave, pid, url, titulo, p_estado, ficha, vid, v_estado, did, fuente_id, n, incompleta in filas:
+        f = ficha if isinstance(ficha, dict) else {}
+        estado = estado_de_documento(v_estado, n or 0) if vid is not None else (
+            "propuesta" if p_estado == "pendiente" else "problema")
+        salida.setdefault(clave, []).append({
+            "propuesta_id": pid, "titulo": titulo, "url": url,
+            "dominio": f.get("dominio") or _dominio(url), "tipo": f.get("tipo"),
+            "cubre": [int(x) for x in (f.get("objetivos") or []) if isinstance(x, int | float)],
+            "resumen": f.get("resumen"), "estado": estado, "version_id": vid, "documento_id": did,
+            "fuente_id": fuente_id, "fragmentos": n or 0, "incompleta": incompleta or None,
+        })
+    return salida
+
+
+def _dominio(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    d = (urlsplit(url).hostname or "").lower()
+    return d[4:] if d.startswith("www.") else d
+
+
+async def apoyo_ids_de_plan(s: AsyncSession, plan_id: int) -> dict[str, list[int]]:
+    """Los fragmentos que hoy apoyan a cada lección (lecciones_fragmentos), en su orden."""
+    filas = (await s.execute(text(
+        "select leccion_clave, fragmento_id from lecciones_fragmentos where plan_id = :p order by leccion_clave, rango"
+    ), {"p": plan_id})).all()
+    salida: dict[str, list[int]] = {}
+    for clave, fid in filas:
+        salida.setdefault(clave, []).append(int(fid))
+    return salida
 
 
 async def tema_de_version(s: AsyncSession, version_id: int) -> int | None:

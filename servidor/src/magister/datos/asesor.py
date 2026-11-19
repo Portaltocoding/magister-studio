@@ -21,6 +21,8 @@ class CambioAsesor(Base):
     # La respuesta del asesor que lo propuso (su tarjeta va debajo de ella).
     mensaje_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("mensajes.id", ondelete="SET NULL"))
     proyecto_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("proyectos.id", ondelete="CASCADE"))
+    # El plan de estudio activo, si el cambio lo toca (mover una sesión, marcar o preparar una lección).
+    plan_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("planes.id", ondelete="CASCADE"))
     encargo: Mapped[str] = mapped_column(Text)  # lo que el asesor pidió, en sus palabras
     resumen: Mapped[str] = mapped_column(Text)
     acciones: Mapped[list] = mapped_column(JSONB)  # las acciones validadas (cambios.Accion)

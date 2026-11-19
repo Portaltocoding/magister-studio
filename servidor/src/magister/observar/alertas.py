@@ -6,7 +6,7 @@
 | Alerta | Salta si (últimas 24 h) | Runbook |
 |---|---|---|
 | errores | más del 5 % de llamadas con error (mínimo 10) | docs/runbooks/errores.md |
-| latencia | p95 de lo que tardas en ver la primera palabra del tutor > 20 s (mínimo 10 respuestas) | docs/runbooks/latencia.md |
+| latencia | p95 de lo que tardas en ver la primera palabra del tutor > 20 s (mínimo 10 respuestas, y al menos 3 de más de 20 s) | docs/runbooks/latencia.md |
 | negativas | más del 2 % de respuestas con negativa | docs/runbooks/negativas.md |
 | tono | menos del 70 % de aprobados del juez online en 7 días con la rúbrica actual (mínimo 10) | docs/runbooks/tono.md |
 """
@@ -20,8 +20,10 @@ from magister.datos.sesion import nueva_sesion
 from magister.tono.juez import rubrica
 
 # La latencia mide lo que ves tú (desde que envías hasta la primera palabra), no solo lo que piensa el modelo: avisa
-# cuando algo nuestro se atasca, no de cada respuesta en la que el modelo piensa un rato.
-UMBRALES = {"errores": 0.05, "latencia_ms": 20000, "latencia_min": 10, "negativas": 0.02, "tono": 0.70}
+# cuando algo nuestro se atasca, no de cada respuesta en la que el modelo piensa un rato. Con pocas respuestas al día (14
+# el 19-11-2026) el p95 es casi la más lenta: dos casos de 70 s con la mediana en 8 s la hacían saltar. Por eso además
+# tiene que haber al menos `latencia_lentas` respuestas por encima del umbral; un caso suelto no es un atasco.
+UMBRALES = {"errores": 0.05, "latencia_ms": 20000, "latencia_min": 10, "latencia_lentas": 3, "negativas": 0.02, "tono": 0.70}
 
 
 async def evaluar() -> list[tuple[str, str]]:
@@ -31,11 +33,15 @@ async def evaluar() -> list[tuple[str, str]]:
             "select count(*), count(*) filter (where error is not null) from llamadas where creada > now() - interval '24 hours'"))).one()
         if n >= 10 and err / n > UMBRALES["errores"]:
             saltan.append(("errores", f"{err} de {n} llamadas con error en 24 h"))
-        n, p95 = (await s.execute(text(
-            "select count(*), percentile_cont(0.95) within group (order by ms_primer_token) from mensajes "
-            "where creado_en > now() - interval '24 hours' and rol = 'tutor' and ms_primer_token is not null"))).one()
-        if n >= UMBRALES["latencia_min"] and p95 and p95 > UMBRALES["latencia_ms"]:
-            saltan.append(("latencia", f"la primera palabra tarda {p95 / 1000:.1f} s (p95 de {n} respuestas en 24 h)"))
+        n, p95, mediana, lentas = (await s.execute(text(
+            "select count(*), percentile_cont(0.95) within group (order by ms_primer_token), "
+            "percentile_cont(0.5) within group (order by ms_primer_token), count(*) filter (where ms_primer_token > :u) "
+            "from mensajes where creado_en > now() - interval '24 hours' and rol = 'tutor' and ms_primer_token is not null"),
+            {"u": UMBRALES["latencia_ms"]})).one()
+        if (n >= UMBRALES["latencia_min"] and p95 and p95 > UMBRALES["latencia_ms"]
+                and lentas >= UMBRALES["latencia_lentas"]):
+            saltan.append(("latencia", f"la primera palabra tarda {p95 / 1000:.1f} s (p95 de {n} respuestas en 24 h; "
+                                       f"mediana {mediana / 1000:.1f} s, {lentas} de más de {UMBRALES['latencia_ms'] // 1000} s)"))
         n, neg = (await s.execute(text(
             "select count(*), coalesce(sum(valor), 0) from puntuaciones where nombre = 'negativa' and creada > now() - interval '24 hours'"))).one()
         if n >= 20 and neg / n > UMBRALES["negativas"]:

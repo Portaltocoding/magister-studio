@@ -37,11 +37,13 @@ async def contexto_para_plan(buscador: Buscador | None, tema: str) -> str:
 
 async def calcular_apoyo(buscador: Buscador | None, plan_id: int, tema_id: int | None) -> None:
     """Para cada lección, los fragmentos (de los 8 mejores) que de verdad la apoyan y si queda «sin material».
-    Solo se guardan los que pasan la puerta: lo demás no llega a los apuntes ni al corrector como «tus fuentes»."""
+    Solo se guardan los que pasan la puerta: lo demás no llega a los apuntes ni al corrector como «tus fuentes».
+    Lo que el research trajo para la lección (anclado por `propuestas`) entra siempre, por objetivo y antes que lo demás."""
     if buscador is None:
         return
     async with nueva_sesion() as s:
         lecciones = await dp.lecciones(s, plan_id)
+        anclados = {lec.clave: await rf.versiones_de_leccion(s, plan_id, lec.clave) for lec in lecciones}
     for lec in lecciones:
         consulta = f"{lec.titulo}. " + " ".join(lec.objetivos)
         # El reranker puntúa siempre los 8: aunque uno llegue al coseno, cuenta cuántos apoyan (ADR-0018).
@@ -54,7 +56,45 @@ async def calcular_apoyo(buscador: Buscador | None, plan_id: int, tema_id: int |
             if r.similitud_densa.get(x.fragmento_id, x.puntuacion) >= ajustes.umbral_apoyo
             or r.puntuacion_reranker.get(x.fragmento_id, float("-inf")) > ajustes.umbral_reranker
         ]
-        await rf.guardar_apoyo(plan_id, lec.clave, buenos, len(buenos) < ajustes.min_apoyo)
+        # Lo que el research trajo para esta lección la apoya aunque esté en otro idioma: lo eligió el juez para ella.
+        # Una búsqueda por objetivo dentro de esas versiones, sin umbral, y los 2 mejores de cada uno.
+        por_objetivo: list[list[tuple[int, int, float]]] = []
+        if anclados.get(lec.clave):
+            filtro = Filtros(version_ids=anclados[lec.clave])
+            for objetivo in lec.objetivos or [lec.titulo]:
+                ra = await buscador.buscar(objetivo, ajustes.apoyo_por_objetivo + 1, filtro, None)
+                por_objetivo.append([(x.fragmento_id, x.rango, x.puntuacion) for x in ra.recuperados])
+        elegidos = juntar_apoyo(por_objetivo, buenos)
+        await rf.guardar_apoyo(plan_id, lec.clave, elegidos, len(elegidos) < ajustes.min_apoyo)
+
+
+def juntar_apoyo(
+    por_objetivo: list[list[tuple[int, int, float]]], buenos: list[tuple[int, int, float]], tope: int | None = None,
+    cuantos: int | None = None,
+) -> list[tuple[int, int, float]]:
+    """Primero los anclados, por turnos entre objetivos (hasta `cuantos` de cada uno, MAGISTER_APOYO_POR_OBJETIVO, sin
+    repetir); luego los que pasan la puerta, hasta `tope` en total (MAGISTER_APOYO_TOPE: que un solo objetivo no llene
+    los apuntes). Cada fragmento lleva su nuevo rango (1..n), que es el orden en que llega a los apuntes."""
+    tope = ajustes.apoyo_tope if tope is None else tope
+    cuantos = ajustes.apoyo_por_objetivo if cuantos is None else cuantos
+    vistos: set[int] = set()
+    salida: list[tuple[int, float]] = []
+    colas = [list(c) for c in por_objetivo]
+    tomados = [0] * len(colas)
+    for _ in range(cuantos):
+        for i, cola in enumerate(colas):
+            while cola and tomados[i] < cuantos:
+                fid, _, p = cola.pop(0)
+                if fid not in vistos:
+                    vistos.add(fid)
+                    salida.append((fid, p))
+                    tomados[i] += 1
+                    break
+    for fid, _, p in buenos:
+        if fid not in vistos:
+            vistos.add(fid)
+            salida.append((fid, p))
+    return [(fid, n, p) for n, (fid, p) in enumerate(salida[:tope], start=1)]
 
 
 async def recalcular_apoyo_por_versiones(buscador: Buscador | None, version_ids: list[int]) -> None:

@@ -186,6 +186,18 @@ h2 {
 .lecciones > li { margin-bottom: 10px; }
 .lecciones ul { margin: 4px 0; padding-left: 18px; font-size: 0.9rem; }
 .nota-linea { color: var(--suave); font-size: 0.8rem; }
+/* La pequeña biblioteca de cada lección del Roadmap: plegada, una línea; al desplegar, una línea por fuente. */
+.biblioteca-leccion { margin: 6px 0 2px; font-size: 0.85rem; }
+.biblioteca-leccion > summary { cursor: pointer; list-style-position: inside; overflow-wrap: anywhere; }
+.biblioteca-leccion-titulo { font-weight: 600; }
+.lecciones .biblioteca-leccion ul { list-style: none; padding-left: 14px; margin: 4px 0; display: flex; flex-direction: column; gap: 3px; }
+.biblioteca-leccion li { overflow-wrap: anywhere; }
+.biblioteca-leccion li a { color: inherit; }
+.biblioteca-leccion .fuente-problema a, .biblioteca-leccion .fuente-propuesta a { color: var(--suave); }
+.biblioteca-leccion-huecos li { color: var(--suave); }
+.aviso-incompleta { display: block; color: var(--suave); font-size: 0.8rem; }
+.aviso-apuntes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+.aviso-apuntes .cuota { flex: 1 1 140px; min-width: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--activo); }
 .botones { display: flex; gap: 8px; }

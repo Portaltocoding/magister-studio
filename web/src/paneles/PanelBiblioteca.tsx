@@ -29,6 +29,46 @@ import {
 } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { DetalleTecnico, mensajeDe, TextoError } from '../componentes/Cargando.tsx'
+import { agruparPorTema, colorDeTema } from '../componentes/colorTema.ts'
+import { avisoIncompleta } from '../componentes/bibliotecaLeccion.ts'
+import { irARuta } from '../componentes/Vacio.tsx'
+
+// Lo que entró a medias (un muro de pago, solo el resumen): el aviso y el camino para subir el PDF a esa fuente.
+function AvisoIncompleta({ motivo, fuenteId }: { motivo: string | null | undefined; fuenteId: number | null | undefined }) {
+  if (!motivo) return null
+  return (
+    <span className="aviso-incompleta" role="note">
+      {avisoIncompleta(motivo)}{' '}
+      {fuenteId != null && (
+        <button className="boton-mini" onClick={() => irARuta(`#/temas/${fuenteId}`)}>
+          Subir el PDF
+        </button>
+      )}
+    </span>
+  )
+}
+
+// Cada grupo de lo que entró, con el punto de color de su tema y su nombre (el color nunca va solo).
+function NombreTema({ temaId, nombre, temas }: { temaId: number | null; nombre: string | null | undefined; temas: readonly number[] }) {
+  if (temaId == null) return <span className="tema-etiqueta">Sin tema (vale para todos)</span>
+  return (
+    <span className="tema-etiqueta">
+      <span className="punto-tema" style={colorDeTema(temaId, temas)?.estilo} aria-hidden="true" />
+      {nombre ?? `Tema ${temaId}`}
+    </span>
+  )
+}
+
+// Los temas de tus planes, en el orden de /api/planes: así cada tema sale con el mismo color que en el resto de la app.
+function usarTemasDePlanes(): number[] {
+  const [temas, setTemas] = useState<number[]>([])
+  useEffect(() => {
+    listarPlanes()
+      .then((ps) => setTemas(ps.map((p) => p.tema_id)))
+      .catch(() => undefined)
+  }, [])
+  return temas
+}
 
 // La Biblioteca, más allá de tus fuentes: rastrear la web en busca de buenas fuentes y guardar páginas o PDF
 // desde un enlace (se descargan, se limpian y se indexan para que el tutor las cite).
@@ -232,7 +272,7 @@ function Buscar() {
             const l = lecciones.find((x) => `${x.plan_id}:${x.clave}` === leccion)
             if (!l) return
             try {
-              const r = await lanzarResearch(l.plan_id, [l.clave])
+              const r = await lanzarResearch(l.plan_id, [l.clave], { forzar: true })
               setAviso(`Buscando fuentes para ${l.clave}. Tarda unos minutos; las propuestas aparecerán abajo.`)
               setEnMarcha((ts) => [...ts, ...r.tareas.map((id) => ({ id, clave: l.clave }))])
             } catch (err) {
@@ -414,6 +454,7 @@ const ESTADO_CORTO: Record<string, string> = { ...ESTADOS, lista: 'lista para ci
 // Arriba de la Biblioteca: cuántos documentos hay listos, indexándose y con problema; qué pasó con los que fallan, con
 // «Reintentar»; y lo que vino del research (lo que entró solo se ve aquí y se puede quitar).
 function EstadoFuentes({ senal }: { senal: number }) {
+  const temas = usarTemasDePlanes()
   const [r, setR] = useState<ResumenFuentes | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const cargar = useCallback(() => {
@@ -450,11 +491,16 @@ function EstadoFuentes({ senal }: { senal: number }) {
     cargar()
   }
   const solos = r.del_research.filter((d) => d.automatica).length
+  // Lo que entró a medias y no se ve ya en los problemas ni en lo del research (esas filas lo dicen ellas mismas).
+  const enOtraLista = new Set([...r.problemas, ...r.del_research].map((d) => d.documento_id))
+  const incompletas = (r.incompletas ?? []).filter((d) => !enOtraLista.has(d.documento_id))
+  const porTema = agruparPorTema(r.del_research, temas)
 
   return (
     <section className="biblioteca-estado">
       <p className="nota" role="status">
         Tus fuentes: {r.listos} {r.listos === 1 ? 'documento listo' : 'documentos listos'} · {r.indexando} indexándose · {r.con_problema} con problema
+        {r.incompletas?.length ? ` · ${r.incompletas.length} solo en parte` : ''}
       </p>
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
       {r.problemas.length > 0 && (
@@ -468,6 +514,7 @@ function EstadoFuentes({ senal }: { senal: number }) {
                 <small>
                   {d.fuente} · {d.que_paso}
                 </small>
+                <AvisoIncompleta motivo={d.incompleta} fuenteId={d.fuente_id} />
                 <DetalleTecnico detalle={d.motivo} />
               </div>
               {d.reintentable && (
@@ -479,31 +526,57 @@ function EstadoFuentes({ senal }: { senal: number }) {
           ))}
         </ul>
       )}
+      {incompletas.length > 0 && (
+        <ul className="biblioteca-lista">
+          {incompletas.map((d) => (
+            <li key={d.documento_id}>
+              <div>
+                <a href={d.uri} target="_blank" rel="noreferrer">
+                  {d.titulo}
+                </a>
+                <small>
+                  {d.tema ? `${d.tema} · ` : ''}
+                  {d.fuente}
+                </small>
+                <AvisoIncompleta motivo={d.incompleta} fuenteId={d.fuente_id} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       {r.del_research.length > 0 && (
         <details>
           <summary>
             Del research: {r.del_research.length} {r.del_research.length === 1 ? 'documento' : 'documentos'}
             {solos ? ` (${solos} ${solos === 1 ? 'entró solo' : 'entraron solos'})` : ''}
           </summary>
-          <ul className="biblioteca-lista">
-            {r.del_research.map((d) => (
-              <li key={d.documento_id}>
-                <div>
-                  <a href={d.uri} target="_blank" rel="noreferrer">
-                    {d.titulo}
-                  </a>
-                  <small>
-                    {d.automatica ? 'entró solo' : 'lo guardaste tú'}
-                    {d.leccion_clave ? ` · para ${d.leccion_clave}` : ''} · {ESTADO_CORTO[d.estado] ?? d.estado}
-                    {d.fragmentos ? ` · ${d.fragmentos} fragmentos` : ''}
-                  </small>
-                </div>
-                <button className="borrar" aria-label={`Quitar ${d.titulo}`} title="Quitar de tus fuentes" onClick={() => quitar(d)}>
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
+          {porTema.map((g) => (
+            <div key={g.temaId ?? 'sin'} className="biblioteca-grupo-tema">
+              <h3 className="dia-tema-nombre">
+                <NombreTema temaId={g.temaId} nombre={g.cosas[0]?.tema} temas={temas} />
+              </h3>
+              <ul className="biblioteca-lista">
+                {g.cosas.map((d) => (
+                  <li key={d.documento_id}>
+                    <div>
+                      <a href={d.uri} target="_blank" rel="noreferrer">
+                        {d.titulo}
+                      </a>
+                      <small>
+                        {d.automatica ? 'entró solo' : 'lo guardaste tú'}
+                        {d.leccion_clave ? ` · para ${d.leccion_clave}` : ''} · {ESTADO_CORTO[d.estado] ?? d.estado}
+                        {d.fragmentos ? ` · ${d.fragmentos} fragmentos` : ''}
+                      </small>
+                      <AvisoIncompleta motivo={d.incompleta} fuenteId={d.fuente_id} />
+                    </div>
+                    <button className="borrar" aria-label={`Quitar ${d.titulo}`} title="Quitar de tus fuentes" onClick={() => quitar(d)}>
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </details>
       )}
     </section>
@@ -511,6 +584,7 @@ function EstadoFuentes({ senal }: { senal: number }) {
 }
 
 function GuardarWeb() {
+  const temasPlanes = usarTemasDePlanes()
   const [texto, setTexto] = useState('')
   const [fuentes, setFuentes] = useState<Fuente[]>([])
   const [temas, setTemas] = useState<Tema[]>([])
@@ -629,22 +703,30 @@ function GuardarWeb() {
           {docs.length === 0 ? (
             <p className="vacio">Todavía nada.</p>
           ) : (
-            <ul className="biblioteca-lista">
-              {docs.map((d) => (
-                <li key={d.id}>
-                  <div>
-                    <a href={d.uri} target="_blank" rel="noreferrer">
-                      {d.titulo}
-                    </a>
-                    <small>
-                      {d.version ? ESTADOS[d.version.estado] ?? d.version.estado : '·'}
-                      {d.version?.motivo ? ` · ${d.version.motivo}` : ''}
-                      {d.fragmentos ? ` · ${d.fragmentos} fragmentos` : ''}
-                    </small>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            agruparPorTema(docs, temasPlanes).map((g) => (
+              <div key={g.temaId ?? 'sin'} className="biblioteca-grupo-tema">
+                <h3 className="dia-tema-nombre">
+                  <NombreTema temaId={g.temaId} nombre={temas.find((t) => t.id === g.temaId)?.nombre} temas={temasPlanes} />
+                </h3>
+                <ul className="biblioteca-lista">
+                  {g.cosas.map((d) => (
+                    <li key={d.id}>
+                      <div>
+                        <a href={d.uri} target="_blank" rel="noreferrer">
+                          {d.titulo}
+                        </a>
+                        <small>
+                          {d.version ? ESTADOS[d.version.estado] ?? d.version.estado : '·'}
+                          {d.version?.motivo ? ` · ${d.version.motivo}` : ''}
+                          {d.fragmentos ? ` · ${d.fragmentos} fragmentos` : ''}
+                        </small>
+                        <AvisoIncompleta motivo={d.incompleta ?? d.version?.incompleta} fuenteId={destino} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
           )}
         </section>
       )}

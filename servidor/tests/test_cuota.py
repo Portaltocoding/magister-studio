@@ -123,3 +123,19 @@ async def test_lo_de_fondo_espera_turno_y_lo_tuyo_no(monkeypatch):
     assert await _contar_a_la_vez("apuntes_bloque", 10, monkeypatch) == 3  # material: como mucho 3 a la vez
     assert await _contar_a_la_vez("juez_tono", 10, monkeypatch) == 3
     assert await _contar_a_la_vez("conversar", 10, monkeypatch) == 10  # tu chat no espera nunca
+
+
+@pytest.mark.anyio
+async def test_buscar_fuentes_cuesta_sus_dos_llamadas(monkeypatch):
+    """El research de una lección: las consultas más el juez; sin llamadas tuyas aún, un valor prudente."""
+    from magister.observar import cuota
+
+    medias = {"research_consultas": 0.01, "research_juez": 0.03}
+
+    async def medio(prompts):
+        return sum(medias.get(p, 0.0) for p in prompts)
+
+    monkeypatch.setattr(cuota, "_coste_medio", medio)
+    assert await cuota.coste_de("research") == pytest.approx(0.04)
+    medias.clear()
+    assert await cuota.coste_de("research") == pytest.approx(0.07)

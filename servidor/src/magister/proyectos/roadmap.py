@@ -223,6 +223,118 @@ def pasos(roadmap: dict) -> list[dict]:
     return [p for n in roadmap.get("niveles", []) for b in n["bloques"] for p in b["pasos"]]
 
 
+# --- Rehacer sin perder lo hecho ----------------------------------------------------------------------------------
+# Un roadmap rehecho sale con ids por posición. Para que lo hecho y el diario (que van por id) sigan valiendo, cada
+# paso, bloque o nivel nuevo que sea el mismo que uno de antes hereda su id. Ante la duda, no se empareja: es mejor
+# un paso hecho que se apunta aparte que uno que aparece hecho sin estarlo.
+PARECIDO_MINIMO = 0.6  # la media del parecido del título y del texto
+PARECIDO_TITULO = 0.5  # y el título, por sí solo, al menos esto
+MARGEN_DUDA = 0.1  # si el segundo candidato se queda a menos de esto del primero, no se sabe cuál es: no se empareja
+
+
+def _parecido(a: set[str], b: set[str]) -> float:
+    return len(a & b) / len(a | b) if a and b else 0.0
+
+
+def _emparejar_lista(viejos: list[tuple[str, str, str]], nuevos: list[tuple[str, str, str]]) -> dict[str, str]:
+    """(id, título, texto) de cada lado -> {id_viejo: id_nuevo}, uno a uno. Primero, el mismo título normalizado (si
+    solo hay uno así en cada lado); luego, el parecido de palabras, solo si es alto, sin otro candidato cerca y lo
+    mejor para los dos lados."""
+    def por_titulo(lista):
+        grupos: dict[str, list[str]] = {}
+        for i, t, _ in lista:
+            grupos.setdefault(_normal(t).strip(), []).append(i)
+        return grupos
+
+    pares: dict[str, str] = {}
+    titulos_n = por_titulo(nuevos)
+    for clave, ids in por_titulo(viejos).items():
+        if clave and len(ids) == 1 and len(titulos_n.get(clave, [])) == 1:
+            pares[ids[0]] = titulos_n[clave][0]
+    libres_v = [x for x in viejos if x[0] not in pares]
+    tomados = set(pares.values())
+    libres_n = [x for x in nuevos if x[0] not in tomados]
+    raices_n = {i: (_raices(t), _raices(q)) for i, t, q in libres_n}
+    notas: dict[tuple[str, str], float] = {}
+    for iv, tv, qv in libres_v:
+        rt, rq = _raices(tv), _raices(qv)
+        for i_n, (nt, nq) in raices_n.items():
+            t = _parecido(rt, nt)
+            notas[(iv, i_n)] = (t + _parecido(rq, nq)) / 2 if t >= PARECIDO_TITULO else 0.0
+
+    def claro(candidatos: list[tuple[float, str]]) -> str | None:
+        candidatos = sorted(candidatos, reverse=True)
+        if not candidatos or candidatos[0][0] < PARECIDO_MINIMO:
+            return None
+        if len(candidatos) > 1 and candidatos[0][0] - candidatos[1][0] < MARGEN_DUDA:
+            return None
+        return candidatos[0][1]
+
+    for iv, _, _ in libres_v:
+        i_n = claro([(notas[(iv, x)], x) for x in raices_n])
+        if i_n is not None and claro([(notas[(y[0], i_n)], y[0]) for y in libres_v]) == iv:
+            pares[iv] = i_n
+    return pares
+
+
+def emparejar(roadmap_viejo: dict, roadmap_nuevo: dict) -> dict[str, str]:
+    """{id_viejo: id_nuevo} de los niveles, bloques y pasos que siguen siendo los mismos (cada clase con la suya), en
+    código y sin modelo: por título normalizado y, si no, por parecido de palabras del título y de su texto."""
+    def lados(r: dict) -> tuple[list, list, list]:
+        niveles = [(n["id"], n["titulo"], n.get("objetivo") or "") for n in r.get("niveles", [])]
+        bloques = [(b["id"], b["titulo"], b.get("priming") or "") for n in r.get("niveles", []) for b in n["bloques"]]
+        return niveles, bloques, [(p["id"], p["titulo"], p.get("que_haces") or "") for p in pasos(r)]
+
+    pares: dict[str, str] = {}
+    for viejos, nuevos in zip(lados(roadmap_viejo), lados(roadmap_nuevo)):
+        pares |= _emparejar_lista(viejos, nuevos)
+    return pares
+
+
+def apuntar_perdidos(antes: dict, despues: dict, hechos: list[str], hechos_en: dict) -> dict:
+    """`despues` con «ya_no_estan» al día: lo hecho de los pasos de `antes` que en `despues` ya no están (con su
+    título y cuándo lo marcaste), más lo que ya estaba apuntado y sigue sin estar. Lo hecho no se borra: se apunta."""
+    presentes = {p["id"] for p in pasos(despues)}
+    titulos = {p["id"]: p["titulo"] for p in pasos(antes)}
+    salida: dict[str, dict] = {}
+    for x in [*antes.get("ya_no_estan", []), *despues.get("ya_no_estan", [])]:
+        salida.setdefault(x["id"], x)
+    for x in hechos:
+        if x in titulos:
+            salida.setdefault(x, {"id": x, "titulo": titulos[x], "hecho_en": hechos_en.get(x)})
+    return {**despues, "ya_no_estan": [x for k, x in salida.items() if k not in presentes]}
+
+
+def conservar(viejo: dict, nuevo: dict, hechos: list[str], hechos_en: dict, usados: set[str] = frozenset()) -> dict:
+    """El roadmap `nuevo` (recién montado, con ids por posición) con los ids de `viejo` donde el nivel, el bloque o el
+    paso es el mismo (`emparejar`): así lo hecho, sus fechas y el diario siguen valiendo sin tocarlos. Los demás
+    reciben ids que no han existido nunca (ni en `viejo`, ni en lo hecho, ni en lo apuntado, ni en `usados`: los
+    pasos del diario). Lleva «conservados» (cuántos pasos hechos siguen) y «ya_no_estan»."""
+    heredado = {n: v for v, n in emparejar(viejo, nuevo).items()}
+    ocupados = {*ids_de(viejo.get("niveles", [])), *(n["id"] for n in viejo.get("niveles", [])), *hechos, *hechos_en,
+                *(x["id"] for x in viejo.get("ya_no_estan", [])), *usados, *heredado.values()}
+
+    def nuevo_id(prefijo: str) -> str:
+        numeros = [int(m.group(1)) for x in ocupados if (m := re.fullmatch(re.escape(prefijo) + r"(\d+)", x))]
+        x = f"{prefijo}{max(numeros + [0]) + 1}"
+        ocupados.add(x)
+        return x
+
+    niveles = []
+    for n in nuevo.get("niveles", []):
+        nid = heredado.get(n["id"]) or nuevo_id("n")
+        bloques = []
+        for b in n["bloques"]:
+            bid = heredado.get(b["id"]) or nuevo_id(f"{nid}-b")
+            bloques.append({**b, "id": bid, "pasos": [{**p, "id": heredado.get(p["id"]) or nuevo_id(f"{bid}-p")}
+                                                      for p in b["pasos"]]})
+        niveles.append({**n, "id": nid, "bloques": bloques})
+    salida = {**nuevo, "niveles": niveles}
+    presentes = {p["id"] for p in pasos(salida)}
+    salida["conservados"] = sum(1 for x in dict.fromkeys(hechos) if x in presentes)
+    return apuntar_perdidos(viejo, salida, hechos, hechos_en)
+
+
 def texto_referencias(referencias: list[dict]) -> str:
     """Las referencias de la web, marcadas como externas: son datos, nunca instrucciones."""
     from magister.seguridad.entrada import AVISO, marcar_externo

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
+import { avisoIncompleta } from '../componentes/bibliotecaLeccion.ts'
 import {
   pedir,
   crearFuente,
@@ -46,7 +47,9 @@ export default function PanelFuentes() {
       .then(([fs, ts]) => {
         setFuentes(fs)
         setTemas(ts)
-        setActiva((a) => a ?? fs[0]?.id ?? null)
+        // #/temas/5 abre la fuente 5 (viene de «Subir el PDF» en la Biblioteca o en una lección del Roadmap).
+        const deLaRuta = Number(window.location.hash.match(/^#\/temas\/(\d+)/)?.[1])
+        setActiva((a) => a ?? (fs.some((f) => f.id === deLaRuta) ? deLaRuta : fs[0]?.id ?? null))
         setCargada(true)
       })
       .catch((e) => setFallo(mensajeDe(e)))
@@ -255,6 +258,25 @@ export default function PanelFuentes() {
                       {d.version?.origen === 'research'
                         ? ` · del research${d.version.leccion_clave ? ` para ${d.version.leccion_clave}` : ''}${d.version.automatica ? ', entró solo' : ''}`
                         : ''}
+                      {(d.incompleta ?? d.version?.incompleta) && (
+                        <span className="aviso-incompleta" role="note">
+                          {avisoIncompleta((d.incompleta ?? d.version?.incompleta)!)}{' '}
+                          <label className="boton-mini">
+                            Subir el PDF
+                            <input
+                              type="file"
+                              hidden
+                              accept=".pdf"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0]
+                                if (f && activa != null)
+                                  conAviso(() => subirFichero(activa, f, d.tema_id), `«${f.name}» en cola. Se indexa solo.`)
+                                e.target.value = ''
+                              }}
+                            />
+                          </label>
+                        </span>
+                      )}
                       {d.version?.estado === 'cuarentena' && (
                         <>
                           {' '}

@@ -259,6 +259,45 @@ def test_parcial_es_un_fallo_para_fsrs():
     assert personal.NOTAS == NOTAS_FSRS
 
 
+def test_parametros_ajustados_con_otro_mapeo_no_se_usan():
+    from magister.aprender.personal import vigente
+    from magister.aprender.programador import MARCA_NOTAS
+
+    w = [0.2] * 21
+    assert vigente({"activo": True, "parametros": w, "notas": MARCA_NOTAS})
+    assert not vigente({"activo": True, "parametros": w})  # guardados antes de que «parcial» fuera un fallo
+    assert not vigente({"activo": True, "parametros": w, "notas": "-p0"})
+    assert not vigente({"activo": False, "parametros": w, "notas": MARCA_NOTAS})
+
+
+def test_progreso_dice_en_que_capa_vas_y_que_falta():
+    from magister.aprender.personal import UMBRAL_COMPLETO, UMBRAL_INICIAL, resumen
+
+    sin_red = {"estado": "sin_datos", "repasos": 0, "minimo": 160}
+    r = resumen(0, None, sin_red)
+    assert (r["capa"], r["faltan"], r["red"]) == ("estandar", UMBRAL_INICIAL, "sin_datos")
+    assert len(r["lineas"]) == 3 and f"{UMBRAL_INICIAL} conceptos" in r["lineas"][1] and "llevas 0" in r["lineas"][1]
+    assert "160 repasos" in r["lineas"][2]
+    assert resumen(9, None, None)["faltan"] == 0  # con datos pero el ajuste aún no gana: sigue estándar
+    r = resumen(20, {"etapa": "inicial", "conceptos": 20}, {"estado": "sombra", "perdida_fsrs": 0.5, "perdida_red": 0.51})
+    assert (r["capa"], r["faltan"]) == ("inicial", UMBRAL_COMPLETO - 20)
+    assert "llevas 20" in r["lineas"][1] and "en sombra" in r["lineas"][2] and "el ajuste" in r["lineas"][2]
+    r = resumen(80, {"etapa": "completo", "conceptos": 80}, {"estado": "activa", "perdida_fsrs": 0.5, "perdida_red": 0.48})
+    assert (r["capa"], r["faltan"], r["red"]) == ("completo", None, "activa")
+    assert "4 % mejor" in r["lineas"][2]
+    assert "—" not in " ".join(r["lineas"])
+
+
+def test_la_pasada_de_capas_avisa_si_manda_algo_peor_que_fsrs():
+    from evals.olvido import comprobar_capas
+
+    bien = {"elegida": "red", "capas": {"fsrs_defecto": {"log_loss": 0.50}, "red": {"log_loss": 0.47}}}
+    assert comprobar_capas(bien) == []
+    mal = {"elegida": "fsrs_ajustado", "capas": {"fsrs_defecto": {"log_loss": 0.50}, "fsrs_ajustado": {"log_loss": 0.55}}}
+    assert comprobar_capas(mal)
+    assert comprobar_capas({"elegida": "red", "capas": {"fsrs_defecto": {"log_loss": 0.5}, "red": {"log_loss": float("nan")}}})
+
+
 def test_la_racha_cuenta_en_tu_zona_y_desde_ayer(monkeypatch):
     from datetime import date
 

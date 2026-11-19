@@ -51,6 +51,8 @@ export type EventoTutor =
       retirado?: string[]
     }
   | { tipo: 'error'; detalle: string }
+  // Ha llegado otro turno en la misma conversación y este se ha cortado (lo ya escrito queda guardado).
+  | { tipo: 'cortado'; mensaje_id: number | null; detalle?: string }
   | { tipo: 'fase'; nodo: string; detalle?: string }
   // Mientras el modelo razona sin escribir: el pulso (segundos) y, si tarda, el guion y frases para la espera.
   | { tipo: 'latido'; segundos: number }
@@ -78,7 +80,13 @@ export interface LeccionPlan {
   conceptos: ConceptoPlan[]
   horas: number
   depende_de: string[]
+  // Si hace falta buscar fuentes para estudiarla (ADR-0021) y por qué, en una frase. Opcional: los planes de antes no
+  // lo traen y el servidor los da como «conviene».
+  necesita_fuentes?: NecesitaFuentes
+  fuentes_por_que?: string
 }
+
+export type NecesitaFuentes = 'no' | 'conviene' | 'imprescindible'
 
 export interface SesionPlan {
   fecha: string
@@ -261,6 +269,8 @@ export interface ExtraMensaje {
   asesor?: boolean
   // El proyecto que tienes en pantalla: el asesor prepara sobre él los cambios que ofrece.
   proyecto_id?: number | null
+  // El plan activo de la app (Roadmap, Calendario, Hoy): el asesor mueve sus sesiones y marca o prepara sus lecciones.
+  plan_activo_id?: number | null
 }
 
 // Un cambio que propone el asesor. Las líneas las escribe el código del servidor, no el modelo; nada cambia hasta
@@ -279,12 +289,19 @@ export interface CambioAsesor {
   nuevos: string[]
   // Lo que pedías y se queda fuera de este cambio, con qué hacer.
   pendiente: string | null
+  // El plan que toca (sus pantallas se recargan al aplicarlo) y si «Deshacer» deshace algo (preparar apuntes, no).
+  plan_id?: number | null
+  deshacible?: boolean
 }
+// Una línea de la tarjeta; `deshace: false` si «Deshacer» no la deshace.
+export type LineaCambio = { texto: string; motivo: string; deshace?: boolean }
 
 // Lo que viaja en EVENTO_CAMBIO_APLICADO: qué proyecto ha cambiado y qué pasos enseñar.
 export interface CambioAplicado {
   proyecto_id: number | null
   nuevos: string[]
+  // Y qué plan (Calendario, Roadmap y Hoy recargan sus datos).
+  plan_id?: number | null
 }
 
 export const cambiosDe = (cid: number) => pedir<CambioAsesor[]>(`/api/conversaciones/${cid}/cambios`)
@@ -321,6 +338,42 @@ export interface LeccionVista extends LeccionPlan {
   estado: 'pendiente' | 'empezada' | 'hecha'
   fuentes: number
   sin_material: boolean
+  // La pequeña biblioteca de la lección: lo que el research trajo para ella y lo que falta. Opcional: un servidor de
+  // antes no lo manda.
+  biblioteca?: BibliotecaLeccion
+  // Con qué se hicieron los apuntes frente a las fuentes de ahora; null si aún no hay apuntes.
+  apuntes_fuentes?: 'sin_fuentes' | 'nuevas' | 'al_dia' | 'desconocido' | null
+  // Hay material tuyo de este tema: manda sobre la etiqueta (nunca sale «no»).
+  material_propio?: boolean
+  // La etiqueta guardada (la del plan o la tuya); `necesita_fuentes` es la que se usa. Difieren si tu material manda.
+  necesita_fuentes_guardada?: NecesitaFuentes | null
+}
+
+export interface FuenteDeLeccion {
+  propuesta_id: number
+  titulo: string
+  url: string
+  dominio: string
+  tipo: string | null
+  // Objetivos que cubre, desde 1 (de la ficha del juez; vacío en las propuestas de antes de la ficha).
+  cubre: number[]
+  resumen: string | null
+  estado: 'lista' | 'indexando' | 'problema' | 'propuesta'
+  version_id: number | null
+  documento_id: number | null
+  fuente_id: number | null
+  fragmentos: number
+  // Entró a medias (un muro de pago, solo el resumen): el motivo.
+  incompleta?: string | null
+}
+
+export interface BibliotecaLeccion {
+  fuentes: FuenteDeLeccion[]
+  // Objetivos (desde 1) sin ninguna fuente.
+  sin_fuente: number[]
+  research: 'sin_lanzar' | 'buscando' | 'acabada' | 'cortada'
+  // false: las fuentes de antes de la ficha del juez no dicen qué objetivos cubren.
+  cobertura_conocida: boolean
 }
 
 // Un examen del plan: sale del calendario (un parcial cada pocas lecciones y un final).
@@ -408,6 +461,8 @@ export interface VersionInfo {
   origen?: 'research' | null
   automatica?: boolean
   leccion_clave?: string | null
+  // Entró a medias (un muro de pago, solo el resumen): el motivo. Puede no venir.
+  incompleta?: string | null
 }
 
 export interface DocumentoInfo {
@@ -417,6 +472,7 @@ export interface DocumentoInfo {
   tema_id: number | null
   version: VersionInfo | null
   fragmentos: number
+  incompleta?: string | null
 }
 
 export interface FragmentoInfo {
@@ -458,8 +514,11 @@ export function subirFichero(fid: number, fichero: File, temaId: number | null) 
 export const subirUrl = (fid: number, url: string, tema_id: number | null) =>
   pedir<{ version_id: number }>(`/api/fuentes/${fid}/documentos`, enviarJson({ url, tema_id }))
 
-export const lanzarResearch = (plan_id: number, leccion_claves: string[]) =>
-  pedir<{ tareas: number[] }>('/api/research', enviarJson({ plan_id, leccion_claves }))
+// `objetivos` (desde 1): buscar solo para esos objetivos de la lección (vale con una sola lección).
+// `forzar`: buscar aunque la lección esté marcada «no» (los botones de una lección lo mandan; un lote, nunca).
+export const lanzarResearch = (plan_id: number, leccion_claves: string[], extra: { objetivos?: number[]; forzar?: boolean } = {}) =>
+  // `saltadas`: las que el plan marca «no necesita fuentes» (no se buscan en un lote); `aviso` lo dice en una frase.
+  pedir<{ tareas: number[]; saltadas?: string[]; aviso?: string | null }>('/api/research', enviarJson({ plan_id, leccion_claves, ...extra }))
 export const verResearch = (id: number) =>
   pedir<{
     estado: string
@@ -504,6 +563,9 @@ export interface DocumentoResumen {
   leccion_clave?: string | null
   que_paso: string | null
   reintentable: boolean
+  tema_id?: number | null
+  tema?: string | null
+  incompleta?: string | null
 }
 export interface ResumenFuentes {
   listos: number
@@ -511,6 +573,8 @@ export interface ResumenFuentes {
   con_problema: number
   problemas: DocumentoResumen[]
   del_research: DocumentoResumen[]
+  // Lo que entró a medias (un artículo con muro de pago del que solo se ve el resumen). Puede no venir.
+  incompletas?: DocumentoResumen[]
 }
 export const resumenFuentes = () => pedir<ResumenFuentes>('/api/fuentes/resumen')
 export const reintentarVersion = (vid: number) =>
@@ -537,3 +601,28 @@ export const guardarNota = (d: { texto: string; mensaje_id?: number | null; comp
 export const comentarNota = (id: number, comentario: string | null) =>
   pedir<Nota>(`/api/notas/${id}`, enviarJson({ comentario }, 'PATCH'))
 export const borrarNota = (id: number) => pedir<void>(`/api/notas/${id}`, { method: 'DELETE' })
+
+// Tus datos (Ajustes): descargarlos todos en un ZIP y las copias de seguridad de la base.
+export interface CopiaBase {
+  id: string
+  carpeta: string
+  nombre: string
+  dia: string | null
+  bytes: number
+  fecha: string
+}
+// Sin el corte de 20 s de las lecturas: preparar el ZIP con tus ficheros puede tardar.
+export async function descargarMisDatos(): Promise<{ datos: Blob; cabecera: string | null }> {
+  let r: Response
+  try {
+    r = await fetch('/api/datos/exportar')
+  } catch {
+    throw new ErrorApi(0, 'No hay conexión con Magister: ¿está en marcha el servidor?')
+  }
+  if (!r.ok) throw new ErrorApi(r.status, await detalleDe(r))
+  return { datos: await r.blob(), cabecera: r.headers.get('Content-Disposition') }
+}
+export const listarCopias = () => pedir<{ copias: CopiaBase[]; ocupado: boolean }>('/api/datos/copias')
+export const hacerCopia = () => pedir<CopiaBase>('/api/datos/copias', { method: 'POST' })
+export const restaurarCopia = (copia: string, confirmacion: string) =>
+  pedir<{ copia_previa: string; restaurada: string }>('/api/datos/copias/restaurar', enviarJson({ copia, confirmacion }))

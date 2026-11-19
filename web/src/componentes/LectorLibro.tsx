@@ -53,6 +53,7 @@ const marca = (m: string) => MARCAS[m] ?? m.charAt(0).toUpperCase() + m.slice(1)
 // Las etiquetas del motor pasan a Markdown normal: la etiqueta de un título va como h6 encima.
 function limpiar(t: string): string {
   return t
+    .replace(/^[ \t]*\$\$[ \t]*(.+?)[ \t]*\$\$[ \t]*$/gm, (_, f: string) => `$$\n${f}\n$$`)
     .replace(/^\[\[([a-z_]+)\]\]\s*/gm, (_, m: string) => `###### ${marca(m)}\n\n`)
     .replace(/^(#{1,4}) (.+?)\s*\{([^}]*)\}\s*$/gm, (_, h: string, titulo: string, attrs: string) => {
       const etq = attrs.match(/etq="([^"]*)"/)

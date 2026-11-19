@@ -63,6 +63,9 @@ class LeccionFila(Base):
     objetivos: Mapped[list[str]] = mapped_column(ARRAY(Text))
     horas: Mapped[float] = mapped_column(Float)
     orden: Mapped[int] = mapped_column(Integer)
+    # Si hace falta buscar fuentes (ADR-0021): no | conviene | imprescindible. Nula en las de antes («conviene»).
+    necesita_fuentes: Mapped[str | None] = mapped_column(String(16))
+    fuentes_por_que: Mapped[str | None] = mapped_column(Text)
 
 
 class ConceptoFila(Base):
@@ -187,6 +190,8 @@ async def guardar_plan(
                     objetivos=lec["objetivos"],
                     horas=lec["horas"],
                     orden=i,
+                    necesita_fuentes=lec.get("necesita_fuentes"),
+                    fuentes_por_que=lec.get("fuentes_por_que") or None,
                 )
             )
         await s.flush()
@@ -279,3 +284,80 @@ async def marcar_sesion(s: AsyncSession, sesion_id: int, estado: str) -> SesionF
     fila.estado = estado
     await s.commit()
     return fila
+
+
+async def ultimas_tareas_research(s: AsyncSession, plan_id: int) -> dict[str, dict]:
+    """La última búsqueda de fuentes de cada lección: su estado y los objetivos que dejó sin fuente (`sin_cubrir` de la
+    trayectoria, si el research lo anota)."""
+    filas = (await s.execute(text(
+        "select distinct on (leccion_clave) leccion_clave, estado, motivo_fin, trayectoria from tareas_research "
+        "where plan_id = :p order by leccion_clave, id desc"
+    ), {"p": plan_id})).all()
+    salida: dict[str, dict] = {}
+    for clave, estado, motivo, trayectoria in filas:
+        sin_cubrir: list[int] | None = None  # None: esta búsqueda no lo anotó (las de antes de buscar por objetivo)
+        for paso in reversed(trayectoria or []):
+            if isinstance(paso, dict) and paso.get("accion") == "sin_cubrir":
+                sin_cubrir = [int(x) for x in paso.get("objetivos") or [] if isinstance(x, int | float)]
+                break
+        salida[clave] = {"estado": estado, "motivo_fin": motivo, "sin_cubrir": sin_cubrir}
+    return salida
+
+
+async def cambiar_necesidad(s: AsyncSession, plan_id: int, clave: str, valor: str, por_que: str) -> LeccionFila | None:
+    """Lo cambias tú en el Roadmap: si esta lección necesita fuentes (no, conviene o imprescindible)."""
+    fila = await s.get(LeccionFila, (plan_id, clave))
+    if fila is None:
+        return None
+    fila.necesita_fuentes, fila.fuentes_por_que = valor, por_que
+    await s.commit()
+    return fila
+
+
+async def material_propio_de_tema(s: AsyncSession, tema_id: int) -> int:
+    """Cuántos documentos tuyos (subidos, no de la web) hay en este tema con su versión lista. Si los hay, mandan sobre
+    la etiqueta: a quien tiene los apuntes del profesor no se le dice «no hace falta»."""
+    return int(await s.scalar(text(
+        "select count(distinct d.id) from documentos d join fuentes fu on fu.id = d.fuente_id "
+        "join versiones v on v.documento_id = d.id and v.estado = 'lista' "
+        "where d.tema_id = :t and fu.tipo <> 'web' and d.uri !~* '^https?://'"
+    ), {"t": tema_id}) or 0)
+
+
+async def para_horizonte(s: AsyncSession) -> list[dict]:
+    """Por plan aceptado, lo que necesita el research automático (plan/horizonte.py): cada lección con su primera sesión
+    pendiente, si está sin material y si necesita fuentes; la última tarea de research de cada una (estado, día en que
+    se creó, motivo_fin); si hay material tuyo del tema; si el plan ya tiene filas de apoyo y si alguna tarea suya está en curso."""
+    salida = []
+    for fila, nombre in await planes_aceptados(s):
+        lecs = (await s.execute(text(
+            "select l.clave, l.necesita_fuentes, "
+            "(select min(se.fecha) from sesiones se where se.plan_id = l.plan_id and se.leccion_clave = l.clave "
+            " and se.estado = 'pendiente'), "
+            "(select la.sin_material from lecciones_apoyo la where la.plan_id = l.plan_id and la.leccion_clave = l.clave) "
+            "from lecciones l where l.plan_id = :p order by l.orden"
+        ), {"p": fila.id})).all()
+        tareas = (await s.execute(text(
+            "select distinct on (leccion_clave) leccion_clave, estado, creada_en, motivo_fin from tareas_research "
+            "where plan_id = :p order by leccion_clave, id desc"
+        ), {"p": fila.id})).all()
+        salida.append({
+            "plan_id": fila.id, "tema_id": fila.tema_id, "tema": nombre,
+            "con_apoyo": any(sin is not None for *_, sin in lecs),
+            "en_curso": any(estado == "en_curso" for _, estado, *_ in tareas),
+            # Con material tuyo del tema, ninguna lección es «no» (plan/apoyo.py, necesidad_efectiva).
+            "material_propio": (await material_propio_de_tema(s, fila.tema_id) > 0) if fila.tema_id is not None else False,
+            "lecciones": [{"clave": c, "necesita_fuentes": n, "primera_sesion": f, "sin_material": True if sin is None else sin}
+                          for c, n, f, sin in lecs],
+            "tareas": {c: (estado, creada.date(), motivo) for c, estado, creada, motivo in tareas},
+        })
+    return salida
+
+
+async def versiones_de_apuntes(s: AsyncSession, plan_id: int) -> dict[str, dict]:
+    """De los últimos apuntes terminados de cada lección, con qué se hicieron (`materiales.versiones`)."""
+    filas = (await s.execute(text(
+        "select distinct on (leccion_clave) leccion_clave, versiones from materiales "
+        "where plan_id = :p and tipo = 'apuntes' and estado in ('listo', 'revisar') order by leccion_clave, id desc"
+    ), {"p": plan_id})).all()
+    return {clave: (v if isinstance(v, dict) else {}) for clave, v in filas}

@@ -5,6 +5,8 @@ import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import { celebrar } from '../componentes/animo.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
+import { avisoRehacer, resumenRehecho, type HechoQueYaNoEsta } from './rehacerProyecto.ts'
+import { agruparReferencias, leerIdea, olvidarIdea, tituloDePaso, type Referencia } from './referenciasProyecto.ts'
 
 // Proyectos: le cuentas lo que quieres construir y saca el roadmap de construcción. Arriba, la explicación del
 // proyecto (qué es, por qué, arquitectura, glosario, riesgos); debajo, los niveles con sus bloques y pasos. Encima de
@@ -44,6 +46,9 @@ interface Roadmap {
   niveles: Nivel[]
   riesgos: { riesgo: string; mitigacion: string }[]
   fuera_de_alcance: string[]
+  // Si viene de rehacer otro: cuántos pasos hechos siguen y lo hecho de los que ya no están.
+  conservados?: number
+  ya_no_estan?: HechoQueYaNoEsta[]
 }
 interface Progreso {
   pasos: number
@@ -64,10 +69,11 @@ interface Proyecto extends ProyectoResumen {
   sabes: string | null
   ritmo: string | null
   roadmap: Roadmap | null
-  referencias: { url: string; titulo: string; motivo: string }[]
+  referencias: Referencia[]
   arquitectura_svg: string | null
   hechos: string[]
   hechos_en?: Record<string, string>
+  anterior?: boolean // hay un roadmap de antes del último «rehacer» al que volver
   trabajo?: { id: number; estado: string; nodo: string | null; trabajador_vivo?: boolean } | null
 }
 interface Decision {
@@ -245,7 +251,8 @@ function Barra({ p }: { p: Progreso }) {
 
 function ListaProyectos({ alAbrir }: { alAbrir: (id: number) => void }) {
   const [lista, setLista] = useState<ProyectoResumen[] | null>(null)
-  const [nuevo, setNuevo] = useState(false)
+  // Con una idea traída del plan, el formulario sale ya abierto.
+  const [nuevo, setNuevo] = useState(() => leerIdea() !== '')
   const [fallo, setFallo] = useState<string | null>(null)
   const cargar = useCallback(() => {
     setFallo(null)
@@ -311,7 +318,9 @@ function ListaProyectos({ alAbrir }: { alAbrir: (id: number) => void }) {
 }
 
 function NuevoProyecto({ alCrear, alCancelar }: { alCrear: (id: number) => void; alCancelar?: () => void }) {
-  const [f, setF] = useState({ nombre: '', idea: '', objetivo: '', sabes: '', ritmo: '', investigar: true })
+  // Si vienes de «Llevar a Proyectos» en el plan, la idea ya está escrita; se toma una vez y se olvida.
+  const [f, setF] = useState(() => ({ nombre: '', idea: leerIdea(), objetivo: '', sabes: '', ritmo: '', investigar: true }))
+  useEffect(() => olvidarIdea(), [])
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cambiar = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
@@ -378,6 +387,8 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   const [p, setP] = useState<Proyecto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  // «Rehacer el roadmap» abierto: antes de gastar cuota, lo que va a pasar con lo hecho.
+  const [rehaciendo, setRehaciendo] = useState(false)
   // Un fallo suelto mientras se mira cómo va la generación no tapa el proyecto: la siguiente vuelta lo reintenta.
   const cargar = useCallback(
     () =>
@@ -465,6 +476,20 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
       await pedir(`/api/proyectos/${id}/niveles/${numero}/detallar`, { method: 'POST' })
       await cargar()
     }, 'detallar el nivel')
+  const rehacer = () =>
+    accion(async () => {
+      await pedir(`/api/proyectos/${id}/rehacer`, enviarJson({ confirmado: true }))
+      setRehaciendo(false)
+      await cargar()
+    }, 'rehacer el roadmap')
+  const volverAnterior = async () => {
+    if (!window.confirm('¿Volver al roadmap anterior? El de ahora se guarda por si quieres regresar a él.')) return
+    await accion(async () => {
+      await pedir(`/api/proyectos/${id}/volver`, { method: 'POST' })
+      await cargar()
+    }, 'volver al roadmap anterior')
+  }
+  const rehecho = r ? resumenRehecho(r.conservados, r.ya_no_estan ?? []) : null
 
   return (
     <div className="panel proyecto">
@@ -586,16 +611,21 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
             {p.referencias.length > 0 && (
               <details>
                 <summary>Referencias · {p.referencias.length}</summary>
-                <ul>
-                  {p.referencias.map((x) => (
-                    <li key={x.url}>
-                      <a href={x.url} target="_blank" rel="noopener noreferrer">
-                        {x.titulo}
-                      </a>
-                      {x.motivo && <span className="nota"> · {x.motivo}</span>}
-                    </li>
-                  ))}
-                </ul>
+                {agruparReferencias(p.referencias, r.niveles[0]?.bloques ?? []).map((g, i) => (
+                  <div key={i}>
+                    {g.titulo && <h4>{g.titulo}</h4>}
+                    <ul>
+                      {g.referencias.map((x) => (
+                        <li key={x.url}>
+                          <a href={x.url} target="_blank" rel="noopener noreferrer">
+                            {x.titulo}
+                          </a>
+                          {x.motivo && <span className="nota"> · {x.motivo}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </details>
             )}
           </div>
@@ -606,15 +636,58 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
               Lo último que pediste no salió: {p.error}
             </p>
           )}
+          {rehecho && (
+            <div className="proyecto-rehecho">
+              <p className="nota">{rehecho}</p>
+              {(r.ya_no_estan ?? []).length > 0 && (
+                <details>
+                  <summary>Hechos que ya no están · {r.ya_no_estan!.length}</summary>
+                  <ul>
+                    {r.ya_no_estan!.map((x) => (
+                      <li key={x.id}>
+                        {x.titulo}
+                        {x.hecho_en && <span className="nota"> · hecho el {new Date(x.hecho_en).toLocaleDateString('es-ES')}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
           {r.niveles.map((n) => (
             <NivelVista key={n.id} n={n} hechos={hechos} proyecto={p} alMarcar={marcar} alDetallar={() => detallar(n.numero)} ocupado={p.estado === 'generando'} />
           ))}
 
-          <Diario id={id} pasos={r.niveles.flatMap((n) => n.bloques.flatMap((b) => b.pasos))} alCambiar={setUltimaDecision} />
+          <Diario id={id} pasos={r.niveles.flatMap((n) => n.bloques.flatMap((b) => b.pasos))} yaNoEstan={r.ya_no_estan ?? []} alCambiar={setUltimaDecision} />
         </>
       )}
 
+      {rehaciendo && r && p.estado === 'listo' && (
+        <div className="proyecto-rehacer" role="group" aria-label="Rehacer el roadmap">
+          <p>{avisoRehacer(p.progreso.hechos)}</p>
+          <p className="nota">Gasta cuota, como hacerlo la primera vez:</p>
+          <BarraCuota accion={{ accion: 'proyecto' }} />
+          <div className="botones">
+            <button className="boton boton-principal" onClick={() => void rehacer()}>
+              Rehacer el roadmap
+            </button>
+            <button type="button" className="boton" onClick={() => setRehaciendo(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
       <p className="proyecto-pie">
+        {r && p.estado === 'listo' && !rehaciendo && (
+          <button type="button" className="boton-mini" onClick={() => setRehaciendo(true)}>
+            Rehacer el roadmap
+          </button>
+        )}
+        {p.anterior && p.estado === 'listo' && (
+          <button type="button" className="boton-mini" onClick={() => void volverAnterior()}>
+            Volver al roadmap anterior
+          </button>
+        )}
         <button
           className="boton-mini peligro"
           onClick={async () => {
@@ -770,7 +843,13 @@ function PasoVista({ x, hecho, proyecto, nivel, bloque, alMarcar }: {
   )
 }
 
-function Diario({ id, pasos, alCambiar }: { id: number; pasos: Paso[]; alCambiar?: (ultima: Decision | null) => void }) {
+function Diario({ id, pasos, yaNoEstan = [], alCambiar }: {
+  id: number
+  pasos: Paso[]
+  // Los pasos hechos que ya no están tras rehacer el roadmap: una decisión puede seguir apuntando a uno de ellos.
+  yaNoEstan?: HechoQueYaNoEsta[]
+  alCambiar?: (ultima: Decision | null) => void
+}) {
   const [lista, setLista] = useState<Decision[]>([])
   const [f, setF] = useState({ titulo: '', contexto: '', decision: '', consecuencias: '', paso_id: '' })
   const [abierto, setAbierto] = useState(false)
@@ -787,7 +866,10 @@ function Diario({ id, pasos, alCambiar }: { id: number; pasos: Paso[]; alCambiar
     window.addEventListener(EVENTO_CAMBIO_APLICADO, al)
     return () => window.removeEventListener(EVENTO_CAMBIO_APLICADO, al)
   }, [id, cargar])
-  const titulo = (pid: string | null) => pasos.find((x) => x.id === pid)?.titulo
+  const enPaso = (pid: string | null) => {
+    const t = tituloDePaso(pid, pasos, yaNoEstan)
+    return t ? ` · en «${t.titulo}»${t.yaNoEsta ? ' (ya no está en el roadmap)' : ''}` : ''
+  }
   return (
     <section className="proyecto-diario">
       <header>
@@ -857,7 +939,7 @@ function Diario({ id, pasos, alCambiar }: { id: number; pasos: Paso[]; alCambiar
               <span className="nota">
                 {' '}
                 · {new Date(d.creada_en).toLocaleDateString('es-ES')}
-                {d.paso_id && titulo(d.paso_id) ? ` · en «${titulo(d.paso_id)}»` : ''}
+                {enPaso(d.paso_id)}
               </span>
               {d.contexto && <p className="nota">{d.contexto}</p>}
               <p>{d.decision}</p>

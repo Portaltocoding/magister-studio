@@ -37,7 +37,7 @@ from magister.config import ajustes
 from magister.fuentes.embeber import embeber
 from magister.fuentes.reranker import reordenar
 from magister.research.agente import Accion, presupuesto_agotado
-from magister.research.fijo import describir
+from magister.research.fijo import describir, normalizar
 from magister.research.herramientas import Herramientas, delimitar, Lectura, neutro
 
 
@@ -102,7 +102,8 @@ class Veredicto(BaseModel):
 
 
 def _norm(t: str) -> str:
-    return " ".join(t.lower().split())
+    # La misma normalización que la cita del flujo fijo (comillas, guiones, Markdown del extractor).
+    return normalizar(t)
 
 
 def _coseno(a: list[float], b: list[float]) -> float:

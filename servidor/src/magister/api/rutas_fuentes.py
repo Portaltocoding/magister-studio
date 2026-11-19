@@ -48,11 +48,14 @@ def _version(v: Version) -> dict:
 
 
 def _origen(metadatos: dict | None) -> dict:
-    """De dónde vino: «research» (y si entró solo y para qué lección) o nada si lo subiste tú."""
+    """De dónde vino: «research» (y si entró solo y para qué lección) o nada si lo subiste tú. Y si entró solo un
+    pedazo, `incompleta` con el motivo (lo escribe fuentes.extraer en `metadatos.incompleta`), venga de donde venga."""
     m = metadatos or {}
+    incompleta = m.get("incompleta") or None
     if m.get("origen") != "research":
-        return {"origen": None}
-    return {"origen": "research", "automatica": bool(m.get("automatica")), "leccion_clave": m.get("leccion_clave")}
+        return {"origen": None, "incompleta": incompleta}
+    return {"origen": "research", "automatica": bool(m.get("automatica")), "leccion_clave": m.get("leccion_clave"),
+            "incompleta": incompleta}
 
 
 @rutas.get("/fuentes")
@@ -75,7 +78,7 @@ async def documentos(fid: int, s: AsyncSession = Depends(sesion_por_peticion)) -
         raise HTTPException(404, "fuente no encontrada")
     return [
         {"id": d.id, "titulo": d.titulo, "uri": d.uri, "tema_id": d.tema_id, "version": _version(v) if v else None,
-         "fragmentos": n}
+         "fragmentos": n, "incompleta": ((v.metadatos or {}).get("incompleta") if v else None) or getattr(d, "incompleta", None)}
         for d, v, n in await rf.documentos_de_fuente(s, fid)
     ]
 
@@ -179,11 +182,17 @@ async def resumen_documentos(s: AsyncSession = Depends(sesion_por_peticion)) -> 
     listos = indexando = 0
     problemas: list[dict] = []
     del_research: list[dict] = []
+    incompletas: list[dict] = []
     for d in await rf.ultimas_versiones(s):
         claro, reintentar = ingesta.explicar_problema(d["estado"], d["motivo"], d["con_texto"], d["fragmentos"])
         fila = {k: d[k] for k in ("documento_id", "titulo", "uri", "fuente_id", "fuente", "version_id", "estado", "motivo",
                                   "fragmentos")}
         fila |= {**_origen(d["metadatos"]), "que_paso": claro or None, "reintentable": reintentar is not None}
+        # Para agrupar por tema en la Biblioteca y avisar de lo que entró a medias (solo el resumen de un artículo).
+        fila |= {"tema_id": d.get("tema_id"), "tema": d.get("tema"),
+                 "incompleta": fila.get("incompleta") or d.get("incompleta")}
+        if fila["incompleta"] and d["estado"] != "retirada":
+            incompletas.append(fila)
         if claro:
             problemas.append(fila)
         elif d["estado"] == "lista":
@@ -193,7 +202,7 @@ async def resumen_documentos(s: AsyncSession = Depends(sesion_por_peticion)) -> 
         if fila["origen"] == "research" and d["estado"] != "retirada":
             del_research.append(fila)
     return {"listos": listos, "indexando": indexando, "con_problema": len(problemas), "problemas": problemas,
-            "del_research": sorted(del_research, key=lambda x: -x["version_id"])[:200]}
+            "del_research": sorted(del_research, key=lambda x: -x["version_id"])[:200], "incompletas": incompletas}
 
 
 @rutas.post("/versiones/{vid}/reintentar", status_code=202)

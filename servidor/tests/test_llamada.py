@@ -103,15 +103,21 @@ async def test_los_turnos_de_la_llamada_no_pasan_por_el_juez_de_explicaciones(mo
 
 
 @pytest.mark.anyio
-async def test_dos_turnos_a_la_vez_van_uno_detras_de_otro(cliente, monkeypatch) -> None:
+async def test_dos_turnos_a_la_vez_no_razonan_a_la_vez(cliente, monkeypatch) -> None:
     from magister.flujo import comun as rc
 
     vistos = []
+    a_la_vez = {"ahora": 0, "maximo": 0}
 
     async def lento(sistema, historial, tarea=None):
         vistos.append([(t.rol, t.contenido) for t in historial])
-        await asyncio.sleep(0.3)
-        yield f"respuesta {len(vistos)}"
+        a_la_vez["ahora"] += 1
+        a_la_vez["maximo"] = max(a_la_vez["maximo"], a_la_vez["ahora"])
+        try:
+            await asyncio.sleep(0.3)
+            yield f"respuesta {len(vistos)}"
+        finally:
+            a_la_vez["ahora"] -= 1
 
     monkeypatch.setattr(rc, "generar", lento)
     cid = (await cliente.post("/api/conversaciones", json={"titulo": "Prueba"})).json()["id"]
@@ -119,9 +125,12 @@ async def test_dos_turnos_a_la_vez_van_uno_detras_de_otro(cliente, monkeypatch) 
         cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "uno"}),
         cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "dos"}),
     )
-    # El segundo ve la respuesta del primero, y su propia pregunta va al final.
-    assert ("tutor", "respuesta 1") in vistos[1]
-    assert vistos[1][-1][0] == "usuario"
+    # El que llega después corta al anterior: nunca hay dos razonando a la vez, y su pregunta va al final.
+    assert a_la_vez["maximo"] == 1
+    assert vistos[-1][-1][0] == "usuario"
+    m = (await cliente.get(f"/api/conversaciones/{cid}/mensajes")).json()
+    assert sorted(x["contenido"] for x in m if x["rol"] == "usuario") == ["dos", "uno"]
+    assert sum(1 for x in m if x["rol"] == "tutor" and x["estado"] == "completo") == 1
 
 
 @pytest.mark.anyio

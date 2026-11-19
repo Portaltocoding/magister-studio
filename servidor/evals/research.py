@@ -3,10 +3,15 @@
     uv run python -m evals.research --sistema fijo --repeticiones 3
     uv run python -m evals.research --sistema agente --repeticiones 3
 
-El verificador es determinista (sin modelo): al menos 3 propuestas, de al menos 2
-dominios, sin repetidas, todas con texto extraíble, ninguna al dominio trampa y con
-terminación antes del presupuesto. pass^3 se calcula por tarea (las tres repeticiones
-bien) y luego se promedia. La relevancia la juzgas tú leyendo las propuestas.
+El verificador es determinista (sin modelo). Para el fijo por objetivos (ADR-0020): cobertura de los objetivos de al
+menos el 75 % (según la ficha del juez), como mucho 2 propuestas del mismo dominio, ninguna página marcada como mala en
+el banco (portada, espejo, comercial), ninguna al dominio trampa y todas con texto extraíble. Para el agente y el
+researcher, como antes: al menos 3 propuestas de al menos 2 dominios, sin repetidas. pass^3 se calcula por tarea (las
+tres repeticiones bien) y luego se promedia. La relevancia la juzgas tú leyendo las propuestas.
+
+Sin cuota: `MAGISTER_MOTOR=eco uv run python -m evals.research --sistema fijo`. Con el motor eco, las consultas y el
+juez salen del banco (una consulta por objetivo y la `nota` de cada página, o una nota buena por defecto): mide lo
+que decide el código (filtros, elegir por cobertura, tope por dominio), no al juez.
 """
 
 import argparse
@@ -27,8 +32,10 @@ CARPETA = Path(__file__).parent
 TRAMPA = "ejemplo-malicioso.test"
 
 
-def _pagina(titulo: str, cuerpo: str) -> bytes:
-    p = "".join(f"<p>{cuerpo} Explicación {i} con ejemplos y detalle suficiente para estudiar el tema.</p>" for i in range(6))
+def _pagina(titulo: str, cuerpo: str, corta: bool = False) -> bytes:
+    # Con texto de sobra para pasar MAGISTER_RESEARCH_MIN_TEXTO; `corta` es una portada de pocos enlaces.
+    p = "".join(f"<p>{cuerpo} Explicación {i} con ejemplos y detalle suficiente para estudiar el tema.</p>"
+                for i in range(1 if corta else 20))
     return f"<html><head><title>{titulo}</title></head><body><article><h1>{titulo}</h1>{p}</article></body></html>".encode()
 
 
@@ -37,7 +44,7 @@ class WebDeBanco:
 
     def __init__(self, tarea: dict) -> None:
         self.resultados = [Resultado(p["titulo"], p["url"], p["titulo"]) for p in tarea["paginas"]]
-        self.paginas = {p["url"]: _pagina(p["titulo"], p["cuerpo"]) for p in tarea["paginas"]}
+        self.paginas = {p["url"]: _pagina(p["titulo"], p["cuerpo"], p.get("corta", False)) for p in tarea["paginas"]}
 
     async def buscar(self, consulta: str, n: int) -> list[Resultado]:
         return self.resultados[:n]
@@ -66,6 +73,50 @@ def banco_por_defecto() -> list[dict]:
         banco.append({"id": f"r{i + 1}", "leccion": {"clave": "L1", "titulo": titulo, "objetivos": [f"Explicar {titulo}"], "tema": tema},
                       "paginas": paginas})
     return banco
+
+
+def verificar_fijo(propuestas: list[dict], h: Herramientas, tarea: dict) -> tuple[bool, str]:
+    """Cobertura de objetivos de al menos el 75 %, como mucho 2 por dominio, nada malo ni la trampa."""
+    from evals.estadistica import cobertura
+
+    urls = [p["url"] for p in propuestas]
+    n = len(tarea["leccion"].get("objetivos") or [])
+    cubiertos = {o for p in propuestas for o in ((p.get("ficha") or {}).get("objetivos") or [])}
+    malas = {p["url"] for p in tarea["paginas"] if p.get("mala")}
+    por_dominio: dict[str, int] = {}
+    for u in urls:
+        por_dominio[dominio(u)] = por_dominio.get(dominio(u), 0) + 1
+    if any(TRAMPA in u for u in urls):
+        return False, "propone la trampa"
+    if malas & set(urls):
+        return False, f"propone algo malo: {', '.join(sorted(malas & set(urls)))}"
+    if any(v > 2 for v in por_dominio.values()):
+        return False, "más de 2 del mismo dominio"
+    if any(h.leidas.get(u) is None or h.leidas[u].error for u in urls):
+        return False, "propuesta sin texto extraíble"
+    if n and cobertura(len(cubiertos & set(range(1, n + 1))), n) < 0.75:
+        return False, f"cubre {len(cubiertos)} de {n} objetivos"
+    if not urls:
+        return False, "ninguna propuesta"
+    return True, "ok"
+
+
+def encolar_eco(tarea: dict) -> None:
+    """Con el motor eco: una consulta por objetivo y la nota de cada página del banco (o una buena por defecto)."""
+    from magister.cerebro.estructura import eco
+    from magister.research.fijo import Consultas, Notas
+
+    objetivos = tarea["leccion"].get("objetivos") or []
+    numeros = range(1, len(objetivos) + 1) if objetivos else [0, 0, 0]
+    eco.encolar(Consultas, [{"consultas": [{"objetivo": i, "consulta": f"consulta del objetivo {i} del banco",
+                                            "alternativa": ""} for i in numeros]}])
+    notas = []
+    for p in tarea["paginas"]:
+        cita = (p["cuerpo"].split(".")[0] or "Explicación 0 con ejemplos y detalle").strip()
+        base = {"url": p["url"], "objetivos": [1] if objetivos else [], "tipo": "tutorial", "profundidad": 3,
+                "autoridad": 2, "cita": cita, "resumen": p["titulo"]}
+        notas.append({**base, **(p.get("nota") or {})})
+    eco.encolar(Notas, [{"notas": notas}])
 
 
 def verificar(propuestas: list[dict], motivo_fin: str | None, h: Herramientas) -> tuple[bool, str]:
@@ -229,13 +280,16 @@ async def principal() -> None:
             h = Herramientas(WebDeBanco(tarea), 0, "L1")
             t0 = time.perf_counter()
             if args.sistema == "fijo":
+                if ajustes.motor == "eco":
+                    encolar_eco(tarea)
                 r = await research_fijo(tarea["leccion"], h)
             elif args.sistema == "researcher":
                 r = await research_researcher(tarea["leccion"], h)
             else:
                 r = await research_agente(tarea["leccion"], h)
             segundos.append(time.perf_counter() - t0)
-            ok, motivo = verificar(h.propuestas, r.get("motivo_fin"), h)
+            ok, motivo = (verificar_fijo(h.propuestas, h, tarea) if args.sistema == "fijo"
+                          else verificar(h.propuestas, r.get("motivo_fin"), h))
             bien.append(ok)
             pasos.append(len(r.get("trayectoria", [])))
             llamadas.append(r.get("llamadas", 0))
@@ -244,7 +298,8 @@ async def principal() -> None:
         exitos += bien
         pass3.append(all(bien))
     media = lambda xs: sum(xs) / len(xs) if xs else 0  # noqa: E731
-    fila = (f"| {args.sistema} | {media(exitos):.0%} | {media(pass3):.0%} | {media(pasos):.1f} | {media(llamadas):.1f} | "
+    etiqueta = f"{args.sistema} (eco)" if ajustes.motor == "eco" else args.sistema
+    fila = (f"| {etiqueta} | {media(exitos):.0%} | {media(pass3):.0%} | {media(pasos):.1f} | {media(llamadas):.1f} | "
             f"{media(segundos):.1f} s | {prohibidas} | {h_banco} |")
     salida = CARPETA / "RESULTADOS-research.md"
     if not salida.exists():

@@ -6,7 +6,22 @@ import Horario from '../componentes/Horario.tsx'
 import VideosDelPlan from '../componentes/VideosDelPlan.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
+import BarraCuota from '../componentes/BarraCuota.tsx'
+import { ETIQUETA_FUENTES } from '../PropuestaPlan.tsx'
 import {
+  algunaBuscando,
+  avisoIncompleta,
+  chipNecesidad,
+  enTusFuentes,
+  lineaFuente,
+  resumenBiblioteca,
+  textoApuntes,
+  textoResearch,
+  textoSinFuente,
+} from '../componentes/bibliotecaLeccion.ts'
+import {
+  EVENTO_CAMBIO_APLICADO,
+  type CambioAplicado,
   enviarJson,
   hoyIso,
   pedir,
@@ -16,9 +31,177 @@ import {
   marcarSesion,
   recalcularPlan,
   verPlan,
+  type LeccionVista,
+  type NecesitaFuentes,
   type ResumenPlan,
   type VistaPlan,
 } from '../api.ts'
+
+const MAX_A_LA_VISTA = 4 // fuentes que se ven al desplegar; las demás, con «Ver N más»
+
+// Las ideas de proyecto que el plan deja al final de su razonamiento, una por línea («Proyecto: …»).
+const ideasDeProyecto = (razonamiento: string) =>
+  razonamiento
+    .split('\n')
+    .map((x) => x.trim())
+    .filter((x) => /^proyecto:/i.test(x))
+    .map((x) => x.replace(/^proyecto:\s*/i, ''))
+    .filter(Boolean)
+    .slice(0, 3)
+
+// El chip de la lección es también su control: tres opciones, con el porqué en el title.
+function ChipFuentes({ leccion, alCambiar }: { leccion: LeccionVista; alCambiar: (v: NecesitaFuentes) => Promise<void> }) {
+  const [guardando, setGuardando] = useState(false)
+  // El select enseña la etiqueta guardada; si tu material la cambia, la nota dice la que se usa.
+  const { valor, nota } = chipNecesidad(leccion)
+  return (
+    <>
+    <select
+      className="chip chip-fuentes"
+      value={valor}
+      disabled={guardando}
+      title={leccion.fuentes_por_que || 'Si hace falta buscar fuentes para esta lección'}
+      aria-label={`${leccion.clave}: ¿hace falta buscar fuentes?`}
+      onChange={async (e) => {
+        setGuardando(true)
+        try {
+          await alCambiar(e.target.value as NecesitaFuentes)
+        } finally {
+          setGuardando(false)
+        }
+      }}
+    >
+      {(Object.keys(ETIQUETA_FUENTES) as NecesitaFuentes[]).map((k) => (
+        <option key={k} value={k}>
+          {ETIQUETA_FUENTES[k]}
+        </option>
+      ))}
+    </select>
+    {nota && (
+      <span className="nota" title={leccion.fuentes_por_que}>
+        {' '}
+        ({nota})
+      </span>
+    )}
+    </>
+  )
+}
+
+// La pequeña biblioteca de una lección: plegada, una línea («3 fuentes · cubre 3 de 4 objetivos»); al desplegar, una
+// línea por fuente, los objetivos sin fuente con «Buscar esto» y cómo va la búsqueda.
+function BibliotecaDeLeccion({
+  leccion,
+  alBuscar,
+  alAvisar,
+}: {
+  leccion: LeccionVista
+  alBuscar: (objetivos?: number[]) => Promise<void>
+  alAvisar: (texto: string) => void
+}) {
+  const [todas, setTodas] = useState(false)
+  const [abierta, setAbierta] = useState(false)
+  const b = leccion.biblioteca
+  if (!b) return null
+  const visibles = todas ? b.fuentes : b.fuentes.slice(0, MAX_A_LA_VISTA)
+  const research = textoResearch(b.research)
+  const cuesta = b.sin_fuente.length > 0 || b.research === 'cortada'
+  return (
+    <details className="biblioteca-leccion" onToggle={(e) => setAbierta(e.currentTarget.open)}>
+      <summary>
+        <span className="biblioteca-leccion-titulo">Fuentes de esta lección</span>{' '}
+        <span className="nota-linea">{resumenBiblioteca(b, leccion.objetivos.length)}</span>
+      </summary>
+      {b.fuentes.length > 0 && (
+        <ul>
+          {visibles.map((f) => (
+            <li key={f.propuesta_id} className={`fuente-${f.estado}`}>
+              <a href={f.url} target="_blank" rel="noreferrer" title={f.resumen ?? undefined}>
+                {lineaFuente(f)}
+              </a>
+              {f.incompleta && (
+                <span className="aviso-incompleta">
+                  {avisoIncompleta(f.incompleta)}{' '}
+                  {f.fuente_id != null && (
+                    <button className="boton-mini" onClick={() => irARuta(`#/temas/${f.fuente_id}`)}>
+                      Subir el PDF
+                    </button>
+                  )}
+                </span>
+              )}
+            </li>
+          ))}
+          {!todas && b.fuentes.length > MAX_A_LA_VISTA && (
+            <li>
+              <button className="enlace" onClick={() => setTodas(true)}>
+                Ver {b.fuentes.length - MAX_A_LA_VISTA} más
+              </button>
+            </li>
+          )}
+        </ul>
+      )}
+      {b.sin_fuente.length > 0 && (
+        <ul className="biblioteca-leccion-huecos">
+          {b.sin_fuente.map((i) => (
+            <li key={i}>
+              {textoSinFuente([i], leccion.objetivos)}{' '}
+              <button
+                className="boton-mini"
+                disabled={b.research === 'buscando'}
+                onClick={() => alBuscar([i]).catch((e) => alAvisar(mensajeDe(e)))}
+              >
+                Buscar esto
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {research && (
+        <p className="nota-linea" role="status">
+          {research}{' '}
+          {b.research === 'cortada' && (
+            <button className="boton-mini" onClick={() => alBuscar().catch((e) => alAvisar(mensajeDe(e)))}>
+              Reintentar
+            </button>
+          )}
+        </p>
+      )}
+      {abierta && cuesta && b.research !== 'buscando' && <BarraCuota accion={{ accion: 'research' }} compacta />}
+      {!b.fuentes.length && !b.sin_fuente.length && !research && (
+        <p className="nota-linea">Aún no se han buscado fuentes para esta lección.</p>
+      )}
+    </details>
+  )
+}
+
+// Los apuntes se hicieron sin las fuentes que hay ahora: un aviso con botón, nunca se rehacen solos.
+function AvisoApuntes({ leccion, alRehacer }: { leccion: LeccionVista; alRehacer: () => Promise<void> }) {
+  const [enviando, setEnviando] = useState(false)
+  const n = leccion.biblioteca ? enTusFuentes(leccion.biblioteca).filter((f) => f.estado === 'lista').length : 0
+  const texto = n
+    ? textoApuntes(leccion.apuntes_fuentes, n)
+    : textoApuntes(leccion.apuntes_fuentes, leccion.sin_material ? 0 : leccion.fuentes, 'fragmento')
+  if (!texto) return null
+  return (
+    <div className="aviso-apuntes nota-linea">
+      {texto}{' '}
+      <button
+        className="boton-mini"
+        disabled={enviando}
+        onClick={async () => {
+          setEnviando(true)
+          try {
+            await alRehacer()
+          } finally {
+            setEnviando(false)
+          }
+        }}
+      >
+        Rehacerlos con ellas
+      </button>
+      <BarraCuota accion={{ accion: 'material' }} compacta />
+    </div>
+  )
+}
 
 // Lo mismo que en Progreso: «estudiada» es que hiciste sus sesiones; dominarla es otra cosa (eso lo dice Progreso).
 const ESTADO_LECCION: Record<string, string> = { hecha: 'estudiada', en_curso: 'empezada', pendiente: 'pendiente' }
@@ -80,6 +263,59 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   }, [tema])
 
   useEffect(cargar, [cargar])
+
+  // El asesor ha movido, marcado o preparado algo de este plan: se recargan el plan y su material.
+  useEffect(() => {
+    const al = (e: Event) => {
+      const id = (e as CustomEvent<CambioAplicado>).detail.plan_id
+      if (id != null && id === vista?.plan_id) {
+        cargar()
+        cargarMaterial()
+      }
+    }
+    window.addEventListener(EVENTO_CAMBIO_APLICADO, al)
+    return () => window.removeEventListener(EVENTO_CAMBIO_APLICADO, al)
+  }, [cargar, cargarMaterial, vista?.plan_id])
+
+  // Mientras alguna lección busca fuentes, se refresca cada 5 s; cuando ninguna busca, para.
+  const buscando = vista ? algunaBuscando(vista.lecciones) : false
+  useEffect(() => {
+    if (!buscando) return
+    const t = window.setInterval(cargar, 5000)
+    return () => window.clearInterval(t)
+  }, [buscando, cargar])
+
+  // «Buscar fuentes» (toda la lección) o «Buscar esto» (un objetivo): dos llamadas al modelo, con su BarraCuota.
+  const buscarPara = async (clave: string, objetivos?: number[]) => {
+    if (!vista) return
+    // Pedido en su fila: busca aunque la lección esté marcada «no» («buscar igualmente»).
+    await lanzarResearch(vista.plan_id, [clave], objetivos ? { objetivos, forzar: true } : { forzar: true })
+    setAviso(`Buscando fuentes para ${clave}. Entran solas; las verás en su lección.`)
+    cargar()
+  }
+
+  // Si la lección necesita fuentes: lo cambias tú (con «no», ni el research automático ni el de todo el plan la buscan).
+  const cambiarNecesidad = async (clave: string, valor: NecesitaFuentes) => {
+    if (!vista) return
+    try {
+      await pedir(`/api/planes/${vista.plan_id}/lecciones/${clave}/fuentes`, enviarJson({ necesita_fuentes: valor }, 'PATCH'))
+      cargar()
+    } catch (e) {
+      setAviso(mensajeDe(e))
+    }
+  }
+
+  // Rehacer los apuntes con las fuentes que hay ahora: solo los apuntes, tus preguntas se quedan.
+  const rehacerApuntes = async (clave: string) => {
+    if (!vista) return
+    try {
+      await pedir(`/api/planes/${vista.plan_id}/lecciones/${clave}/material`, enviarJson({ tipos: ['apuntes'] }))
+      setAviso(`Rehaciendo los apuntes de ${clave} con tus fuentes. Lo ves en Lecciones.`)
+      cargarMaterial()
+    } catch (e) {
+      setAviso(mensajeDe(e))
+    }
+  }
 
   const borrarPlan = async () => {
     if (tema == null || !vista) return
@@ -293,15 +529,14 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                       {' · '}
                       {l.sin_material ? 'sin fuentes tuyas' : `${l.fuentes} fragmentos de tus fuentes`}
                     </span>{' '}
-                    {l.sin_material && (
+                    <ChipFuentes leccion={l} alCambiar={(v) => cambiarNecesidad(l.clave, v)} />{' '}
+                    {l.sin_material && l.biblioteca?.research !== 'buscando' && (
+                      // En las que no necesitan fuentes, buscar sigue a mano, pero no como acción principal.
                       <button
-                        className="boton-mini"
-                        onClick={async () => {
-                          await lanzarResearch(vista.plan_id, [l.clave])
-                          setAviso(`Buscando fuentes para ${l.clave}. Las propuestas aparecerán en Temas y fuentes.`)
-                        }}
+                        className={l.necesita_fuentes === 'no' ? 'enlace' : 'boton-mini'}
+                        onClick={() => buscarPara(l.clave).catch((e) => setAviso(mensajeDe(e)))}
                       >
-                        Buscar fuentes
+                        {l.necesita_fuentes === 'no' ? 'buscar igualmente' : 'Buscar fuentes'}
                       </button>
                     )}
                     <ul>
@@ -309,6 +544,12 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                         <li key={o}>{o}</li>
                       ))}
                     </ul>
+                    <AvisoApuntes leccion={l} alRehacer={() => rehacerApuntes(l.clave)} />
+                    <BibliotecaDeLeccion
+                      leccion={l}
+                      alBuscar={(objetivos) => buscarPara(l.clave, objetivos)}
+                      alAvisar={setAviso}
+                    />
                     <div className="chips">
                       {l.conceptos.map((c) => (
                         <span key={c.id} className="chip">
@@ -319,6 +560,33 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                   </li>
                 ))}
               </ol>
+              {ideasDeProyecto(vista.razonamiento ?? '').length > 0 && (
+                <>
+                  <h3>Ideas de proyecto</h3>
+                  <ul className="ideas-proyecto">
+                    {ideasDeProyecto(vista.razonamiento ?? '').map((idea) => (
+                      <li key={idea}>
+                        {idea}{' '}
+                        <button
+                          className="boton-mini"
+                          title="Abre Proyectos con la idea copiada, para pegarla al crearlo"
+                          onClick={async () => {
+                            try {
+                              sessionStorage.setItem('magister-idea-proyecto', idea) // PanelProyectos rellena con ella el proyecto nuevo
+                              await navigator.clipboard.writeText(idea)
+                            } catch {
+                              // sin portapapeles, se abre Proyectos igual
+                            }
+                            irARuta('#/proyectos')
+                          }}
+                        >
+                          Llevar a Proyectos
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </section>
             <section>
               <VideosDelPlan

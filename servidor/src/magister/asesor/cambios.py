@@ -5,6 +5,9 @@ que no vale vuelve al modelo para que lo corrija) y el arnés al aplicar (la pue
 
 Los ids de niveles, bloques y pasos no cambian nunca al mover nada (lo hecho y el diario van por id); los nuevos se
 numeran después del mayor que haya existido. Los niveles se nombran por id (n2): su número cambia al reestructurar.
+
+El plan de estudio activo (el de Roadmap, Calendario y Hoy) tiene sus propias acciones: mover una sesión, marcar una
+lección, preparar sus apuntes y apuntar algo en la agenda. Se simulan igual, sobre una copia de sus sesiones.
 """
 
 import copy
@@ -12,10 +15,13 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from magister.plan.calendario import a_hora, horas_utiles
+from magister.plan.reglas import fmt
 from magister.proyectos.roadmap import BloqueGen, PasoGen, errores_paso, ids_de
 
 TipoAccion = Literal[
@@ -26,8 +32,14 @@ TipoAccion = Literal[
     "quitar_paso", "quitar_bloque", "quitar_nivel",
     # Lo demás
     "marcar_paso", "apuntar_decision", "guardar_nota",
+    # El plan de estudio activo y tu agenda
+    "mover_sesion", "marcar_leccion", "preparar_leccion", "apuntar_evento",
 ]
-SIN_PROYECTO = {"guardar_nota"}
+# Las que trabajan sobre el plan activo (su huella cuenta para que la propuesta caduque si el plan cambia).
+DEL_PLAN = {"mover_sesion", "marcar_leccion", "preparar_leccion"}
+SIN_PROYECTO = {"guardar_nota", "apuntar_evento", *DEL_PLAN}
+# Lo que no se deshace: unos apuntes preparados ya han gastado cuota.
+NO_SE_DESHACE = {"preparar_leccion"}
 MAX_PASOS_BLOQUE = 6
 MAX_BLOQUES_NIVEL = 5
 INICIO = "inicio"
@@ -61,15 +73,22 @@ class Accion(BaseModel):
                                                    "el mismo); cambiar_nivel, quitar_nivel: el nivel")
     despues_de: str | None = Field(None, description="Dónde va lo nuevo o lo movido: el id del paso, bloque o nivel "
                                                      "tras el que va, o «inicio». Sin él, al final")
-    titulo: str | None = Field(None, description="nuevo_bloque, nuevo_nivel, cambiar_bloque, cambiar_nivel")
+    titulo: str | None = Field(None, description="nuevo_bloque, nuevo_nivel, cambiar_bloque, cambiar_nivel; apuntar_evento: "
+                                                 "qué es («Parcial de integrales»)")
     priming: str | None = Field(None, description="nuevo_bloque, nuevo_nivel, cambiar_bloque, cambiar_nivel: como mucho 5 líneas")
     objetivo: str | None = Field(None, description="nuevo_nivel, cambiar_nivel: qué hace el producto al acabar el nivel")
     pasos: list[PasoGen] = Field(default_factory=list, max_length=MAX_PASOS_BLOQUE, description="anadir_pasos, nuevo_bloque")
     bloques: list[BloqueGen] = Field(default_factory=list, max_length=MAX_BLOQUES_NIVEL, description="nuevo_nivel")
     campos: CamposPaso | None = Field(None, description="cambiar_paso: solo los campos que cambian")
-    hecho: bool | None = Field(None, description="marcar_paso")
+    hecho: bool | None = Field(None, description="marcar_paso, marcar_leccion")
     decision: DecisionNueva | None = Field(None, description="apuntar_decision")
     nota: str | None = Field(None, max_length=20_000, description="guardar_nota: el texto que se guarda")
+    sesion_id: int | None = Field(None, description="mover_sesion: el id de la sesión, de <plan>")
+    fecha: date | None = Field(None, description="mover_sesion: el día nuevo; apuntar_evento: el día. AAAA-MM-DD")
+    hora: str | None = Field(None, pattern=r"^\d{1,2}:\d{2}$", description="mover_sesion: la hora nueva «HH:MM» (sin ella, "
+                             "la primera libre de ese día); apuntar_evento: la hora, si la tiene")
+    clave: str | None = Field(None, max_length=20, description="marcar_leccion, preparar_leccion: la clave de la lección (L5)")
+    tipo_evento: Literal["examen", "deber", "clase", "nota"] | None = Field(None, description="apuntar_evento (sin él, deber)")
 
 
 class Cambios(BaseModel):
@@ -83,6 +102,7 @@ class Cambios(BaseModel):
 class Linea:
     texto: str
     motivo: str
+    deshace: bool = True  # False: «Deshacer» no lo deshace (preparar apuntes)
 
 
 @dataclass
@@ -98,6 +118,12 @@ class Resultado:
     errores: list[str] = field(default_factory=list)
     bloques_tocados: set[str] = field(default_factory=set)
     niveles_tocados: set[str] = field(default_factory=set)
+    # El plan activo tal como quedaría (sus sesiones), y lo que se hace aparte.
+    plan: dict | None = None
+    eventos: list[dict] = field(default_factory=list)
+    preparar: list[str] = field(default_factory=list)  # claves de lecciones cuyos apuntes se encolan
+    marcar: list[tuple[str, bool]] = field(default_factory=list)  # (clave, hecha)
+    movidas: set[int] = field(default_factory=set)
 
 
 _BLOQUE_CAMBIO = re.compile(r"```cambio[^\n]*\n([\s\S]*?)(?:```|$)")
@@ -118,6 +144,31 @@ def huella(roadmap: dict | None, hechos: list[str] | None) -> str:
     """Cambia si cambia el roadmap o lo hecho: una propuesta hecha sobre otro estado ya no se aplica."""
     datos = json.dumps({"roadmap": roadmap, "hechos": sorted(hechos or [])}, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(datos.encode("utf-8")).hexdigest()
+
+
+def usa_plan(c: Cambios) -> bool:
+    return any(a.tipo in DEL_PLAN for a in c.acciones)
+
+
+def huella_plan(plan: dict) -> str:
+    """Cambia si cambian sus lecciones o sus sesiones (una movida, marcada o recalculada). La agenda no cuenta."""
+    sesiones = sorted([x["id"], x["clave"], x["fecha"], x["inicio"] or "", x["horas"], x["estado"]] for x in plan["sesiones"])
+    datos = json.dumps({"lecciones": sorted(x["clave"] for x in plan["lecciones"]), "sesiones": sesiones}, ensure_ascii=False)
+    return hashlib.sha256(datos.encode("utf-8")).hexdigest()
+
+
+def huella_de(c: Cambios, proyecto: dict | None, plan: dict | None) -> str | None:
+    """La huella con la que se guarda una propuesta: la del proyecto (como siempre) y, si toca el plan, también la suya."""
+    del_proyecto = huella(proyecto["roadmap"], proyecto["hechos"]) if proyecto else None
+    if plan is None or not usa_plan(c):
+        return del_proyecto
+    datos = json.dumps({"proyecto": del_proyecto, "plan": huella_plan(plan)}, sort_keys=True)
+    return hashlib.sha256(datos.encode("utf-8")).hexdigest()
+
+
+def deshacible(lineas: list[dict]) -> bool:
+    """Si «Deshacer» deshace algo: no, si todo lo que hizo fue preparar apuntes."""
+    return any(x.get("deshace", True) for x in lineas)
 
 
 # --- Buscar y numerar ---------------------------------------------------------------------------------------------
@@ -549,6 +600,224 @@ def _guardar_nota(a: Accion, r: Resultado, errores: list[str]) -> None:
     r.lineas.append(Linea(f"Guardar en «Mis notas»: «{corto}{'…' if len(texto) > len(corto) else ''}»", a.motivo))
 
 
+# --- El plan de estudio activo y tu agenda ------------------------------------------------------------------------
+# `plan`: {"plan_id", "tema_id", "tema", "horas_por_dia", "inicio_por_dia", "lecciones": [{clave, titulo, horas,
+# depende_de, apuntes}], "sesiones": [{id, clave, fecha, inicio, horas, estado}], "eventos": [{id, fecha, hora, titulo,
+# tipo}]}. Fechas ISO y horas «HH:MM», como lo deja `arnes.leer_plan`.
+
+DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre",
+         "diciembre")
+
+
+def dia(d: date | str) -> str:
+    """«jueves 20 de noviembre»."""
+    d = date.fromisoformat(d) if isinstance(d, str) else d
+    return f"{DIAS[d.weekday()]} {d.day} de {MESES[d.month - 1]}"
+
+
+def _cuando(fecha: str, inicio: str | None) -> str:
+    return dia(fecha) + (f" a las {inicio}" if inicio else "")
+
+
+def _min(hhmm: str) -> int:
+    h, m = hhmm.split(":")
+    return int(h) * 60 + int(m)
+
+
+def _hhmm(minutos: int) -> str:
+    return f"{minutos // 60:02d}:{minutos % 60:02d}"
+
+
+def _hora(texto: str, donde: str, errores: list[str]) -> str | None:
+    try:
+        return a_hora(texto).strftime("%H:%M")
+    except ValueError:
+        errores.append(f"{donde}: «{texto}» no es una hora (HH:MM, de 00:00 a 23:59).")
+        return None
+
+
+def _leccion(r: Resultado, clave: str | None) -> dict | None:
+    c = (clave or "").strip().lower()
+    return next((x for x in r.plan["lecciones"] if x["clave"].lower() == c), None)
+
+
+def _sesion(r: Resultado, sesion_id: int | None) -> dict | None:
+    return next((x for x in r.plan["sesiones"] if x["id"] == sesion_id), None)
+
+
+def _de(r: Resultado, clave: str) -> list[dict]:
+    """Las sesiones que cuentan de una lección (las saltadas no)."""
+    return [x for x in r.plan["sesiones"] if x["clave"] == clave and x["estado"] != "saltada"]
+
+
+def leccion_hecha(plan: dict, leccion: dict) -> bool:
+    """Como en Roadmap: hecha si sus sesiones hechas suman sus horas."""
+    hechas = sum(x["horas"] for x in plan["sesiones"] if x["clave"] == leccion["clave"] and x["estado"] == "hecha")
+    return hechas >= leccion["horas"] - 1e-6
+
+
+def _nombre(lec: dict) -> str:
+    return f"{lec['clave']} «{lec['titulo']}»"
+
+
+def _horas_del_dia(r: Resultado, d: date) -> float | None:
+    """Las horas que estudias ese día de la semana según tu horario, sin pasar de medianoche; None si no hay horario."""
+    horas = r.plan.get("horas_por_dia")
+    if not horas:
+        return None
+    inicios = [a_hora(x) for x in (r.plan.get("inicio_por_dia") or [None] * 7)]
+    return horas_utiles(horas, inicios)[d.weekday()]
+
+
+def _hora_libre(r: Resultado, s: dict, fecha: date) -> str | None:
+    """Sin hora: detrás de la última sesión de ese día; si no hay, a la hora a la que empiezas ese día; si no, la suya."""
+    otras = [x for x in r.plan["sesiones"] if x["fecha"] == fecha.isoformat() and x["id"] != s["id"] and x["inicio"]
+             and x["estado"] != "saltada"]
+    if otras:
+        return _hhmm(max(_min(x["inicio"]) + round(x["horas"] * 60) for x in otras))
+    inicio = (r.plan.get("inicio_por_dia") or [None] * 7)[fecha.weekday()]
+    return a_hora(inicio).strftime("%H:%M") if inicio else s["inicio"]
+
+
+def _mover_sesion(a: Accion, r: Resultado, errores: list[str], hoy: date) -> None:
+    s = _sesion(r, a.sesion_id)
+    if s is None:
+        errores.append(f"mover_sesion: no existe la sesión «{a.sesion_id}»; usa el id de una sesión de <plan>.")
+        return
+    lec = _leccion(r, s["clave"]) or {"clave": s["clave"], "titulo": s["clave"]}
+    if s["estado"] != "pendiente":
+        errores.append(f"La sesión de {_nombre(lec)} del {dia(s['fecha'])} ya está {s['estado']}: solo se mueven las pendientes.")
+        return
+    if a.fecha is None:
+        errores.append("mover_sesion: falta `fecha`, el día al que va.")
+        return
+    if a.fecha < hoy:
+        errores.append(f"mover_sesion: el {dia(a.fecha)} ya ha pasado (hoy es {dia(hoy)}); muévela a hoy o después.")
+        return
+    hora = _hora(a.hora, "mover_sesion", errores) if a.hora else _hora_libre(r, s, a.fecha)
+    if a.hora and hora is None:
+        return
+    if hora and _min(hora) + round(s["horas"] * 60) > 24 * 60:
+        errores.append(f"Empezando a las {hora}, la sesión de {_nombre(lec)} ({fmt(s['horas'])} h) pasaría de medianoche: "
+                       "ponla antes o en otro día.")
+        return
+    if (a.fecha.isoformat(), hora) == (s["fecha"], s["inicio"]):
+        errores.append(f"mover_sesion: la sesión de {_nombre(lec)} ya está el {_cuando(s['fecha'], s['inicio'])}.")
+        return
+    antes = _cuando(s["fecha"], s["inicio"])
+    s["fecha"], s["inicio"] = a.fecha.isoformat(), hora
+    r.movidas.add(s["id"])
+    r.lineas.append(Linea(f"Mover la sesión de {_nombre(lec)} ({fmt(s['horas'])} h) del {antes} al "
+                          f"{_cuando(s['fecha'], s['inicio'])}", a.motivo))
+
+
+def _marcar_leccion(a: Accion, r: Resultado, errores: list[str], hoy: date) -> None:
+    lec = _leccion(r, a.clave)
+    if lec is None or a.hecho is None:
+        errores.append(f"marcar_leccion: hace falta una lección del plan (no «{a.clave}») y si queda hecha o no.")
+        return
+    desde, hasta = ("pendiente", "hecha") if a.hecho else ("hecha", "pendiente")
+    cuales = [x for x in r.plan["sesiones"] if x["clave"] == lec["clave"] and x["estado"] == desde]
+    if not cuales:
+        ya = "hecha" if a.hecho and leccion_hecha(r.plan, lec) else "pendiente" if not a.hecho else "sin sesiones pendientes"
+        errores.append(f"{_nombre(lec)} ya está {ya}: no hay nada que marcar.")
+        return
+    for x in cuales:
+        x["estado"] = hasta
+    r.marcar.append((lec["clave"], a.hecho))
+    n = len(cuales)
+    r.lineas.append(Linea(f"Marcar {_nombre(lec)} como {'hecha' if a.hecho else 'pendiente'} "
+                          f"({n} {'sesión' if n == 1 else 'sesiones'})", a.motivo))
+
+
+def _preparar_leccion(a: Accion, r: Resultado, errores: list[str], hoy: date) -> None:
+    lec = _leccion(r, a.clave)
+    if lec is None:
+        errores.append(f"preparar_leccion: no existe la lección «{a.clave}» en el plan; usa su clave (L5).")
+        return
+    if lec.get("apuntes") == "listos":
+        errores.append(f"{_nombre(lec)} ya tiene apuntes: para rehacerlos, «Rehacer el material» en Lecciones.")
+        return
+    if lec.get("apuntes") == "preparandose" or lec["clave"] in r.preparar:
+        errores.append(f"Los apuntes de {_nombre(lec)} ya se están preparando.")
+        return
+    r.preparar.append(lec["clave"])
+    r.lineas.append(Linea(f"Preparar los apuntes de {_nombre(lec)} (gasta cuota)", a.motivo, deshace=False))
+
+
+def _apuntar_evento(a: Accion, r: Resultado, errores: list[str], hoy: date) -> None:
+    titulo = (a.titulo or "").strip()[:200]
+    antes = len(errores)
+    if len(titulo) < 3:
+        errores.append("apuntar_evento: falta `titulo`, qué es («Parcial de integrales»).")
+    if a.fecha is None:
+        errores.append("apuntar_evento: falta `fecha`, el día.")
+    elif a.fecha < hoy:
+        errores.append(f"apuntar_evento: el {dia(a.fecha)} ya ha pasado; en la agenda se apunta lo que viene.")
+    hora = _hora(a.hora, "apuntar_evento", errores) if a.hora else None
+    if len(errores) > antes:
+        return
+    ya = (r.plan or {}).get("eventos", []) + r.eventos
+    if any(e["fecha"] == a.fecha.isoformat() and e["titulo"].strip().lower() == titulo.lower() for e in ya):
+        errores.append(f"«{titulo}» ya está apuntado el {dia(a.fecha)}.")
+        return
+    tipo = a.tipo_evento or "deber"
+    r.eventos.append({"fecha": a.fecha.isoformat(), "hora": hora, "titulo": titulo, "tipo": tipo})
+    r.lineas.append(Linea(f"Apuntar en tu agenda: {tipo} «{titulo}» el {_cuando(a.fecha.isoformat(), hora)}", a.motivo))
+
+
+_HACER_PLAN = {"mover_sesion": _mover_sesion, "marcar_leccion": _marcar_leccion, "preparar_leccion": _preparar_leccion,
+               "apuntar_evento": _apuntar_evento}
+
+
+def _empieza(x: dict) -> tuple[str, str]:
+    return x["fecha"], x["inicio"] or "00:00"
+
+
+def _como_queda_plan(r: Resultado) -> list[str]:
+    """Lo que tiene que cumplir el calendario al final, en los días y lecciones de las sesiones movidas: el día no pasa
+    de sus horas, dos sesiones no se pisan y una lección no queda antes de una de la que depende."""
+    errores: list[str] = []
+    movidas = [x for x in r.plan["sesiones"] if x["id"] in r.movidas]
+    titulos = {x["clave"]: x for x in r.plan["lecciones"]}
+    for fecha in sorted({x["fecha"] for x in movidas}):
+        d = date.fromisoformat(fecha)
+        tope = _horas_del_dia(r, d)
+        del_dia = [x for x in r.plan["sesiones"] if x["fecha"] == fecha and x["estado"] != "saltada"]
+        total = round(sum(x["horas"] for x in del_dia), 2)
+        if tope is not None and total > tope + 0.01:
+            errores.append(f"El {dia(d)} no tienes horas de estudio en tu horario: elige otro día (el horario se "
+                           "cambia en «Roadmap», «Mi horario»)." if tope == 0 else
+                           f"El {dia(d)} tendrías {fmt(total)} h de este plan y ese día estudias {fmt(tope)} h: elige "
+                           "otro día o mueve también otra sesión de ese día.")
+    for m in movidas:
+        if not m["inicio"]:
+            continue
+        a0, a1 = _min(m["inicio"]), _min(m["inicio"]) + round(m["horas"] * 60)
+        for x in r.plan["sesiones"]:
+            if x["id"] == m["id"] or x["fecha"] != m["fecha"] or not x["inicio"] or x["estado"] == "saltada":
+                continue
+            b0, b1 = _min(x["inicio"]), _min(x["inicio"]) + round(x["horas"] * 60)
+            if a0 < b1 and b0 < a1 and (x["id"] not in r.movidas or x["id"] > m["id"]):
+                otra = titulos.get(x["clave"], {"clave": x["clave"], "titulo": x["clave"]})
+                errores.append(f"El {dia(m['fecha'])} la sesión de {m['clave']} se pisaría con la de {_nombre(otra)} "
+                               f"(de {x['inicio']} a {_hhmm(b1)}): ponla a otra hora.")
+    tocadas = {x["clave"] for x in movidas}
+    for lec in r.plan["lecciones"]:
+        for previa in lec.get("depende_de") or []:
+            if lec["clave"] not in tocadas and previa not in tocadas:
+                continue
+            antes = titulos.get(previa)
+            if antes is None or leccion_hecha(r.plan, antes):
+                continue
+            suyas, de_la_previa = _de(r, lec["clave"]), _de(r, previa)
+            if suyas and de_la_previa and min(map(_empieza, suyas)) < max(map(_empieza, de_la_previa)):
+                errores.append(f"{_nombre(lec)} quedaría antes de {_nombre(antes)}, de la que depende: muévela después "
+                               f"del {dia(max(map(_empieza, de_la_previa))[0])} o mueve también {antes['clave']}.")
+    return list(dict.fromkeys(errores))
+
+
 _HACER = {
     "anadir_pasos": _anadir_pasos, "nuevo_bloque": _nuevo_bloque, "nuevo_nivel": _nuevo_nivel,
     "mover_paso": _mover_paso, "mover_bloque": _mover_bloque, "cambiar_paso": _cambiar_paso,
@@ -574,21 +843,31 @@ def _como_queda(r: Resultado) -> list[str]:
     return errores
 
 
-def simular(c: Cambios, proyecto: dict | None, momento: str) -> Resultado:
+def simular(c: Cambios, proyecto: dict | None, momento: str, plan: dict | None = None, hoy: date | None = None) -> Resultado:
     """`proyecto`: {"roadmap", "hechos", "hechos_en"} del proyecto en pantalla, o None si no hay. `momento`: la fecha
-    ISO con la que se marcaría un paso como hecho. No toca `proyecto`: trabaja sobre una copia."""
+    ISO con la que se marcaría un paso como hecho. `plan`: el plan de estudio activo (ver arriba), o None. `hoy`: tu
+    día (sin él, el de `momento`); no se mueve ni se apunta nada en el pasado. No toca `proyecto` ni `plan`: trabaja
+    sobre una copia."""
     p = copy.deepcopy(proyecto) if proyecto else None
     r = Resultado(roadmap=(p or {}).get("roadmap"), hechos=list((p or {}).get("hechos") or []),
-                  hechos_en=dict((p or {}).get("hechos_en") or {}))
+                  hechos_en=dict((p or {}).get("hechos_en") or {}), plan=copy.deepcopy(plan) if plan else None)
+    hoy = hoy or date.fromisoformat(momento[:10])
     for a in c.acciones:
         errores: list[str] = []
-        if a.tipo not in SIN_PROYECTO and not r.roadmap:
+        if a.tipo in DEL_PLAN and not r.plan:
+            errores.append(f"{a.tipo}: no hay ningún plan de estudio activo; esto solo se puede con uno (se crea en "
+                           "«Roadmap», «Nuevo plan»).")
+        elif a.tipo not in SIN_PROYECTO and not r.roadmap:
             errores.append(f"{a.tipo}: no hay ningún proyecto con roadmap en pantalla; esto solo se puede en uno.")
         elif a.tipo == "marcar_paso":
             _marcar_paso(a, r, errores, momento)
+        elif a.tipo in _HACER_PLAN:
+            _HACER_PLAN[a.tipo](a, r, errores, hoy)
         else:
             _HACER[a.tipo](a, r, errores)
         r.errores += errores
     if r.roadmap and not r.errores:
         r.errores += _como_queda(r)
+    if r.plan and r.movidas and not r.errores:
+        r.errores += _como_queda_plan(r)
     return r

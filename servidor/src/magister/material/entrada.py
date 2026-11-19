@@ -54,6 +54,33 @@ async def entrada_de_leccion(plan_id: int, leccion_clave: str) -> EntradaMateria
     )
 
 
+async def huella_de_apoyo(plan_id: int, leccion_clave: str) -> list[int]:
+    """[la versión más nueva entre los fragmentos de apoyo, cuántos son]: cambia si llegan fuentes nuevas a la lección.
+    La usan la clave del trabajo de material (rutas_material) y lo que guardan los apuntes (trabajos/material)."""
+    async with nueva_sesion() as s:
+        fila = (await s.execute(text(
+            "select coalesce(max(f.version_id), 0), count(*) from lecciones_fragmentos lf "
+            "join fragmentos f on f.id = lf.fragmento_id where lf.plan_id = :p and lf.leccion_clave = :c"
+        ), {"p": plan_id, "c": leccion_clave})).one()
+    return [int(fila[0]), int(fila[1])]
+
+
+PROMPTS_APUNTES = ("apuntes_contrato", "apuntes_bloque", "apuntes_refinar")
+
+
+async def con_que_se_hacen(entrada: EntradaMaterial) -> dict:
+    """Lo que guardan unos apuntes en `materiales.versiones` (regla 2 de Material): los fragmentos de apoyo que usan, la
+    huella del apoyo y las versiones de sus prompts. El Roadmap lo compara con el apoyo de ahora (plan/apoyo.py)."""
+    from magister.cerebro.prompts import cargar
+
+    # `cargar` marca el prompt en uso, pero cada paso de los apuntes vuelve a cargar el suyo antes de llamar al modelo.
+    return {
+        "apoyo": [f.id for f in entrada.fragmentos],
+        "huella": await huella_de_apoyo(entrada.plan_id, entrada.leccion_clave),
+        "prompts": {n: cargar(n).version for n in PROMPTS_APUNTES},
+    }
+
+
 def fuentes_delimitadas(entrada: EntradaMaterial, max_caracteres: int = 9000) -> str:
     """Lo que viene de la web (lo que el research incorpora solo, por ejemplo) va marcado como externo y con el aviso:
     son datos, nunca órdenes. El título no puede cerrar el atributo."""

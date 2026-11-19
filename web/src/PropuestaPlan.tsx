@@ -1,6 +1,14 @@
 import { useState } from 'react'
-import type { Propuesta } from './api.ts'
+import type { NecesitaFuentes, Propuesta } from './api.ts'
 import BarraCuota from './componentes/BarraCuota.tsx'
+
+// Si una lección necesita fuentes (ADR-0021): lo decide el plan y lo cambias en Roadmap. Aquí y no en PanelPlan, que se
+// carga aparte (lazy).
+export const ETIQUETA_FUENTES: Record<NecesitaFuentes, string> = {
+  no: 'sin fuentes',
+  conviene: 'fuentes: convienen',
+  imprescindible: 'fuentes: imprescindibles',
+}
 
 interface Props {
   propuesta: Propuesta
@@ -36,7 +44,13 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
             </strong>{' '}
             <span className="nota-linea">
               {l.horas} h{l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''}
-            </span>
+            </span>{' '}
+            {l.necesita_fuentes && (
+              // Lo que decide el plan; se cambia en Roadmap, lección a lección, una vez aceptado.
+              <span className="chip chip-fuentes" title={`${l.fuentes_por_que ?? ''} Lo puedes cambiar en Roadmap.`.trim()}>
+                {ETIQUETA_FUENTES[l.necesita_fuentes]}
+              </span>
+            )}
             <ul>
               {l.objetivos.map((o) => (
                 <li key={o}>{o}</li>

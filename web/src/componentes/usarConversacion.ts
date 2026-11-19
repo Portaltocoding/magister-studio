@@ -136,6 +136,10 @@ export function usarConversacion(
             case 'error':
               actualizarUltima((b) => ({ ...b, contenido: errorLegible(ev.detalle).mensaje, estado: 'error' }))
               break
+            case 'cortado':
+              // Se queda con lo que llevaba escrito, como una respuesta que paraste tú.
+              actualizarUltima((b) => ({ ...b, clave: ev.mensaje_id ? `m-${ev.mensaje_id}` : b.clave, estado: 'interrumpido' }))
+              break
             default:
               break // un evento desconocido no rompe el cliente
           }

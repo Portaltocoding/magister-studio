@@ -95,7 +95,13 @@
 .proyecto-decisiones { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 8px; }
 .proyecto-decisiones li { padding: 12px 14px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; }
 .proyecto-decisiones p { margin: 4px 0; }
-.proyecto-pie { margin-top: 30px; }
+.proyecto-pie { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 8px; }
+/* Rehacer el roadmap: lo que pasa con lo hecho, antes de confirmarlo; y, después, lo que se conservó. */
+.proyecto-rehacer { margin-top: 30px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); }
+.proyecto-rehacer p { margin: 0; line-height: 1.5; }
+.proyecto-rehecho { margin: 12px 0; }
+.proyecto-rehecho p { margin: 0 0 6px; }
+.proyecto-rehecho ul { margin: 6px 0 0; padding-left: 20px; }
 
 @media (max-width: 640px) {
   .proyecto-nivel { padding: 14px; }

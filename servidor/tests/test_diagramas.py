@@ -71,18 +71,29 @@ async def test_la_ruta_dibuja_el_encargo(cliente) -> None:
 
 
 @pytest.mark.anyio
-async def test_peticiones_iguales_a_la_vez_comparten_una_llamada_y_hay_tope(monkeypatch) -> None:
+async def test_la_ruta_pasa_si_sigues_ahi(cliente, monkeypatch) -> None:
+    """La ruta le da a `dibujar` cómo saber si el cliente se ha ido (request.is_disconnected), para no lanzar en vano."""
+    vistos: list = []
+
+    async def dibujar_falso(encargo, contexto, desconectado=None):
+        vistos.append(desconectado)
+        return None if desconectado is None else ("ido" if await desconectado() else SVG)
+
+    monkeypatch.setattr(dg, "dibujar", dibujar_falso)
+    r = await cliente.post("/api/diagramas", json={"encargo": "Mapa de ideas del tema", "contexto": "texto"})
+    assert r.json()["svg"] == SVG  # el cliente sigue conectado mientras espera la respuesta
+    assert len(vistos) == 1 and callable(vistos[0])
+
+
+@pytest.mark.anyio
+async def test_peticiones_iguales_a_la_vez_comparten_una_llamada(monkeypatch) -> None:
     import asyncio
 
     llamadas: list[str] = []
-    a_la_vez = {"ahora": 0, "maximo": 0}
 
     async def llamar_falso(encargo, contexto):
         llamadas.append(encargo)
-        a_la_vez["ahora"] += 1
-        a_la_vez["maximo"] = max(a_la_vez["maximo"], a_la_vez["ahora"])
         await asyncio.sleep(0.05)
-        a_la_vez["ahora"] -= 1
         return SVG
 
     monkeypatch.setattr(dg, "_llamar", llamar_falso)
@@ -90,7 +101,95 @@ async def test_peticiones_iguales_a_la_vez_comparten_una_llamada_y_hay_tope(monk
     iguales = await asyncio.gather(*(dg.dibujar("Mapa de ideas del tema", "texto") for _ in range(10)))
     assert iguales == [SVG] * 10 and llamadas == ["Mapa de ideas del tema"]
     await asyncio.gather(*(dg.dibujar(f"Mapa número {i}", "texto") for i in range(6)))
-    assert len(llamadas) == 7 and a_la_vez["maximo"] <= dg.A_LA_VEZ
+    assert len(llamadas) == 7
+
+
+def _claude_de_mentira(monkeypatch, lanzados: list[str], suelta):
+    """El proceso de claude, sin claude: apunta qué se lanza y no acaba hasta que se suelte."""
+    from magister.cerebro import modelo
+
+    async def lanzar_falso(sistema, entrada, esquema=None, modelo_=None):
+        lanzados.append(entrada)
+        await suelta.wait()
+        yield {"type": "result"}
+
+    monkeypatch.setattr(modelo, "_lanzar_claude", lanzar_falso)
+
+
+async def _llamada(prompt: str, entrada: str) -> list[dict]:
+    from magister.cerebro import modelo
+
+    marca = modelo.prompt_actual.set((prompt, "v1"))
+    try:
+        return [e async for e in modelo._lineas_claude("s", entrada)]
+    finally:
+        modelo.prompt_actual.reset(marca)
+
+
+@pytest.mark.anyio
+async def test_los_diagramas_tienen_tope_y_el_chat_nunca_espera(monkeypatch) -> None:
+    """MAGISTER_DIAGRAMAS_A_LA_VEZ: los que pasan del tope esperan en cola sin lanzar claude; el chat sale al momento."""
+    import asyncio
+
+    from magister.cerebro import modelo
+
+    monkeypatch.setattr(modelo.ajustes, "diagramas_a_la_vez", 2)
+    lanzados: list[str] = []
+    suelta = asyncio.Event()
+    _claude_de_mentira(monkeypatch, lanzados, suelta)
+    dibujos = [asyncio.create_task(_llamada("diagrama_chat", f"d{i}")) for i in range(5)]
+    await asyncio.sleep(0.05)
+    assert sorted(lanzados) == ["d0", "d1"]  # el resto, en cola: sin proceso
+    chat = asyncio.create_task(_llamada("conversar", "pregunta"))
+    await asyncio.sleep(0.05)
+    assert "pregunta" in lanzados  # con los dos huecos ocupados, el chat no espera
+    suelta.set()
+    await asyncio.gather(chat, *dibujos)
+    assert len(lanzados) == 6
+
+
+@pytest.mark.anyio
+async def test_si_te_vas_mientras_espera_en_cola_no_se_lanza(monkeypatch) -> None:
+    import asyncio
+
+    from magister.cerebro import modelo
+
+    monkeypatch.setattr(modelo.ajustes, "diagramas_a_la_vez", 1)
+    monkeypatch.setattr(dg, "_repetido", lambda *a: False)
+    monkeypatch.setattr(dg, "SONDEO_S", 0.02)
+    lanzados: list[str] = []
+    suelta = asyncio.Event()
+    _claude_de_mentira(monkeypatch, lanzados, suelta)
+
+    async def llamar(encargo, contexto):  # como _llamar, sin caché ni esquema: solo la llamada a claude
+        await _llamada("diagrama_chat", encargo)
+        return SVG
+
+    monkeypatch.setattr(dg, "_llamar", llamar)
+    primero = asyncio.create_task(dg.dibujar("Mapa que se dibuja", "texto"))
+    await asyncio.sleep(0.05)
+    segundo = asyncio.create_task(dg.dibujar("Mapa que espera", "texto"))
+    await asyncio.sleep(0.05)
+    assert lanzados == ["Mapa que se dibuja"]
+
+    async def ido() -> bool:
+        return True
+
+    # Quien lo pidió se va (cierra la pestaña): la ruta lo ve con request.is_disconnected.
+    tercero = await dg.dibujar("Mapa de la pestaña cerrada", "texto", desconectado=ido)
+    segundo.cancel()
+    suelta.set()
+    assert await primero == SVG and tercero is None
+    await asyncio.sleep(0.1)
+    assert lanzados == ["Mapa que se dibuja"]  # ni el cancelado ni el de la pestaña cerrada han lanzado claude
+    # Si ya se está dibujando, se acaba aunque te vayas (queda en la caché para cuando vuelvas).
+    suelta.clear()
+    cuarto = asyncio.create_task(dg.dibujar("Mapa ya empezado", "texto"))
+    await asyncio.sleep(0.05)
+    cuarto.cancel()
+    suelta.set()
+    await asyncio.sleep(0.1)
+    assert lanzados[-1] == "Mapa ya empezado" and not dg._en_curso
 
 
 def test_trozos_del_mismo_encargo_no_se_dibujan() -> None:

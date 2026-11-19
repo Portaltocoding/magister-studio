@@ -179,6 +179,8 @@ interface EstadoModelo {
   umbral_completo: number
   activo: { etapa: string; fecha: string; perdida_antes: number; perdida_despues: number; conceptos: number } | null
   red: { estado: 'sin_datos' | 'sombra' | 'activa'; repasos: number; minimo: number; perdida_fsrs?: number; perdida_red?: number; fecha?: string } | null
+  // En qué capa vas y qué falta para la siguiente, ya redactado por el servidor (umbrales y recuentos salen de allí).
+  resumen?: { capa: 'estandar' | 'inicial' | 'completo'; faltan: number | null; red: string; lineas: string[] }
 }
 
 const coma = (n?: number) => (n == null ? '·' : String(n).replace('.', ','))
@@ -216,6 +218,13 @@ function TuModelo() {
   return (
     <section className="pg-seccion tu-modelo">
       <h2>Tu modelo de olvido</h2>
+      {e.resumen && (
+        <div className="tu-modelo-capa" aria-label="En qué capa vas">
+          {e.resumen.lineas.map((l, i) => (
+            <p key={i}>{l}</p>
+          ))}
+        </div>
+      )}
       <p className="pg-explica">
         Magister decide cuándo repasas con FSRS. Con tus repasos, aprende cuánto aguantas tú cada concepto y se reajusta solo una vez al
         día, solo si predice tus aciertos mejor que antes. Lo que fallas vuelve en la misma sesión, y lo recién aprendido vuelve
@@ -241,11 +250,6 @@ function TuModelo() {
         <span style={{ width: `${Math.min(100, (e.conceptos_con_dos / siguiente) * 100)}%` }} />
       </span>
       <p className="nota">
-        {e.conceptos_con_dos < e.umbral_inicial
-          ? `Con ${e.umbral_inicial} conceptos repasados dos veces, empieza a ajustarse a ti. Con ${e.umbral_completo}, del todo.`
-          : e.conceptos_con_dos < e.umbral_completo
-            ? `Con ${e.umbral_completo} conceptos, el ajuste completo.`
-            : 'Tienes datos para el ajuste completo.'}{' '}
         <button className="boton-mini" onClick={ajustar} disabled={haciendo}>
           {haciendo ? 'Ajustando…' : 'Ajustar ahora'}
         </button>

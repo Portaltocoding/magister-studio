@@ -43,7 +43,29 @@ def leccion_de(datos: dict) -> dict:
         titulo += f"\nLo que ya sabe: {datos['sabes'][:600]}"
     return {"tema": "Construir un proyecto", "titulo": titulo,
             "objetivos": ["proyectos parecidos de código abierto", "arquitectura de referencia", "tutorial paso a paso",
-                          "documentación oficial de las herramientas"]}
+                          "documentación oficial de las herramientas"],
+            "alumno": {"sabes": datos.get("sabes")}}
+
+
+def leccion_de_bloques(datos: dict, mapa: dict | None) -> dict:
+    """La búsqueda de referencias para lo que de verdad hay que construir: proyectos parecidos y los bloques del nivel 1
+    (hasta 3). El juez sabe lo que ya sabe, así que lo que ya domina no se le trae. Sin bloques, la de siempre."""
+    bloques = [b["titulo"] for b in ((mapa or {}).get("niveles") or [{}])[0].get("bloques", [])][:3]
+    leccion = leccion_de(datos)
+    if bloques:
+        leccion["objetivos"] = ["Proyectos parecidos de código abierto", *bloques]
+    return leccion
+
+
+def bloque_de(ficha: dict | None, mapa: dict | None) -> tuple[int | None, str | None]:
+    """(número del bloque del nivel 1, su id) que cubre una referencia, según los objetivos que le dio el juez: el
+    objetivo 1 son los proyectos parecidos (ningún bloque) y el k, el bloque k-1."""
+    objetivos = sorted(o for o in (ficha or {}).get("objetivos", []) if o >= 2)
+    bloques = ((mapa or {}).get("niveles") or [{}])[0].get("bloques", [])
+    if not objetivos or objetivos[0] - 1 > len(bloques):
+        return None, None
+    n = objetivos[0] - 1
+    return n, bloques[n - 1].get("id")
 
 
 def motivo_limpio(motivo: str) -> str:
@@ -51,38 +73,60 @@ def motivo_limpio(motivo: str) -> str:
     return motivo.split(" · ", 1)[-1] if re.match(r"\d+/\d+ · ", motivo) else motivo
 
 
-async def buscar_referencias(datos: dict) -> list[dict]:
-    """Proyectos, tutoriales y documentación parecidos, con el agente de research (con su tope de coste).
-    Si falla (sin red, sin presupuesto), el roadmap se hace igual, sin referencias."""
+async def buscar_referencias(datos: dict, mapa: dict | None = None) -> list[dict]:
+    """Proyectos parecidos y lo que piden los bloques del nivel 1, con el research fijo (2 llamadas). Cada referencia
+    lleva su `bloque` (número en el nivel 1, o None) y `bloque_id`. Si falla (sin red, sin presupuesto), el proyecto
+    sale igual, sin referencias."""
     from magister.research.fijo import research_fijo
     from magister.research.herramientas import Herramientas
     from magister.research.tareas import web_por_defecto
 
     encontradas: list[dict] = []
 
-    async def guardar(url: str, titulo: str, motivo: str) -> bool:
-        encontradas.append({"url": url, "titulo": titulo, "motivo": motivo_limpio(motivo)})
+    async def guardar(url: str, titulo: str, motivo: str, ficha: dict | None = None) -> bool:
+        bloque, bloque_id = bloque_de(ficha, mapa)
+        porque = (ficha or {}).get("resumen") or motivo_limpio(motivo)
+        encontradas.append({"url": url, "titulo": titulo, "motivo": porque, "bloque": bloque, "bloque_id": bloque_id,
+                            "ficha": ficha})
         return True
 
     try:
         h = Herramientas(web_por_defecto, 0, "proyecto", None, guardar_propuesta=guardar)
-        await research_fijo(leccion_de(datos), h, max_urls=8, max_propuestas=5)
-    except Exception as e:  # noqa: BLE001 (las referencias son un extra: sin ellas el roadmap sale igual)
+        await research_fijo(leccion_de_bloques(datos, mapa), h, max_urls=8, max_propuestas=5)
+    except Exception as e:  # noqa: BLE001 (las referencias son un extra: sin ellas el proyecto sale igual)
         registro.warning("referencias del proyecto: %s", e)
     return encontradas[:6]
+
+
+async def _guardar_roadmap(trabajo_id: int, pid: int, mapa: dict) -> dict:
+    """Guarda el roadmap recién hecho. Si ya había uno (rehacer), lo de antes se conserva (`rm.conservar`: los pasos
+    que siguen heredan su id, lo hecho de los que no se apunta aparte) y el de antes se guarda para poder volver.
+    Si este trabajo se reintenta, el de antes es el que guardó la primera vez, no el que él mismo escribió."""
+    async with nueva_sesion() as s, s.begin():
+        p = await s.scalar(select(Proyecto).where(Proyecto.id == pid).with_for_update())
+        if p is None:
+            raise LookupError(f"el proyecto {pid} ya no existe")
+        anterior = p.roadmap_anterior if (p.roadmap_anterior or {}).get("trabajo_id") == trabajo_id else None
+        viejo = anterior["roadmap"] if anterior else p.roadmap
+        if viejo:
+            diario = set((await s.scalars(select(Decision.paso_id).where(
+                Decision.proyecto_id == pid, Decision.paso_id.is_not(None)))).all())
+            mapa = rm.conservar(viejo, mapa, list(p.hechos or []), dict(p.hechos_en or {}), diario)
+            p.roadmap_anterior = anterior or {"roadmap": viejo, "arquitectura_svg": p.arquitectura_svg, "trabajo_id": trabajo_id}
+        p.roadmap = mapa
+    return mapa
 
 
 async def crear(trabajo_id: int, pid: int, investigar: bool) -> None:
     p = await _leer(pid)
     datos = _datos(p)
-    referencias = p.referencias or []
-    if investigar and not referencias:
-        await cola.fase(trabajo_id, "referencias", 1, 3)
-        referencias = await buscar_referencias(datos)
-        await _guardar(pid, referencias=referencias)
-    await cola.fase(trabajo_id, "roadmap", 2, 3)
-    mapa = await rm.generar_roadmap(datos, referencias)
-    await _guardar(pid, roadmap=mapa)
+    # Primero el roadmap y después las referencias, para los bloques del nivel 1: así se busca lo que hay que
+    # construir, no lo que ya dominas.
+    await cola.fase(trabajo_id, "roadmap", 1, 3)
+    mapa = await _guardar_roadmap(trabajo_id, pid, await rm.generar_roadmap(datos, []))
+    if investigar and not (p.referencias or []):
+        await cola.fase(trabajo_id, "referencias", 2, 3)
+        await _guardar(pid, referencias=await buscar_referencias(datos, mapa))
     await cola.fase(trabajo_id, "arquitectura", 3, 3)
     try:
         svg = await rm.dibujar_arquitectura(datos, mapa)

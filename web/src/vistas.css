@@ -145,6 +145,8 @@ body.en-foco { overflow: hidden; }
   background: color-mix(in srgb, var(--t-oscuro, #141414) 88%, #2a2a2a);
   --texto: #e9e9e9; --fondo: #1a1917; --tarjeta: #242320; --borde: #3a3936; --suave: #9a968f; --activo: #33322e;
   color-scheme: dark;
+  /* Un solo sistema de movimiento: todo lo que se anima dentro del foco usa estos tiempos y esta curva. */
+  --foco-rapido: 120ms; --foco-medio: 240ms; --foco-lento: 420ms; --foco-curva: cubic-bezier(0.22, 1, 0.36, 1);
 }
 .foco-barra {
   display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 18px; align-items: center;
@@ -153,12 +155,16 @@ body.en-foco { overflow: hidden; }
 .foco-titulo { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; }
 .foco-titulo .bloques-clave { border: 1px solid #333; }
 .foco-pasos { list-style: none; display: flex; gap: 6px; padding: 0; margin: 0; }
+/* La barrita mide 8 px, pero se toca en 24 px de alto (una franja invisible encima y debajo). */
 .foco-paso {
-  width: 34px; height: 8px; border-radius: 4px; border: 0; padding: 0; cursor: pointer; background: #3a3936; transition: background 150ms;
+  position: relative; width: 34px; height: 8px; border-radius: 4px; border: 0; padding: 0; cursor: pointer; background: #3a3936;
+  transition: background-color var(--foco-rapido) var(--foco-curva);
 }
+.foco-paso::before { content: ""; position: absolute; inset: -8px 0; }
+.foco-pasos { align-items: center; min-height: 24px; }
 .foco-paso:disabled { cursor: default; opacity: 0.6; }
 .foco-paso.vista { background: #8b867b; }
-.foco-paso.actual { background: var(--t-acento, #f2c200); box-shadow: 0 0 0 3px color-mix(in srgb, var(--t-acento, #f2c200) 25%, transparent); }
+.foco-paso.actual { background: var(--t-acento, #f2c200); }
 .foco-paso.nota-bien, .foco-paso.nota-perfecta { background: #2d8a4e; }
 .foco-paso.nota-parcial { background: #d08a2a; }
 .foco-paso.nota-fallo { background: #c2453a; }
@@ -172,12 +178,15 @@ body.en-foco { overflow: hidden; }
 .foco-boton[aria-pressed="true"] { border-color: var(--t-acento, #f2c200); color: var(--t-acento, #f2c200); }
 .foco-reloj { font-variant-numeric: tabular-nums; font-weight: 700; }
 .foco-reloj small { font-weight: 400; opacity: 0.6; }
-.foco-reloj.pausado { color: var(--t-acento, #f2c200); border-color: var(--t-acento, #f2c200); animation: latir 1.6s infinite; }
+.foco-reloj.pausado { color: var(--t-acento, #f2c200); border-color: var(--t-acento, #f2c200); }
 .foco-salir:hover { border-color: #e5817a; color: #e5817a; }
 
+/* El aviso de pausa, flotando sobre el pie: no empuja el papel. */
 .foco-aviso {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; padding: 10px 22px;
-  background: #2a2614; color: #f3e6b0; font-size: 0.92rem; border-bottom: 1px solid #4a4220;
+  position: absolute; left: 50%; bottom: 72px; translate: -50% 0; z-index: 25; width: max-content; max-width: min(520px, calc(100% - 32px));
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; padding: 12px 18px; border-radius: 12px;
+  background: #2a2614; color: #f3e6b0; font-size: 0.92rem; border: 1px solid #4a4220; box-shadow: 0 12px 30px rgb(0 0 0 / 0.35);
+  animation: idea-entra var(--foco-medio) var(--foco-curva);
 }
 .foco-aviso .boton { padding: 5px 12px; }
 .foco-aviso .boton:not(.boton-principal) { background: transparent; color: #f3e6b0; border-color: #6b5e2a; }
@@ -186,13 +195,21 @@ body.en-foco { overflow: hidden; }
 .foco .boton:not(.boton-principal), .foco .boton-mini { background: transparent; color: #e9e9e9; border-color: #4a4945; }
 
 .foco-cuerpo { flex: 1; overflow-y: auto; padding: 36px 24px 60px; scrollbar-gutter: stable; }
+.foco-cuerpo:focus { outline: none; }
 .foco-idea { max-width: 780px; margin: 0 auto; }
 .foco-etq { color: var(--t-acento, #f2c200); }
-.foco-idea h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -0.5px; margin: 6px 0 22px; color: #fff; }
-.foco-papel.lector-texto { max-width: none; font-size: 1.1rem; line-height: 1.8; padding: 40px 48px; }
+.foco-idea h1 { font-size: calc(1.75rem / var(--zoom-ui, 1)); line-height: 1.15; letter-spacing: -0.5px; margin: 6px 0 22px; color: #fff; }
+/* La letra del papel es suya: no la encoge el tamaño compacto de la interfaz (19 px en pantalla con la M). */
+.foco-papel.lector-texto { max-width: none; font-size: calc(var(--foco-letra, 1.1875rem) / var(--zoom-ui, 1)); line-height: 1.62; padding: 40px 48px; }
+.foco-papel.lector-texto p + p { margin-top: 0.85em; }
+.foco-papel pre { max-width: 100%; overflow-x: auto; }
+.foco-papel .katex-display { font-size: 1.15em; margin: 0.8em 0; overflow-x: auto; overflow-y: hidden; }
 .foco-comprobar {
   margin-top: 26px; padding: 22px 24px; border-radius: 14px; background: #242320; border: 1px solid #36352f;
+  font-size: 1rem; outline: 2px solid transparent; outline-offset: 4px; transition: outline-color var(--foco-medio) var(--foco-curva);
 }
+.foco-comprobar.reclama { outline-color: var(--t-acento, #f2c200); }
+.foco-confianza-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .foco-pregunta { font-size: 1.15rem; font-weight: 600; margin: 6px 0 14px; color: #fff; line-height: 1.45; }
 .foco-comprobar textarea {
   width: 100%; min-height: 110px; font: inherit; font-size: 1rem; padding: 12px 14px; border-radius: 10px;
@@ -211,10 +228,21 @@ body.en-foco { overflow: hidden; }
 .foco-hecho.nota-parcial { color: #e3a857; }
 
 .foco-pie {
-  display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-top: 1px solid #2c2b28; background: rgb(0 0 0 / 0.18);
+  position: relative; display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-top: 1px solid #2c2b28; background: rgb(0 0 0 / 0.18);
 }
 .foco-pie .boton { padding: 10px 18px; }
-.foco-atajos { margin-right: auto; margin-left: 8px; font-size: 0.8rem; opacity: 0.5; }
+.foco-atajos { margin-right: auto; margin-left: 8px; font-size: 0.8rem; opacity: 0.75; }
+.foco-error-cierre { color: #f3b8b2; opacity: 1; }
+.foco-contador-parrafo { font-size: 0.8rem; opacity: 0.6; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.foco-chuleta {
+  position: absolute; right: 22px; bottom: calc(100% + 8px); z-index: 25; width: 300px; padding: 12px 16px; border-radius: 12px;
+  background: #201f1c; border: 1px solid #36352f; box-shadow: 0 12px 30px rgb(0 0 0 / 0.4); font-size: 0.85rem;
+  animation: idea-entra var(--foco-medio) var(--foco-curva);
+}
+.foco-chuleta dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; }
+.foco-chuleta dt { font-weight: 700; white-space: nowrap; }
+.foco-chuleta dd { margin: 0; opacity: 0.85; }
+.solo-lector { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 .foco-descanso, .foco-cierre { max-width: 640px; margin: calc(8vh / var(--zoom-ui, 1)) auto 0; text-align: center; }
 .foco-descanso strong { display: block; font-size: 5rem; font-weight: 800; color: var(--t-acento, #f2c200); font-variant-numeric: tabular-nums; margin: 10px 0; }
@@ -251,21 +279,28 @@ body.en-foco { overflow: hidden; }
 .foco-pregunta p { margin: 0; }
 .foco-pregunta code { background: #3a3520; color: #f3e6b0; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
 
-/* ===== Lupa: el párrafo bajo el ratón se acerca y lo demás se atenúa ===== */
-.foco.lupa .foco-papel :is(p:not(li p), li, pre, table, blockquote, .lb-aviso, .lb-frase, .lb-marco, .lb-rejilla) {
-  position: relative; transform-origin: left center; border-radius: 4px;
-  transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+/* ===== Atenuar: el párrafo activo a plena luz y lo demás, un poco apagado (sin moverse ni crecer) ===== */
+.foco.atenuar .foco-papel [data-u] { opacity: 0.6; transition: opacity var(--foco-medio) var(--foco-curva); }
+.foco.atenuar .foco-papel [data-u].activo { opacity: 1; }
+/* El párrafo activo recibe el foco del teclado, pero lo señala la marca del margen, no un recuadro. */
+.foco .foco-papel [data-u]:focus, .foco .foco-papel [data-u]:focus-visible { outline: none; }
+.foco-marca {
+  position: absolute; left: -18px; width: 3px; border-radius: 2px; background: var(--t-acento, #f2c200); pointer-events: none;
+  transition: top var(--foco-medio) var(--foco-curva), height var(--foco-medio) var(--foco-curva);
 }
-.foco.lupa .foco-papel:hover :is(p:not(li p), li, pre, table, blockquote, .lb-aviso, .lb-frase, .lb-marco, .lb-rejilla) { opacity: 0.38; }
-.foco.lupa .foco-papel :is(p:not(li p), li, pre, table, blockquote, .lb-aviso, .lb-frase, .lb-marco, .lb-rejilla):hover {
-  opacity: 1; transform: scale(1.06); z-index: 1; background: var(--t-papel, #fffdf7);
-  box-shadow: 0 0 0 12px var(--t-papel, #fffdf7), 0 10px 30px 12px rgb(0 0 0 / 0.14);
-}
-.foco.lupa .foco-papel pre:hover { background: var(--t-oscuro, #141414); box-shadow: 0 10px 30px 4px rgb(0 0 0 / 0.25); }
-/* Dentro de una caja o una lista, la caja entera no se apaga si el ratón está en uno de sus hijos. */
-.foco.lupa .foco-papel :is(.lb-aviso, .lb-frase, .lb-marco, .lb-rejilla):hover :is(p, li) { opacity: 1; transform: none; box-shadow: none; background: none; }
+/* El anillo del teclado, del color de acento (se ve sobre el marco oscuro). */
+.foco :focus-visible { outline: 2px solid var(--t-acento, #f2c200); outline-offset: 3px; }
+/* Con el dedo, 44 px en pantalla (divididos por el zoom de la interfaz). */
+@media (pointer: coarse) { .foco .boton, .foco .boton-mini, .foco-boton, .foco-reloj { min-height: calc(44px / var(--zoom-ui, 1)); } }
+
+/* Cambiar de idea: la que se va se funde y la nueva aparece; solo opacidad (un transform encerraría lo que va fijo). */
+.foco-idea-entra { animation: idea-entra 280ms var(--foco-curva); }
+.foco-idea.saliendo { opacity: 0; transition: opacity 160ms ease-in; }
+@keyframes idea-entra { from { opacity: 0; } }
+/* Detrás de la capa nada late. */
+body.en-foco .tomate-boton .tomate-icono, body.en-foco .riel-hoy.con-aviso svg { animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  .foco.lupa .foco-papel :is(p:not(li p), li, pre, table, blockquote, .lb-aviso, .lb-frase, .lb-marco, .lb-rejilla):hover { transform: none; }
+  .foco * { transition-duration: 0s !important; animation: none !important; }
 }
 
 /* ===== Barra lateral por secciones ===== */
@@ -478,6 +513,9 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 @media (max-width: 820px) { .tu-modelo-cifras { grid-template-columns: minmax(0, 1fr); } }
 .tu-modelo-red { margin-top: 16px; }
 .tu-modelo-red h3 { margin: 0 0 4px; font-size: 1rem; }
+.tu-modelo-capa { margin: 6px 0 10px; }
+.tu-modelo-capa p { margin: 0 0 2px; }
+.tu-modelo-capa p:first-child { font-weight: 600; }
 
 
 /* ===== Índice sencillo y libro del tema ===== */
@@ -495,25 +533,28 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 
 /* ===== Compañera de lectura, mapa de palabras clave y ritmo ===== */
 .foco-papel-envoltura { position: relative; }
-.companera { position: absolute; top: 0; right: -64px; width: 52px; transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); z-index: 5; }
-.companera-boton { width: 52px; height: 52px; border-radius: 50%; border: 0; padding: 4px; background: transparent; cursor: pointer; }
-.companera-boton .mascota { width: 44px; height: 44px; }
-.companera-boton.atasco { animation: llamar 1.6s ease-in-out 3; }
-@keyframes llamar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-.companera-bocadillo {
-  position: absolute; right: 58px; top: 0; width: min(340px, calc(70vw / var(--zoom-ui, 1))); padding: 12px 14px; border-radius: 16px 4px 16px 16px;
-  background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); box-shadow: 0 12px 34px rgb(0 0 0 / 0.28);
-  display: flex; flex-direction: column; gap: 8px; font-size: 0.95rem; line-height: 1.5;
+/* La compañera: quieta en el margen, a media altura de la zona de lectura (pegada con sticky); nada de transform. */
+.companera { position: absolute; top: 0; bottom: 0; left: calc(100% + 12px); width: 48px; z-index: 5; }
+.companera-fija { position: sticky; top: calc(35vh / var(--zoom-ui, 1)); }
+.companera-boton {
+  position: relative; display: block; width: 40px; height: 40px; border-radius: 50%; border: 0; padding: 2px; background: transparent; cursor: pointer;
+  opacity: 0.7; transition: opacity var(--foco-medio) var(--foco-curva);
 }
-.companera-respuesta, .companera-atasco, .companera-pensando { margin: 0; }
-.companera-pensando, .companera-atasco { color: var(--suave); }
+.companera-boton:hover, .companera-boton:focus-visible, .companera-boton[aria-expanded="true"] { opacity: 1; }
+.companera-boton .mascota, .companera-boton .mascota.mascota-mini { width: 36px; height: 36px; margin: 0; }
+/* Un término en negrita que aún no está en tu mapa. */
+.companera-punto { position: absolute; top: 1px; right: 1px; width: 8px; height: 8px; border-radius: 50%; background: var(--t-acento, #f2c200); pointer-events: none; }
+.companera-bocadillo {
+  position: absolute; left: 52px; top: 0; width: 300px; max-height: calc(60vh / var(--zoom-ui, 1)); overflow: auto; padding: 12px 14px;
+  border-radius: 4px 16px 16px 16px; background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); box-shadow: 0 12px 34px rgb(0 0 0 / 0.28);
+  display: flex; flex-direction: column; gap: 8px; font-size: 0.95rem; line-height: 1.5;
+  animation: aparecer-globo var(--foco-medio) var(--foco-curva);
+}
+.companera-respuesta, .companera-pensando, .companera-mapa { margin: 0; }
+.companera-pensando { color: var(--suave); }
+.companera-mapa { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--borde); }
 .companera-acciones { display: flex; flex-wrap: wrap; gap: 6px; }
 .companera-bocadillo input { width: 100%; box-sizing: border-box; font: inherit; font-size: 0.9rem; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 10px; padding: 6px 10px; }
-@media (max-width: 1100px) {
-  .companera { right: 8px; }
-  .companera-bocadillo { right: 0; top: 56px; border-radius: 16px; }
-}
-@media (prefers-reduced-motion: reduce) { .companera { transition: none; } .companera-boton.atasco { animation: none; } }
 .al-mapa {
   position: absolute; transform: translate(-50%, calc(-100% - 8px)); z-index: 6; font: inherit; font-size: 0.8rem; font-weight: 600;
   background: var(--texto); color: var(--fondo); border: 0; border-radius: 999px; padding: 4px 10px; cursor: pointer; box-shadow: 0 6px 16px rgb(0 0 0 / 0.25);
@@ -543,7 +584,6 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 /* La barra del foco en una línea, aunque haya más herramientas */
 .foco-boton { white-space: nowrap; }
 .foco-barra .foco-boton, .foco-barra .boton-mini { padding: 6px 10px; font-size: 0.85rem; }
-.companera-boton .mascota.mascota-mini { width: 44px; height: 44px; }
 .foco-reloj { white-space: nowrap; }
 /* Con más herramientas, el título es lo que cede sitio: los pasos y el reloj no se pisan. */
 @media (min-width: 821px) { .foco-barra { grid-template-columns: minmax(0, 1fr) auto auto; } }
@@ -575,48 +615,32 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .control-voz.compacto { justify-content: center; }
 .control-voz.compacto .opcion-chip { padding: 3px 9px; font-size: 0.8rem; }
 
-/* Compañera: más grande, salta al cambiar de párrafo y habla con globitos */
-.companera { right: -78px; width: 64px; }
-.companera-boton { width: 64px; height: 64px; padding: 2px; }
-.companera-boton .mascota { width: 60px; height: 60px; margin: 0; }
-.companera-boton.salta { animation: saltito 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
-@keyframes saltito { 0% { transform: translateY(0) scale(1, 1); } 35% { transform: translateY(-10px) scale(0.95, 1.06); } 70% { transform: translateY(0) scale(1.06, 0.94); } 100% { transform: translateY(0) scale(1, 1); } }
+/* Compañera: el globo (solo el del código, como mucho uno por idea) aparece con un fundido */
 .companera-globo {
-  position: absolute; right: 70px; top: 6px; width: max-content; max-width: 260px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-  padding: 8px 12px; border-radius: 14px 4px 14px 14px; background: var(--texto); color: var(--fondo); font-size: 0.88rem; line-height: 1.4;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); animation: aparecer-globo 0.25s ease-out;
+  position: absolute; left: 52px; top: 4px; width: max-content; max-width: 260px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  padding: 8px 12px; border-radius: 4px 14px 14px 14px; background: var(--texto); color: var(--fondo); font-size: 0.88rem; line-height: 1.4;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); animation: aparecer-globo var(--foco-medio) var(--foco-curva);
 }
 .companera-globo .boton-mini { background: var(--fondo); color: var(--texto); border-color: transparent; }
-@keyframes aparecer-globo { from { opacity: 0; transform: translateX(6px) scale(0.96); } to { opacity: 1; transform: none; } }
-.companera-bocadillo { right: 72px; }
-@media (max-width: 1100px) {
-  .companera { right: 8px; }
-  .companera-globo { right: 0; top: 68px; border-radius: 14px; }
-  .companera-bocadillo { right: 0; top: 68px; }
-}
-@media (prefers-reduced-motion: reduce) { .companera-boton.salta, .companera-globo { animation: none; } }
+@keyframes aparecer-globo { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .companera-globo, .companera-bocadillo { animation: none; } }
 
 /* ===== La página del foco: ancho a tu gusto y la mascota en el margen ===== */
-/* El carril de la derecha es para la mascota y sus globos: nunca tapan la página. */
+/* El papel, centrado; la mascota cabe en un margen estrecho a su derecha (--carril, a cada lado para seguir centrado).
+   El ancho va en ch de la letra del papel: por eso la página lleva su tamaño de letra. */
 .foco-lectura {
-  --carril: 380px;
-  max-width: none; box-sizing: border-box;
-  width: min(100%, calc(var(--ancho-papel, 780px) + var(--carril)));
-  padding-right: var(--carril);
+  --carril: 64px;
+  max-width: none; box-sizing: border-box; margin-inline: auto; padding-right: 0;
+  font-size: calc(var(--foco-letra, 1.1875rem) / var(--zoom-ui, 1));
+  width: min(calc(100% - 2 * var(--carril)), var(--ancho-papel, 64ch));
 }
+.foco-lectura > .foco-etq { font-size: 0.72rem; }
 .foco-lectura .foco-papel-envoltura { width: 100%; }
-.foco-lectura .companera { left: calc(100% + 14px); right: auto; }
-.foco-lectura .companera-globo {
-  left: 74px; right: auto; max-width: calc(var(--carril) - 96px); border-radius: 4px 14px 14px 14px;
-}
-.foco-lectura .companera-bocadillo { left: 74px; right: auto; width: calc(var(--carril) - 96px); border-radius: 4px 16px 16px 16px; }
-@keyframes aparecer-globo-d { from { opacity: 0; transform: translateX(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
-.foco-lectura .companera-globo { animation-name: aparecer-globo-d; }
 /* El asa del borde derecho */
 .foco-asa { position: absolute; top: 0; bottom: 0; right: -7px; width: 14px; cursor: ew-resize; touch-action: none; z-index: 4; }
 .foco-asa::after {
   content: ""; position: absolute; top: 50%; left: 5px; width: 4px; height: 56px; margin-top: -28px; border-radius: 4px;
-  background: currentColor; opacity: 0; transition: opacity 0.2s;
+  background: currentColor; opacity: 0; transition: opacity var(--foco-medio) var(--foco-curva);
 }
 .foco-papel-envoltura:hover .foco-asa::after { opacity: 0.25; }
 .foco-asa:hover::after, .foco-asa:focus-visible::after, body.redimensionando .foco-asa::after { opacity: 0.6; }
@@ -625,13 +649,20 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .foco-ancho-opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .foco-ancho-opciones .foco-boton { width: 100%; text-align: center; font-size: 0.82rem; }
 .foco-ancho small { opacity: 0.6; font-size: 0.75rem; }
-/* Pantallas estrechas: no hay margen; la mascota va dentro, en la esquina, y los globos debajo de ella. */
+.foco-letras { grid-template-columns: repeat(3, 1fr); }
+/* Pantallas estrechas: no hay margen; la mascota baja al pie (a la izquierda de «Siguiente idea») y su bocadillo sale
+   como una hoja desde abajo. */
 @media (max-width: 1000px) {
   .foco-lectura { --carril: 0px; padding-right: 0; }
-  .foco-lectura .companera { left: auto; right: 8px; }
-  .foco-lectura .companera-globo, .foco-lectura .companera-bocadillo { left: auto; right: 0; top: 68px; width: min(300px, calc(80vw / var(--zoom-ui, 1))); max-width: none; border-radius: 14px; }
   .foco-asa { display: none; }
-  .foco-lectura .foco-papel.lector-texto { padding-right: 78px; }
+}
+.companera.estrecha { position: static; width: auto; }
+.companera.estrecha .companera-fija { position: static; }
+.companera.estrecha .companera-boton { width: calc(44px / var(--zoom-ui, 1)); height: calc(44px / var(--zoom-ui, 1)); opacity: 1; }
+.companera.estrecha .companera-boton .mascota { width: 100%; height: 100%; }
+.companera.estrecha .companera-bocadillo, .companera.estrecha .companera-globo {
+  position: fixed; left: 0; right: 0; top: auto; bottom: var(--alto-pie, 54px); width: auto; max-width: none;
+  max-height: calc(60vh / var(--zoom-ui, 1)); overflow: auto; border-radius: 16px 16px 0 0; z-index: 30;
 }
 
 /* ===== El tutor que te guía ===== */
@@ -851,3 +882,15 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .videos-plan-lista > li > .videos-plan-accion { flex-direction: row; align-items: center; gap: 8px; }
 .videos-plan-fallo { grid-column: 1 / -1; }
 .videos-plan-fallo p { margin: 0; }
+
+/* ===== Ajustes: tus datos y las copias de seguridad ===== */
+.ajustes-datos-estado:empty { display: none; }
+.ajustes-copias { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ajustes-copia { border: 1px solid var(--borde); border-radius: 10px; padding: 8px 12px; }
+.ajustes-copia.elegida { border-color: color-mix(in srgb, #c2453a 45%, var(--borde)); }
+.ajustes-copia-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ajustes-copia-fila > span { display: flex; flex-direction: column; min-width: 0; }
+.ajustes-copia-fila small { color: var(--suave); }
+.ajustes-restaurar { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ajustes-restaurar p { margin: 0; }
+.ajustes-restaurar input { font: inherit; font-family: ui-monospace, monospace; letter-spacing: 0.05em; max-width: 12em; }

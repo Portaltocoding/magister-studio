@@ -1,0 +1,217 @@
+# ¿Hace falta buscar fuentes para esta lección? (ADR-0021, evals/cuando_research.py)
+# Cada lección lleva la etiqueta que se espera, puesta a mano con su porqué:
+#   no             conocimiento básico y estable que cualquier modelo explica bien
+#   conviene       una buena fuente mejora la explicación
+#   imprescindible lo que cambia o caduca, lo muy especializado, lo que exige cita o el temario concreto de un curso
+# El fallo caro es «no» donde se esperaba «imprescindible»: la eval lo cuenta aparte.
+# v1: revísalas tú; si cambias una etiqueta, sube la versión del fichero (v2) para no mezclar medidas.
+
+- id: dividir-decimales
+  tema: Matemáticas básicas
+  titulo: Dividir con decimales
+  objetivos: [Dividir un número decimal entre un entero, Dividir entre un número decimal moviendo la coma]
+  espera: "no"
+  porque: aritmética de primaria, estable desde siempre
+
+- id: que-es-variable
+  tema: Programación desde cero
+  titulo: Qué es una variable
+  objetivos: [Explicar qué es una variable y para qué sirve, Escribir un programa que guarda y muestra un valor]
+  espera: "no"
+  porque: lo explica bien cualquier modelo y no ha cambiado en décadas
+
+- id: fracciones
+  tema: Matemáticas básicas
+  titulo: Sumar fracciones
+  objetivos: [Calcular el mínimo común múltiplo de dos denominadores, Sumar dos fracciones con distinto denominador]
+  espera: "no"
+  porque: procedimiento elemental y estable
+
+- id: pitagoras
+  tema: Geometría
+  titulo: El teorema de Pitágoras
+  objetivos: [Calcular la hipotenusa de un triángulo rectángulo, Calcular un cateto conociendo los otros dos lados]
+  espera: "no"
+  porque: geometría básica estable
+
+- id: ecuacion-primer-grado
+  tema: Álgebra
+  titulo: Despejar la x
+  objetivos: [Despejar la incógnita de una ecuación de primer grado, Comprobar la solución sustituyendo]
+  espera: "no"
+  porque: procedimiento elemental
+
+- id: bucle-for
+  tema: Programación desde cero
+  titulo: Repetir con un bucle
+  objetivos: [Escribir un bucle que recorre una lista, Explicar cuándo termina un bucle]
+  espera: "no"
+  porque: concepto básico de programación, estable
+
+- id: porcentajes
+  tema: Matemáticas básicas
+  titulo: Calcular porcentajes
+  objetivos: [Calcular el porcentaje de una cantidad, Calcular un descuento sobre un precio]
+  espera: "no"
+  porque: aritmética básica
+
+- id: derivadas
+  tema: Derivadas de bachillerato
+  titulo: Derivar una función
+  objetivos: [Calcular la derivada de un polinomio, Aplicar la regla de la cadena]
+  espera: conviene
+  porque: tema de bachillerato con matices; una buena fuente con ejercicios resueltos ayuda
+
+- id: cors
+  tema: Desarrollo web para entrevistas
+  titulo: Peticiones entre dominios
+  objetivos: [Explicar qué bloquea el navegador con la política del mismo origen, Configurar las cabeceras CORS de una API]
+  espera: conviene
+  porque: técnica con matices donde la documentación de referencia (MDN) mejora la explicación
+
+- id: big-o
+  tema: Algoritmos para entrevistas
+  titulo: Coste de un algoritmo
+  objetivos: [Calcular la complejidad de un bucle anidado, Comparar O(n log n) con O(n²) en un ejemplo]
+  espera: conviene
+  porque: tema universitario; lo explica un modelo, pero una fuente con ejemplos lo mejora
+
+- id: angulos-gon
+  tema: Topografía
+  titulo: Ángulos en gon
+  objetivos: [Pasar de grados sexagesimales a gon, Calcular un acimut en gon entre dos puntos]
+  espera: conviene
+  porque: convención de topografía en España; conviene una fuente que use la misma notación
+
+- id: rag-paso-a-paso
+  tema: IA aplicada
+  titulo: RAG paso a paso
+  objetivos: [Explicar las fases de un sistema RAG, Elegir el tamaño de los trozos al indexar]
+  espera: conviene
+  porque: técnica reciente con matices; una buena guía mejora la explicación
+
+- id: indices-sql
+  tema: Bases de datos para entrevistas
+  titulo: Cuándo usar un índice
+  objetivos: [Explicar cómo acelera un índice B-tree una consulta, Decidir qué columnas indexar en un caso]
+  espera: conviene
+  porque: técnica con matices; la documentación de referencia ayuda
+
+- id: transacciones-acid
+  tema: Bases de datos para entrevistas
+  titulo: Transacciones y aislamiento
+  objetivos: [Explicar las propiedades ACID, Comparar los niveles de aislamiento con un ejemplo de lectura sucia]
+  espera: conviene
+  porque: tema universitario con matices entre motores
+
+- id: usucapion
+  tema: Derecho civil
+  titulo: La usucapión
+  objetivos: [Explicar los requisitos de la usucapión, Calcular el plazo de la usucapión ordinaria de un inmueble]
+  espera: imprescindible
+  porque: derecho español que exige citar el Código Civil (artículos 1940 y siguientes)
+
+- id: articulo-codigo-civil
+  tema: Derecho civil
+  titulo: La legítima de los hijos
+  objetivos: [Explicar qué es la legítima según el artículo 806 del Código Civil, Calcular el tercio de legítima en una herencia]
+  espera: imprescindible
+  porque: exige citar la norma vigente
+
+- id: ultima-version-react
+  tema: Desarrollo web
+  titulo: Lo nuevo de React 19
+  objetivos: [Explicar qué cambian las Actions de React 19, Usar el hook use con una promesa]
+  espera: imprescindible
+  porque: versión reciente de una librería; lo que sabe un modelo puede estar desfasado
+
+- id: precios-api
+  tema: IA aplicada
+  titulo: Cuánto cuesta una API de modelos
+  objetivos: [Calcular el coste de un millón de tokens con los precios actuales, Comparar el coste de dos proveedores]
+  espera: imprescindible
+  porque: los precios cambian cada pocos meses
+
+- id: temario-profesor
+  tema: Estadística II (UNED)
+  titulo: El tema 3 del profesor
+  objetivos: [Resolver los ejercicios del tema 3 de la guía del profesor, Explicar los contrastes de hipótesis como los pide su examen]
+  espera: imprescindible
+  porque: el temario concreto de una asignatura con su profesor
+
+- id: primeros-auxilios
+  tema: Primeros auxilios
+  titulo: Reanimación cardiopulmonar
+  objetivos: [Aplicar la secuencia de RCP según el protocolo vigente del ERC, Usar un desfibrilador externo automático]
+  espera: imprescindible
+  porque: protocolo vigente que se revisa cada pocos años; un error tiene consecuencias
+
+- id: rgpd-plazos
+  tema: Protección de datos
+  titulo: Avisar de una brecha
+  objetivos: [Explicar el plazo de 72 horas del artículo 33 del RGPD, Redactar la notificación a la AEPD]
+  espera: imprescindible
+  porque: norma que exige cita y procedimiento de un organismo concreto
+
+- id: irpf-tramos
+  tema: Fiscalidad personal
+  titulo: Los tramos del IRPF
+  objetivos: [Calcular la cuota del IRPF con los tramos de este año, Aplicar la deducción por vivienda habitual]
+  espera: imprescindible
+  porque: cambia cada año y depende de la comunidad autónoma
+
+- id: paper-transformer
+  tema: Máster de IA
+  titulo: Leer Attention Is All You Need
+  objetivos: [Explicar la atención multicabeza como la define el artículo, Comparar sus resultados con los de las redes recurrentes]
+  espera: imprescindible
+  porque: estudiar un artículo concreto exige tenerlo y citarlo
+
+- id: kubernetes-version
+  tema: Cloud
+  titulo: Desplegar en Kubernetes
+  objetivos: [Escribir un Deployment con la API actual de Kubernetes, Exponer el servicio con un Ingress]
+  espera: imprescindible
+  porque: las APIs de Kubernetes se retiran entre versiones
+
+- id: delirios-filosofia
+  tema: Filosofía de la psicopatología
+  titulo: ¿Son creencias los delirios?
+  objetivos: [Explicar el argumento doxástico de Bortolotti, Comparar su postura con la de Currie]
+  espera: imprescindible
+  porque: muy especializado y exige citar a los autores
+
+- id: dosis-medicamento
+  tema: Enfermería
+  titulo: Calcular una dosis pediátrica
+  objetivos: [Calcular la dosis de paracetamol por kilo según la ficha técnica, Ajustar la dosis a la presentación disponible]
+  espera: imprescindible
+  porque: dato que exige la ficha técnica vigente
+
+- id: http-basico
+  tema: Desarrollo web para entrevistas
+  titulo: Cómo viaja una petición
+  objetivos: [Explicar las partes de una petición HTTP, "Distinguir los códigos de estado 2xx, 4xx y 5xx"]
+  espera: conviene
+  porque: estable pero con detalles donde MDN mejora la explicación
+
+- id: recursividad
+  tema: Programación
+  titulo: Funciones que se llaman a sí mismas
+  objetivos: [Escribir una función recursiva con su caso base, Explicar la pila de llamadas en un factorial]
+  espera: conviene
+  porque: tema universitario clásico; un buen ejemplo de referencia ayuda
+
+- id: tabla-multiplicar
+  tema: Matemáticas básicas
+  titulo: La tabla del 7
+  objetivos: [Recitar la tabla del 7, Usar la tabla del 7 para dividir entre 7]
+  espera: "no"
+  porque: memorización elemental
+
+- id: oposicion-tema
+  tema: Oposiciones de auxiliar administrativo
+  titulo: La Constitución, título I
+  objetivos: [Explicar los derechos fundamentales de la sección primera, Responder preguntas tipo test del temario oficial]
+  espera: imprescindible
+  porque: temario oficial de una oposición; las preguntas siguen el texto literal

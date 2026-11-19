@@ -7,7 +7,8 @@ recalcula el apoyo de las lecciones. No llama al modelo: no gasta cuota.
 
 Idempotente: solo toca propuestas pendientes, una URL con una versión viva no se vuelve a bajar y cada propuesta se
 anota una sola vez (reanudar no duplica). Lo anotado va en `avisos` del trabajo, una entrada por propuesta:
-{"regla": "incorporada" | "no_incorporada", "propuesta_id", "url", "titulo", "leccion_clave", "motivo", "version_id"}.
+{"regla": "incorporada" | "no_incorporada", "propuesta_id", "url", "titulo", "leccion_clave", "motivo", "version_id"},
+más "incompleta" (el motivo) si entró solo un pedazo: se queda, pero marcado (`versiones.metadatos.incompleta`).
 """
 
 import httpx
@@ -73,9 +74,12 @@ def resumen(t: dict) -> dict:
     anotadas = [a for a in t.get("avisos") or [] if a.get("regla") in (ENTRA, NO_ENTRA)]
     fallidas = [{k: a.get(k) for k in ("propuesta_id", "url", "titulo", "leccion_clave", "motivo")}
                 for a in anotadas if a["regla"] == NO_ENTRA]
+    incompletas = [{k: a.get(k) for k in ("propuesta_id", "url", "titulo", "leccion_clave", "version_id", "incompleta")}
+                   for a in anotadas if a["regla"] == ENTRA and a.get("incompleta")]
     return {"trabajo_id": t["id"], "estado": t["estado"], "error": t.get("error"),
             "total": len(parametros.get("ids", [])), "van": len(anotadas), "entradas": len(anotadas) - len(fallidas),
-            "fallidas": fallidas, "automatica": bool(parametros.get("automatica")), "acabado_en": t.get("acabado_en")}
+            "fallidas": fallidas, "incompletas": incompletas, "automatica": bool(parametros.get("automatica")),
+            "acabado_en": t.get("acabado_en")}
 
 
 def _como_dict(t: Trabajo) -> dict:
@@ -156,6 +160,8 @@ async def _tratar(pid: int, fuente_id: int, automatica: bool, temas: dict[int, i
     async with nueva_sesion() as s, s.begin():
         v = await _version_que_vale(s, vid)
         estado, motivo, vid = v.estado, v.motivo, v.id
+        # Un pedazo (el resumen tras un muro de pago) entra igual, porque algo sirve, pero se dice (ADR-0020).
+        incompleta = (v.metadatos or {}).get("incompleta")
         if estado == "cuarentena":
             # No entró: la propuesta sigue pendiente (no desaparece de «Propuestas por revisar») y el porqué queda
             # anotado en el trabajo.
@@ -163,7 +169,10 @@ async def _tratar(pid: int, fuente_id: int, automatica: bool, temas: dict[int, i
             return {**base, "regla": NO_ENTRA, "version_id": vid, "motivo": f"{claro} ({motivo})" if motivo else claro}
         await s.execute(update(Propuesta).where(Propuesta.id == pid, Propuesta.estado == "pendiente")
                         .values(estado="aprobada", version_id=vid))
-    return {**base, "regla": ENTRA, "version_id": vid, "motivo": "ya estaba en tus fuentes" if viva else None}
+    entrada = {**base, "regla": ENTRA, "version_id": vid, "motivo": "ya estaba en tus fuentes" if viva else None}
+    if incompleta:
+        entrada |= {"incompleta": incompleta, "motivo": f"entró incompleta: {incompleta}"}
+    return entrada
 
 
 async def ejecutar(trabajo_id: int, parametros: dict) -> None:

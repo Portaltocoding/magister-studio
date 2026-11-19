@@ -1,0 +1,25 @@
+# ADR-0020. El research busca por objetivos, juzga con rúbrica y trae fuentes enteras
+
+**Estado:** aceptada. **Fecha:** 2026-11-19. Afina a ADR-0008 (el flujo fijo sigue siendo el de por defecto) y a ADR-0019 (lo que entra solo pasa ahora por este juez).
+
+**Contexto.** Con ADR-0019 lo que propone el research entra solo en tus fuentes y en el apoyo de las lecciones, así que el filtro del research pasa a ser el único. Leído a mano, el de antes fallaba: de 96 propuestas, unas 17 eran malas con un 2/3 cuyo propio motivo reconocía el defecto («es un índice general», «es una traducción», «solo menú de navegación»). Las consultas juntaban dos objetivos y daban 0 resultados (L13: F1 y el descenso de gradiente no se buscaron nunca), se elegían las 5 de mejor nota aunque fueran del mismo tema y del mismo dominio (L1: 5 sobre HTTP y ninguna de JSON; L15: 3 de OpenAI), el juez no sabía quién eras y los prompts estaban en el código, sin nombre ni versión. Y entró un pedazo: un artículo de Springer tras un muro de pago, con el resumen, las notas y la bibliografía, y nada del cuerpo.
+
+**Decisión.**
+
+1. **Una consulta por objetivo.** `research_consultas` (plantilla con versión) escribe una consulta de 3 a 10 palabras por objetivo, sin «;» ni comillas, y una alternativa que se busca sin llamar al modelo si la primera no da nada. En inglés si el tema es técnico, aunque estudies en español; en español si depende de España o tus preferencias lo piden.
+2. **Filtros gratis antes de leer.** URL sin parámetros de seguimiento; fuera anuncios, espejos, ficheros, cambios de código y los dominios de `MAGISTER_RESEARCH_FUERA`; como mucho 2 lecturas del mismo dominio; menos de `MAGISTER_RESEARCH_MIN_TEXTO` (1.500) caracteres o un muro de registro es un error, no una página.
+3. **Se leen PDF** (`MAGISTER_RESEARCH_PDF`, por defecto sí), hasta `MAGISTER_RESEARCH_PDF_MAX_MB` (20), con el mismo extractor que la ingesta y en un hilo. El juez ve las primeras páginas y sabe que es un PDF; la ingesta guarda el documento entero. Un PDF escaneado se descarta. Su texto es tan no confiable como el de una página.
+4. **Fuentes enteras.** `fuentes.extraer.parece_incompleta` (pura, sin modelo, con la misma lista de secciones que deja fuera el troceador) marca un pedazo: solo el resumen, un muro de pago con poco contenido, o casi todo bibliografía. Medida en tu base: marca la versión 1 (Synthese) y no las otras 4; en las 221 páginas HTML guardadas marca 5 (Springer dos veces y 3 vistas previas de Scribd) y ninguna entera. En el research, un pedazo no se juzga tal cual: se prueba UNA alternativa gratis (el PDF que anuncia la página o, con `MAGISTER_UNPAYWALL_EMAIL`, su versión en abierto en Unpaywall). Si lo guardas o lo incorpora la cola, entra igual, porque algo sirve, pero queda marcado en `versiones.metadatos.incompleta`.
+5. **Un juez con rúbrica que conoce al alumno.** `research_juez` (plantilla con versión) recibe los objetivos numerados y tu nivel, objetivo, preferencias y lo que ya sabes. Por página da los objetivos que explica, el tipo (oficial, referencia, tutorial, artículo, portada, comercial, foro, espejo, muro), profundidad y autoridad de 0 a 3, una cita literal y un resumen. El código comprueba la cita: una cita que no está descarta esa nota sola, no el lote.
+6. **El código elige por cobertura.** `elegir`: la mejor nota válida de cada objetivo, como mucho 2 del mismo dominio, y después solo las de profundidad 3 y autoridad 2 o más, hasta 6. Lo que queda sin fuente se dice por su nombre y se anota en la trayectoria (`sin_cubrir`). Cada propuesta guarda su ficha (`propuestas.ficha`).
+7. **Cuándo buscar.** Una lección marcada por el plan con `necesita_fuentes = no` no se busca al lanzar un plan entero (se dice cuántas y cuáles se saltan); pedir a mano una lección concreta busca siempre. «Buscar esto» busca solo los objetivos que digas.
+8. **Rejugar sin cuota.** La trayectoria guarda todas las notas (`puntuar`) y el `crudo_sha` de cada lectura: `evals.research_rejugar --solo-elegir` vuelve a elegir sin modelo y `--juez` vuelve a juzgar desde el crudo con una llamada por lección.
+9. El agente (`sistema = agente`) queda solo para evals, marcado como experimental; `researcher.py` queda como referencia de evals. Siguen siendo 2 llamadas por lección.
+
+**Consecuencias.**
+
+- Un juez más exigente deja lecciones con menos propuestas y algunos objetivos sin fuente. Es lo correcto, y se ve.
+- Al pasar los prompts a plantillas cambian sus versiones: las 96 propuestas de antes no son comparables con las nuevas y no tienen ficha. Las 21 tareas de antes no se pueden rejugar.
+- La salida del juez crece (unos 1.400 tokens) y su entrada también (extracto de 2.500 caracteres): unos 0,045 equiv por lección en vez de 0,034.
+- Más búsquedas web por lección (una por objetivo y su alternativa): más riesgo de que ddgs limite peticiones.
+- Leer PDF trae los apuntes universitarios y los artículos en abierto, que eran lo mejor en temas como Topografía, a cambio de descargas de hasta 20 MB.

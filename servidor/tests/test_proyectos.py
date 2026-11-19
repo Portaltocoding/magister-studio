@@ -188,3 +188,114 @@ async def test_un_proyecto_nunca_se_queda_generando_si_su_trabajo_ya_no_va(clien
         await s.execute(delete(Trabajo).where(Trabajo.id == tid))
     p = (await cliente.get(f"/api/proyectos/{pid}")).json()
     assert p["estado"] == "error" and "perdió" in p["error"]
+
+
+# --- Rehacer sin perder lo hecho ------------------------------------------------------------------------------------
+
+_IAM = ("Crear el usuario IAM", "Crea un usuario IAM con permisos de solo lectura.")
+_CLI = ("Configurar la CLI de AWS", "Instala la CLI y configura el perfil con las claves del usuario.")
+_EC2 = ("Listar las instancias EC2", "Llama a describe_instances con boto3 y saca id, tipo y estado.")
+
+
+def _con_pasos(*pasos: tuple[str, str]) -> dict:
+    r = _roadmap(2)
+    r.niveles[0].bloques[0].pasos = [
+        rm.PasoGen(titulo=t, que_haces=q, antes="Lo mínimo que hay que saber antes de este paso.",
+                   hecho_si="aws sts get-caller-identity devuelve tu usuario", minutos=30) for t, q in pasos]
+    return rm.montar(r)
+
+
+def _titulos(m: dict) -> dict[str, str]:
+    return {p["id"]: p["titulo"] for p in rm.pasos(m)}
+
+
+def test_emparejar_por_titulo_y_por_parecido_y_ante_la_duda_no() -> None:
+    viejo = _con_pasos(_IAM, _CLI, _EC2)
+    # El mismo título con otra puntuación y mayúsculas; uno parecido de verdad; uno nuevo; y el de EC2 desaparece.
+    nuevo = _con_pasos(("Leer los costes del mes", "Consulta Cost Explorer y saca lo gastado este mes."),
+                       ("Configurar la CLI de AWS y el perfil", "Instala la CLI y configura el perfil con las claves del usuario IAM."),
+                       ("crear el usuario iam.", "Crea un usuario de solo lectura."))
+    pares = rm.emparejar(viejo, nuevo)
+    assert {k: v for k, v in pares.items() if "-p" in k} == {"n1-b1-p1": "n1-b1-p3", "n1-b1-p2": "n1-b1-p2"}
+    assert pares["n1"] == "n1" and pares["n1-b1"] == "n1-b1" and pares["n2-b1"] == "n2-b1"
+    # Dos candidatos igual de parecidos: no se sabe cuál es, así que no se empareja con ninguno.
+    viejo = _con_pasos(("Probar el agente", "Lánzalo contra la cuenta y mira lo que propone."), _IAM)
+    nuevo = _con_pasos(("Probar el agente en local", "Lánzalo contra la cuenta y mira lo que propone."),
+                       ("Probar el agente en la nube", "Lánzalo contra la cuenta y mira lo que propone."))
+    assert "n1-b1-p1" not in rm.emparejar(viejo, nuevo)
+    # Parecido de palabras por debajo del umbral: tampoco.
+    assert "n1-b1-p1" not in rm.emparejar(_con_pasos(_IAM, _CLI), _con_pasos(("Crear un rol para el agente", _IAM[1]), _EC2))
+
+
+def test_conservar_hereda_ids_y_apunta_lo_hecho_que_ya_no_esta() -> None:
+    viejo = _con_pasos(_IAM, _CLI, _EC2)
+    nuevo = _con_pasos(("Leer los costes del mes", "Consulta Cost Explorer y saca lo gastado este mes."), _CLI, _IAM)
+    hechos = ["n1-b1-p1", "n1-b1-p3"]
+    hechos_en = {"n1-b1-p1": "2026-11-01T10:00:00+00:00", "n1-b1-p3": "2026-11-02T10:00:00+00:00"}
+    # n1-b1-p4 lo usa una decisión del diario de un roadmap aún más viejo: no se reparte.
+    m = rm.conservar(viejo, nuevo, hechos, hechos_en, {"n1-b1-p4"})
+    assert _titulos(m) == {"n1-b1-p5": "Leer los costes del mes", "n1-b1-p2": _CLI[0], "n1-b1-p1": _IAM[0]}
+    assert m["conservados"] == 1
+    assert m["ya_no_estan"] == [{"id": "n1-b1-p3", "titulo": _EC2[0], "hecho_en": "2026-11-02T10:00:00+00:00"}]
+    # Rehacer otra vez sin que vuelva: sigue apuntado (una vez); si un nivel cambia del todo, su id es nuevo.
+    otra = _con_pasos(_IAM, _CLI)
+    otra["niveles"][1]["titulo"], otra["niveles"][1]["objetivo"] = "Otra cosa", "Hace algo muy distinto."
+    otra["niveles"][1]["bloques"][0]["titulo"] = "Nada que ver"
+    m2 = rm.conservar(m, otra, hechos, hechos_en)
+    assert [x["id"] for x in m2["ya_no_estan"]] == ["n1-b1-p3"]
+    assert m2["niveles"][1]["id"] == "n3" and m2["niveles"][1]["bloques"][0]["id"] == "n3-b1"
+    assert m2["niveles"][1]["numero"] == 2  # la pantalla va por número: el id solo es para lo hecho
+
+
+async def test_rehacer_por_la_api_conserva_lo_hecho_avisa_y_se_puede_volver(cliente, monkeypatch) -> None:
+    from magister.proyectos import trabajo
+
+    mapas = [_con_pasos(_IAM, _CLI, _EC2)]
+
+    async def roadmap_falso(datos, referencias):
+        return mapas[-1]
+
+    async def sin_dibujo(datos, mapa):
+        return None
+
+    async def fase(*a):
+        return None
+
+    monkeypatch.setattr(rm, "generar_roadmap", roadmap_falso)
+    monkeypatch.setattr(rm, "dibujar_arquitectura", sin_dibujo)
+    monkeypatch.setattr(trabajo.cola, "fase", fase)
+
+    pid = (await cliente.post("/api/proyectos", json={"nombre": "Copiloto", "idea": "Un agente que opera mi cuenta de AWS.", "investigar": False})).json()["id"]
+    tid = (await cliente.get(f"/api/proyectos/{pid}")).json()["trabajo"]["id"]
+    await trabajo.ejecutar(tid, "proyecto_roadmap", {"proyecto_id": pid, "investigar": False})
+    assert (await cliente.get(f"/api/proyectos/{pid}")).json()["anterior"] is False
+    for x in ("n1-b1-p1", "n1-b1-p3"):
+        await cliente.put(f"/api/proyectos/{pid}/pasos/{x}", json={"hecho": True})
+    await cliente.post(f"/api/proyectos/{pid}/decisiones", json={"titulo": "Solo lectura", "decision": "Nada de escribir.", "paso_id": "n1-b1-p1"})
+
+    # Con pasos hechos, sin confirmar no se encola nada: dice lo que va a pasar.
+    r = await cliente.post(f"/api/proyectos/{pid}/rehacer")
+    assert r.status_code == 428 and "2 pasos hechos" in r.json()["detail"] and "cuota" in r.json()["detail"]
+    assert "volver" in r.json()["detail"] and (await cliente.get(f"/api/proyectos/{pid}")).json()["estado"] == "listo"
+    r = await cliente.post(f"/api/proyectos/{pid}/rehacer", json={"confirmado": True})
+    assert r.status_code == 200 and r.json()["estado"] == "generando"
+    mapas.append(_con_pasos(("Leer los costes del mes", "Consulta Cost Explorer y saca lo gastado este mes."), _CLI, _IAM))
+    tid = (await cliente.get(f"/api/proyectos/{pid}")).json()["trabajo"]["id"]
+    await trabajo.ejecutar(tid, "proyecto_roadmap", {"proyecto_id": pid, "investigar": False})
+    # Un reintento del mismo trabajo no pisa el roadmap de antes con el que él mismo escribió.
+    await trabajo.ejecutar(tid, "proyecto_roadmap", {"proyecto_id": pid, "investigar": False})
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert p["estado"] == "listo" and p["anterior"] is True
+    assert _titulos(p["roadmap"])["n1-b1-p1"] == _IAM[0] and p["progreso"]["hechos"] == 1
+    assert [x["titulo"] for x in p["roadmap"]["ya_no_estan"]] == [_EC2[0]] and p["roadmap"]["conservados"] == 1
+    d = (await cliente.get(f"/api/proyectos/{pid}/decisiones")).json()[0]
+    assert _titulos(p["roadmap"])[d["paso_id"]] == _IAM[0]  # el diario sigue apuntando al mismo paso
+
+    # Volver al de antes: vuelve entero, con lo hecho, y el de ahora queda como anterior (se puede ir y volver).
+    p = (await cliente.post(f"/api/proyectos/{pid}/volver")).json()
+    assert list(_titulos(p["roadmap"]).values()) == [_IAM[0], _CLI[0], _EC2[0]]
+    assert p["progreso"]["hechos"] == 2 and p["roadmap"]["ya_no_estan"] == [] and "conservados" not in p["roadmap"]
+    p = (await cliente.post(f"/api/proyectos/{pid}/volver")).json()
+    assert list(_titulos(p["roadmap"]).values())[0] == "Leer los costes del mes" and p["anterior"] is True
+    sin = (await cliente.post("/api/proyectos", json={"nombre": "Otro", "idea": "Otro proyecto sin roadmap aún.", "investigar": False})).json()["id"]
+    assert (await cliente.post(f"/api/proyectos/{sin}/volver")).status_code == 409

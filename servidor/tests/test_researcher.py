@@ -22,8 +22,8 @@ EJ = "Ejemplos resueltos paso a paso con la solucion comentada y varios ejercici
 
 
 def _pagina(cuerpo: str) -> bytes:
-    # Párrafos distintos: trafilatura descarta los repetidos idénticos.
-    p = "".join(f"<p>{cuerpo} Parrafo {i} del desarrollo.</p>" for i in range(6))
+    # Párrafos distintos (trafilatura descarta los repetidos idénticos) y texto de sobra para MAGISTER_RESEARCH_MIN_TEXTO.
+    p = "".join(f"<p>{cuerpo} Parrafo {i} del desarrollo.</p>" for i in range(14))
     return f"<html><head><title>T</title></head><body><article><h1>T</h1>{p}</article></body></html>".encode()
 
 

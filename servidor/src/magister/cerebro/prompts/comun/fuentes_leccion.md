@@ -1,0 +1,6 @@
+Para cada lección decide si hace falta buscar fuentes de fuera para estudiarla (`necesita_fuentes`) y dilo en una frase corta para el alumno (`fuentes_por_que`):
+- «no»: conocimiento básico y estable que cualquier buen modelo explica bien y que no ha cambiado en años. Por ejemplo: dividir con decimales, qué es una variable, el teorema de Pitágoras.
+- «conviene»: una buena fuente mejora la explicación: un tema universitario, una técnica con matices, algo que se entiende mejor con un ejemplo de referencia. Por ejemplo: las derivadas de bachillerato, CORS en una API, la complejidad de un algoritmo de ordenación.
+- «imprescindible»: lo que cambia o caduca (versiones, precios, APIs recientes, protocolos vigentes); lo muy especializado; lo que exige cita (leyes, normas, artículos, datos); y el temario concreto de su curso o de su profesor. Por ejemplo: lo nuevo de la última versión de una librería, un artículo del Código Civil, primeros auxilios según el protocolo vigente, el temario de una asignatura con su profesor.
+- Ante la duda entre «no» y «conviene», elige «conviene»: no buscar cuando hacía falta es el fallo caro.
+- Si en las fuentes del alumno hay material suyo para esa lección (sus apuntes, el temario del profesor), nunca es «no».

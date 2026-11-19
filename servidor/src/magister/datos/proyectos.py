@@ -31,6 +31,9 @@ class Proyecto(Base):
     hechos: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     # Cuándo marcaste cada paso ({id: fecha ISO}): para retomar («lo dejaste hace 3 días en…»).
     hechos_en: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    # El roadmap de antes del último «rehacer» ({"roadmap", "arquitectura_svg", "trabajo_id"}), para poder volver a
+    # él. Una sola copia: la última. `trabajo_id` es el trabajo que lo reemplazó (si se reintenta, no se pisa).
+    roadmap_anterior: Mapped[dict | None] = mapped_column(JSONB)
     creado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
     actualizado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now(), onupdate=func.now())
 

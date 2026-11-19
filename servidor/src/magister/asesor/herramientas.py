@@ -1,22 +1,27 @@
-"""Lo que el asesor puede mirar antes de proponer: dos lecturas de tus datos, y nada más.
+"""Lo que el asesor puede mirar antes de proponer: tres lecturas de tus datos, y nada más.
 
 Solo leen (ninguna escribe), solo de la base de Magister (ni web ni ficheros) y devuelven texto corto. El roadmap y
 el diario del proyecto no son herramientas: son cortos y siempre hacen falta, así que van en el prompt desde el
-principio (`diario`) y no cuestan una vuelta.
+principio (`diario`) y no cuestan una vuelta. Lo mismo el plan activo y sus próximos 14 días; `ver_calendario` es
+para otro rango.
 """
 
 import re
 import unicodedata
 from collections.abc import Awaitable, Callable
+from datetime import date
 
 from sqlalchemy import select, text
 
+from magister.asesor.cambios import MESES, dia
+from magister.datos.agenda import Evento
 from magister.datos.notas import Nota
+from magister.datos.plan import LeccionFila, SesionFila
 from magister.datos.proyectos import Decision
 from magister.datos.sesion import nueva_sesion
 
 MAX_RESULTADO = 6000
-NOMBRES = {"buscar_notas": "tus notas", "ver_plan_estudio": "tu plan de estudio"}
+NOMBRES = {"buscar_notas": "tus notas", "ver_plan_estudio": "tu plan de estudio", "ver_calendario": "tu calendario"}
 
 
 async def diario(proyecto_id: int | None) -> str:
@@ -81,17 +86,56 @@ async def ver_plan_estudio(proyecto_id: int | None, consulta: str | None = None)
     return "\n".join(lineas) or "(no tiene ningún plan de estudio aceptado)"
 
 
+async def ver_calendario(plan_id: int | None, desde: date, hasta: date) -> str:
+    """Las sesiones del plan activo (con sus ids) y lo apuntado en tu agenda entre dos días, día a día."""
+    async with nueva_sesion() as s:
+        sesiones = [] if plan_id is None else (await s.execute(
+            select(SesionFila, LeccionFila.titulo)
+            .join(LeccionFila, (LeccionFila.plan_id == SesionFila.plan_id) & (LeccionFila.clave == SesionFila.leccion_clave))
+            .where(SesionFila.plan_id == plan_id, SesionFila.fecha >= desde, SesionFila.fecha <= hasta)
+            .order_by(SesionFila.fecha, SesionFila.inicio, SesionFila.id))).all()
+        eventos = (await s.scalars(select(Evento).where(Evento.fecha >= desde, Evento.fecha <= hasta)
+                                   .order_by(Evento.fecha, Evento.hora, Evento.id))).all()
+    por_dia: dict[date, list[str]] = {}
+    for x, titulo in sesiones:
+        hora = f" a las {x.inicio.strftime('%H:%M')}" if x.inicio else ""
+        por_dia.setdefault(x.fecha, []).append(f"sesión {x.id}: {x.leccion_clave} «{titulo}»{hora}, {x.horas:g} h ({x.estado})")
+    for e in eventos:
+        hora = f" a las {e.hora.strftime('%H:%M')}" if e.hora else ""
+        por_dia.setdefault(e.fecha, []).append(f"{e.tipo} «{e.titulo}»{hora}{' (hecho)' if e.hecho else ''}")
+    lineas = [f"- {dia(d)} ({d.isoformat()}): " + "; ".join(v) for d, v in sorted(por_dia.items())]
+    sin_plan = "" if plan_id is not None else "(no hay plan activo: solo tu agenda)\n"
+    return sin_plan + ("\n".join(lineas) or f"(nada entre el {dia(desde)} y el {dia(hasta)})")
+
+
 HERRAMIENTAS: dict[str, Callable[[int | None, str | None], Awaitable[str]]] = {
     "buscar_notas": buscar_notas, "ver_plan_estudio": ver_plan_estudio,
 }
 
 
-async def leer(herramienta: str, proyecto_id: int | None, consulta: str | None) -> str:
+async def leer(herramienta: str, proyecto_id: int | None, consulta: str | None, plan_id: int | None = None,
+               desde: str | None = None, hasta: str | None = None) -> str:
     """El resultado de una lectura, recortado. Un fallo de la base es un resultado más, no un error del turno."""
     try:
-        return (await HERRAMIENTAS[herramienta](proyecto_id, consulta))[:MAX_RESULTADO]
+        if herramienta == "ver_calendario":
+            inicio = date.fromisoformat(desde)
+            texto = await ver_calendario(plan_id, inicio, date.fromisoformat(hasta) if hasta else inicio)
+        else:
+            texto = await HERRAMIENTAS[herramienta](proyecto_id, consulta)
+        return texto[:MAX_RESULTADO]
     except Exception as e:  # noqa: BLE001  (sin esa lectura, el asesor propone con lo que tiene)
         return f"(no se pudo leer: {type(e).__name__})"
+
+
+def _rango(desde: str, hasta: str | None) -> str:
+    """«del 1 al 7 de diciembre», «del 28 de noviembre al 4 de diciembre», «el 3 de diciembre»."""
+    a = date.fromisoformat(desde)
+    b = date.fromisoformat(hasta) if hasta else a
+    if a == b:
+        return f"el {a.day} de {MESES[a.month - 1]}"
+    if a.month == b.month:
+        return f"del {a.day} al {b.day} de {MESES[b.month - 1]}"
+    return f"del {a.day} de {MESES[a.month - 1]} al {b.day} de {MESES[b.month - 1]}"
 
 
 def descripcion(lectura: dict) -> str:
@@ -99,4 +143,6 @@ def descripcion(lectura: dict) -> str:
     nombre = NOMBRES.get(lectura["herramienta"], lectura["herramienta"])
     if lectura["herramienta"] == "buscar_notas" and lectura.get("consulta"):
         return f"{nombre} sobre «{lectura['consulta']}»"
+    if lectura["herramienta"] == "ver_calendario" and lectura.get("desde"):
+        return f"{nombre} {_rango(lectura['desde'], lectura.get('hasta'))}"
     return nombre

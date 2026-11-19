@@ -12,6 +12,7 @@ import {
 } from './api.ts'
 import Cuestionario from './componentes/Cuestionario.tsx'
 import BarraCuota from './componentes/BarraCuota.tsx'
+import { avisoAlAceptar, clavesParaBuscar } from './componentes/bibliotecaLeccion.ts'
 import { irARuta } from './componentes/Vacio.tsx'
 import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
@@ -41,10 +42,11 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     if (!buscarAlGuardar.current) return
     buscarAlGuardar.current = false
     const vista = await verPlan(temaId)
-    const claves = vista.lecciones.filter((l) => l.sin_material).map((l) => l.clave)
-    if (!claves.length) return setAviso('Todas las lecciones tienen ya material en tus fuentes.')
-    await lanzarResearch(planId, claves)
-    setAviso(`Buscando fuentes para ${claves.length} lecciones. Las propuestas te llegarán a «Temas y fuentes» para que las apruebes.`)
+    if (!vista.lecciones.some((l) => l.sin_material)) return setAviso('Todas las lecciones tienen ya material en tus fuentes.')
+    const claves = clavesParaBuscar(vista.lecciones)
+    if (!claves.length) return setAviso(avisoAlAceptar(0))
+    const r = await lanzarResearch(planId, claves)
+    setAviso(avisoAlAceptar(r.tareas.length, r.aviso))
   }, [])
 
   const abrir = useCallback(

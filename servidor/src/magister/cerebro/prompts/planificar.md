@@ -16,9 +16,15 @@ Reglas:
 - De uno a cinco conceptos por lección. Cada concepto tiene un `id` en minúsculas con guiones (por ejemplo `clave-primaria`), único en todo el plan: son lo que el tutor medirá después, así que tienen que ser concretos y evaluables.
 - Títulos de lección sencillos, de 2 a 5 palabras, como los diría alguien explicándolo en una cafetería («Cómo viaja una petición», «Diseñar una API»): sin dos puntos, sin paréntesis y sin enumerar tecnologías. Los detalles van en objetivos y conceptos.
 - Cada objetivo empieza por un verbo observable (explicar, escribir, calcular, comparar, diseñar), nunca por «entender» o «conocer».
+- Cada objetivo es una sola idea que se puede practicar y buscar por separado. Si junta varias cosas distintas («XSS, CSRF e inyección SQL» son tres defensas), pártelo en varios objetivos o quédate con lo que tienen en común. Cuatro objetivos por lección como mucho: si salen más, son dos lecciones.
+- Si pide proyectos para practicar, no hagas una lección de proyectos: escribe al final de `razonamiento` hasta tres ideas de proyecto, una por línea, empezando por «Proyecto:».
+- No escribas en `razonamiento` totales de horas ni cuentas: los calcula y los enseña el código.
 - Ajusta la profundidad al nivel y al objetivo del alumno.
 - Si su nivel es «nada», la primera lección es de fundamentos: lo que el resto da por sabido (vocabulario básico y las ideas previas imprescindibles), explicado desde cero. Si es «básico», incluye esos previos dentro de la primera lección que los necesite.
 - Si hay fuentes del alumno en <fuentes>, apóyate en ellas para el orden y el contenido.
+
+Fuentes por lección:
+@incluir fuentes_leccion
 
 <perfil>
 {perfil}

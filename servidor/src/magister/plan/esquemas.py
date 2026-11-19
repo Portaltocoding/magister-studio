@@ -12,6 +12,12 @@ HORAS_MAX_DIA = 12.0  # el mismo tope que la ruta del horario
 
 Nivel = Literal["nada", "basico", "intermedio", "avanzado"]
 
+# Si una lección necesita fuentes de fuera (ADR-0021). «no»: lo explica bien cualquier modelo (dividir, qué es una
+# variable); «conviene»: una buena fuente mejora la explicación; «imprescindible»: lo que caduca, lo muy especializado,
+# lo que exige cita o el temario concreto de su curso.
+Necesidad = Literal["no", "conviene", "imprescindible"]
+NECESIDADES: tuple[str, ...] = ("no", "conviene", "imprescindible")
+
 
 class Perfil(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -71,6 +77,33 @@ class Leccion(BaseModel):
     conceptos: list[Concepto] = Field(min_length=1, max_length=5, description="De uno a cinco conceptos.")
     horas: float = Field(gt=0, description="Horas de estudio de la lección.")
     depende_de: list[str] = Field(default_factory=list, description="Claves de las lecciones que hay que saber antes.")
+    # Si hace falta buscar fuentes para esta lección (ADR-0021). Los planes guardados antes de decidirlo se leen como
+    # «conviene»: se busca por si acaso, como hasta ahora.
+    necesita_fuentes: Necesidad = "conviene"
+    fuentes_por_que: str = ""
+
+
+DESCRIPCION_NECESITA = (
+    "Si hace falta buscar fuentes para estudiar esta lección: no (conocimiento básico y estable que cualquier modelo "
+    "explica bien), conviene (una buena fuente mejora la explicación) o imprescindible (lo que cambia o caduca, lo muy "
+    "especializado, lo que exige cita o el temario concreto de su curso)."
+)
+
+
+class LeccionNueva(Leccion):
+    """La lección que escribe el modelo: tiene que decir si necesita fuentes y por qué (las guardadas pueden no tenerlo)."""
+
+    necesita_fuentes: Necesidad = Field(description=DESCRIPCION_NECESITA)
+    fuentes_por_que: str = Field(
+        min_length=3, description="Una frase corta para el alumno: por qué hace falta buscar fuentes o por qué no."
+    )
+
+    @field_validator("fuentes_por_que")
+    @classmethod
+    def _motivo_no_vacio(cls, valor: str) -> str:
+        if len(valor.strip()) < 3:
+            raise ValueError("di en una frase por qué esta lección necesita fuentes o no")
+        return valor.strip()
 
 
 Alcance = Literal["procedimiento", "concepto", "tema", "tema_amplio", "tema_master", "asignatura"]
@@ -95,6 +128,8 @@ class Plan(BaseModel):
 
 
 class PlanNuevo(Plan):
-    """El plan que escribe el modelo: con el alcance obligatorio (los ya guardados pueden no tenerlo)."""
+    """El plan que escribe el modelo: con el alcance obligatorio y, en cada lección, si necesita fuentes (los ya
+    guardados pueden no tenerlos)."""
 
     alcance: Alcance = Field(description=Plan.model_fields["alcance"].description)
+    lecciones: list[LeccionNueva] = Field(min_length=1)

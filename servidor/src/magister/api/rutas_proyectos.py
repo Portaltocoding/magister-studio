@@ -7,7 +7,7 @@ from sqlalchemy import delete, select, update
 from magister.datos.material import Trabajo
 from magister.datos.proyectos import Decision, Proyecto
 from magister.datos.sesion import nueva_sesion
-from magister.proyectos.roadmap import pasos
+from magister.proyectos.roadmap import apuntar_perdidos, pasos
 from magister.trabajos import cola
 
 rutas = APIRouter(prefix="/api")
@@ -85,7 +85,9 @@ def _salida(p: Proyecto, completo: bool = True) -> dict:
         return base
     return {**base, "idea": p.idea, "objetivo": p.objetivo, "sabes": p.sabes, "ritmo": p.ritmo, "roadmap": p.roadmap,
             "referencias": p.referencias or [], "arquitectura_svg": p.arquitectura_svg, "hechos": p.hechos or [],
-            "hechos_en": p.hechos_en or {}}
+            "hechos_en": p.hechos_en or {},
+            # Hay un roadmap de antes del último «rehacer» al que se puede volver.
+            "anterior": bool((p.roadmap_anterior or {}).get("roadmap"))}
 
 
 async def _proyecto(pid: int) -> Proyecto:
@@ -139,14 +141,52 @@ async def borrar(pid: int) -> None:
         await s.execute(delete(Proyecto).where(Proyecto.id == pid))
 
 
+class Rehacer(BaseModel):
+    confirmado: bool = False  # ya sabes lo que pasa con lo hecho (hace falta si tienes pasos hechos)
+
+
+def aviso_rehacer(hechos: int) -> str:
+    return (f"Tienes {hechos} {'paso hecho' if hechos == 1 else 'pasos hechos'}. Rehacer el roadmap gasta cuota; se "
+            "intentarán conservar los que sigan existiendo, lo hecho de los que no se apunta aparte y el roadmap de "
+            "ahora se guarda para poder volver a él. Confírmalo para seguir.")
+
+
 @rutas.post("/proyectos/{pid}/rehacer")
-async def rehacer(pid: int) -> dict:
-    """Vuelve a generar el roadmap entero (si falló, o si cambiaste la idea). Los ids de los pasos van por posición:
-    lo marcado como hecho guarda sus ids viejos, que en el roadmap nuevo pueden caer en otros pasos o en ninguno."""
+async def rehacer(pid: int, cuerpo: Rehacer | None = None) -> dict:
+    """Vuelve a generar el roadmap entero (si falló, o si cambiaste la idea). Si ya había uno, al terminar se empareja
+    por contenido con el nuevo (`roadmap.conservar`): los pasos que siguen heredan su id, así que lo hecho, sus fechas y
+    el diario siguen valiendo; lo hecho de los que ya no están se apunta en «ya_no_estan» del roadmap, y el roadmap de
+    antes se guarda en `roadmap_anterior` para volver a él (`/volver`). Con pasos hechos, sin `confirmado` responde
+    428 con lo que va a pasar y no encola nada."""
     p = await _proyecto(pid)
     if p.estado == "generando":
         raise HTTPException(409, "ya se está generando algo de este proyecto")
+    hechos = _progreso(p)["hechos"]
+    if hechos and not (cuerpo and cuerpo.confirmado):
+        raise HTTPException(428, aviso_rehacer(hechos))
     await _encolar(pid, "proyecto_roadmap", {"investigar": True, "vez": await _siguiente_vez(pid)})
+    return _salida(await _proyecto(pid))
+
+
+@rutas.post("/proyectos/{pid}/volver")
+async def volver(pid: int) -> dict:
+    """Vuelve al roadmap de antes del último «rehacer», y el de ahora pasa a ser el anterior (se puede ir y volver).
+    Lo hecho no se toca: los pasos que están en los dos tienen el mismo id; lo hecho de los que no, se apunta aparte."""
+    async with nueva_sesion() as s, s.begin():
+        p = await s.scalar(select(Proyecto).where(Proyecto.id == pid).with_for_update())
+        if p is None:
+            raise HTTPException(404, "proyecto no encontrado")
+        if p.estado == "generando":
+            raise HTTPException(409, "ya se está generando algo de este proyecto")
+        anterior = p.roadmap_anterior
+        if not anterior or not anterior.get("roadmap"):
+            raise HTTPException(409, "no hay un roadmap anterior al que volver")
+        actual = p.roadmap or {}
+        p.roadmap_anterior = {"roadmap": actual, "arquitectura_svg": p.arquitectura_svg, "trabajo_id": None}
+        # «conservados» cuenta lo del último rehacer: en el roadmap al que se vuelve ya no dice nada.
+        de_antes = {k: v for k, v in anterior["roadmap"].items() if k != "conservados"}
+        p.roadmap = apuntar_perdidos(actual, de_antes, list(p.hechos or []), dict(p.hechos_en or {}))
+        p.arquitectura_svg = anterior.get("arquitectura_svg")
     return _salida(await _proyecto(pid))
 
 

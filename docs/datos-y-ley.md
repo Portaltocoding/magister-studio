@@ -15,6 +15,12 @@
 
 `uv run magister exportar --salida <carpeta>` saca un JSON por tabla; `uv run magister borrar-todo --confirmar` lo borra (las fuentes, solo con `--fuentes`).
 
+## Desde la app (Ajustes)
+
+- **Descargar mis datos** (`GET /api/datos/exportar`): `magister-AAAA-MM-DD.zip` con lo mismo que `magister exportar` (un JSON por tabla y el LEEME) y, en `ficheros/`, tus salidas (PDF, diapositivas, guiones) y `servidor/crudo`, hasta `MAGISTER_EXPORTAR_MAX_MB` (500 por defecto). Lo que no cabe se nombra en el LEEME. Nunca entra `instalacion` (el canario), ni `.env`, ni `secretos/`, ni el token, y ningún fichero lleva el canario dentro (lo vigila `tests/test_datos.py`).
+- **Copias de seguridad** (`/api/datos/copias`): lista los `.dump` de `copias/` (`MAGISTER_COPIAS`) y «Hacer una copia ahora» lanza el mismo `pg_dump -Fc` que `scripts/copia_db.sh`, con `docker exec` en el contenedor de la base (`MAGISTER_CONTENEDOR_DB`), sin bash.
+- **Restaurar** (`POST /api/datos/copias/restaurar` con `{"copia", "confirmacion": "RESTAURAR"}`): sustituye todos los datos. Antes guarda el estado actual en `copias/antes-de-restaurar/` (si esa copia falla, no restaura) y mete la copia en una sola transacción: si algo falla, la base queda como estaba. No restaura `checkpoints.sqlite` (las pausas de la conversación de diagnóstico). Después hay que reiniciar Magister (`arrancar.ps1` aplica las migraciones si la copia es anterior).
+
 ## Clasificación
 
 Uso personal y doméstico: fuera del RGPD (excepción doméstica) y de las obligaciones de despliegue de la Ley de IA. Si se instalara para otras personas cambiaría: serías encargado del tratamiento (contrato con Anthropic como subencargado y transferencia internacional), el corrector que decide repasos podría considerarse sistema de alto riesgo en educación, y habría obligaciones de transparencia (avisar de que es una IA).

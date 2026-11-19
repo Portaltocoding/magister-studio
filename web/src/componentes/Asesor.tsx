@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from './Markdown.tsx'
-import { EVENTO_CAMBIO_APLICADO, cambiosDe, crearConversacion, decidirCambio, enviar, listarMensajes, type CambioAplicado, type CambioAsesor } from '../api.ts'
+import { EVENTO_CAMBIO_APLICADO, cambiosDe, crearConversacion, decidirCambio, enviar, listarMensajes, listarPlanes, type CambioAplicado, type CambioAsesor, type LineaCambio } from '../api.ts'
 import { mensajeDe } from './Cargando.tsx'
 import Mascota from '../Mascota.tsx'
 import { MODOS } from '../modos.ts'
 import { EVENTO_SUENO } from './animo.ts'
-import { buscarFaq, ofreceCambio, sugerenciasDe } from './faqs.ts'
+import { buscarFaq, esPantallaDePlan, ofreceCambio, sugerenciasDe } from './faqs.ts'
+import { planQueToca, temaActivo } from './planActivo.ts'
 import { aCss } from './escala.ts'
 
 // El asesor: la mascota de la barra de arriba, cogida y dejada donde quieras. Se queda flotando sobre la pantalla y,
@@ -137,6 +138,17 @@ function ejecutar(a: Accion) {
 
 // El proyecto que tienes abierto: sobre él prepara el asesor los cambios que ofrece.
 const proyectoEnPantalla = () => Number(window.location.hash.match(/^#\/proyectos\/(\d+)/)?.[1]) || null
+
+// El plan con el que estás (el mismo en toda la app; en Lecciones, el de la lección abierta): sobre él mueve sesiones y
+// marca o prepara lecciones. Sin planes, o sin red, ninguno.
+async function planDeLaApp(): Promise<number | null> {
+  try {
+    const deLaRuta = Number(window.location.hash.match(/^#\/fichas\/(\d+)/)?.[1]) || null
+    return planQueToca(await listarPlanes(), deLaRuta, temaActivo())?.plan_id ?? null
+  } catch {
+    return null
+  }
+}
 
 // Lo que pone la pantalla, en texto y sin el propio asesor (va al tutor marcado como datos de la página).
 function textoPantalla(): string {
@@ -501,7 +513,7 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
       const c = await decidirCambio(cambio.id, que)
       alCambiar(c)
       if (c.estado === 'aplicada' || c.estado === 'deshecha') {
-        const detail: CambioAplicado = { proyecto_id: c.proyecto_id, nuevos: c.nuevos }
+        const detail: CambioAplicado = { proyecto_id: c.proyecto_id, nuevos: c.nuevos, plan_id: c.plan_id ?? null }
         window.dispatchEvent(new CustomEvent(EVENTO_CAMBIO_APLICADO, { detail }))
       }
     } catch (e) {
@@ -517,10 +529,11 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
         {TITULO_CAMBIO[cambio.estado]}
       </p>
       <ul>
-        {cambio.lineas.map((l, i) => (
+        {(cambio.lineas as LineaCambio[]).map((l, i) => (
           <li key={i}>
             {l.texto}
             {l.motivo && <small>{l.motivo}</small>}
+            {l.deshace === false && <small>Esto no se deshace.</small>}
           </li>
         ))}
       </ul>
@@ -535,7 +548,8 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
         </div>
       )}
       {error && <p className="nota" role="alert">{error}</p>}
-      {(cambio.estado === 'propuesta' || cambio.estado === 'aplicada') && (
+      {/* Lo que solo prepara apuntes no se deshace: sin botón de «Deshacer». */}
+      {(cambio.estado === 'propuesta' || (cambio.estado === 'aplicada' && cambio.deshacible !== false)) && (
         <div className="asesor-cambio-botones">
           {cambio.estado === 'propuesta' ? (
             <>
@@ -576,6 +590,15 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   const [error, setError] = useState<string | null>(null)
   const control = useRef<AbortController | null>(null)
   const fondo = useRef<HTMLDivElement | null>(null)
+  // Si hay un plan activo (para sugerir cambios del plan en sus pantallas).
+  const [hayPlan, setHayPlan] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    void planDeLaApp().then((p) => vivo && setHayPlan(p != null))
+    return () => {
+      vivo = false
+    }
+  }, [aqui.clave])
 
   // Al cambiar de pantalla, el chat se pone en la sección nueva.
   useEffect(() => {
@@ -648,7 +671,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
       let acumulado = ''
       // La respuesta es siempre el último mensaje: lo que llega después del texto (el cambio) se le añade.
       const alUltimo = (cambio: Partial<Mensaje>) => setMensajes((m) => [...m.slice(0, -1), { ...m[m.length - 1], ...cambio }])
-      const extra = { asesor: true, contexto, proyecto_id: proyectoEnPantalla() }
+      const extra = { asesor: true, contexto, proyecto_id: proyectoEnPantalla(), plan_activo_id: await planDeLaApp() }
       for await (const ev of enviar(h.cid, pregunta, control.current.signal, true, false, extra)) {
         if (ev.tipo === 'delta') {
           acumulado += ev.t
@@ -681,7 +704,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   }
 
   // Una sola pantalla: la conversación de la sección en la que estás. Tres sugerencias para empezar; si no, escribes.
-  const sugerencias = sugerenciasDe(aqui.clave, proyectoEnPantalla() != null)
+  const sugerencias = sugerenciasDe(aqui.clave, proyectoEnPantalla() != null, hayPlan)
 
   return (
     <section className={`asesor-chat ${lado} ${vertical}`} role="dialog" aria-label={`Tu asesor · ${aqui.nombre}`}>
@@ -703,7 +726,9 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
             <p>
               {proyectoEnPantalla()
                 ? 'Te explico lo que ves y, si me lo pides, cambio este proyecto contigo: añadir pasos o niveles, reordenar, partir bloques… Tú apruebas cada cambio.'
-                : 'Estoy aquí para lo que tienes delante. ¿En qué te ayudo?'}
+                : hayPlan && esPantallaDePlan(aqui.clave)
+                  ? 'Te explico lo que ves y, si me lo pides, cambio tu plan contigo: mover una sesión, marcar una lección, preparar sus apuntes o apuntarte un examen. Tú apruebas cada cambio.'
+                  : 'Estoy aquí para lo que tienes delante. ¿En qué te ayudo?'}
             </p>
             <div className="asesor-sugerencias">
               {sugerencias.map((s) => (

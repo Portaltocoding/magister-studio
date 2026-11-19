@@ -23,7 +23,13 @@ rutas = APIRouter(prefix="/api")
 class ResearchEntrada(BaseModel):
     plan_id: int
     leccion_claves: list[str] = Field(min_length=1, max_length=30)
+    # «agente» es experimental: queda para las evals (ADR-0020); el de siempre es el fijo por objetivos.
     sistema: Literal["fijo", "agente"] = "fijo"
+    # Buscar solo para estos objetivos (desde 1) de la lección: «Buscar esto». Solo con una lección.
+    objetivos: list[int] | None = Field(default=None, max_length=10)
+    # Buscar aunque el plan diga que la lección no necesita fuentes: lo mandan los botones de una lección («Buscar
+    # fuentes», «buscar igualmente», «Buscar esto»). Un lote, aunque sea de una sola lección, no fuerza nada.
+    forzar: bool = False
 
 
 class Decision(BaseModel):
@@ -32,12 +38,16 @@ class Decision(BaseModel):
 
 @rutas.post("/research", status_code=202)
 async def lanzar(cuerpo: ResearchEntrada) -> dict:
+    """Las lecciones que el plan marca con `necesita_fuentes` = «no» se saltan (salvo con `forzar`): la
+    respuesta dice cuáles en `saltadas` y por qué en `aviso`."""
+    if cuerpo.objetivos is not None and len(cuerpo.leccion_claves) != 1:
+        raise HTTPException(422, "los objetivos solo valen para buscar en una lección")
+    if cuerpo.objetivos is not None and any(o < 1 for o in cuerpo.objetivos):
+        raise HTTPException(422, "los objetivos se cuentan desde 1")
     async with nueva_sesion() as s:
         if await dp.plan_por_id(s, cuerpo.plan_id) is None:
             raise HTTPException(404, "plan no encontrado")
-    ids = await tareas.crear(cuerpo.plan_id, cuerpo.leccion_claves, cuerpo.sistema)
-    tareas.lanzar_en_fondo(ids)
-    return {"tareas": ids}
+    return await tareas.lanzar(cuerpo.plan_id, cuerpo.leccion_claves, cuerpo.sistema, cuerpo.objetivos, cuerpo.forzar)
 
 
 @rutas.get("/research/{tarea_id}")
@@ -132,8 +142,8 @@ async def research_libre(cuerpo: ResearchLibre) -> dict:
 
     encontradas: list[dict] = []
 
-    async def guardar(url: str, titulo: str, motivo: str) -> bool:
-        encontradas.append({"url": url, "titulo": titulo, "motivo": motivo})
+    async def guardar(url: str, titulo: str, motivo: str, ficha: dict | None = None) -> bool:
+        encontradas.append({"url": url, "titulo": titulo, "motivo": motivo, "ficha": ficha})
         return True
 
     h = Herramientas(tareas.web_por_defecto, 0, "libre", None, guardar_propuesta=guardar)

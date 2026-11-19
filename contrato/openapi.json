@@ -146,6 +146,80 @@
         }
       }
     },
+    "/api/materias": {
+      "get": {
+        "summary": "Listar Materias",
+        "description": "Los perfiles de explicación que se pueden asignar a un tema.",
+        "operationId": "listar_materias_api_materias_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Materias Api Materias Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/temas/{tema_id}/materia": {
+      "put": {
+        "summary": "Cambiar Materia",
+        "description": "Cambia a mano el perfil de explicación del tema; null lo deja sin elegir y se vuelve a elegir al usarlo.",
+        "operationId": "cambiar_materia_api_temas__tema_id__materia_put",
+        "parameters": [
+          {
+            "name": "tema_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tema Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MateriaEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemaSalida"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversaciones": {
       "get": {
         "summary": "Listar Conversaciones",
@@ -410,7 +484,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DecisionEntrada"
+                "$ref": "#/components/schemas/magister__api__esquemas__DecisionEntrada"
               }
             }
           }
@@ -437,6 +511,173 @@
                       "minimum": 0
                     }
                   }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversaciones/{cid}/cambios": {
+      "get": {
+        "summary": "Cambios De Conversacion",
+        "operationId": "cambios_de_conversacion_api_conversaciones__cid__cambios_get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Cambios De Conversacion Api Conversaciones  Cid  Cambios Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cambios/{cambio_id}/aplicar": {
+      "post": {
+        "summary": "Aplicar",
+        "operationId": "aplicar_api_cambios__cambio_id__aplicar_post",
+        "parameters": [
+          {
+            "name": "cambio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cambio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Aplicar Api Cambios  Cambio Id  Aplicar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cambios/{cambio_id}/descartar": {
+      "post": {
+        "summary": "Descartar",
+        "operationId": "descartar_api_cambios__cambio_id__descartar_post",
+        "parameters": [
+          {
+            "name": "cambio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cambio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Descartar Api Cambios  Cambio Id  Descartar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cambios/{cambio_id}/deshacer": {
+      "post": {
+        "summary": "Deshacer",
+        "operationId": "deshacer_api_cambios__cambio_id__deshacer_post",
+        "parameters": [
+          {
+            "name": "cambio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cambio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Deshacer Api Cambios  Cambio Id  Deshacer Post"
                 }
               }
             }
@@ -516,6 +757,107 @@
             }
           }
         }
+      },
+      "delete": {
+        "summary": "Borrar Plan",
+        "description": "El plan de un tema con todas sus versiones: lecciones, calendario, material, fichas, repasos y exámenes.\n\nLas conversaciones se quedan (se borran aparte); el tema también, por si vuelves a planificarlo.",
+        "operationId": "borrar_plan_api_temas__tema_id__plan_delete",
+        "parameters": [
+          {
+            "name": "tema_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tema Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Borrar Plan Api Temas  Tema Id  Plan Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/lecciones/{clave}/fuentes": {
+      "patch": {
+        "summary": "Cambiar Necesidad",
+        "description": "Cambias si esta lección necesita fuentes: con «no», el research automático y «Buscar fuentes» de todo el plan se\nla saltan (pedirla a mano en su fila sigue buscando).",
+        "operationId": "cambiar_necesidad_api_planes__plan_id__lecciones__clave__fuentes_patch",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NecesitaFuentes"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cambiar Necesidad Api Planes  Plan Id  Lecciones  Clave  Fuentes Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/temas/{tema_id}/plan/recalcular": {
@@ -569,6 +911,58 @@
         }
       }
     },
+    "/api/temas/{tema_id}/plan/horario": {
+      "put": {
+        "summary": "Cambiar Horario",
+        "description": "Cambia cuántas horas y a qué hora estudias cada día, y recoloca lo pendiente desde hoy.",
+        "operationId": "cambiar_horario_api_temas__tema_id__plan_horario_put",
+        "parameters": [
+          {
+            "name": "tema_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tema Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Horario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cambiar Horario Api Temas  Tema Id  Plan Horario Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sesiones/{sesion_id}": {
       "patch": {
         "summary": "Marcar Sesion",
@@ -603,6 +997,57 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Marcar Sesion Api Sesiones  Sesion Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/lecciones/{clave}/hecha": {
+      "patch": {
+        "summary": "Marcar Leccion",
+        "description": "Cerrar una lección: todas sus sesiones pendientes pasan a hechas, también las de otros días.",
+        "operationId": "marcar_leccion_api_planes__plan_id__lecciones__clave__hecha_patch",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Marcar Leccion Api Planes  Plan Id  Lecciones  Clave  Hecha Patch"
                 }
               }
             }
@@ -1183,9 +1628,73 @@
         }
       }
     },
+    "/api/fuentes/resumen": {
+      "get": {
+        "summary": "Resumen Documentos",
+        "description": "Cuántos documentos hay listos, indexándose y con problema; los problemas, en claro; y lo que vino del research.",
+        "operationId": "resumen_documentos_api_fuentes_resumen_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Resumen Documentos Api Fuentes Resumen Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/versiones/{vid}/reintentar": {
+      "post": {
+        "summary": "Reintentar",
+        "description": "Vuelve a poner a indexar una versión que se quedó a medias (cuarentena por un fallo, o lista sin fragmentos).",
+        "operationId": "reintentar_api_versiones__vid__reintentar_post",
+        "parameters": [
+          {
+            "name": "vid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Vid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reintentar Api Versiones  Vid  Reintentar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/research": {
       "post": {
         "summary": "Lanzar",
+        "description": "Las lecciones que el plan marca con `necesita_fuentes` = «no» se saltan (salvo una sola o `forzar`): la\nrespuesta dice cuáles en `saltadas` y por qué en `aviso`.",
         "operationId": "lanzar_api_research_post",
         "requestBody": {
           "content": {
@@ -1264,6 +1773,109 @@
         }
       }
     },
+    "/api/incorporar": {
+      "post": {
+        "summary": "Incorporar Pendientes",
+        "description": "Todas las propuestas pendientes (o las de un plan o una lección) entran en tus fuentes por la cola, sin modelo.",
+        "operationId": "incorporar_pendientes_api_incorporar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Incorporar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Incorporar Pendientes Api Incorporar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incorporar/ultimo": {
+      "get": {
+        "summary": "Ultima Incorporacion",
+        "description": "El último trabajo de incorporar (también los que lanzó solo el research) y si lo propuesto entra solo.",
+        "operationId": "ultima_incorporacion_api_incorporar_ultimo_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ultima Incorporacion Api Incorporar Ultimo Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incorporar/{tid}": {
+      "get": {
+        "summary": "Ver Incorporacion",
+        "operationId": "ver_incorporacion_api_incorporar__tid__get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Incorporacion Api Incorporar  Tid  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/propuestas": {
       "get": {
         "summary": "Listar",
@@ -1319,7 +1931,7 @@
     "/api/propuestas/{pid}": {
       "post": {
         "summary": "Decidir",
-        "description": "Aprobar manda la URL a la ingesta entera (validación, duplicados, cuarentena) en la fuente `web`.",
+        "description": "Aprobar manda la URL a la ingesta entera (validación, duplicados, cuarentena) en la fuente del research.",
         "operationId": "decidir_api_propuestas__pid__post",
         "parameters": [
           {
@@ -1351,6 +1963,47 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Decidir Api Propuestas  Pid  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/research/libre": {
+      "post": {
+        "summary": "Research Libre",
+        "description": "Busca y puntúa páginas sobre un tema de Estudio libre. Devuelve las mejores; añadirlas a tus fuentes es aparte.",
+        "operationId": "research_libre_api_research_libre_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchLibre"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Research Libre Api Research Libre Post"
                 }
               }
             }
@@ -1459,6 +2112,803 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Material De Leccion Api Planes  Plan Id  Lecciones  Clave  Material Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Borrar Material",
+        "description": "El material de una lección. «todo» quita también sus fichas y deja la lección sin preparar; tus repasos se quedan.",
+        "operationId": "borrar_material_api_planes__plan_id__lecciones__clave__material_delete",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "apuntes",
+                "diapositivas",
+                "guion",
+                "todo"
+              ],
+              "type": "string",
+              "default": "todo",
+              "title": "Tipo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Borrar Material Api Planes  Plan Id  Lecciones  Clave  Material Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/lecciones/{clave}/tests": {
+      "post": {
+        "summary": "Crear Tests",
+        "description": "Añade preguntas tipo test a una lección que ya tiene apuntes (una llamada al modelo); no toca las demás.",
+        "operationId": "crear_tests_api_planes__plan_id__lecciones__clave__tests_post",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          },
+          {
+            "name": "n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 5,
+              "title": "N"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Crear Tests Api Planes  Plan Id  Lecciones  Clave  Tests Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/diagramas": {
+      "post": {
+        "summary": "Diagrama Del Chat",
+        "description": "Un diagrama rico de una respuesta del tutor (bloque ```diagrama), dibujado aparte mientras se lee. Si cierras\nla pestaña mientras espera en la cola, no se lanza: `dibujar` pregunta si sigues ahí.",
+        "operationId": "diagrama_del_chat_api_diagramas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncargoDiagrama"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Diagrama Del Chat Api Diagramas Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/videos/recomendados": {
+      "get": {
+        "summary": "Videos Recomendados",
+        "description": "Las lecciones del plan que llevan vídeo (las más duras, tantas como pidas) y tu preferencia.",
+        "operationId": "videos_recomendados_api_planes__plan_id__videos_recomendados_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Videos Recomendados Api Planes  Plan Id  Videos Recomendados Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/preferencias": {
+      "put": {
+        "summary": "Preferencias Videos",
+        "description": "Cuántos vídeos quieres en tus planes («más» o «menos» mueve un paso), su duración y su estilo.",
+        "operationId": "preferencias_videos_api_videos_preferencias_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrefVideos"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Preferencias Videos Api Videos Preferencias Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/videos": {
+      "get": {
+        "summary": "Videos",
+        "description": "Todos los vídeos (guiones) del plan, con su lección, estilo, concepto y duración.",
+        "operationId": "videos_api_planes__plan_id__videos_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Videos Api Planes  Plan Id  Videos Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materiales/{mid}": {
+      "delete": {
+        "summary": "Borrar Un Material",
+        "operationId": "borrar_un_material_api_materiales__mid__delete",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Ver Material",
+        "operationId": "ver_material_api_materiales__mid__get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Material Api Materiales  Mid  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materiales/{mid}/bloques/{clave}/rehacer": {
+      "post": {
+        "summary": "Rehacer",
+        "description": "Rehace un solo bloque de los apuntes a tu manera. Tarda lo que un bloque (unos 30 s); el PDF se repinta después.",
+        "operationId": "rehacer_api_materiales__mid__bloques__clave__rehacer_post",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/magister__api__rutas_material__Rehacer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Rehacer Api Materiales  Mid  Bloques  Clave  Rehacer Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/indice": {
+      "get": {
+        "summary": "Ver Indice",
+        "description": "El índice sencillo del plan, si ya está hecho (no gasta modelo).",
+        "operationId": "ver_indice_api_planes__plan_id__indice_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Ver Indice Api Planes  Plan Id  Indice Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Hacer Indice",
+        "description": "Temas con nombre llano, de qué trata cada uno y un título sencillo por lección (una llamada al modelo).",
+        "operationId": "hacer_indice_api_planes__plan_id__indice_post",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          },
+          {
+            "name": "rehacer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Rehacer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Hacer Indice Api Planes  Plan Id  Indice Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/indice/titulo": {
+      "put": {
+        "summary": "Poner Titulo",
+        "description": "Cambia el título que se enseña de una lección; vacío vuelve al original.",
+        "operationId": "poner_titulo_api_planes__plan_id__indice_titulo_put",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TituloPropio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Poner Titulo Api Planes  Plan Id  Indice Titulo Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/libro": {
+      "get": {
+        "summary": "Ver Libro",
+        "operationId": "ver_libro_api_planes__plan_id__libro_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Ver Libro Api Planes  Plan Id  Libro Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Hacer Libro",
+        "description": "Junta los apuntes preparados en un libro (PDF). Va en segundo plano: consulta GET para saber cuándo está.",
+        "operationId": "hacer_libro_api_planes__plan_id__libro_post",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Hacer Libro Api Planes  Plan Id  Libro Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/libro/pdf": {
+      "get": {
+        "summary": "Libro Pdf",
+        "operationId": "libro_pdf_api_planes__plan_id__libro_pdf_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/materiales": {
+      "get": {
+        "summary": "Materiales Del Plan",
+        "description": "Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha.",
+        "operationId": "materiales_del_plan_api_planes__plan_id__materiales_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Materiales Del Plan Api Planes  Plan Id  Materiales Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materiales/{mid}/estilo": {
+      "post": {
+        "summary": "Cambiar Estilo",
+        "description": "Vuelve a pintar los apuntes en otro estilo, sin llamar al modelo.",
+        "operationId": "cambiar_estilo_api_materiales__mid__estilo_post",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiarEstilo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cambiar Estilo Api Materiales  Mid  Estilo Post"
                 }
               }
             }
@@ -1612,10 +3062,11 @@
         }
       }
     },
-    "/api/materiales/{mid}": {
+    "/api/materiales/{mid}/guion_grafico": {
       "get": {
-        "summary": "Ver Material",
-        "operationId": "ver_material_api_materiales__mid__get",
+        "summary": "Guion Grafico",
+        "description": "El vídeo animado: el guion gráfico que pinta el motor de escena de la web.",
+        "operationId": "guion_grafico_api_materiales__mid__guion_grafico_get",
         "parameters": [
           {
             "name": "mid",
@@ -1632,11 +3083,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Ver Material Api Materiales  Mid  Get"
-                }
+                "schema": {}
               }
             }
           },
@@ -1998,6 +3445,47 @@
         }
       }
     },
+    "/api/practica/autoevaluacion": {
+      "post": {
+        "summary": "Autoevaluar",
+        "description": "Una ficha marcada o un test respondido: cuenta para el repaso espaciado sin llamar al modelo.\n\nVa sin seguridad apostada, así que no entra en la calibración.",
+        "operationId": "autoevaluar_api_practica_autoevaluacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Autoevaluacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Autoevaluar Api Practica Autoevaluacion Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/practica/intentos/{intento_id}": {
       "patch": {
         "summary": "Corregir Nota",
@@ -2186,6 +3674,88 @@
         }
       }
     },
+    "/api/practica/test": {
+      "post": {
+        "summary": "Responder Test",
+        "description": "Una pregunta tipo test: se corrige al momento, sin modelo, y cuenta para el repaso (y la calibración si apostaste).",
+        "operationId": "responder_test_api_practica_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespuestaTest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Responder Test Api Practica Test Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/progreso/modelo": {
+      "get": {
+        "summary": "Ver Modelo",
+        "description": "En qué escalón está tu modelo de olvido y con cuántos datos.",
+        "operationId": "ver_modelo_api_progreso_modelo_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ver Modelo Api Progreso Modelo Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/progreso/modelo/ajustar": {
+      "post": {
+        "summary": "Ajustar Modelo",
+        "operationId": "ajustar_modelo_api_progreso_modelo_ajustar_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ajustar Modelo Api Progreso Modelo Ajustar Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/hoy": {
       "get": {
         "summary": "Hoy",
@@ -2289,6 +3859,185 @@
         }
       }
     },
+    "/api/apariencia": {
+      "put": {
+        "summary": "Guardar Apariencia",
+        "description": "El acento de la app, para que los PDF (apuntes y libro del tema) salgan con el mismo color.",
+        "operationId": "guardar_apariencia_api_apariencia_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Apariencia"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Guardar Apariencia Api Apariencia Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferencias": {
+      "get": {
+        "summary": "Ver Preferencias",
+        "operationId": "ver_preferencias_api_preferencias_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ver Preferencias Api Preferencias Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Guardar Preferencias",
+        "description": "Lo que ajustas desde la mascota: el tutor lo tiene en cuenta desde el siguiente mensaje.",
+        "operationId": "guardar_preferencias_api_preferencias_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenciasTutor"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Guardar Preferencias Api Preferencias Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automatizaciones": {
+      "get": {
+        "summary": "Ver Automatizaciones",
+        "operationId": "ver_automatizaciones_api_automatizaciones_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ver Automatizaciones Api Automatizaciones Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Guardar Automatizaciones",
+        "operationId": "guardar_automatizaciones_api_automatizaciones_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Automatizaciones"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Guardar Automatizaciones Api Automatizaciones Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/automatizaciones/ahora": {
+      "post": {
+        "summary": "Automatizar Ahora",
+        "description": "Revisa las reglas ya, sin esperar a la siguiente vuelta (respeta «solo de noche»).",
+        "operationId": "automatizar_ahora_api_automatizaciones_ahora_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Automatizar Ahora Api Automatizaciones Ahora Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/trazas/{traza_id}/feedback": {
       "post": {
         "summary": "Feedback",
@@ -2324,6 +4073,68 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Feedback Api Trazas  Traza Id  Feedback Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/afinado": {
+      "get": {
+        "summary": "Ver Afinado",
+        "description": "Lo que Magister ha aprendido de tus valoraciones y cuánto revisa ya el juez.",
+        "operationId": "ver_afinado_api_afinado_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ver Afinado Api Afinado Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/afinado/reglas/{motivo}/quitar": {
+      "post": {
+        "summary": "Quitar Regla",
+        "operationId": "quitar_regla_api_afinado_reglas__motivo__quitar_post",
+        "parameters": [
+          {
+            "name": "motivo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Motivo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Quitar Regla Api Afinado Reglas  Motivo  Quitar Post"
                 }
               }
             }
@@ -2408,6 +4219,7 @@
     "/api/candidatos": {
       "get": {
         "summary": "Candidatos",
+        "description": "Los pendientes, con lo que preguntaste y lo que respondió el tutor (del hilo, por la traza) para leerlos a gusto.\nLa entrada guardada del juez es el prompt de sistema: no se envía.",
         "operationId": "candidatos_api_candidatos_get",
         "responses": {
           "200": {
@@ -2462,6 +4274,48 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Triar Api Candidatos  Cid  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidatos/{cid}/deshacer": {
+      "post": {
+        "summary": "Deshacer Triaje",
+        "description": "Vuelve a dejarlo pendiente; si estaba en el banco, quita su fichero.",
+        "operationId": "deshacer_triaje_api_candidatos__cid__deshacer_post",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Deshacer Triaje Api Candidatos  Cid  Deshacer Post"
                 }
               }
             }
@@ -2711,10 +4565,2153 @@
           }
         }
       }
+    },
+    "/api/estudio/{mid}/priming": {
+      "get": {
+        "summary": "Priming",
+        "operationId": "priming_api_estudio__mid__priming_get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Priming Api Estudio  Mid  Priming Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estudio/{mid}/facil/{clave}": {
+      "get": {
+        "summary": "Facil",
+        "operationId": "facil_api_estudio__mid__facil__clave__get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Facil Api Estudio  Mid  Facil  Clave  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estudio/{mid}/oral": {
+      "get": {
+        "summary": "Oral",
+        "operationId": "oral_api_estudio__mid__oral_get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          },
+          {
+            "name": "rehacer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Rehacer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Oral Api Estudio  Mid  Oral Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estudio/volcado": {
+      "post": {
+        "summary": "Volcado",
+        "operationId": "volcado_api_estudio_volcado_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Volcado"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Volcado Api Estudio Volcado Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estudio/repasos-de-tema": {
+      "get": {
+        "summary": "Repasos De Tema",
+        "operationId": "repasos_de_tema_api_estudio_repasos_de_tema_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Repasos De Tema Api Estudio Repasos De Tema Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/estilo-examen": {
+      "get": {
+        "summary": "Ver Estilo",
+        "operationId": "ver_estilo_api_planes__plan_id__estilo_examen_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Estilo Api Planes  Plan Id  Estilo Examen Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Poner Estilo",
+        "operationId": "poner_estilo_api_planes__plan_id__estilo_examen_put",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Estilo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Poner Estilo Api Planes  Plan Id  Estilo Examen Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estudio/{mid}/parrafo": {
+      "post": {
+        "summary": "Parrafo",
+        "description": "La mascota ayuda con el párrafo que estás leyendo (respuesta corta).",
+        "operationId": "parrafo_api_estudio__mid__parrafo_post",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Parrafo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Parrafo Api Estudio  Mid  Parrafo Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estudio/{mid}/mapa": {
+      "get": {
+        "summary": "Ver Mapa",
+        "operationId": "ver_mapa_api_estudio__mid__mapa_get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Mapa Api Estudio  Mid  Mapa Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Guardar Mapa",
+        "operationId": "guardar_mapa_api_estudio__mid__mapa_put",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mapa"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Guardar Mapa Api Estudio  Mid  Mapa Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estudio/{mid}/diagrama/{clave}": {
+      "get": {
+        "summary": "Diagrama Apartado",
+        "description": "El diagrama de un apartado para la pizarra de la llamada ({\"svg\": null} si un dibujo no aclara nada).",
+        "operationId": "diagrama_apartado_api_estudio__mid__diagrama__clave__get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          },
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Diagrama Apartado Api Estudio  Mid  Diagrama  Clave  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/estudio/{mid}/mapa/generar": {
+      "post": {
+        "summary": "Generar Mapa",
+        "description": "El modelo lee la lección, elige los conceptos clave y los une. Sustituye el mapa que hubiera.",
+        "operationId": "generar_mapa_api_estudio__mid__mapa_generar_post",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Generar Mapa Api Estudio  Mid  Mapa Generar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notas": {
+      "get": {
+        "summary": "Listar Notas",
+        "operationId": "listar_notas_api_notas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Notas Api Notas Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Guardar Nota",
+        "operationId": "guardar_nota_api_notas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotaEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Guardar Nota Api Notas Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notas/{nid}": {
+      "patch": {
+        "summary": "Cambiar Nota",
+        "operationId": "cambiar_nota_api_notas__nid__patch",
+        "parameters": [
+          {
+            "name": "nid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Nid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotaCambio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cambiar Nota Api Notas  Nid  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Borrar Nota",
+        "operationId": "borrar_nota_api_notas__nid__delete",
+        "parameters": [
+          {
+            "name": "nid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Nid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voz/voces": {
+      "get": {
+        "summary": "Voces",
+        "description": "Las voces instaladas (vacío si Piper no está: la pantalla usa entonces la voz del navegador).",
+        "operationId": "voces_api_voz_voces_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Voces Api Voz Voces Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voz": {
+      "post": {
+        "summary": "Decir",
+        "operationId": "decir_api_voz_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Frase"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llamadas/registro": {
+      "post": {
+        "summary": "Guardar Registro",
+        "operationId": "guardar_registro_api_llamadas_registro_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Registro"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Guardar Registro Api Llamadas Registro Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llamadas/registros": {
+      "get": {
+        "summary": "Registros",
+        "operationId": "registros_api_llamadas_registros_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Registros Api Llamadas Registros Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos": {
+      "get": {
+        "summary": "Listar",
+        "operationId": "listar_api_proyectos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Api Proyectos Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear",
+        "operationId": "crear_api_proyectos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProyectoEntrada"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Crear Api Proyectos Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{pid}": {
+      "get": {
+        "summary": "Ver",
+        "operationId": "ver_api_proyectos__pid__get",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Api Proyectos  Pid  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Borrar",
+        "operationId": "borrar_api_proyectos__pid__delete",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{pid}/rehacer": {
+      "post": {
+        "summary": "Rehacer",
+        "description": "Vuelve a generar el roadmap entero (si falló, o si cambiaste la idea). Si ya había uno, al terminar se empareja\npor contenido con el nuevo (`roadmap.conservar`): los pasos que siguen heredan su id, así que lo hecho, sus fechas y\nel diario siguen valiendo; lo hecho de los que ya no están se apunta en «ya_no_estan» del roadmap, y el roadmap de\nantes se guarda en `roadmap_anterior` para volver a él (`/volver`). Con pasos hechos, sin `confirmado` responde\n428 con lo que va a pasar y no encola nada.",
+        "operationId": "rehacer_api_proyectos__pid__rehacer_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/magister__api__rutas_proyectos__Rehacer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Cuerpo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Rehacer Api Proyectos  Pid  Rehacer Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{pid}/volver": {
+      "post": {
+        "summary": "Volver",
+        "description": "Vuelve al roadmap de antes del último «rehacer», y el de ahora pasa a ser el anterior (se puede ir y volver).\nLo hecho no se toca: los pasos que están en los dos tienen el mismo id; lo hecho de los que no, se apunta aparte.",
+        "operationId": "volver_api_proyectos__pid__volver_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Volver Api Proyectos  Pid  Volver Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{pid}/pasos/{paso_id}": {
+      "put": {
+        "summary": "Marcar",
+        "operationId": "marcar_api_proyectos__pid__pasos__paso_id__put",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "paso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Paso Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Hecho"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Marcar Api Proyectos  Pid  Pasos  Paso Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{pid}/niveles/{numero}/detallar": {
+      "post": {
+        "summary": "Detallar",
+        "operationId": "detallar_api_proyectos__pid__niveles__numero__detallar_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "numero",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Numero"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Detallar Api Proyectos  Pid  Niveles  Numero  Detallar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{pid}/decisiones": {
+      "get": {
+        "summary": "Decisiones",
+        "operationId": "decisiones_api_proyectos__pid__decisiones_get",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Decisiones Api Proyectos  Pid  Decisiones Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Apuntar",
+        "operationId": "apuntar_api_proyectos__pid__decisiones_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/magister__api__rutas_proyectos__DecisionEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Apuntar Api Proyectos  Pid  Decisiones Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{pid}/decisiones/{did}": {
+      "delete": {
+        "summary": "Borrar Decision",
+        "operationId": "borrar_decision_api_proyectos__pid__decisiones__did__delete",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "did",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Did"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/planes/{plan_id}/examen/opciones": {
+      "get": {
+        "summary": "Opciones",
+        "description": "Las lecciones con preguntas activas: solo de esas puede salir un examen.",
+        "operationId": "opciones_api_planes__plan_id__examen_opciones_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Opciones Api Planes  Plan Id  Examen Opciones Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/examenes": {
+      "post": {
+        "summary": "Crear",
+        "operationId": "crear_api_examenes_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoExamen"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Crear Api Examenes Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Listar",
+        "operationId": "listar_api_examenes_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Listar Api Examenes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/examenes/{examen_id}/terminar": {
+      "post": {
+        "summary": "Terminar",
+        "operationId": "terminar_api_examenes__examen_id__terminar_post",
+        "parameters": [
+          {
+            "name": "examen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Examen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Final"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Terminar Api Examenes  Examen Id  Terminar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/examenes/{examen_id}": {
+      "get": {
+        "summary": "Ver",
+        "operationId": "ver_api_examenes__examen_id__get",
+        "parameters": [
+          {
+            "name": "examen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Examen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Api Examenes  Examen Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Borrar Examen",
+        "description": "Quita el examen del historial. Las respuestas ya contaron para tu repaso y ahí se quedan.",
+        "operationId": "borrar_examen_api_examenes__examen_id__delete",
+        "parameters": [
+          {
+            "name": "examen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Examen Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/examenes/{examen_id}/corregir": {
+      "post": {
+        "summary": "Corregir Entero",
+        "description": "Corrige el examen entero de una vez: los test sin modelo y las abiertas en una sola llamada.\n\nCada respuesta queda como intento del repaso espaciado; después se cierra el examen como en `terminar`.",
+        "operationId": "corregir_entero_api_examenes__examen_id__corregir_post",
+        "parameters": [
+          {
+            "name": "examen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Examen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Corregir"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Corregir Entero Api Examenes  Examen Id  Corregir Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materiales/{mid}/mp4": {
+      "post": {
+        "summary": "Pedir Mp4",
+        "operationId": "pedir_mp4_api_materiales__mid__mp4_post",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PedirMp4"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Pedir Mp4 Api Materiales  Mid  Mp4 Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Estado Mp4",
+        "description": "Si ya hay MP4 (y con qué voz y cuánto dura) y cómo va el último trabajo que lo monta.",
+        "operationId": "estado_mp4_api_materiales__mid__mp4_get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Estado Mp4 Api Materiales  Mid  Mp4 Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materiales/{mid}/mp4/fichero": {
+      "get": {
+        "summary": "Fichero Mp4",
+        "operationId": "fichero_mp4_api_materiales__mid__mp4_fichero_get",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fuentes/{fid}": {
+      "delete": {
+        "summary": "Borrar Fuente",
+        "description": "Una fuente con sus documentos, versiones y fragmentos indexados; las citas a ella desaparecen de las respuestas.",
+        "operationId": "borrar_fuente_api_fuentes__fid__delete",
+        "parameters": [
+          {
+            "name": "fid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Fid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fuentes/{fid}/documentos/{did}": {
+      "delete": {
+        "summary": "Borrar Documento",
+        "operationId": "borrar_documento_api_fuentes__fid__documentos__did__delete",
+        "parameters": [
+          {
+            "name": "fid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Fid"
+            }
+          },
+          {
+            "name": "did",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Did"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cuota": {
+      "get": {
+        "tags": [
+          "cuota"
+        ],
+        "summary": "Estado",
+        "operationId": "estado_api_cuota_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Estado Api Cuota Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cuota/estimar": {
+      "get": {
+        "tags": [
+          "cuota"
+        ],
+        "summary": "Estimar",
+        "operationId": "estimar_api_cuota_estimar_get",
+        "parameters": [
+          {
+            "name": "accion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "video",
+                "diapositivas",
+                "material",
+                "mensaje",
+                "proyecto",
+                "nivel",
+                "plan",
+                "research"
+              ],
+              "type": "string",
+              "title": "Accion"
+            }
+          },
+          {
+            "name": "minutos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 60,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Minutos"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Estimar Api Cuota Estimar Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/mapa": {
+      "get": {
+        "summary": "Ver Mapa",
+        "operationId": "ver_mapa_api_modelos_mapa_get",
+        "parameters": [
+          {
+            "name": "dias",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Dias"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Ver Mapa Api Modelos Mapa Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datos/exportar": {
+      "get": {
+        "summary": "Descargar",
+        "description": "magister-AAAA-MM-DD.zip: un JSON por tabla, el LEEME y tus ficheros hasta MAGISTER_EXPORTAR_MAX_MB.",
+        "operationId": "descargar_api_datos_exportar_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datos/copias": {
+      "get": {
+        "summary": "Copias",
+        "operationId": "copias_api_datos_copias_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Copias Api Datos Copias Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Copia Ahora",
+        "operationId": "copia_ahora_api_datos_copias_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Copia Ahora Api Datos Copias Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datos/copias/restaurar": {
+      "post": {
+        "summary": "Restaurar",
+        "operationId": "restaurar_api_datos_copias_restaurar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PedirRestaurar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Restaurar Api Datos Copias Restaurar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "Apariencia": {
+        "properties": {
+          "modo": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "fijo"
+            ],
+            "title": "Modo",
+            "default": "fijo"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Color"
+          },
+          "paleta": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Paleta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "color"
+        ],
+        "title": "Apariencia"
+      },
+      "Autoevaluacion": {
+        "properties": {
+          "pregunta_id": {
+            "type": "string",
+            "title": "Pregunta Id"
+          },
+          "nota": {
+            "type": "string",
+            "enum": [
+              "fallo",
+              "parcial",
+              "bien",
+              "perfecta"
+            ],
+            "title": "Nota"
+          },
+          "clave": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 8,
+            "title": "Clave"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "ficha",
+              "test"
+            ],
+            "title": "Origen",
+            "default": "ficha"
+          },
+          "respuesta": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Respuesta",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "pregunta_id",
+          "nota",
+          "clave"
+        ],
+        "title": "Autoevaluacion"
+      },
+      "Automatizaciones": {
+        "properties": {
+          "preparar_siguiente": {
+            "$ref": "#/components/schemas/ReglaPreparar",
+            "default": {
+              "activa": false,
+              "dias_antes": 1
+            }
+          },
+          "diapositivas_al_preparar": {
+            "$ref": "#/components/schemas/ReglaSimple",
+            "default": {
+              "activa": false
+            }
+          },
+          "video_al_preparar": {
+            "$ref": "#/components/schemas/ReglaVideo",
+            "default": {
+              "activa": false,
+              "estilo": "clase",
+              "minutos": 6
+            }
+          },
+          "solo_de_noche": {
+            "type": "boolean",
+            "title": "Solo De Noche",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "Automatizaciones"
+      },
+      "CambiarEstilo": {
+        "properties": {
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "libro",
+              "ficha"
+            ],
+            "title": "Estilo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estilo"
+        ],
+        "title": "CambiarEstilo"
+      },
       "ConversacionEntrada": {
         "properties": {
           "titulo": {
@@ -2738,7 +6735,8 @@
             "type": "string",
             "enum": [
               "libre",
-              "plan"
+              "plan",
+              "asesor"
             ],
             "title": "Tipo",
             "default": "libre"
@@ -2797,6 +6795,28 @@
         ],
         "title": "ConversacionSalida"
       },
+      "Corregir": {
+        "properties": {
+          "resultados": {
+            "items": {
+              "$ref": "#/components/schemas/Entrega"
+            },
+            "type": "array",
+            "title": "Resultados"
+          },
+          "segundos": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Segundos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resultados",
+          "segundos"
+        ],
+        "title": "Corregir"
+      },
       "Decision": {
         "properties": {
           "accion": {
@@ -2814,34 +6834,99 @@
         ],
         "title": "Decision"
       },
-      "DecisionEntrada": {
+      "EncargoDiagrama": {
         "properties": {
-          "accion": {
+          "encargo": {
             "type": "string",
-            "enum": [
-              "aceptar",
-              "cambiar"
-            ],
-            "title": "Accion"
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Encargo"
           },
-          "texto": {
+          "contexto": {
+            "type": "string",
+            "maxLength": 40000,
+            "title": "Contexto",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "encargo"
+        ],
+        "title": "EncargoDiagrama"
+      },
+      "Entrega": {
+        "properties": {
+          "pregunta_id": {
+            "type": "string",
+            "title": "Pregunta Id"
+          },
+          "respuesta": {
+            "type": "string",
+            "maxLength": 8000,
+            "title": "Respuesta",
+            "default": ""
+          },
+          "confianza": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 5000
+                "type": "number",
+                "enum": [
+                  0.25,
+                  0.5,
+                  0.75,
+                  0.95
+                ]
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Texto"
+            "title": "Confianza"
           }
         },
         "type": "object",
         "required": [
-          "accion"
+          "pregunta_id"
         ],
-        "title": "DecisionEntrada"
+        "title": "Entrega"
+      },
+      "EscenaVideo": {
+        "properties": {
+          "marca": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Marca",
+            "default": ""
+          },
+          "frases": {
+            "items": {
+              "$ref": "#/components/schemas/FraseVideo"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "minItems": 1,
+            "title": "Frases"
+          },
+          "pagina": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagina"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frases"
+        ],
+        "title": "EscenaVideo"
       },
       "EstadoSesion": {
         "properties": {
@@ -2860,6 +6945,26 @@
           "estado"
         ],
         "title": "EstadoSesion"
+      },
+      "Estilo": {
+        "properties": {
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "oral",
+              "desarrollo",
+              "test",
+              "cortas",
+              "sin_examen"
+            ],
+            "title": "Estilo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estilo"
+        ],
+        "title": "Estilo"
       },
       "EtiquetaEntrada": {
         "properties": {
@@ -2915,6 +7020,37 @@
           "veredicto"
         ],
         "title": "EtiquetaEntrada"
+      },
+      "Evento": {
+        "properties": {
+          "t": {
+            "type": "integer",
+            "title": "T"
+          },
+          "e": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "E"
+          },
+          "d": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "e"
+        ],
+        "title": "Evento"
       },
       "EventoCambio": {
         "properties": {
@@ -3107,6 +7243,20 @@
               }
             ],
             "title": "Comentario"
+          },
+          "otra": {
+            "type": "boolean",
+            "title": "Otra",
+            "default": false
+          },
+          "motivos": {
+            "items": {
+              "type": "string",
+              "maxLength": 20
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Motivos"
           }
         },
         "type": "object",
@@ -3114,6 +7264,102 @@
           "bien"
         ],
         "title": "Feedback"
+      },
+      "Final": {
+        "properties": {
+          "resultados": {
+            "items": {
+              "$ref": "#/components/schemas/Resultado"
+            },
+            "type": "array",
+            "title": "Resultados"
+          },
+          "segundos": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Segundos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resultados",
+          "segundos"
+        ],
+        "title": "Final"
+      },
+      "Flecha": {
+        "properties": {
+          "de": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "De"
+          },
+          "a": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "A"
+          },
+          "etiqueta": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Etiqueta",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "de",
+          "a"
+        ],
+        "title": "Flecha"
+      },
+      "Frase": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 1,
+            "title": "Texto"
+          },
+          "voz": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Voz"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto",
+          "voz"
+        ],
+        "title": "Frase"
+      },
+      "FraseVideo": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 1,
+            "title": "Texto"
+          },
+          "dicho": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 600
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dicho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto"
+        ],
+        "title": "FraseVideo"
       },
       "FuenteEntrada": {
         "properties": {
@@ -3162,6 +7408,83 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "Hecho": {
+        "properties": {
+          "hecho": {
+            "type": "boolean",
+            "title": "Hecho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hecho"
+        ],
+        "title": "Hecho"
+      },
+      "Horario": {
+        "properties": {
+          "horas_por_dia": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 7,
+            "minItems": 7,
+            "title": "Horas Por Dia"
+          },
+          "inicio_por_dia": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 7,
+            "minItems": 7,
+            "title": "Inicio Por Dia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horas_por_dia",
+          "inicio_por_dia"
+        ],
+        "title": "Horario"
+      },
+      "Incorporar": {
+        "properties": {
+          "plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Id"
+          },
+          "leccion_clave": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leccion Clave"
+          }
+        },
+        "type": "object",
+        "title": "Incorporar"
+      },
       "IntentoEntrada": {
         "properties": {
           "pregunta_id": {
@@ -3179,12 +7502,19 @@
             "title": "Respuesta"
           },
           "confianza": {
-            "type": "number",
-            "enum": [
-              0.25,
-              0.5,
-              0.75,
-              0.95
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  0.25,
+                  0.5,
+                  0.75,
+                  0.95
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Confianza"
           },
@@ -3220,10 +7550,50 @@
           "pregunta_id",
           "concepto_id",
           "respuesta",
-          "confianza",
           "clave"
         ],
         "title": "IntentoEntrada"
+      },
+      "Mapa": {
+        "properties": {
+          "nodos": {
+            "items": {
+              "$ref": "#/components/schemas/Nodo"
+            },
+            "type": "array",
+            "maxItems": 80,
+            "title": "Nodos"
+          },
+          "flechas": {
+            "items": {
+              "$ref": "#/components/schemas/Flecha"
+            },
+            "type": "array",
+            "maxItems": 160,
+            "title": "Flechas"
+          }
+        },
+        "type": "object",
+        "title": "Mapa"
+      },
+      "MateriaEntrada": {
+        "properties": {
+          "materia": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Materia",
+            "description": "Un perfil de GET /api/materias, o null para que se vuelva a elegir solo"
+          }
+        },
+        "type": "object",
+        "title": "MateriaEntrada"
       },
       "MensajeEntrada": {
         "properties": {
@@ -3237,6 +7607,95 @@
             "type": "boolean",
             "title": "Cuenta",
             "default": true
+          },
+          "voz": {
+            "type": "boolean",
+            "title": "Voz",
+            "default": false
+          },
+          "llamada": {
+            "type": "boolean",
+            "title": "Llamada",
+            "default": false
+          },
+          "modo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modo"
+          },
+          "plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Id"
+          },
+          "leccion_clave": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leccion Clave"
+          },
+          "corregir": {
+            "type": "boolean",
+            "title": "Corregir",
+            "default": false
+          },
+          "asesor": {
+            "type": "boolean",
+            "title": "Asesor",
+            "default": false
+          },
+          "proyecto_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proyecto Id"
+          },
+          "plan_activo_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Activo Id"
+          },
+          "contexto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 12000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contexto"
           }
         },
         "type": "object",
@@ -3285,6 +7744,33 @@
             "type": "array",
             "title": "Citas",
             "default": []
+          },
+          "traza_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Traza Id"
+          },
+          "voto": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voto"
+          },
+          "cuenta": {
+            "type": "boolean",
+            "title": "Cuenta",
+            "default": true
           }
         },
         "type": "object",
@@ -3296,6 +7782,149 @@
           "creado_en"
         ],
         "title": "MensajeSalida"
+      },
+      "ModoPropio": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Nombre"
+          },
+          "para": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Para",
+            "default": ""
+          },
+          "reglas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Reglas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ModoPropio"
+      },
+      "NecesitaFuentes": {
+        "properties": {
+          "necesita_fuentes": {
+            "type": "string",
+            "enum": [
+              "no",
+              "conviene",
+              "imprescindible"
+            ],
+            "title": "Necesita Fuentes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "necesita_fuentes"
+        ],
+        "title": "NecesitaFuentes"
+      },
+      "Nodo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Id"
+          },
+          "texto": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Texto"
+          },
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "texto",
+          "x",
+          "y"
+        ],
+        "title": "Nodo"
+      },
+      "NotaCambio": {
+        "properties": {
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          }
+        },
+        "type": "object",
+        "title": "NotaCambio"
+      },
+      "NotaEntrada": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "maxLength": 40000,
+            "minLength": 1,
+            "title": "Texto"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          },
+          "mensaje_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mensaje Id"
+          },
+          "completa": {
+            "type": "boolean",
+            "title": "Completa",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto"
+        ],
+        "title": "NotaEntrada"
       },
       "NotaUsuario": {
         "properties": {
@@ -3316,6 +7945,105 @@
         ],
         "title": "NotaUsuario"
       },
+      "NuevoExamen": {
+        "properties": {
+          "plan_id": {
+            "type": "integer",
+            "title": "Plan Id"
+          },
+          "lecciones": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Lecciones"
+          },
+          "cantidad": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Cantidad"
+          },
+          "minutos": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 240.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutos"
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "examen",
+              "evaluacion"
+            ],
+            "title": "Modo",
+            "default": "examen"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan_id",
+          "lecciones",
+          "cantidad"
+        ],
+        "title": "NuevoExamen"
+      },
+      "Parrafo": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "maxLength": 10,
+            "title": "Clave"
+          },
+          "parrafo": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 3,
+            "title": "Parrafo"
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "facil",
+              "ejemplo",
+              "porque",
+              "clave",
+              "codigo",
+              "pregunta",
+              "comprobar"
+            ],
+            "title": "Accion"
+          },
+          "pregunta": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pregunta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "parrafo",
+          "accion"
+        ],
+        "title": "Parrafo"
+      },
       "PedirMaterial": {
         "properties": {
           "tipos": {
@@ -3329,22 +8057,362 @@
               ]
             },
             "type": "array",
-            "title": "Tipos",
-            "default": [
-              "apuntes",
-              "preguntas",
-              "diapositivas",
-              "guion"
-            ]
+            "minItems": 1,
+            "title": "Tipos"
           },
           "forzar": {
             "type": "boolean",
             "title": "Forzar",
             "default": false
+          },
+          "preferencias": {
+            "$ref": "#/components/schemas/Preferencias",
+            "default": {
+              "profundidad": "estandar",
+              "preguntas": "mezcla",
+              "cantidad": "normal",
+              "estilo": "libro"
+            }
           }
         },
         "type": "object",
         "title": "PedirMaterial"
+      },
+      "PedirMp4": {
+        "properties": {
+          "voz": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Voz"
+          },
+          "titulo": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Titulo",
+            "default": ""
+          },
+          "escenas": {
+            "items": {
+              "$ref": "#/components/schemas/EscenaVideo"
+            },
+            "type": "array",
+            "maxItems": 80,
+            "minItems": 1,
+            "title": "Escenas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "voz",
+          "escenas"
+        ],
+        "title": "PedirMp4"
+      },
+      "PedirRestaurar": {
+        "properties": {
+          "copia": {
+            "type": "string",
+            "title": "Copia"
+          },
+          "confirmacion": {
+            "type": "string",
+            "title": "Confirmacion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "copia",
+          "confirmacion"
+        ],
+        "title": "PedirRestaurar"
+      },
+      "PrefVideos": {
+        "properties": {
+          "cuantos": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ninguno",
+                  "pocos",
+                  "normal",
+                  "muchos"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuantos"
+          },
+          "hacia": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "mas",
+                  "menos"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hacia"
+          },
+          "minutos": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  3,
+                  6,
+                  10
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutos"
+          },
+          "estilo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "clase",
+                  "resumen",
+                  "analogias",
+                  "examen"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estilo"
+          }
+        },
+        "type": "object",
+        "title": "PrefVideos"
+      },
+      "Preferencias": {
+        "properties": {
+          "profundidad": {
+            "type": "string",
+            "enum": [
+              "intro",
+              "estandar",
+              "fondo"
+            ],
+            "title": "Profundidad",
+            "default": "estandar"
+          },
+          "preguntas": {
+            "type": "string",
+            "enum": [
+              "conceptuales",
+              "practicas",
+              "mezcla"
+            ],
+            "title": "Preguntas",
+            "default": "mezcla"
+          },
+          "cantidad": {
+            "type": "string",
+            "enum": [
+              "pocas",
+              "normal",
+              "muchas"
+            ],
+            "title": "Cantidad",
+            "default": "normal"
+          },
+          "enfoque": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enfoque"
+          },
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "libro",
+              "ficha"
+            ],
+            "title": "Estilo",
+            "default": "libro"
+          },
+          "video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Video"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "Preferencias"
+      },
+      "PreferenciasTutor": {
+        "properties": {
+          "longitud": {
+            "type": "string",
+            "enum": [
+              "breve",
+              "normal",
+              "detallada"
+            ],
+            "title": "Longitud",
+            "default": "normal"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "cero",
+              "normal",
+              "experto"
+            ],
+            "title": "Nivel",
+            "default": "normal"
+          },
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "directo",
+              "analogias",
+              "codigo"
+            ],
+            "title": "Estilo",
+            "default": "directo"
+          },
+          "diagramas": {
+            "type": "boolean",
+            "title": "Diagramas",
+            "default": true
+          },
+          "tests": {
+            "type": "boolean",
+            "title": "Tests",
+            "default": true
+          },
+          "opciones": {
+            "type": "boolean",
+            "title": "Opciones",
+            "default": true
+          },
+          "idioma": {
+            "type": "string",
+            "enum": [
+              "es",
+              "en"
+            ],
+            "title": "Idioma",
+            "default": "es"
+          },
+          "instrucciones": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Instrucciones"
+          },
+          "modos": {
+            "items": {
+              "$ref": "#/components/schemas/ModoPropio"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Modos"
+          },
+          "modo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modo"
+          }
+        },
+        "type": "object",
+        "title": "PreferenciasTutor"
+      },
+      "ProyectoEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Nombre"
+          },
+          "idea": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 10,
+            "title": "Idea"
+          },
+          "objetivo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objetivo"
+          },
+          "sabes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sabes"
+          },
+          "ritmo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ritmo"
+          },
+          "investigar": {
+            "type": "boolean",
+            "title": "Investigar",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "idea"
+        ],
+        "title": "ProyectoEntrada"
       },
       "Reajuste": {
         "properties": {
@@ -3377,6 +8445,134 @@
         ],
         "title": "Recalcular"
       },
+      "Registro": {
+        "properties": {
+          "conversacion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversacion Id"
+          },
+          "tipo": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Tipo"
+          },
+          "leccion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leccion"
+          },
+          "segundos": {
+            "type": "integer",
+            "title": "Segundos",
+            "default": 0
+          },
+          "voz": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voz"
+          },
+          "resumen": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumen"
+          },
+          "eventos": {
+            "items": {
+              "$ref": "#/components/schemas/Evento"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Eventos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo"
+        ],
+        "title": "Registro"
+      },
+      "ReglaPreparar": {
+        "properties": {
+          "activa": {
+            "type": "boolean",
+            "title": "Activa",
+            "default": false
+          },
+          "dias_antes": {
+            "type": "integer",
+            "title": "Dias Antes",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "title": "ReglaPreparar"
+      },
+      "ReglaSimple": {
+        "properties": {
+          "activa": {
+            "type": "boolean",
+            "title": "Activa",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ReglaSimple"
+      },
+      "ReglaVideo": {
+        "properties": {
+          "activa": {
+            "type": "boolean",
+            "title": "Activa",
+            "default": false
+          },
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "clase",
+              "resumen",
+              "analogias",
+              "examen"
+            ],
+            "title": "Estilo",
+            "default": "clase"
+          },
+          "minutos": {
+            "type": "integer",
+            "title": "Minutos",
+            "default": 6
+          }
+        },
+        "type": "object",
+        "title": "ReglaVideo"
+      },
       "ResearchEntrada": {
         "properties": {
           "plan_id": {
@@ -3400,6 +8596,32 @@
             ],
             "title": "Sistema",
             "default": "fijo"
+          },
+          "objetivos": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objetivos"
+          },
+          "forzar": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forzar"
           }
         },
         "type": "object",
@@ -3408,6 +8630,127 @@
           "leccion_claves"
         ],
         "title": "ResearchEntrada"
+      },
+      "ResearchLibre": {
+        "properties": {
+          "consulta": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Consulta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consulta"
+        ],
+        "title": "ResearchLibre"
+      },
+      "RespuestaTest": {
+        "properties": {
+          "pregunta_id": {
+            "type": "string",
+            "title": "Pregunta Id"
+          },
+          "opcion": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Opcion"
+          },
+          "confianza": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  0.25,
+                  0.5,
+                  0.75,
+                  0.95
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confianza"
+          },
+          "clave": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 8,
+            "title": "Clave"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pregunta_id",
+          "opcion",
+          "clave"
+        ],
+        "title": "RespuestaTest"
+      },
+      "Resultado": {
+        "properties": {
+          "pregunta_id": {
+            "type": "string",
+            "title": "Pregunta Id"
+          },
+          "respuesta": {
+            "type": "string",
+            "title": "Respuesta",
+            "default": ""
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "fallo",
+                  "parcial",
+                  "bien",
+                  "perfecta"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          },
+          "intento_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intento Id"
+          },
+          "explicacion": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Explicacion",
+            "default": ""
+          },
+          "confianza": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confianza"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pregunta_id"
+        ],
+        "title": "Resultado"
       },
       "Salud": {
         "properties": {
@@ -3456,6 +8799,17 @@
           "nombre": {
             "type": "string",
             "title": "Nombre"
+          },
+          "materia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Materia"
           }
         },
         "type": "object",
@@ -3464,6 +8818,32 @@
           "nombre"
         ],
         "title": "TemaSalida"
+      },
+      "TituloPropio": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Clave"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave"
+        ],
+        "title": "TituloPropio"
       },
       "Triaje": {
         "properties": {
@@ -3490,13 +8870,46 @@
           "respuesta_buena": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 8000
               },
               {
                 "type": "null"
               }
             ],
             "title": "Respuesta Buena"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          },
+          "motivos": {
+            "items": {
+              "type": "string",
+              "maxLength": 20
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Motivos"
+          },
+          "juez_acerto": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Juez Acerto"
           }
         },
         "type": "object",
@@ -3544,6 +8957,197 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Video": {
+        "properties": {
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "clase",
+              "resumen",
+              "analogias",
+              "examen"
+            ],
+            "title": "Estilo",
+            "default": "clase"
+          },
+          "concepto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concepto"
+          },
+          "minutos": {
+            "type": "integer",
+            "maximum": 15.0,
+            "minimum": 2.0,
+            "title": "Minutos",
+            "default": 6
+          }
+        },
+        "type": "object",
+        "title": "Video",
+        "description": "Qué vídeo hacer: estilo, un solo concepto (o la lección entera) y duración."
+      },
+      "Volcado": {
+        "properties": {
+          "plan_id": {
+            "type": "integer",
+            "title": "Plan Id"
+          },
+          "leccion_clave": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Leccion Clave"
+          },
+          "texto": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 10,
+            "title": "Texto"
+          },
+          "alcance": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alcance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan_id",
+          "leccion_clave",
+          "texto"
+        ],
+        "title": "Volcado"
+      },
+      "magister__api__esquemas__DecisionEntrada": {
+        "properties": {
+          "accion": {
+            "type": "string",
+            "enum": [
+              "aceptar",
+              "cambiar",
+              "descartar"
+            ],
+            "title": "Accion"
+          },
+          "texto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accion"
+        ],
+        "title": "DecisionEntrada"
+      },
+      "magister__api__rutas_material__Rehacer": {
+        "properties": {
+          "como": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 2,
+            "title": "Como"
+          }
+        },
+        "type": "object",
+        "required": [
+          "como"
+        ],
+        "title": "Rehacer"
+      },
+      "magister__api__rutas_proyectos__DecisionEntrada": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Titulo"
+          },
+          "contexto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contexto"
+          },
+          "decision": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 3,
+            "title": "Decision"
+          },
+          "consecuencias": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consecuencias"
+          },
+          "paso_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paso Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo",
+          "decision"
+        ],
+        "title": "DecisionEntrada"
+      },
+      "magister__api__rutas_proyectos__Rehacer": {
+        "properties": {
+          "confirmado": {
+            "type": "boolean",
+            "title": "Confirmado",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "Rehacer"
       }
     }
   }

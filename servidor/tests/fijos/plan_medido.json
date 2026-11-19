@@ -4,6 +4,8 @@
  "lecciones": [
   {
    "clave": "L1",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Modelo relacional",
    "horas": 2,
    "depende_de": [],
@@ -23,6 +25,8 @@
   },
   {
    "clave": "L2",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "SELECT básico",
    "horas": 3,
    "depende_de": [
@@ -44,6 +48,8 @@
   },
   {
    "clave": "L3",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Agregación",
    "horas": 3,
    "depende_de": [
@@ -61,6 +67,8 @@
   },
   {
    "clave": "L4",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "JOINs",
    "horas": 4,
    "depende_de": [
@@ -82,6 +90,8 @@
   },
   {
    "clave": "L5",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Subconsultas",
    "horas": 3,
    "depende_de": [
@@ -99,6 +109,8 @@
   },
   {
    "clave": "L6",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Diseño y normalización",
    "horas": 3,
    "depende_de": [
@@ -116,6 +128,8 @@
   },
   {
    "clave": "L7",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Transacciones",
    "horas": 3,
    "depende_de": [
@@ -137,6 +151,8 @@
   },
   {
    "clave": "L8",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Índices",
    "horas": 3,
    "depende_de": [
@@ -155,6 +171,8 @@
   },
   {
    "clave": "L9",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Restricciones",
    "horas": 3,
    "depende_de": [
@@ -172,6 +190,8 @@
   },
   {
    "clave": "L10",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Funciones de ventana",
    "horas": 3,
    "depende_de": [
@@ -189,6 +209,8 @@
   },
   {
    "clave": "L11",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Planes de ejecución",
    "horas": 1.5,
    "depende_de": [
@@ -207,6 +229,8 @@
   },
   {
    "clave": "L12",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Repaso de entrevista",
    "horas": 1.5,
    "depende_de": [

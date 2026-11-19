@@ -4,6 +4,8 @@
  "lecciones": [
   {
    "clave": "L1",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Modelo relacional",
    "horas": 3,
    "depende_de": [],
@@ -23,6 +25,8 @@
   },
   {
    "clave": "L2",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Consultas básicas",
    "horas": 3,
    "depende_de": [
@@ -40,6 +44,8 @@
   },
   {
    "clave": "L3",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "JOINs",
    "horas": 3,
    "depende_de": [
@@ -57,6 +63,8 @@
   },
   {
    "clave": "L4",
+   "necesita_fuentes": "conviene",
+   "fuentes_por_que": "Una buena fuente con ejemplos mejora la explicación.",
    "titulo": "Índices",
    "horas": 3,
    "depende_de": [

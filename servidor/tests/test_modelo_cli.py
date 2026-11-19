@@ -52,3 +52,55 @@ async def test_el_plazo_cuenta_sin_noticias_con_un_tope(monkeypatch) -> None:
     # Habla sin parar más allá del tope (3 × 0,6 s): se corta igual.
     with pytest.raises(modelo.ErrorModelo, match="plazo agotado"):
         [e async for e in modelo._proceso_claude(_falso([0.2] * 15), "")]
+
+
+def _con_nieto() -> list[str]:
+    """Un «claude» que lanza un hijo suyo, dice los dos pid y se queda razonando (callado) un minuto."""
+    import sys
+
+    codigo = ("import json,subprocess,sys,time\n"
+              "nieto = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+              "print(json.dumps({'type': 'stream_event', 'pids': [__import__('os').getpid(), nieto.pid]}), flush=True)\n"
+              "time.sleep(60)\n")
+    return [sys.executable, "-c", codigo]
+
+
+async def _vivo(pid: int) -> bool:
+    import asyncio
+    import os
+    import sys
+
+    if sys.platform != "win32":
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        return True
+    p = await asyncio.create_subprocess_exec("tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH",
+                                             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+    salida, _ = await p.communicate()
+    return f'"{pid}"' in salida.decode("utf-8", "replace")
+
+
+@pytest.mark.anyio
+async def test_si_te_vas_a_medias_claude_muere_con_lo_que_haya_lanzado() -> None:
+    """Como al cerrar la pestaña o pulsar Parar: la petición se cancela mientras claude razona. Con un cancel scope de
+    anyio, el de la respuesta SSE, que vuelve a cancelar en cada await: matar va blindado."""
+    import sys
+
+    import anyio
+
+    pids: list[int] = []
+    with anyio.CancelScope() as alcance:
+        async for evento in modelo._proceso_claude(_con_nieto(), ""):
+            pids = evento["pids"]
+            alcance.cancel()
+    assert alcance.cancelled_caught and len(pids) == 2
+    hijo, nieto = pids
+    assert not await _vivo(hijo)
+    if sys.platform == "win32":  # kill() solo llega al hijo; taskkill /T, al árbol entero
+        for _ in range(20):
+            if not await _vivo(nieto):
+                break
+            await anyio.sleep(0.1)
+        assert not await _vivo(nieto)
