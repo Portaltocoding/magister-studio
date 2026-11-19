@@ -4,7 +4,7 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const [htmlPath, outArg, footer = ''] = process.argv.slice(2);
@@ -31,6 +31,20 @@ const PINTAR_FORMULAS = String.raw`(() => {
   });
   return true;
 })()`;
+// Las únicas carpetas de las que la página puede leer: la del HTML que se pinta y la de KaTeX.
+const RAICES = [dirname(resolve(htmlPath)), fileURLToPath(new URL('./katex', import.meta.url))].map((r) => resolve(r));
+const igual = (s) => (process.platform === 'win32' ? s.toLowerCase() : s);
+const permitida = (url) => {
+  if (/^data:/i.test(url)) return true;
+  if (!/^file:/i.test(url)) return false;
+  let ruta;
+  try {
+    ruta = resolve(fileURLToPath(url.split(/[?#]/)[0]));
+  } catch {
+    return false;
+  }
+  return RAICES.some((r) => igual(ruta) === igual(r) || igual(ruta).startsWith(igual(r) + sep));
+};
 const sinNavegador = (e) => {
   console.error(`No encuentro el navegador para pintar el PDF (${exe}): ${e.message}. Ajusta MAGISTER_CHROME.`);
   process.exit(2);
@@ -76,8 +90,9 @@ try {
       pending.delete(m.id);
       m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result);
     } else if (m.method === 'Fetch.requestPaused') {
-      // Solo ficheros locales (el HTML, la hoja de KaTeX y sus fuentes) y data:; lo demás, cortado.
-      const local = /^(file|data):/i.test(m.params.request.url);
+      // Solo data: y los ficheros de la carpeta del HTML y de KaTeX (su hoja y sus fuentes); lo demás, cortado:
+      // ni la red ni otros ficheros del disco (un <iframe src="file:///..."> acabaría pintado en el PDF).
+      const local = permitida(m.params.request.url);
       ws.send(JSON.stringify({ id: ++id, method: local ? 'Fetch.continueRequest' : 'Fetch.failRequest',
         params: local ? { requestId: m.params.requestId } : { requestId: m.params.requestId, errorReason: 'BlockedByClient' } }));
     } else if (m.method) waiters.filter((w) => w.method === m.method).forEach((w) => w.res(m.params));
