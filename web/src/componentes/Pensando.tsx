@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Aurea, David, Euclides, Pendulos } from './PensandoDibujos.tsx'
+import { Adn, Arbol, Arco, Cuerda, Kepler, Koch, Mitosis, Pitagoras, Quintas, Vitruvio } from './PensandoCampos.tsx'
 
 // Animaciones de espera mientras el tutor piensa o genera. Todas en línea, sin relleno,
 // pequeñas, y una al azar cada vez para que no aburran.
 
-export type Variante = 'rubik' | 'hanoi' | 'ordenar' | 'fourier' | 'lissajous'
-const VARIANTES: Variante[] = ['rubik', 'hanoi', 'ordenar', 'fourier', 'lissajous']
+export type Variante = 'rubik' | 'hanoi' | 'ordenar' | 'fourier' | 'lissajous' | 'david' | 'aurea' | 'euclides' | 'pendulos'
+  | 'vitruvio' | 'pitagoras' | 'arco' | 'kepler' | 'koch' | 'quintas' | 'cuerda' | 'adn' | 'mitosis' | 'arbol'
+// El nombre de cada una, para la galería del Taller.
+export const NOMBRES: Record<Variante, string> = {
+  rubik: 'Cubo de Rubik', hanoi: 'Torre de Hanói', ordenar: 'Ordenación', fourier: 'Fourier', lissajous: 'Lissajous',
+  david: 'David, por encaje', aurea: 'Proporción áurea', euclides: 'Euclides, I.1', pendulos: 'Péndulos',
+  vitruvio: 'El hombre de Vitruvio', pitagoras: 'Pitágoras', arco: 'El arco y su clave', kepler: 'Kepler: áreas iguales', koch: 'Copo de Koch',
+  quintas: 'Círculo de quintas', cuerda: 'Armónicos de una cuerda', adn: 'Doble hélice', mitosis: 'Mitosis', arbol: 'Un árbol que crece',
+}
+export const VARIANTES = Object.keys(NOMBRES) as Variante[]
 
 const quieto = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
@@ -266,7 +276,12 @@ function usarFase() {
   return fase
 }
 
-const ANIMACIONES: Record<Variante, () => React.JSX.Element> = { rubik: Rubik, hanoi: Hanoi, ordenar: Ordenar, fourier: Fourier, lissajous: Lissajous }
+const ANIMACIONES: Record<Variante, () => React.JSX.Element> = {
+  rubik: Rubik, hanoi: Hanoi, ordenar: Ordenar, fourier: Fourier, lissajous: Lissajous,
+  david: David, aurea: Aurea, euclides: Euclides, pendulos: Pendulos,
+  vitruvio: Vitruvio, pitagoras: Pitagoras, arco: Arco, kepler: Kepler, koch: Koch,
+  quintas: Quintas, cuerda: Cuerda, adn: Adn, mitosis: Mitosis, arbol: Arbol,
+}
 
 export default function Pensando({ texto, variante, estilo }: { texto?: string; variante?: Variante; estilo?: CSSProperties }) {
   const [elegida] = useState<Variante>(() => variante ?? VARIANTES[Math.floor(Math.random() * VARIANTES.length)])

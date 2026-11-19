@@ -15,6 +15,7 @@ export interface Tablero {
 
 export interface PorDentro {
   tipo: 'por_dentro'
+  // `resaltar`: números de línea contando desde 1, los mismos que se ven a la izquierda del código.
   codigo: { fichero: string; lineas: string[]; resaltar?: number[] }
   memoria: { titulo: string; filas: { clave: string; valor: string; estado?: Estado }[] }
   pantalla: { titulo: string; lineas: { texto: string; estado?: Estado }[]; boton?: string }
@@ -167,21 +168,125 @@ export const ANCHO = 1280
 export const ALTO = 720
 const PALABRAS_MINUTO = 150
 
-// Cada tramo dura lo que se tarda en decir su narración, con un respiro; nunca menos de 5 s. `ritmo` es la velocidad
-// de voz elegida (0,8× a 2×): a voz lenta, tramos más largos, para que la narración no se corte al pasar al siguiente.
+// La estimación, para cuando no hay voz medida (la del navegador): cada tramo dura lo que se tarda en decir su
+// narración a 150 palabras por minuto, con un respiro; nunca menos de 5 s. `ritmo` es la velocidad de voz elegida
+// (0,8× a 2×): a voz lenta, tramos más largos, para que la narración no se corte al pasar al siguiente.
 export function duracionTramo(t: Tramo, ritmo = 1): number {
   const palabras = t.narracion.split(/\s+/).filter(Boolean).length
   return Math.round(Math.max(5, (palabras / (PALABRAS_MINUTO * ritmo)) * 60 + 1.2) * FPS)
 }
 
-export function inicios(g: GuionGrafico, ritmo = 1): number[] {
-  const salida: number[] = []
-  let n = 0
-  for (const t of g.tramos) {
-    salida.push(n)
-    n += duracionTramo(t, ritmo)
-  }
-  return salida
+// ===== La línea de tiempo: la usan a la vez el Player (duración, saltos) y la composición (secuencias, voz) =====
+
+// Entre dos tramos, la salida de uno y la entrada del siguiente se cruzan durante SOLAPE fotogramas (sin bajar a fondo).
+export const SOLAPE = 8
+// Con la voz medida, el respiro de 1,2 s de siempre se reparte: ENTRADA antes de la primera frase (el tramo ya ha
+// entrado del todo) y COLA tras la última. Como COLA > SOLAPE, la voz de un tramo acaba antes de que entre el siguiente.
+const ENTRADA = 12
+const COLA = 24
+// Entre trozos: tras una coma, lo que tardaba el Locutor en encadenar dos audios; entre frases, algo más.
+const PAUSA_COMA = 3
+const PAUSA_FRASE = 7
+const MINIMO = 5 * FPS
+
+// Un trozo de narración: lo que se dice de una vez (una frase cortada en sus comas) y a qué frase pertenece.
+export interface Trozo {
+  texto: string
+  frase: number
+}
+// Un trozo colocado en su tramo: desde qué fotograma del tramo suena y cuántos dura.
+export interface TrozoEnLinea extends Trozo {
+  desde: number
+  dur: number
+}
+export interface TramoEnLinea {
+  desde: number
+  dur: number
+  trozos: TrozoEnLinea[]
+}
+export interface Linea {
+  tramos: TramoEnLinea[]
+  total: number
+}
+// Lo que dura de verdad cada trozo de cada tramo, en segundos y a velocidad 1 (null: no hay nada que decir).
+export type Medidas = (number | null)[][]
+
+// Los trozos de una narración, en orden: los mismos que decía el Locutor (frase a frase, cortadas en sus comas).
+export function trozos(narracion: string): Trozo[] {
+  return frases(narracion).flatMap((f, frase) => respiros(f).map((texto) => ({ texto, frase })))
+}
+
+const contarPalabras = (t: string) => t.split(/\s+/).filter(Boolean).length
+
+// Sin medir: los trozos, uno tras otro desde el principio del tramo, a 150 palabras por minuto (como la estimación).
+function estimado(t: Tramo, ritmo: number): Omit<TramoEnLinea, 'desde'> {
+  const porPalabra = (60 / (PALABRAS_MINUTO * ritmo)) * FPS
+  let dichas = 0
+  const lista = trozos(t.narracion).map((z) => {
+    const n = contarPalabras(z.texto)
+    const desde = Math.round(dichas * porPalabra)
+    dichas += n
+    return { ...z, desde, dur: Math.max(1, Math.round(n * porPalabra)) }
+  })
+  return { dur: duracionTramo(t, ritmo), trozos: lista }
+}
+
+// Medido: cada trozo dura lo que dura su audio; el tramo, la voz entera más el respiro (nunca menos de 5 s).
+function medido(t: Tramo, segundos: (number | null)[]): Omit<TramoEnLinea, 'desde'> {
+  const base = trozos(t.narracion)
+  let f = ENTRADA
+  let fin = ENTRADA
+  const lista = base.map((z, k) => {
+    const dur = Math.ceil(Math.max(0, segundos[k] ?? 0) * FPS)
+    const salida = { ...z, desde: f, dur }
+    if (dur > 0) {
+      fin = f + dur
+      f = fin + (base[k + 1] && base[k + 1].frase !== z.frase ? PAUSA_FRASE : PAUSA_COMA)
+    }
+    return salida
+  })
+  return { dur: Math.max(MINIMO, fin + COLA), trozos: lista }
+}
+
+// Dónde empieza y cuánto dura cada tramo y cada trozo. Con `medidas` (la voz de Magister), lo que dura su audio, a
+// velocidad 1: la velocidad la pone el Player a imagen y voz a la vez. Sin ellas, la estimación con su `ritmo`.
+export function lineaDeTiempo(g: GuionGrafico, ritmo = 1, medidas?: Medidas | null): Linea {
+  const tramos: TramoEnLinea[] = []
+  let desde = 0
+  g.tramos.forEach((t, i) => {
+    const m = medidas?.[i]
+    const x = m && m.length === trozos(t.narracion).length ? medido(t, m) : estimado(t, ritmo)
+    tramos.push({ desde, ...x })
+    desde += x.dur - SOLAPE
+  })
+  const ultimo = tramos[tramos.length - 1]
+  return { tramos, total: ultimo ? ultimo.desde + ultimo.dur : 0 }
+}
+
+export function inicios(g: GuionGrafico, ritmo = 1, medidas?: Medidas | null): number[] {
+  return lineaDeTiempo(g, ritmo, medidas).tramos.map((t) => t.desde)
+}
+
+// El tramo que se ve en un fotograma del vídeo (en el cruce, el que entra).
+export function tramoEn(desde: number[], frame: number): number {
+  let i = 0
+  while (i + 1 < desde.length && desde[i + 1] <= frame) i++
+  return i
+}
+
+// La frase que suena en el fotograma `f` del tramo: la del último trozo que ya ha empezado (antes, la primera).
+export function fraseEn(lista: TrozoEnLinea[], f: number): number {
+  let frase = lista[0]?.frase ?? 0
+  for (const z of lista) if (z.dur > 0 && z.desde <= f) frase = z.frase
+  return frase
+}
+
+// Por qué trozo seguir si se reanuda en el fotograma `f` del tramo: el que sonaba (otra vez), o el siguiente si se
+// paró entre dos. Devuelve lista.length si ya no queda nada por decir.
+export function trozoEn(lista: TrozoEnLinea[], f: number): number {
+  let k = 0
+  for (let i = 0; i < lista.length; i++) if (lista[i].desde <= f) k = i
+  return lista[k] && f >= lista[k].desde + lista[k].dur ? k + 1 : k
 }
 
 // Las frases de una narración (para la voz y los subtítulos).
@@ -195,4 +300,4 @@ export function respiros(frase: string): string[] {
   return frase.split(/(?<=[,;:])\s+/).filter(Boolean)
 }
 
-export const duracionTotal = (g: GuionGrafico, ritmo = 1) => g.tramos.reduce((n, t) => n + duracionTramo(t, ritmo), 0)
+export const duracionTotal = (g: GuionGrafico, ritmo = 1, medidas?: Medidas | null) => lineaDeTiempo(g, ritmo, medidas).total

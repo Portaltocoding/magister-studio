@@ -43,7 +43,16 @@ def _version(v: Version) -> dict:
         "extractor": v.extractor,
         "duplicado_de": v.duplicado_de,
         "ingerida_en": v.ingerida_en.isoformat() if v.ingerida_en else None,
+        **_origen(v.metadatos),
     }
+
+
+def _origen(metadatos: dict | None) -> dict:
+    """De dónde vino: «research» (y si entró solo y para qué lección) o nada si lo subiste tú."""
+    m = metadatos or {}
+    if m.get("origen") != "research":
+        return {"origen": None}
+    return {"origen": "research", "automatica": bool(m.get("automatica")), "leccion_clave": m.get("leccion_clave")}
 
 
 @rutas.get("/fuentes")
@@ -162,5 +171,40 @@ async def buscar(
 @rutas.get("/fuentes/estado")
 async def estado_indice(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     return await rf.contar(s)
+
+
+@rutas.get("/fuentes/resumen")
+async def resumen_documentos(s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    """Cuántos documentos hay listos, indexándose y con problema; los problemas, en claro; y lo que vino del research."""
+    listos = indexando = 0
+    problemas: list[dict] = []
+    del_research: list[dict] = []
+    for d in await rf.ultimas_versiones(s):
+        claro, reintentar = ingesta.explicar_problema(d["estado"], d["motivo"], d["con_texto"], d["fragmentos"])
+        fila = {k: d[k] for k in ("documento_id", "titulo", "uri", "fuente_id", "fuente", "version_id", "estado", "motivo",
+                                  "fragmentos")}
+        fila |= {**_origen(d["metadatos"]), "que_paso": claro or None, "reintentable": reintentar is not None}
+        if claro:
+            problemas.append(fila)
+        elif d["estado"] == "lista":
+            listos += 1
+        elif d["estado"] in ("recibida", "pendiente"):
+            indexando += 1
+        if fila["origen"] == "research" and d["estado"] != "retirada":
+            del_research.append(fila)
+    return {"listos": listos, "indexando": indexando, "con_problema": len(problemas), "problemas": problemas,
+            "del_research": sorted(del_research, key=lambda x: -x["version_id"])[:200]}
+
+
+@rutas.post("/versiones/{vid}/reintentar", status_code=202)
+async def reintentar(vid: int) -> dict:
+    """Vuelve a poner a indexar una versión que se quedó a medias (cuarentena por un fallo, o lista sin fragmentos)."""
+    try:
+        estado = await ingesta.reintentar_version(vid)
+    except LookupError:
+        raise HTTPException(404, "versión no encontrada") from None
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from None
+    return {"version_id": vid, "estado": estado}
 
 

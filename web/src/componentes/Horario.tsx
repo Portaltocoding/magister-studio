@@ -3,7 +3,14 @@ import { enviarJson, pedir, type VistaPlan } from '../api.ts'
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const HORAS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8]
-const horasTexto = (h: number) => (h === 0 ? 'Nada' : h < 1 ? '30 min' : `${String(h).replace('.', ',')} h`)
+const MAXIMO = 12 // el mismo tope que el servidor
+// En horas y minutos: 0,75 es «45 min» y 2,75, «2 h 45 min».
+const horasTexto = (h: number) => {
+  if (h === 0) return 'Nada'
+  const total = Math.round(h * 60)
+  const [hh, mm] = [Math.floor(total / 60), total % 60]
+  return hh === 0 ? `${mm} min` : mm === 0 ? `${hh} h` : `${hh} h ${mm} min`
+}
 
 interface Props {
   temaId: number
@@ -19,6 +26,9 @@ export default function Horario({ temaId, perfil, alGuardar, alCerrar }: Props) 
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const semana = horas.reduce((a, b) => a + b, 0)
+  // Las de la lista y las que ya tenías (el cuestionario da cuartos de hora): si no, el desplegable enseñaría «Nada».
+  const [opciones] = useState(() => [...new Set([...HORAS, ...horas])].sort((a, b) => a - b))
+  const demasiadas = horas.find((h) => h > MAXIMO)
 
   const guardar = async () => {
     setGuardando(true)
@@ -45,7 +55,7 @@ export default function Horario({ temaId, perfil, alGuardar, alCerrar }: Props) 
           <div key={d} className={`horario-dia ${horas[i] ? '' : 'libre'}`}>
             <span>{d}</span>
             <select aria-label={`Horas el ${d.toLowerCase()}`} value={horas[i]} onChange={(e) => setHoras(horas.map((h, k) => (k === i ? Number(e.target.value) : h)))}>
-              {HORAS.map((h) => (
+              {opciones.map((h) => (
                 <option key={h} value={h}>
                   {horasTexto(h)}
                 </option>
@@ -67,9 +77,10 @@ export default function Horario({ temaId, perfil, alGuardar, alCerrar }: Props) 
           Como el lunes, de lunes a viernes
         </button>
       </p>
+      {demasiadas != null && <p role="alert">{`${horasTexto(demasiadas)} pasa del máximo de ${MAXIMO} h: elige otro.`}</p>}
       {error && <p role="alert">{error}</p>}
       <div className="botones">
-        <button className="boton boton-principal" disabled={guardando || semana <= 0} onClick={guardar}>
+        <button className="boton boton-principal" disabled={guardando || semana <= 0 || demasiadas != null} onClick={guardar}>
           {guardando ? 'Recolocando…' : 'Guardar y recolocar'}
         </button>
         <button className="boton" onClick={alCerrar}>

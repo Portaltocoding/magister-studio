@@ -7,6 +7,7 @@ consulta, conservando el orden de la fusión.
 """
 
 import asyncio
+import math
 import time
 from sqlalchemy import text
 
@@ -110,6 +111,8 @@ def _como_recuperados(pares: list[tuple[int, float]]) -> list[Recuperado]:
 class BuscadorHibrido:
     """Cumple `cerebro.contratos.Buscador`. Deja una traza en `busquedas` en cada llamada."""
 
+    _params: dict | None = None  # los de la configuración de la última búsqueda (para `similitud_frases`)
+
     async def buscar(
         self,
         consulta: str,
@@ -144,14 +147,25 @@ class BuscadorHibrido:
             pares = densa or lexica
         rerank: list[Recuperado] | None = None
         ms_reranker = None
+        puntos_reranker: dict[int, float] = {}
         if params.reranker and pares:
             candidatos = await hidratar(pares[: params.n_candidatos])
             t1 = time.perf_counter()
             rerank = await asyncio.to_thread(reordenar, consulta, candidatos)
             ms_reranker = int((time.perf_counter() - t1) * 1000)
             recuperados = rerank[:k]
+            puntos_reranker = {r.fragmento_id: r.puntuacion for r in rerank}
         else:
             recuperados = await hidratar(pares[:k])
+            # Pregunta en español y fuente en inglés: el coseno de e5 se queda en 0,78-0,85 aunque la sección conteste.
+            # Solo entonces, el reranker (multilingüe) puntúa estos k: es la segunda puerta de «hay fuentes» (ADR-0018).
+            # El apoyo de las lecciones lo pide siempre (`puntuar_reranker`): cuenta fragmento a fragmento.
+            mejor = ResultadoBusqueda(recuperados, None, dict(densa), via).mejor_similitud
+            if recuperados and (params.puntuar_reranker or mejor < ajustes.umbral_fuentes):
+                t1 = time.perf_counter()
+                puntos_reranker = {r.fragmento_id: r.puntuacion for r in await asyncio.to_thread(reordenar, consulta, recuperados)}
+                ms_reranker = int((time.perf_counter() - t1) * 1000)
+        self._params = config_params
         ms = int((time.perf_counter() - t0) * 1000)
         async with nueva_sesion() as s, s.begin():
             b = Busqueda(
@@ -169,7 +183,19 @@ class BuscadorHibrido:
             s.add(b)
             await s.flush()
             busqueda_id = b.id
-        return ResultadoBusqueda(recuperados, busqueda_id, dict(densa), via)
+        return ResultadoBusqueda(recuperados, busqueda_id, dict(densa), via, puntos_reranker)
+
+    def similitud_frases(self, afirmacion: str, frases: list[str]) -> list[float]:
+        """Coseno de e5 entre una afirmación y cada frase, para comprobar citas entre idiomas (cerebro.citas). Usa el
+        modelo y el prefijo de consulta de la última búsqueda, el mismo para los dos lados. Si el modelo aún no está
+        cargado, [] (y las citas se comprueban solo por palabras). Es CPU: llámala en un hilo."""
+        params = self._params or {}
+        if not frases or not modelo_listo(params.get("modelo")):
+            return []
+        vectores = embeber([afirmacion, *frases], "consulta", params)
+        norma = [math.sqrt(sum(x * x for x in v)) or 1.0 for v in vectores]
+        a = vectores[0]
+        return [sum(x * y for x, y in zip(a, v, strict=True)) / (norma[0] * n) for v, n in zip(vectores[1:], norma[1:], strict=True)]
 
     async def indice_fuentes(self, tema_id: int | None, max_caracteres: int = 6000) -> str:
         """Títulos de documento y encabezados del tema, para orientar al planificador."""

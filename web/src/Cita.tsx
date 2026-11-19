@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { verFragmento, type CitaInfo, type FragmentoInfo } from './api.ts'
 
 // Las marcas [n] del texto pasan a enlaces en componentes/marcas.ts.
@@ -13,6 +13,20 @@ interface Props {
 export function PanelCita({ id, info, alCerrar }: Props) {
   const [f, setF] = useState<FragmentoInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const cerrar = useRef<HTMLButtonElement>(null)
+  // alCerrar cambia en cada pintado del hilo (mientras llega la respuesta): se lee de una ref para no robar el foco.
+  const alCerrarActual = useRef(alCerrar)
+  alCerrarActual.current = alCerrar
+
+  // Al abrirlo, el foco va a la ×; Esc lo cierra.
+  useEffect(() => {
+    cerrar.current?.focus()
+    const alTecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') alCerrarActual.current()
+    }
+    window.addEventListener('keydown', alTecla)
+    return () => window.removeEventListener('keydown', alTecla)
+  }, [])
 
   useEffect(() => {
     setF(null)
@@ -39,7 +53,7 @@ export function PanelCita({ id, info, alCerrar }: Props) {
     <aside className="panel-cita" role="dialog" aria-label={`Fuente del fragmento ${id}`}>
       <div className="cabecera-seccion">
         <h2>Fuente [{id}]</h2>
-        <button className="boton-mini" onClick={alCerrar} aria-label="Cerrar">
+        <button ref={cerrar} className="boton-mini" onClick={alCerrar} aria-label="Cerrar">
           ×
         </button>
       </div>

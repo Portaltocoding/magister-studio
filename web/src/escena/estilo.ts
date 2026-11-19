@@ -25,8 +25,9 @@ export const C = {
 export const F = {
   // Georgia: serif de remates redondeados; la Palatino de Windows quedaba demasiado afilada.
   serif: "Georgia, 'Iowan Old Style', 'Source Serif 4', serif",
-  mono: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
-  sans: "'Inter', 'Segoe UI', system-ui, sans-serif",
+  // Solo las del sistema: lo declarado es lo que se pinta (Inter y JetBrains Mono no se cargan en ningún sitio).
+  mono: "'Cascadia Code', Consolas, monospace",
+  sans: "'Segoe UI', system-ui, sans-serif",
 }
 
 export const colorDe = (e?: Estado) =>

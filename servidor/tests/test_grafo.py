@@ -125,3 +125,29 @@ def test_con_un_plan_delante_solo_lo_descarta_quien_lo_rechaza() -> None:
     assert all(rechaza_plan(t) for t in ("déjalo", "ahora no, gracias", "no quiero plan", "mejor otra cosa"))
     # Preguntar por el plan o pedir un cambio no lo tira.
     assert not any(rechaza_plan(t) for t in ("explícame por qué L2 va antes que L1", "hazlo más corto", "quita los domingos"))
+
+
+async def test_aceptar_otro_dia_recalcula_desde_hoy(monkeypatch) -> None:
+    """Propuesto el 09-11 y aceptado el 12-11: se guarda el calendario desde el 12, sin volver a preguntar."""
+    from magister.flujo.nodos import guardar as nodo_guardar
+
+    guardado: dict = {}
+
+    async def falso_guardar_plan(tema, cid, perfil, plan, sesiones, version_prompt, modelo):
+        guardado["sesiones"] = sesiones
+        return 1, 1
+
+    async def sin_apoyo(*_):
+        return None
+
+    monkeypatch.setattr(nodo_guardar, "guardar_plan", falso_guardar_plan)
+    monkeypatch.setattr(nodo_guardar, "calcular_apoyo", sin_apoyo)
+    g = construir_grafo(InMemorySaver())
+    eco.encolar(Plan, ["plan_ok.json"])
+    _, _, inter, _ = await correr(g, entrada())
+    assert inter and inter[0]["sesiones"][0]["fecha"] == HOY
+    nodos, _, inter2, _ = await correr(g, Command(resume={"accion": "aceptar"}, update={"hoy": "2026-11-12"}))
+    assert nodos == ["guardar"] and not inter2
+    fechas = [x["fecha"] for x in guardado["sesiones"]]
+    assert min(fechas) == "2026-11-12"
+    assert abs(sum(x["horas"] for x in guardado["sesiones"]) - 12) < 0.05

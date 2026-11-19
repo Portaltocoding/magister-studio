@@ -18,6 +18,7 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 - `cerebro` y `datos` solo importan de `magister.config`, para leer sus ajustes.
 - `material` importa de `cerebro`, `plan`, `tono` y `datos`; `tono` importa solo de `cerebro`; `trabajos` importa de `material`, `datos` y `voz` (exportar vídeos a MP4); `api` importa además de `trabajos`.
 - `aprender` importa de `cerebro`, `plan`, `tono`, `datos` y `config`; `api` y `flujo` importan de `aprender`.
+- Fuentes del research (ADR-0019): `trabajos` importa también de `fuentes` (ingesta) y `seguridad` (politica); `research` importa de `trabajos` (incorporar, perezoso); `material` y `aprender` importan `seguridad.entrada` dentro de la función, solo para marcar lo externo, como `flujo`.
 - `voz` (la voz local con Piper, el registro de las llamadas y el montaje de vídeos en MP4 con ffmpeg, `MAGISTER_FFMPEG`) solo importa de `magister.config`; `api` importa de `voz`. Piper y sus voces van en `herramientas/piper/` y los registros en `servidor/registros/llamadas/`, los dos fuera de git.
 - `asesor` (el agente que lee y propone cambios en un proyecto, y el arnés que los aplica, ADR-0017) importa de `cerebro`, `datos`, `proyectos` y `config`; `api` importa de `asesor`. Sus herramientas solo leen y el modelo solo propone acciones de la lista cerrada de `asesor/cambios.py`: aplicar es un botón, nunca una salida del modelo.
 - `plan` es código puro: no importa de `datos`, `cerebro` ni `config`.

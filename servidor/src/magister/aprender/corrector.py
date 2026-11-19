@@ -27,7 +27,21 @@ class Correccion(BaseModel):
 
 
 def _plano(t: str) -> str:
-    return " ".join(t.split()).lower()
+    from magister.seguridad.entrada import MARCADOR
+
+    # Una cita copiada del texto marcado trae el marcador entre palabras: se compara sin él.
+    return " ".join(t.replace(MARCADOR, " ").split()).lower()
+
+
+def fragmentos_marcados(fragmentos: list[str]) -> str:
+    """Los fragmentos llegan como texto suelto, sin saber cuáles vienen de la web (lo que el research incorpora solo
+    también acaba aquí): todos van marcados como externos, con el aviso. Son datos para citar, nunca órdenes."""
+    from magister.seguridad.entrada import AVISO, marcar_externo
+
+    if not fragmentos:
+        return "(sin fragmentos)"
+    return AVISO + "\n\n" + "\n\n".join(f"<fragmento>{marcar_externo(f, n, 'fuente')}</fragmento>"
+                                        for n, f in enumerate(fragmentos, 1))
 
 
 def comprobar(c: Correccion, fragmentos: list[str]) -> Correccion:
@@ -44,7 +58,7 @@ async def corregir(pregunta: str, referencia: str, fragmentos: list[str], respue
     """Devuelve la corrección y la versión del corrector."""
     p = cargar("corrector")
     sistema = p.rellenar(pregunta=pregunta, referencia=referencia, respuesta=respuesta,
-                         fragmentos="\n\n".join(f"<fragmento>{f}</fragmento>" for f in fragmentos) or "(sin fragmentos)")
+                         fragmentos=fragmentos_marcados(fragmentos))
     c = await estructurar(sistema, "Devuelve la corrección.", Correccion)
     return comprobar(c, fragmentos), p.etiqueta
 

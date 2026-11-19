@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
+import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
+import { colorDeTema } from '../componentes/colorTema.ts'
 import { usarAviso } from '../componentes/Aviso.tsx'
 import { mensajeDe } from '../componentes/Cargando.tsx'
 import Pensando from '../componentes/Pensando.tsx'
@@ -304,6 +306,7 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
     // Si falla, se queda el plan que estaba (y vuelve a poner su nombre) en vez de dejar la pantalla a medias.
     Promise.all([verPlan(p.tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${p.plan_id}/materiales`)])
       .then(([v, m]) => {
+        recordarPlan(p.tema_id)
         setPlan(v)
         setMateriales(m)
       })
@@ -329,9 +332,10 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
       pedir<Hoy>('/api/hoy'),
     ])
       .then(async ([ps, r, c, cg, tu, mo, h]) => {
-        if (ps[0]) {
-          const [v, m] = await Promise.all([verPlan(ps[0].tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${ps[0].plan_id}/materiales`)])
-          setNombre(ps[0].tema)
+        const activo = planActivo(ps)
+        if (activo) {
+          const [v, m] = await Promise.all([verPlan(activo.tema_id), pedir<Record<string, EstadoMaterial>>(`/api/planes/${activo.plan_id}/materiales`)])
+          setNombre(activo.tema)
           setPlan(v)
           setMateriales(m)
         }
@@ -392,6 +396,8 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
       <div className="cabecera-panel">
         <h1>Progreso</h1>
         {planes.length > 1 && (
+          <span className="selector-tema">
+          <span className="punto-tema" style={colorDeTema(plan?.tema_id, planes)?.estilo} aria-hidden="true" />
           <select
             aria-label="Plan"
             value={plan?.plan_id ?? ''}
@@ -406,6 +412,7 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
               </option>
             ))}
           </select>
+          </span>
         )}
       </div>
       {falloPlan && (

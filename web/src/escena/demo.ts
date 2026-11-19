@@ -29,7 +29,7 @@ export const DEMO_IDEMPOTENCIA: GuionGrafico = {
         'Ana compra en una tienda y pulsa Pagar. Su app manda un POST con el pedido 42 y el importe, 30 euros. El servidor cobra, lo apunta y responde 200: pagado.',
       escena: {
         tipo: 'por_dentro',
-        codigo: { fichero: 'peticion.http', lineas: PETICION, resaltar: [0] },
+        codigo: { fichero: 'peticion.http', lineas: PETICION, resaltar: [1] },
         memoria: { titulo: 'servidor · cobros', filas: [{ clave: 'pedido 42', valor: '30 €', estado: 'nuevo' }] },
         pantalla: { titulo: 'tienda.app', lineas: [{ texto: 'Pagado ✓', estado: 'bien' }], boton: 'Pagar' },
         flujo: [
@@ -45,7 +45,7 @@ export const DEMO_IDEMPOTENCIA: GuionGrafico = {
         'Ahora la respuesta se pierde por el camino: Ana entra en un túnel. El servidor sí cobró, pero la app no lo sabe. Solo ve que no ha llegado nada.',
       escena: {
         tipo: 'por_dentro',
-        codigo: { fichero: 'peticion.http', lineas: PETICION, resaltar: [0] },
+        codigo: { fichero: 'peticion.http', lineas: PETICION, resaltar: [1] },
         memoria: { titulo: 'servidor · cobros', filas: [{ clave: 'pedido 42', valor: '30 €', estado: 'nuevo' }] },
         pantalla: { titulo: 'tienda.app', lineas: [{ texto: 'Sin respuesta', estado: 'mal' }, { texto: '¿Reintentar?' }] },
         flujo: [
@@ -61,7 +61,7 @@ export const DEMO_IDEMPOTENCIA: GuionGrafico = {
         'El intento ingenuo es reintentar. Para el servidor, ese segundo POST es un pago nuevo: cobra otra vez. Ana ve 60 euros en su tarjeta por un pedido de 30. Y cada reintento más, otros 30.',
       escena: {
         tipo: 'por_dentro',
-        codigo: { fichero: 'peticion.http', lineas: PETICION, resaltar: [0] },
+        codigo: { fichero: 'peticion.http', lineas: PETICION, resaltar: [1] },
         memoria: {
           titulo: 'servidor · cobros',
           filas: [
@@ -91,7 +91,7 @@ export const DEMO_IDEMPOTENCIA: GuionGrafico = {
         'La app inventa una clave única antes del primer intento y la manda en cada reintento. El servidor apunta la clave junto a su respuesta. Si vuelve a ver la misma clave, no cobra: devuelve la respuesta que guardó. Reintenta las veces que quieras: siguen siendo 30 euros.',
       escena: {
         tipo: 'por_dentro',
-        codigo: { fichero: 'peticion.http', lineas: ['POST /pagos', 'Idempotency-Key: a41e-77c2', '', '{ "pedido": 42, "importe": 30 }'], resaltar: [1] },
+        codigo: { fichero: 'peticion.http', lineas: ['POST /pagos', 'Idempotency-Key: a41e-77c2', '', '{ "pedido": 42, "importe": 30 }'], resaltar: [2] },
         memoria: {
           titulo: 'servidor · claves vistas',
           filas: [

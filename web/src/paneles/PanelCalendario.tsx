@@ -1,5 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { enviarJson, hoyIso, marcarSesion, pedir, rutaExamen, verCalendario, type HitoExamen, type SesionVista } from '../api.ts'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  enviarJson,
+  hoyIso,
+  listarPlanes,
+  marcarSesion,
+  pedir,
+  rutaExamen,
+  verCalendario,
+  type HitoExamen,
+  type ResumenPlan,
+  type SesionVista,
+} from '../api.ts'
+import { agruparPorTema, alternarTema, colorDeTema, nombreCorto } from '../componentes/colorTema.ts'
 
 type Tipo = 'deber' | 'examen' | 'clase' | 'nota'
 
@@ -12,7 +24,11 @@ interface Evento {
   quien: string | null
   notas: string | null
   hecho: boolean
+  tema_id?: number | null
 }
+
+// Lo del plan de un día (sesiones y exámenes), para juntarlo por tema.
+type DelPlan = { tipo: 'sesion'; tema_id?: number | null; s: SesionVista } | { tipo: 'examen'; tema_id?: number | null; h: HitoExamen }
 
 interface Carga {
   fecha: string
@@ -57,6 +73,16 @@ export default function PanelCalendario() {
   const [verPlan, setVerPlan] = useState(true)
   const hoy = hoyIso()
   const celdas = useMemo(() => rejilla(mes), [mes])
+  // Cada tema (cada plan), su color y su chip en la leyenda, que además filtra.
+  const [planes, setPlanes] = useState<ResumenPlan[]>([])
+  const [nombresTemas, setNombresTemas] = useState<Record<number, string>>({})
+  const [ocultos, setOcultos] = useState<Set<number>>(() => new Set())
+  useEffect(() => {
+    listarPlanes().then(setPlanes).catch(() => undefined)
+    pedir<{ id: number; nombre: string }[]>('/api/temas')
+      .then((ts) => setNombresTemas(Object.fromEntries(ts.map((t) => [t.id, t.nombre]))))
+      .catch(() => undefined)
+  }, [])
 
   const cargar = useCallback(() => {
     const desde = iso(celdas[0])
@@ -103,7 +129,37 @@ export default function PanelCalendario() {
     cargar()
   }
 
-  const delDia = (f: string) => eventos.filter((e) => e.fecha === f)
+  // Los temas de la leyenda: los de tus planes, en su orden, y detrás cualquier otro que salga en el mes.
+  const temas = useMemo(() => {
+    const m = new Map<number, string>()
+    for (const p of planes) m.set(p.tema_id, p.tema)
+    const otro = (id: number | null | undefined, nombre?: string) => {
+      if (id != null && !m.has(id)) m.set(id, nombre ?? nombresTemas[id] ?? `Tema ${id}`)
+    }
+    for (const lista of Object.values(sesiones)) for (const x of lista) otro(x.tema_id, x.tema)
+    for (const lista of Object.values(examenes)) for (const h of lista) otro(h.tema_id, h.tema)
+    for (const e of [...eventos, ...pendientes]) otro(e.tema_id)
+    return [...m.entries()].map(([id, nombre]) => ({ id, nombre }))
+  }, [planes, nombresTemas, sesiones, examenes, eventos, pendientes])
+  const orden = temas.map((t) => t.id)
+  // El color, siempre sobre la misma lista (la de tus planes): así sale igual que en Roadmap, Lecciones o Examen.
+  const idsPlanes = planes.map((p) => p.tema_id)
+  const colorDe = (id: number | null | undefined) => colorDeTema(id, idsPlanes)
+  const nombreTema = (id: number) => temas.find((t) => t.id === id)?.nombre ?? nombresTemas[id] ?? `Tema ${id}`
+  const visible = (id: number | null | undefined) => id == null || !ocultos.has(id)
+  const etiquetaTema = (id: number | null | undefined): ReactNode =>
+    id == null ? null : (
+      <span className="tema-etiqueta" style={colorDe(id)?.estilo}>
+        <span className="punto-tema" aria-hidden="true" />
+        {nombreTema(id)}
+      </span>
+    )
+
+  const delDia = (f: string) => eventos.filter((e) => e.fecha === f && visible(e.tema_id))
+  const delPlan = (f: string): DelPlan[] => [
+    ...(sesiones[f] ?? []).filter((s) => visible(s.tema_id)).map((s) => ({ tipo: 'sesion' as const, tema_id: s.tema_id, s })),
+    ...(examenes[f] ?? []).filter((h) => visible(h.tema_id)).map((h) => ({ tipo: 'examen' as const, tema_id: h.tema_id, h })),
+  ]
   const titulo = mes.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
 
   return (
@@ -134,6 +190,29 @@ export default function PanelCalendario() {
           <input type="checkbox" checked={verPlan} onChange={(e) => setVerPlan(e.target.checked)} /> Ver el plan y los repasos
         </label>
       </div>
+      {temas.length > 0 && (
+        <div className="leyenda-temas" role="group" aria-label="Temas: pulsa uno para enseñarlo u ocultarlo">
+          {temas.map((t) => {
+            const visto = !ocultos.has(t.id)
+            const ultimo = visto && temas.every((o) => o.id === t.id || ocultos.has(o.id))
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className="chip-tema"
+                style={colorDe(t.id)?.estilo}
+                aria-pressed={visto}
+                aria-disabled={ultimo || undefined}
+                title={ultimo ? 'Siempre queda un tema a la vista' : visto ? `Ocultar ${t.nombre}` : `Enseñar ${t.nombre}`}
+                onClick={() => setOcultos((o) => alternarTema(o, t.id, orden))}
+              >
+                <span className="punto-tema" aria-hidden="true" />
+                {t.nombre}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <div className="mes-y-dia">
         <div className="mes" role="grid" aria-label={`Calendario de ${titulo}`}>
@@ -159,38 +238,54 @@ export default function PanelCalendario() {
                 <span className="celda-numero">{c.getDate()}</span>
                 <span className="celda-cosas">
                   {lista.slice(0, 3).map((e) => (
-                    <span key={e.id} className={`pastilla pastilla-${e.tipo} ${e.hecho ? 'pastilla-hecha' : ''}`} title={e.titulo}>
+                    <span
+                      key={e.id}
+                      className={`pastilla pastilla-${e.tipo} ${e.hecho ? 'pastilla-hecha' : ''}`}
+                      style={colorDe(e.tema_id)?.estilo}
+                      title={e.tema_id != null ? `${e.titulo} · ${nombreTema(e.tema_id)}` : e.titulo}
+                    >
+                      {e.tema_id != null && <span className="punto-tema" aria-hidden="true" />}
                       {e.hora ? `${e.hora} ` : ''}
                       {e.titulo}
                     </span>
                   ))}
                   {lista.length > 3 && <span className="nota-linea">+{lista.length - 3} más</span>}
+                  {/* Lo del plan, junto por tema y en el orden de la leyenda: el nombre corto del tema y debajo lo suyo. */}
                   {verPlan &&
-                    (sesiones[f] ?? []).map((x) => (
-                      <span
-                        key={`s${x.id}`}
-                        className={`fondo-plan ${x.estado === 'hecha' ? 'pastilla-hecha' : ''}`}
-                        title={`${x.clave} ${x.titulo} (${x.tema}). Pulsa para abrirla`}
-                        onClick={(ev) => {
-                          ev.stopPropagation()
-                          abrirLeccion(x)
-                        }}
-                      >
-                        {x.clave} {x.titulo}
-                      </span>
-                    ))}
-                  {verPlan &&
-                    (examenes[f] ?? []).map((h) => (
-                      <span
-                        key={`e${h.id}`}
-                        className={`fondo-plan fondo-examen ${h.hecho ? 'pastilla-hecha' : ''}`}
-                        title={`${h.titulo} · ${h.preguntas} preguntas, ${h.minutos} min. Pulsa para hacerlo`}
-                        onClick={(ev) => {
-                          ev.stopPropagation()
-                          if (h.plan_id) window.location.hash = rutaExamen(h.plan_id, h)
-                        }}
-                      >
-                        {h.titulo}
+                    agruparPorTema(delPlan(f), orden).map((g) => (
+                      <span key={`t${g.temaId ?? 'x'}`} className="cal-grupo" style={colorDe(g.temaId)?.estilo}>
+                        {g.temaId != null && (
+                          <span className="cal-grupo-nombre" title={nombreTema(g.temaId)}>
+                            {nombreCorto(nombreTema(g.temaId))}
+                          </span>
+                        )}
+                        {g.cosas.map((c) =>
+                          c.tipo === 'sesion' ? (
+                            <span
+                              key={`s${c.s.id}`}
+                              className={`fondo-plan ${g.temaId != null ? 'con-tema' : ''} ${c.s.estado === 'hecha' ? 'pastilla-hecha' : ''}`}
+                              title={`${c.s.clave} ${c.s.titulo} (${c.s.tema}). Pulsa para abrirla`}
+                              onClick={(ev) => {
+                                ev.stopPropagation()
+                                abrirLeccion(c.s)
+                              }}
+                            >
+                              {c.s.clave} {c.s.titulo}
+                            </span>
+                          ) : (
+                            <span
+                              key={`e${c.h.id}`}
+                              className={`fondo-plan fondo-examen ${g.temaId != null ? 'con-tema' : ''} ${c.h.hecho ? 'pastilla-hecha' : ''}`}
+                              title={`${c.h.titulo}${c.h.tema ? ` (${c.h.tema})` : ''} · ${c.h.preguntas} preguntas, ${c.h.minutos} min. Pulsa para hacerlo`}
+                              onClick={(ev) => {
+                                ev.stopPropagation()
+                                if (c.h.plan_id) window.location.hash = rutaExamen(c.h.plan_id, c.h)
+                              }}
+                            >
+                              {c.h.titulo}
+                            </span>
+                          ),
+                        )}
                       </span>
                     ))}
                   {verPlan && carga[f] && <span className="fondo-plan fondo-repaso">{carga[f].repasos} {carga[f].repasos === 1 ? 'repaso' : 'repasos'}</span>}
@@ -218,6 +313,7 @@ export default function PanelCalendario() {
                     <span className="nota-linea">
                       {TIPOS[e.tipo]}
                       {e.quien ? ` · ${e.quien}` : ''}
+                      {e.tema_id != null && <> · {etiquetaTema(e.tema_id)}</>}
                     </span>
                     {e.notas && <p className="nota">{e.notas}</p>}
                     <span className="acciones">
@@ -237,18 +333,19 @@ export default function PanelCalendario() {
                   </li>
                 ))}
               </ul>
-              {verPlan && (examenes[dia] ?? []).length > 0 && (
+              {verPlan && (examenes[dia] ?? []).some((h) => visible(h.tema_id)) && (
                 <>
                   <h3>Exámenes</h3>
                   <ul className="lista-dia">
-                    {(examenes[dia] ?? []).map((h) => (
-                      <li key={h.id} className="item-plan">
+                    {agruparPorTema((examenes[dia] ?? []).filter((h) => visible(h.tema_id)), orden).flatMap((g) => g.cosas).map((h) => (
+                      <li key={h.id} className={`item-plan ${h.tema_id != null ? 'con-tema' : ''}`} style={colorDe(h.tema_id)?.estilo}>
                         <span>
                           <strong>{h.titulo}</strong>{' '}
                           <span className="nota">
                             · {h.preguntas} preguntas, {h.minutos} min
                             {h.nota != null ? ` · ${h.hecho ? 'aprobado con' : 'mejor nota'} ${h.nota.toFixed(1).replace('.', ',')}` : ''}
                           </span>
+                          {h.tema_id != null && <span className="nota-linea">{etiquetaTema(h.tema_id)}</span>}
                         </span>
                         <button className="boton-mini" onClick={() => h.plan_id && (window.location.hash = rutaExamen(h.plan_id, h))}>
                           {h.hecho ? 'Repetir →' : 'Hacerlo →'}
@@ -258,30 +355,35 @@ export default function PanelCalendario() {
                   </ul>
                 </>
               )}
-              {verPlan && (sesiones[dia] ?? []).length > 0 && (
+              {verPlan && (sesiones[dia] ?? []).some((x) => visible(x.tema_id)) && (
                 <>
                   <h3>Del plan</h3>
-                  <ul className="lista-dia">
-                    {(sesiones[dia] ?? []).map((x) => (
-                      <li key={x.id} className="item-plan">
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={x.estado === 'hecha'}
-                            onChange={async () => {
-                              await marcarSesion(x.id, x.estado === 'hecha' ? 'pendiente' : 'hecha')
-                              cargar()
-                            }}
-                          />{' '}
-                          {x.inicio ? `${x.inicio.slice(0, 5)} · ` : ''}
-                          <strong>{x.clave}</strong> {x.titulo} <span className="nota">· {x.horas} h</span>
-                        </label>
-                        <button className="boton-mini" onClick={() => abrirLeccion(x)} title={x.tema}>
-                          Abrir →
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  {agruparPorTema((sesiones[dia] ?? []).filter((x) => visible(x.tema_id)), orden).map((g) => (
+                    <div key={g.temaId ?? 'x'} className="dia-tema">
+                      {g.temaId != null && <h4 className="dia-tema-nombre">{etiquetaTema(g.temaId)}</h4>}
+                      <ul className="lista-dia">
+                        {g.cosas.map((x) => (
+                          <li key={x.id} className={`item-plan ${g.temaId != null ? 'con-tema' : ''}`} style={colorDe(g.temaId)?.estilo}>
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={x.estado === 'hecha'}
+                                onChange={async () => {
+                                  await marcarSesion(x.id, x.estado === 'hecha' ? 'pendiente' : 'hecha')
+                                  cargar()
+                                }}
+                              />{' '}
+                              {x.inicio ? `${x.inicio.slice(0, 5)} · ` : ''}
+                              <strong>{x.clave}</strong> {x.titulo} <span className="nota">· {x.horas} h</span>
+                            </label>
+                            <button className="boton-mini" onClick={() => abrirLeccion(x)} title={x.tema}>
+                              Abrir →
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </>
               )}
               <form
@@ -339,7 +441,7 @@ export default function PanelCalendario() {
               <h2>Pendiente</h2>
               {pendientes.length === 0 && <p className="vacio">Ningún deber ni examen pendiente. Pulsa un día para apuntar.</p>}
               <ul className="lista-dia">
-                {pendientes.map((e) => (
+                {pendientes.filter((e) => visible(e.tema_id)).map((e) => (
                   <li key={e.id} className={`item-${e.tipo} ${e.fecha < hoy ? 'atrasado' : ''}`}>
                     <label>
                       <input type="checkbox" checked={e.hecho} onChange={() => alternar(e)} /> {e.titulo}
@@ -348,6 +450,7 @@ export default function PanelCalendario() {
                       {TIPOS[e.tipo]} · {new Date(e.fecha + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
                       {e.quien ? ` · ${e.quien}` : ''}
                       {e.fecha < hoy ? ' · atrasado' : ''}
+                      {e.tema_id != null && <> · {etiquetaTema(e.tema_id)}</>}
                     </span>
                   </li>
                 ))}

@@ -3,6 +3,8 @@ import Markdown from '../componentes/Markdown.tsx'
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
 import { enviarJson, flujo, listarPlanes, pedir, type ResumenPlan } from '../api.ts'
+import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
+import { colorDeTema } from '../componentes/colorTema.ts'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
@@ -154,7 +156,9 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
     listarPlanes()
       .then((ps) => {
         setPlanes(ps)
-        setPlan(ps.find((p) => p.plan_id === desdeRuta?.plan) ?? ps[0] ?? null)
+        const deLaRuta = ps.find((p) => p.plan_id === desdeRuta?.plan)
+        if (deLaRuta) recordarPlan(deLaRuta.tema_id)
+        setPlan(deLaRuta ?? planActivo(ps) ?? null)
       })
       .catch((e) => setFalloCarga(mensajeDe(e)))
     if (desdeRuta?.n) setCantidad(Math.min(20, desdeRuta.n))
@@ -214,13 +218,20 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
       <div className="cabecera-panel">
         <h1>Examen</h1>
         {planes.length > 1 && (
-          <select aria-label="Plan" value={plan.plan_id} onChange={(e) => setPlan(planes.find((p) => p.plan_id === Number(e.target.value)) ?? null)}>
+          <span className="selector-tema">
+          <span className="punto-tema" style={colorDeTema(plan.tema_id, planes)?.estilo} aria-hidden="true" />
+          <select aria-label="Plan" value={plan.plan_id} onChange={(e) => {
+              const p = planes.find((x) => x.plan_id === Number(e.target.value)) ?? null
+              recordarPlan(p?.tema_id)
+              setPlan(p)
+            }}>
             {planes.map((p) => (
               <option key={p.plan_id} value={p.plan_id}>
                 {p.tema}
               </option>
             ))}
           </select>
+          </span>
         )}
       </div>
 

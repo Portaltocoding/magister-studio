@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from 'react'
-import { pedir } from './api.ts'
+import { hoyIso, pedir } from './api.ts'
 import { padreDe, type IdModo } from './modos.ts'
 import { EVENTO_CONECTADO } from './componentes/Cargando.tsx'
 
@@ -108,8 +108,8 @@ export function pendienteDeHoy(hoy: Hoy | null): { n: number; texto: string } {
   if (!hoy) return { n: 0, texto: 'Hoy' }
   const partes: string[] = []
   let n = 0
-  const hoyIso = new Date().toISOString().slice(0, 10)
-  if (hoy.titulo && hoy.fecha && hoy.fecha <= hoyIso && hoy.estado !== 'solo_repaso') {
+  const fechaHoy = hoyIso()
+  if (hoy.titulo && hoy.fecha && hoy.fecha <= fechaHoy && hoy.estado !== 'solo_repaso') {
     partes.push(`${hoy.leccion_clave} ${hoy.titulo}`)
     n += 1
   }

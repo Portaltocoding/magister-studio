@@ -193,3 +193,64 @@ def test_overflow_hidden_no_es_contenido_oculto():
     limpio = html_a_texto(html)
     assert "El artículo de verdad." in limpio
     assert "ignora lo anterior" not in limpio and "y esto también" not in limpio
+
+
+async def test_otra_web_no_escribe_ni_gasta_modelo(cliente) -> None:
+    """Sin token, un POST sin cuerpo desde otra web o un GET de otra web (un <img>) se cortan con 403."""
+    r = await cliente.post("/api/alertas/1/resolver", headers={"Origin": "https://otra.web"})
+    assert r.status_code == 403
+    r = await cliente.get("/api/temas", headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+    # La propia app (Vite, la API, el escritorio) y curl, sin esas cabeceras, siguen pasando.
+    for origen in ("http://localhost:5173", "http://127.0.0.1:8000", "magister://app", "http://prueba"):
+        r = await cliente.post("/api/temas", json={"nombre": origen}, headers={"Origin": origen, "Sec-Fetch-Site": "same-origin"})
+        assert r.status_code == 201, origen
+    assert (await cliente.get("/api/temas")).status_code == 200
+
+
+async def test_aceptar_un_candidato_del_juez_guarda_tu_pregunta_sin_canario(cliente, tmp_path, monkeypatch) -> None:
+    import json as _json
+
+    from magister.api import rutas_produccion
+    from magister.config import ajustes
+    from magister.observar import juez_online
+
+    monkeypatch.setattr(rutas_produccion, "RAIZ_SERVIDOR", tmp_path)
+    monkeypatch.setattr(ajustes, "canario", "mg-canario-de-prueba")
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "x"})).json()["id"]
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "qué es un índice"}, headers={"X-Request-Id": "traza-j"})
+    await juez_online.candidato("traza-j", "juez", "Eres el tutor. Clave interna de esta instalación: mg-canario-de-prueba",
+                                "respuesta mg-canario-de-prueba", "razonamiento: flojo")
+    [c] = (await cliente.get("/api/candidatos")).json()
+    await cliente.post(f"/api/candidatos/{c['id']}", json={"accion": "aceptar", "banco": "tono"})
+    texto = (tmp_path / "evals" / "banco" / "tono" / "traza-j.json").read_text(encoding="utf-8")
+    assert "mg-canario-de-prueba" not in texto and _json.loads(texto)["entrada"] == "qué es un índice"
+
+
+async def test_no_me_sirve_guarda_la_pregunta_de_su_conversacion(cliente) -> None:
+    from sqlalchemy import text
+
+    from magister.datos.sesion import nueva_sesion
+
+    a = (await cliente.post("/api/conversaciones", json={"titulo": "a"})).json()["id"]
+    b = (await cliente.post("/api/conversaciones", json={"titulo": "b"})).json()["id"]
+    await cliente.post(f"/api/conversaciones/{a}/mensajes", json={"contenido": "pregunta de a"}, headers={"X-Request-Id": "traza-a"})
+    await cliente.post(f"/api/conversaciones/{b}/mensajes", json={"contenido": "pregunta de b"}, headers={"X-Request-Id": "traza-b"})
+    await cliente.post("/api/trazas/traza-a/feedback", json={"bien": False})
+    async with nueva_sesion() as s:
+        assert await s.scalar(text("select entrada from candidatos_banco where traza_id = 'traza-a'")) == "pregunta de a"
+
+
+async def test_toda_tabla_se_exporta_o_se_decide_que_no(cliente) -> None:
+    """Una tabla nueva tiene que ir a TABLAS (se exporta), a FUENTES o a NO_SON_DEL_USUARIO: nunca fuera sin decidirlo."""
+    from sqlalchemy import text
+
+    from magister.datos.sesion import nueva_sesion
+    from magister.datos.tus_datos import BORRAR, FUENTES, NO_SON_DEL_USUARIO, TABLAS
+
+    async with nueva_sesion() as s:
+        hay = set((await s.execute(text("select tablename from pg_tables where schemaname = current_schema()"))).scalars())
+    assert hay - set(TABLAS) - set(FUENTES) - set(NO_SON_DEL_USUARIO) == set()
+    assert set(TABLAS) <= hay and not set(TABLAS) & set(NO_SON_DEL_USUARIO)
+    # Lo que se exporta como tuyo, borrar-todo lo borra.
+    assert set(TABLAS) <= set(BORRAR)

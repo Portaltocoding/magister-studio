@@ -6,7 +6,9 @@ Código puro: `magister.plan` no importa de `datos`, `cerebro` ni `config`.
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+HORAS_MAX_DIA = 12.0  # el mismo tope que la ruta del horario
 
 Nivel = Literal["nada", "basico", "intermedio", "avanzado"]
 
@@ -43,6 +45,12 @@ class Perfil(BaseModel):
     sin_plazo: bool = Field(False, description="true solo si dijo expresamente que no tiene fecha límite.")
     preferencias: str | None = Field(None, description="Cómo le gusta aprender, si lo dijo.")
     notas: str | None = Field(None, description="Cualquier otro dato útil para el plan.")
+
+    @field_validator("horas_por_dia")
+    @classmethod
+    def _tope_por_dia(cls, valor: list[float] | None) -> list[float] | None:
+        # Lo que pase de 12 h en un día se recorta, no se rechaza: así un perfil guardado antes del tope se sigue leyendo.
+        return None if valor is None else [min(h, HORAS_MAX_DIA) for h in valor]
 
 
 class Concepto(BaseModel):

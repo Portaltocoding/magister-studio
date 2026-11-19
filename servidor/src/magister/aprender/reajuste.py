@@ -6,12 +6,17 @@ Reutiliza `calendarizar` y `orden` de la Parte II. El momento entra como argumen
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from magister.aprender.practica import conceptos_practicables, minutos_por_repaso
 from magister.aprender.estado import estados_en
 from magister.aprender.programador import programador
-from magister.plan.calendario import Calendario, NoCabe, ReglasCalendario, calendarizar
+from magister.config import ajustes
+from magister.plan.calendario import Calendario, NoCabe, ReglasCalendario, calendarizar, horas_utiles
 from magister.plan.esquemas import Plan
+
+
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
 
 @dataclass
@@ -26,17 +31,20 @@ async def prever_carga(desde: datetime, dias: int) -> list[CargaDia]:
     conceptos = await conceptos_practicables()
     estados = await estados_en([c.concepto_id for c in conceptos], desde)
     minutos = await minutos_por_repaso()
+    # Los días, en tu zona: a las 00:30 de Madrid ya es el día siguiente, aunque en UTC no.
+    zona = ZoneInfo(ajustes.zona)
+    hoy = desde.astimezone(zona).date()
     cuenta: Counter = Counter()
     for c in conceptos:
         e = estados[c.concepto_id]
         prox = (programador(c.brazo) if c.brazo else programador()).proxima(e)
         if prox is None:
             continue
-        dia = max(prox.date(), desde.date())
-        if dia < desde.date() + timedelta(days=dias):
+        dia = max(prox.astimezone(zona).date(), hoy)
+        if dia < hoy + timedelta(days=dias):
             cuenta[dia] += 1
-    return [CargaDia(desde.date() + timedelta(days=i), cuenta[desde.date() + timedelta(days=i)],
-                     round(cuenta[desde.date() + timedelta(days=i)] * minutos, 1)) for i in range(dias)]
+    return [CargaDia(hoy + timedelta(days=i), cuenta[hoy + timedelta(days=i)],
+                     round(cuenta[hoy + timedelta(days=i)] * minutos, 1)) for i in range(dias)]
 
 
 def reajustar(plan: Plan, disponibilidad: list[float], inicios: list, hoy: date, plazo: date | None,
@@ -65,6 +73,10 @@ def reajustar(plan: Plan, disponibilidad: list[float], inicios: list, hoy: date,
         if isinstance(sin_plazo, Calendario) and sin_plazo.fin:
             avisos.append(f"No llegas a la fecha objetivo; con tus horas, acabarías el {sin_plazo.fin:%d-%m-%Y}.")
             resultado = sin_plazo
+    utiles = horas_utiles(disponibilidad, inicios)
+    recortados = [DIAS[i] for i in range(7) if utiles[i] < disponibilidad[i] - 1e-6]
+    if recortados:
+        avisos.append(f"Tu horario pasa de medianoche ({', '.join(recortados)}): solo cuento las horas hasta las 24:00.")
     if dominadas:
         avisos.append(f"Lecciones ya dominadas que se dan por hechas: {', '.join(sorted(dominadas))}.")
     return resultado, avisos

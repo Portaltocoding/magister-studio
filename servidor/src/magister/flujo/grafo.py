@@ -26,7 +26,7 @@ from magister.flujo.nodos.negociar import explicar_fallo, negociar
 from magister.flujo.nodos.planificar import hacer_planificar
 from magister.flujo.nodos.preguntar import preguntar
 from magister.flujo.nodos.proponer import proponer
-from magister.flujo.nodos.rag import aclarar, hacer_recuperar, reescribir, responder, tras_reescribir
+from magister.flujo.nodos.rag import aclarar, hacer_recuperar, hacer_responder, reescribir, tras_reescribir
 from magister.flujo.comun import decir, fase
 from magister.flujo.intencion import deja_plan, pide_plan
 from magister.plan.esquemas import Perfil
@@ -98,7 +98,7 @@ def construir_grafo(
         g.add_node("reescribir", reescribir)
         g.add_node("aclarar", aclarar)
         g.add_node("recuperar", hacer_recuperar(buscador))
-        g.add_node("responder", responder)
+        g.add_node("responder", hacer_responder(buscador))
         g.add_conditional_edges(START, enrutar_entrada, {"extraer": "extraer", "estudio": "reescribir",
                                                          "a_diagnostico": "a_diagnostico", "a_estudio": "a_estudio"})
         g.add_conditional_edges("reescribir", tras_reescribir, ["aclarar", "recuperar"])

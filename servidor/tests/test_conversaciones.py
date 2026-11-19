@@ -105,3 +105,21 @@ async def test_la_llamada_llega_al_cerebro(cliente, monkeypatch) -> None:
     await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "otra cosa"})
     assert "llamada de voz" not in sistemas[-1] and "Entrevista sobre" not in sistemas[-1]
     assert tareas[-1] is None
+
+
+async def test_borrar_la_conversacion_borra_su_hilo_del_grafo(cliente) -> None:
+    from magister.flujo import ejecutar
+
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "para borrar"})).json()["id"]
+    await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "algo privado"})
+    assert await ejecutar.fase_actual(cid) is not None
+    assert (await cliente.delete(f"/api/conversaciones/{cid}")).status_code == 204
+    assert await ejecutar.fase_actual(cid) is None
+
+
+async def test_la_respuesta_guarda_su_traza(cliente) -> None:
+    """Sin X-Request-Id también: la traza que abre la petición llega al guardado y se cruza con sus llamadas."""
+    cid = (await cliente.post("/api/conversaciones", json={"titulo": "traza"})).json()["id"]
+    r = await cliente.post(f"/api/conversaciones/{cid}/mensajes", json={"contenido": "hola"})
+    [tutor] = [m for m in (await cliente.get(f"/api/conversaciones/{cid}/mensajes")).json() if m["rol"] == "tutor"]
+    assert tutor["traza_id"] and tutor["traza_id"] == r.headers["x-request-id"]

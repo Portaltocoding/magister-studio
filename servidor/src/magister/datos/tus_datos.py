@@ -12,9 +12,15 @@ from magister.datos.sesion import nueva_sesion
 
 TABLAS = ["temas", "conversaciones", "mensajes", "mensajes_citas", "planes", "lecciones", "conceptos", "dependencias", "sesiones",
           "materiales", "bloques_material", "preguntas", "preguntas_concepto", "intentos", "servidas", "etiquetas",
-          "llamadas", "puntuaciones", "candidatos_banco", "eventos"]
+          "llamadas", "puntuaciones", "candidatos_banco", "eventos", "notas", "examenes", "proyectos",
+          "proyecto_decisiones", "asesor_cambios", "propuestas", "tareas_research", "lecciones_apoyo",
+          "lecciones_fragmentos", "banco_tono"]
+# Las tablas que no son tuyas: de la instalación (el canario está en `instalacion`), la cola, cachés y avisos.
+# Toda tabla está en TABLAS, en FUENTES o aquí (lo comprueba un test): así una nueva no se queda fuera sin decidirlo.
+NO_SON_DEL_USUARIO = ["alembic_version", "instalacion", "configuraciones", "prompts_activos", "prompts_versiones",
+                      "trabajadores", "trabajos", "cache_respuestas", "alertas"]
 # Lo que borra `borrar-todo` (las fuentes, solo con --fuentes). El orden respeta las claves foráneas.
-BORRAR = ["candidatos_banco", "puntuaciones", "llamadas", "servidas", "intentos", "etiquetas", "banco_tono", "preguntas_concepto",
+BORRAR = ["asesor_cambios", "proyecto_decisiones", "proyectos", "notas", "examenes", "candidatos_banco", "puntuaciones", "llamadas", "servidas", "intentos", "etiquetas", "banco_tono", "preguntas_concepto",
           "preguntas", "bloques_material", "materiales", "trabajos", "propuestas", "tareas_research", "lecciones_apoyo",
           "lecciones_fragmentos", "sesiones", "dependencias", "conceptos", "lecciones", "planes", "mensajes_citas", "mensajes",
           "conversaciones", "temas", "cache_respuestas", "alertas", "eventos"]
@@ -29,6 +35,9 @@ Un fichero JSON por tabla, con todas sus filas. Lo principal:
 - intentos.json: cada respuesta tuya en el repaso, con la nota del corrector, tu nota si la corregiste, tu confianza y la latencia.
 - servidas.json: lo que el tutor apostaba (p_predicha) antes de cada pregunta.
 - llamadas.json y puntuaciones.json: el registro de llamadas al modelo (tokens, tiempos) y sus métricas.
+- notas.json y examenes.json: Mis notas y tus exámenes y evaluaciones.
+- proyectos.json, proyecto_decisiones.json y asesor_cambios.json: tus proyectos, su diario y los cambios del asesor.
+- propuestas.json y tareas_research.json: las fuentes que se te propusieron y las búsquedas que las trajeron.
 Las fuentes (documentos y fragmentos) no se exportan aquí: los originales están en servidor/crudo.
 """
 
@@ -47,11 +56,17 @@ def _a_json(v):
     return v
 
 
+async def _existentes(s, tablas: list[str]) -> list[str]:
+    """Las que ya están en la base: con una migración sin aplicar, exportar y borrar no fallan por una tabla nueva."""
+    hay = set((await s.execute(text("select tablename from pg_tables where schemaname = current_schema()"))).scalars())
+    return [t for t in tablas if t in hay]
+
+
 async def exportar(carpeta: Path) -> dict[str, int]:
     carpeta.mkdir(parents=True, exist_ok=True)
     cuentas = {}
     async with nueva_sesion() as s:
-        for t in TABLAS:
+        for t in await _existentes(s, TABLAS):
             filas = (await s.execute(text(f"select * from {t}"))).mappings().all()
             datos = [{k: _a_json(v) for k, v in f.items()} for f in filas]
             (carpeta / f"{t}.json").write_text(json.dumps(datos, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
@@ -61,9 +76,9 @@ async def exportar(carpeta: Path) -> dict[str, int]:
 
 
 async def borrar_todo(confirmar: bool, fuentes: bool = False) -> dict[str, int]:
-    tablas = BORRAR + (FUENTES if fuentes else [])
     cuentas = {}
     async with nueva_sesion() as s, s.begin():
+        tablas = await _existentes(s, BORRAR + (FUENTES if fuentes else []))
         for t in tablas:
             cuentas[t] = await s.scalar(text(f"select count(*) from {t}"))
         if confirmar:

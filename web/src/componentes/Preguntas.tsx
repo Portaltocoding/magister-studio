@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { hoyIso } from '../api.ts'
 
 // Lo que el tutor puede pedirte o proponerte dentro de una respuesta, como las preguntas de Claude Code:
 // ```pregunta  -> una pregunta con opciones (con explicación, la recomendada marcada, «Otra» y, si quiere, varias a la vez).
@@ -108,7 +109,7 @@ export function AgendarTarjeta({ texto, completo }: { texto: string; completo: b
       .filter((m): m is RegExpMatchArray => !!m)
       .map((m) => [m[1].toLowerCase(), m[2].trim()]),
   ) as Record<string, string>
-  const [fecha, setFecha] = useState(/^\d{4}-\d{2}-\d{2}$/.test(campos.fecha ?? '') ? campos.fecha : new Date().toISOString().slice(0, 10))
+  const [fecha, setFecha] = useState(/^\d{4}-\d{2}-\d{2}$/.test(campos.fecha ?? '') ? campos.fecha : hoyIso())
   const [hora, setHora] = useState(/^\d{1,2}:\d{2}$/.test(campos.hora ?? '') ? campos.hora.padStart(5, '0') : '')
   const [estado, setEstado] = useState<'propuesta' | 'editando' | 'hecho' | 'no' | 'error'>('propuesta')
   // Mientras el texto aparece, el bloque llega a trozos: la fecha y la hora siguen a lo escrito hasta que las tocas.

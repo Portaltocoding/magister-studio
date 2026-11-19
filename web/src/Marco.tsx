@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { listarConversaciones, type Conversacion } from './api.ts'
+import { hoyIso, listarConversaciones, type Conversacion } from './api.ts'
 import BarraLateral from './BarraLateral.tsx'
 import BarraSesion from './BarraSesion.tsx'
 import Riel, { pendienteDeHoy, usarHoy } from './Riel.tsx'
@@ -63,7 +63,7 @@ export default function Marco() {
   }, [modo])
   useEffect(() => {
     if (!hoy || !('Notification' in window) || Notification.permission !== 'granted' || !avisosActivos()) return
-    const fecha = new Date().toISOString().slice(0, 10)
+    const fecha = hoyIso()
     const clave = `magister-avisado-${fecha}`
     try {
       if (localStorage.getItem(clave)) return

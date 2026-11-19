@@ -9,6 +9,7 @@ import {
   listarFuentes,
   listarPropuestas,
   listarTemas,
+  reintentarVersion,
   subirFichero,
   type DocumentoInfo,
   type Fuente,
@@ -251,6 +252,22 @@ export default function PanelFuentes() {
                       {d.version ? ESTADOS[d.version.estado] : '·'}
                       {d.version?.motivo ? ` · ${d.version.motivo}` : ''}
                       {d.version?.duplicado_de ? ` · duplicado de ${d.version.duplicado_de}` : ''}
+                      {d.version?.origen === 'research'
+                        ? ` · del research${d.version.leccion_clave ? ` para ${d.version.leccion_clave}` : ''}${d.version.automatica ? ', entró solo' : ''}`
+                        : ''}
+                      {d.version?.estado === 'cuarentena' && (
+                        <>
+                          {' '}
+                          <button
+                            className="boton-mini"
+                            onClick={() =>
+                              conAviso(() => reintentarVersion(d.version!.id), `«${d.titulo}» vuelve a indexarse.`)
+                            }
+                          >
+                            Reintentar
+                          </button>
+                        </>
+                      )}
                     </td>
                     <td>{d.fragmentos}</td>
                     <td>

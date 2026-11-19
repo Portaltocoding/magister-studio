@@ -1,10 +1,21 @@
 """El contrato del buscador (Parte III). `flujo` y `cerebro` solo conocen esto;
 `api` construye el `BuscadorHibrido` de `magister.fuentes` y lo inyecta."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 TipoFuente = Literal["vault", "pdf", "libro", "web", "audio"]
+Escalon = Literal["lexica", "densa", "reranker", "nada"]
+
+
+def titulo_para_atributo(titulo: str) -> str:
+    """Un título (de una página web, por ejemplo) metido en `fuente="..."` no puede cerrar el atributo ni la etiqueta."""
+    return " ".join((titulo or "").replace('"', "'").replace("<", "‹").replace(">", "›").split())
+
+# (afirmación, frases) -> similitud de la afirmación con cada frase, entre idiomas. El `BuscadorHibrido` la ofrece
+# como `similitud_frases` con el modelo de embeddings ya cargado; una lista vacía quiere decir «no disponible».
+Similitud = Callable[[str, list[str]], list[float]]
 
 
 @dataclass(frozen=True)
@@ -31,6 +42,9 @@ class Consulta:
     via: Literal["densa", "lexica", "hibrida"] = "hibrida"
     n_candidatos: int = 30
     reranker: bool = False
+    # Puntuar los k con el reranker aunque el coseno llegue (el apoyo de las lecciones cuenta fragmento a fragmento).
+    # En el chat no: ahí solo corre si el coseno no llega (ADR-0018).
+    puntuar_reranker: bool = False
 
 
 @dataclass
@@ -41,6 +55,27 @@ class ResultadoBusqueda:
     similitud_densa: dict[int, float] = field(default_factory=dict)
     # La vía que se usó de verdad: la híbrida pasa a «lexica» si e5 aún no está cargado.
     via: str = "hibrida"
+    # Puntuación del reranker por fragmento. Solo se calcula cuando el coseno no llega (pregunta en español, fuente en
+    # inglés: ADR-0018); vacío si no corrió.
+    puntuacion_reranker: dict[int, float] = field(default_factory=dict)
+
+    @property
+    def mejor_reranker(self) -> float | None:
+        puntos = [self.puntuacion_reranker[r.fragmento_id] for r in self.recuperados if r.fragmento_id in self.puntuacion_reranker]
+        return max(puntos) if puntos else None
+
+    def hay_fuentes(self, umbral: float, umbral_reranker: float) -> bool:
+        """Hay fuentes si el coseno llega al umbral o, si no, el reranker supera el suyo."""
+        return self.escalon(umbral, umbral_reranker) != "nada"
+
+    def escalon(self, umbral: float, umbral_reranker: float) -> Escalon:
+        """En qué escalón se resolvió: un acierto léxico (sin vía densa), el coseno, el reranker o nada."""
+        if not self.recuperados:
+            return "nada"
+        if self.mejor_similitud >= umbral:
+            return "lexica" if self.via == "lexica" else "densa"
+        mejor = self.mejor_reranker
+        return "reranker" if mejor is not None and mejor > umbral_reranker else "nada"
 
     @property
     def mejor_similitud(self) -> float:
@@ -77,9 +112,13 @@ class BuscadorFalso:
     def __init__(self, vacio: bool = False) -> None:
         self.vacio = vacio
         self.consultas: list[str] = []
+        self.filtros: list[Filtros | None] = []
+        self.params: list[Consulta | None] = []
 
     async def buscar(self, consulta, k, filtros=None, params=None, consulta_original=None) -> ResultadoBusqueda:
         self.consultas.append(consulta)
+        self.filtros.append(filtros)
+        self.params.append(params)
         return ResultadoBusqueda([] if self.vacio else self.FRAGMENTOS[:k], None)
 
     async def indice_fuentes(self, tema_id, max_caracteres=6000) -> str:

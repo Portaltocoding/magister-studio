@@ -4,7 +4,10 @@
     magister fuentes listar
     magister ingerir <ruta, carpeta o url> --fuente <nombre> [--tema <id>]
     magister reingerir --fuente vault --carpeta ~/vault [--tema <id>]
-    magister indexar                       procesa recibidas y pendientes hasta «lista»
+    magister indexar                       procesa recibidas y pendientes hasta «lista» y recalcula el apoyo
+    magister indexar --activar v3          crea v3 (la activa sin bibliografía ni notas, ADR-0018), la activa y reindexa
+    magister indexar --reintentar          además, vuelve a indexar lo que quedó en cuarentena al indexar
+    magister indexar --en-seco [...]       dice qué haría y por qué, sin escribir nada (con --activar y --reintentar)
     magister indexar --indice v2           crea v2 (250 tokens, 25 de solape) al lado de v1, sin activarla
     magister versiones --duplicadas
     magister trocear --version <id> --solo-contar
@@ -80,19 +83,36 @@ async def principal(args: argparse.Namespace) -> None:
         resultados = await ingesta.ingerir_ruta(f.id, args.ruta, args.tema)
         _resumen(resultados)
         if not args.sin_indexar:
-            n = await ingesta.procesar_pendientes()
-            print(f"Indexadas: {n} versiones")
+            listas = await indexar_pendientes()
+            print(f"Indexadas: {len(listas)} versiones")
+            await recalcular_apoyo(listas)
     elif args.orden == "reingerir":
         f = await _fuente(args.fuente)
         print(await ingesta.reingerir(f.id, args.carpeta, args.tema))
-        await ingesta.procesar_pendientes()
+        listas = await indexar_pendientes()
+        print(f"Indexadas: {len(listas)} versiones")
+        await recalcular_apoyo(listas)
     elif args.orden == "indexar":
+        if args.en_seco:
+            if args.indice:
+                raise SystemExit("--en-seco no vale con --indice")
+            for linea in await en_seco(args.activar, args.reintentar):
+                print(linea)
+            return
         if args.indice:
             await _indice_nuevo(args.indice)
         else:
-            print(f"Indexadas: {await ingesta.procesar_pendientes()} versiones")
+            # Sin --activar, la activa: lo ya listo que no tenga sus fragmentos (por ejemplo, tras la migración que
+            # activa v3) se reindexa con ella.
+            reindexadas = await activar_config(args.activar)
+            if args.reintentar:
+                print(f"Vuelven a pendiente: {await reintentar_cuarentena()} versiones que no se pudieron indexar")
+            listas = await indexar_pendientes()
+            print(f"Indexadas: {len(listas)} versiones")
+            await recalcular_apoyo(reindexadas + listas)
         async with nueva_sesion() as s:
             print(await rf.contar(s))
+        print("Comprueba el índice: uv run python -m evals.recuperacion --estricto")
     elif args.orden == "versiones":
         await _duplicadas()
     elif args.orden == "trocear":
@@ -113,6 +133,184 @@ async def principal(args: argparse.Namespace) -> None:
         print(("Borrado: " if args.confirmar else "Borraría (añade --confirmar): ") + ", ".join(f"{k} {v}" for k, v in cuentas.items() if v))
     elif args.orden == "prompts":
         await _prompts(args.accion, args.nombre, args.version)
+
+
+async def indexar_pendientes() -> list[int]:
+    """Pasadas hasta que no quede nada recibido ni pendiente (cada pasada coge 20). Devuelve las versiones que
+    quedaron listas."""
+    from magister.fuentes import ingesta
+
+    listas: list[int] = []
+
+    async def apuntar(ids: list[int]) -> None:
+        listas.extend(ids)
+
+    while await ingesta.procesar_pendientes(apuntar):
+        pass
+    return listas
+
+
+async def reintentar_cuarentena() -> int:
+    """Devuelve a pendiente las versiones en cuarentena por un fallo al indexar (no las que no pasaron la validación:
+    esas tienen el texto mal)."""
+    from sqlalchemy import update
+
+    from magister.datos.fuentes import Version
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s, s.begin():
+        r = await s.execute(
+            update(Version)
+            .where(Version.estado == "cuarentena", Version.motivo.like("no se pudo indexar%"))
+            .values(estado="pendiente", motivo=None)
+        )
+        return r.rowcount or 0
+
+
+async def recalcular_apoyo(version_ids: list[int]) -> None:
+    """Lo mismo que hace el bucle de la API al quedar versiones listas: el apoyo (lecciones_fragmentos) de los planes
+    de sus temas."""
+    if not version_ids:
+        return
+    from magister.flujo.fuentes import recalcular_apoyo_por_versiones
+    from magister.fuentes.buscar import BuscadorHibrido
+    from magister.fuentes.embeber import embeber
+
+    if ajustes.embeddings == "local":
+        # La búsqueda no espera a e5 más de unos segundos: sin él, el apoyo saldría por palabras.
+        await asyncio.to_thread(embeber, ["calentar"], "consulta")
+    await recalcular_apoyo_por_versiones(BuscadorHibrido(), version_ids)
+    print(f"Apoyo de las lecciones recalculado ({len(version_ids)} versiones)")
+
+
+async def activar_config(nombre: str | None) -> list[int]:
+    """Crea (si no existe) la configuración `nombre` como la activa más `secciones_fuera` (ADR-0018), la activa y
+    reindexa con ella las versiones ya listas que no tengan sus fragmentos. La anterior no se edita: sus fragmentos
+    se quedan a un lado. Si ya existe (la crea la migración), solo la activa. Sin `nombre`, la activa."""
+    from sqlalchemy import select, update
+
+    from magister.datos import repositorio_fuentes as rf
+    from magister.datos.fuentes import Configuracion, Fragmento, Version
+    from magister.datos.sesion import nueva_sesion
+    from magister.fuentes import ingesta
+    from magister.fuentes.trocear import SECCIONES_FUERA
+
+    async with nueva_sesion() as s, s.begin():
+        if nombre is None:
+            activa = await rf.configuracion(s)
+            if activa is None:
+                raise SystemExit("No hay ninguna configuración del índice activa.")
+            nombre = activa.nombre
+        conf = await rf.configuracion(s, nombre)
+        if conf is None:
+            base = await rf.configuracion(s)
+            params = {**(base.params if base else {}), "secciones_fuera": SECCIONES_FUERA}
+            conf = Configuracion(nombre=nombre, params=params, activa=False)
+            s.add(conf)
+            await s.flush()
+            print(f"Configuración {nombre} creada: {params}")
+        if not conf.activa:
+            await s.execute(update(Configuracion).where(Configuracion.activa.is_(True)).values(activa=False))
+            await s.execute(update(Configuracion).where(Configuracion.id == conf.id).values(activa=True))
+            print(f"Configuración {nombre} activa")
+        con_fragmentos = select(Fragmento.version_id).where(Fragmento.config_id == conf.id)
+        listas = (await s.scalars(select(Version.id).where(Version.estado == "lista", Version.id.not_in(con_fragmentos)))).all()
+    for vid in listas:
+        await ingesta.indexar_version(vid, nombre)
+    if listas:
+        print(f"{len(listas)} versiones ya listas reindexadas con {nombre}")
+    return list(listas)
+
+
+async def en_seco(activar: str | None, reintentar: bool) -> list[str]:
+    """Qué haría `magister indexar` con estas opciones, y por qué, sin escribir nada: solo SELECT y trocear en memoria.
+    Devuelve las líneas que se imprimen."""
+    from sqlalchemy import select
+
+    from magister.datos import plan as dp
+    from magister.datos import repositorio_fuentes as rf
+    from magister.datos.fuentes import Configuracion, Documento, Fragmento, Fuente, Version
+    from magister.datos.sesion import nueva_sesion
+    from magister.fuentes import ingesta
+    from magister.fuentes.trocear import SECCIONES_FUERA, trocear
+
+    lineas = ["Modo en seco: no escribo nada en la base."]
+    async with nueva_sesion() as s:
+        activa = await rf.configuracion(s)
+        destino = await rf.configuracion(s, activar) if activar else activa
+        if destino is None and not activar:
+            return [*lineas, "No hay ninguna configuración del índice activa: no podría indexar."]
+        if destino is None:
+            params = {**(activa.params if activa else {}), "secciones_fuera": SECCIONES_FUERA}
+            nombre, config_id = activar, None
+            lineas.append(f"Crearía la configuración {activar}: la activa ({activa.nombre if activa else 'ninguna'}) "
+                          "sin bibliografía ni notas, y la activaría.")
+        else:
+            params, nombre, config_id = destino.params, destino.nombre, destino.id
+            if destino.activa:
+                lineas.append(f"La configuración {nombre} ya está activa: no cambiaría de configuración.")
+            else:
+                lineas.append(f"Activaría la configuración {nombre} (ahora está activa {activa.nombre if activa else 'ninguna'}).")
+        nombres = {c.id: c.nombre for c in (await s.scalars(select(Configuracion))).all()}
+        filas = (await s.execute(
+            select(Version.id, Version.estado, Version.motivo, Version.texto, Version.crudo_hash, Version.crudo_tipo,
+                   Version.metadatos, Documento.titulo, Fuente.tipo)
+            .join(Documento, Documento.id == Version.documento_id).join(Fuente, Fuente.id == Documento.fuente_id)
+            .where(Version.estado.in_(("recibida", "pendiente", "lista", "cuarentena"))).order_by(Version.id)
+        )).all()
+        configs_de: dict[int, set[int]] = {}
+        for vid, cid in (await s.execute(select(Fragmento.version_id, Fragmento.config_id).distinct())).all():
+            configs_de.setdefault(vid, set()).add(cid)
+        temas = {f[0]: await rf.tema_de_version(s, f[0]) for f in filas}
+        planes = await dp.planes_aceptados(s)
+
+    hara: list[tuple[int, str, str, int | None]] = []  # (versión, título, por qué, trozos)
+    ya_listas, sin_reintentar, apartadas = 0, 0, 0
+    for vid, estado, motivo, texto, crudo_hash, crudo_tipo, metadatos, titulo, tipo in filas:
+        otras = sorted(nombres.get(c, str(c)) for c in configs_de.get(vid, set()) if c != config_id)
+        if estado == "lista":
+            if config_id is not None and config_id in configs_de.get(vid, set()):
+                ya_listas += 1
+                continue
+            porque = f"tiene fragmentos de otra configuración ({', '.join(otras)})" if otras else "está lista pero sin fragmentos"
+        elif estado == "pendiente":
+            porque = "nunca indexada"
+        elif estado == "recibida":
+            porque = "recibida, sin extraer: se extraería antes"
+            try:
+                crudo = await asyncio.to_thread(ingesta.leer_crudo, crudo_hash)
+                e, _, problemas, _ = await asyncio.to_thread(ingesta._preparar, crudo, (metadatos or {}).get("nombre", "documento"), crudo_tipo)
+            except Exception as ex:  # noqa: BLE001
+                hara.append((vid, titulo, f"{porque}; no se podría extraer ({ex})", None))
+                continue
+            if problemas:
+                apartadas += 1
+                hara.append((vid, titulo, f"{porque}; se apartaría al validarla ({problemas[0].motivo})", 0))
+                continue
+            texto = e.texto
+        elif (motivo or "").startswith("no se pudo indexar") and texto is not None:
+            if not reintentar:
+                sin_reintentar += 1
+                continue
+            porque = f"en cuarentena por un fallo nuestro al indexar ({motivo[:80]})"
+        else:
+            continue  # cuarentena por el texto (casi vacío, escaneado): reindexar no lo arregla
+        trozos = len(await asyncio.to_thread(trocear, texto or "", titulo, tipo, params)) if texto else 0
+        hara.append((vid, titulo, porque, trozos))
+
+    total = sum(t or 0 for *_, t in hara)
+    lineas.append(f"Indexaría {len(hara)} versiones con {nombre}, unos {total} fragmentos en total:")
+    for vid, titulo, porque, trozos in hara:
+        lineas.append(f"  {vid}  «{titulo}»: {porque} · {trozos if trozos is not None else '?'} fragmentos")
+    lineas.append(f"No tocaría {ya_listas} versiones ya listas con {nombre}.")
+    if sin_reintentar:
+        lineas.append(f"{sin_reintentar} versiones en cuarentena por un fallo al indexar se quedan así: añade --reintentar.")
+    if apartadas:
+        lineas.append(f"{apartadas} de ellas se quedarían en cuarentena al validarlas.")
+    afectados = {temas[vid] for vid, *_ in hara}
+    n_planes = sum(1 for p, _ in planes if None in afectados or p.tema_id in afectados) if hara else 0
+    lineas.append(f"Después recalcularía el apoyo de las lecciones de {n_planes} planes aceptados.")
+    return lineas
 
 
 async def _indice_nuevo(nombre: str) -> None:
@@ -232,6 +430,9 @@ def main() -> None:
     r.add_argument("--tema", type=int)
     x = sub.add_parser("indexar")
     x.add_argument("--indice")
+    x.add_argument("--activar", metavar="NOMBRE", help="crea la configuración sin bibliografía (ADR-0018) y la activa")
+    x.add_argument("--reintentar", action="store_true", help="vuelve a indexar lo que quedó en cuarentena al indexar")
+    x.add_argument("--en-seco", action="store_true", help="dice qué haría y por qué, sin escribir nada")
     v = sub.add_parser("versiones")
     v.add_argument("--duplicadas", action="store_true")
     t = sub.add_parser("trocear")

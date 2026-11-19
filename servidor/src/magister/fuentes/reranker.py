@@ -1,20 +1,36 @@
-"""Reranker local con un cross-encoder. Apagado por defecto; se enciende por consulta.
+"""Reranker local con un cross-encoder multilingüe (mMARCO). Para reordenar, apagado por defecto; se enciende por
+consulta. Como segunda puerta de «hay fuentes», corre solo cuando el coseno no llega (ADR-0018).
 
 Recibe `texto` (sin el encabezado contextual) para no empujar hacia el sesgo de cabecera.
 """
 
+import threading
 from dataclasses import replace
-from functools import cache
 
 from magister.cerebro.contratos import Recuperado
 from magister.config import ajustes
 
+# Ahora también es la segunda puerta de «hay fuentes» (ADR-0018): se carga una vez aunque lo pidan a la vez el
+# calentamiento del arranque y la primera búsqueda.
+_modelos: dict[str, object] = {}
+_candado = threading.Lock()
 
-@cache
+
 def _modelo(nombre: str):
-    from sentence_transformers import CrossEncoder
+    if (m := _modelos.get(nombre)) is not None:
+        return m
+    with _candado:
+        if nombre not in _modelos:
+            from sentence_transformers import CrossEncoder
 
-    return CrossEncoder(nombre, device="cpu")
+            _modelos[nombre] = CrossEncoder(nombre, device="cpu")
+        return _modelos[nombre]
+
+
+def calentar() -> None:
+    """Carga el cross-encoder (unos 5 s) para que la primera pregunta no lo espere. Con embeddings falsos, nada."""
+    if ajustes.embeddings != "falso":
+        _modelo(ajustes.reranker_modelo)
 
 
 def reordenar(consulta: str, candidatos: list[Recuperado]) -> list[Recuperado]:

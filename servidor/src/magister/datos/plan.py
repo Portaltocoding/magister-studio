@@ -261,6 +261,17 @@ async def sustituir_pendientes(s: AsyncSession, plan_id: int, nuevas: list[dict]
     await s.commit()
 
 
+async def marcar_leccion_hecha(s: AsyncSession, plan_id: int, clave: str) -> int:
+    """Marca hechas todas las sesiones pendientes de una lección (la cerraste entera). No recoloca nada."""
+    r = await s.execute(
+        update(SesionFila)
+        .where(SesionFila.plan_id == plan_id, SesionFila.leccion_clave == clave, SesionFila.estado == "pendiente")
+        .values(estado="hecha")
+    )
+    await s.commit()
+    return r.rowcount or 0
+
+
 async def marcar_sesion(s: AsyncSession, sesion_id: int, estado: str) -> SesionFila | None:
     fila = await s.get(SesionFila, sesion_id)
     if fila is None:

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
+import { colorDeTema } from '../componentes/colorTema.ts'
 import { BotonLibro, guardarIndice, TituloEditable, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
 import Horario from '../componentes/Horario.tsx'
 import VideosDelPlan from '../componentes/VideosDelPlan.tsx'
@@ -48,10 +50,11 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   const [haciendoIndice, setHaciendoIndice] = useState(false)
   const indice = indiceNuevo ?? indiceGuardado
   // Qué material tiene ya cada lección (lo mismo que dice Lecciones).
-  const [material, setMaterial] = useState<Record<string, { tipos: Record<string, string> }>>({})
-  useEffect(() => {
-    if (vista) pedir<Record<string, { tipos: Record<string, string> }>>(`/api/planes/${vista.plan_id}/materiales`).then(setMaterial).catch(() => undefined)
+  const [material, setMaterial] = useState<Record<string, { tipos: Record<string, string>; en_marcha?: boolean }>>({})
+  const cargarMaterial = useCallback(() => {
+    if (vista) pedir<Record<string, { tipos: Record<string, string>; en_marcha?: boolean }>>(`/api/planes/${vista.plan_id}/materiales`).then(setMaterial).catch(() => undefined)
   }, [vista])
+  useEffect(cargarMaterial, [cargarMaterial])
   const [reajuste, setReajuste] = useState<{ cambios: string[]; avisos: string[]; texto: string; sesiones: unknown[] | null } | null>(null)
 
   const [falloCarga, setFalloCarga] = useState<string | null>(null)
@@ -64,7 +67,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
     listarPlanes()
       .then((ps) => {
         setPlanes(ps)
-        if (ps.length && tema == null) setTema(ps[0].tema_id)
+        if (ps.length && tema == null) setTema(planActivo(ps)!.tema_id)
       })
       .catch((e) => setFalloCarga(mensajeDe(e)))
   }, [tema, intento])
@@ -92,7 +95,10 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       setTema(null)
       const ps = await listarPlanes()
       setPlanes(ps)
-      if (ps.length) setTema(ps[0].tema_id)
+      if (ps.length) {
+        recordarPlan(ps[0].tema_id)
+        setTema(ps[0].tema_id)
+      }
       setAviso(`Plan «${nombre}» borrado.`)
     } catch (e) {
       setAviso(String((e as Error).message))
@@ -143,9 +149,15 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
             key={p.plan_id}
             className="tarjeta"
             aria-pressed={p.tema_id === tema}
-            onClick={() => setTema(p.tema_id)}
+            onClick={() => {
+              recordarPlan(p.tema_id) // el plan con el que estás, para toda la app
+              setTema(p.tema_id)
+            }}
           >
-            <strong>{p.tema}</strong>
+            <strong className="con-punto-tema">
+              <span className="punto-tema" style={colorDeTema(p.tema_id, planes)?.estilo} aria-hidden="true" />
+              {p.tema}
+            </strong>
             <span className="nota">
               {p.lecciones} lecciones · {num(p.total_horas)} h · acaba {fechaCorta(p.fin)}
             </span>
@@ -312,6 +324,8 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               <VideosDelPlan
                 planId={vista.plan_id}
                 preparadas={new Set(Object.keys(material).filter((c) => ['listo', 'revisar'].includes(material[c]?.tipos?.apuntes ?? '')))}
+                enMarcha={new Set(Object.keys(material).filter((c) => material[c]?.en_marcha))}
+                alAcabar={cargarMaterial}
               />
               {vista.examenes?.length > 0 && (
                 <>

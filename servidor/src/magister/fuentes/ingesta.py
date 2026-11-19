@@ -13,11 +13,11 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 
 from magister.config import ajustes
 from magister.datos import repositorio_fuentes as rf
-from magister.datos.fuentes import Documento, Fuente, Version
+from magister.datos.fuentes import Documento, Fragmento, Fuente, Version
 from magister.datos.sesion import nueva_sesion
 from magister.fuentes import duplicados as dup
 from magister.fuentes.embeber import embeber
@@ -57,10 +57,37 @@ def leer_crudo(h: str) -> bytes:
     return (carpeta_crudo() / h).read_bytes()
 
 
-async def descargar(url: str) -> tuple[bytes, str]:
-    async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": "Magister/0.3"}) as c:
+async def _vigilar(peticion: httpx.Request) -> None:
+    """Cada salto (también tras una redirección) se comprueba antes de salir: nada de direcciones internas."""
+    from magister.seguridad.politica import comprobar_url
+
+    await asyncio.to_thread(comprobar_url, str(peticion.url))
+
+
+def tipo_externo(content_type: str, url: str) -> str:
+    """Qué se ingiere de una URL que vino de la web; lo que no es página, texto ni PDF no entra."""
+    ct = content_type.split(";")[0].strip().lower()
+    if "pdf" in ct or (not ct and url.lower().split("?")[0].endswith(".pdf")):
+        return "pdf"
+    if not ct or "html" in ct or ct.endswith("/xml"):
+        return "html"
+    if ct == "text/markdown":
+        return "md"
+    if ct.startswith("text/"):
+        return "txt"
+    raise ValueError(f"no es una página ni un PDF ({ct})")
+
+
+async def descargar(url: str, externa: bool = False) -> tuple[bytes, str]:
+    """`externa`: la URL la propuso la web (el research). Se vigila cada salto y solo entra HTML, texto o PDF."""
+    ganchos = {"request": [_vigilar]} if externa else {}
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": "Magister/0.3"},
+                                 event_hooks=ganchos) as c:
         async with c.stream("GET", url) as r:
             r.raise_for_status()
+            content_type = r.headers.get("content-type", "")
+            tipo = tipo_externo(content_type, str(r.url)) if externa else (
+                "pdf" if "pdf" in content_type or url.lower().endswith(".pdf") else "html")
             trozos: list[bytes] = []
             total = 0
             async for t in r.aiter_bytes():
@@ -68,7 +95,8 @@ async def descargar(url: str) -> tuple[bytes, str]:
                 if total > MAX_DESCARGA:
                     raise ValueError("la página pasa de 20 MB")
                 trozos.append(t)
-            tipo = "pdf" if "pdf" in r.headers.get("content-type", "") or url.lower().endswith(".pdf") else "html"
+            if externa and not total:
+                raise ValueError("la página está vacía")
             return b"".join(trozos), tipo
 
 
@@ -201,7 +229,9 @@ async def reingerir(fuente_id: int, carpeta: str, tema_id: int | None = None) ->
 # Subida por la API: se guarda el crudo y se procesa en segundo plano.
 
 
-async def recibir(fuente_id: int, crudo: bytes, nombre: str, uri: str, tema_id: int | None, tipo: str | None) -> int:
+async def recibir(fuente_id: int, crudo: bytes, nombre: str, uri: str, tema_id: int | None, tipo: str | None,
+                  metadatos: dict | None = None) -> int:
+    """`metadatos` guarda de dónde vino (por ejemplo, `origen: research`); la extracción lo conserva."""
     crudo_hash = await asyncio.to_thread(guardar_crudo, crudo)
     async with nueva_sesion() as s, s.begin():
         doc = await rf.documento_o_nuevo(s, fuente_id, uri, Path(nombre).stem if "://" not in nombre else nombre, tema_id)
@@ -210,7 +240,7 @@ async def recibir(fuente_id: int, crudo: bytes, nombre: str, uri: str, tema_id: 
             crudo_hash=crudo_hash,
             crudo_tipo=tipo or tipo_de(nombre),
             estado="recibida",
-            metadatos={"nombre": nombre},
+            metadatos={**(metadatos or {}), "nombre": nombre},
         )
         s.add(v)
         await s.flush()
@@ -230,11 +260,15 @@ async def procesar_recibida(version_id: int) -> None:
     except Exception as ex:  # noqa: BLE001
         async with nueva_sesion() as s, s.begin():
             await s.execute(
-                update(Version).where(Version.id == version_id).values(estado="cuarentena", motivo=f"no se pudo extraer: {ex}")
+                update(Version).where(Version.id == version_id, Version.estado == "recibida")
+                .values(estado="cuarentena", motivo=f"no se pudo extraer: {ex}")
             )
         return
     async with nueva_sesion() as s, s.begin():
-        v = await s.get(Version, version_id)
+        # La procesan el bucle de fondo y el trabajo de incorporar: la fila se bloquea y solo la primera la toca.
+        v = await s.get(Version, version_id, with_for_update=True, populate_existing=True)
+        if v is None or v.estado != "recibida":
+            return
         fuente = await s.get(Fuente, doc.fuente_id)
         if await rf.version_con_hash(s, v.documento_id, h):
             v.estado, v.motivo = "retirada", "sin cambios"
@@ -255,10 +289,13 @@ async def procesar_recibida(version_id: int) -> None:
 
 
 async def indexar_version(version_id: int, nombre_config: str | None = None) -> int:
+    """Idempotente: la indexan el bucle de fondo de la API y la orden `magister indexar`, a veces a la vez. Sin
+    `nombre_config` solo indexa lo que sigue «pendiente»; con él (reindexar con otra configuración), sustituye los
+    fragmentos de esa configuración. Nunca deja dos copias de (versión, configuración)."""
     t0 = time.perf_counter()
     async with nueva_sesion() as s:
         v = await s.get(Version, version_id)
-        if v is None or v.texto is None:
+        if v is None or v.texto is None or (nombre_config is None and v.estado != "pendiente"):
             return 0
         doc = await s.get(Documento, v.documento_id)
         fuente = await s.get(Fuente, doc.fuente_id)
@@ -269,6 +306,11 @@ async def indexar_version(version_id: int, nombre_config: str | None = None) -> 
     trozos = await asyncio.to_thread(trocear, texto, titulo, tipo, params)
     vectores = await asyncio.to_thread(embeber, [t.texto_indexado for t in trozos], "pasaje", params) if trozos else []
     async with nueva_sesion() as s, s.begin():
+        # La fila se bloquea y se vuelve a mirar: si otro la indexó mientras troceábamos, no se repite.
+        v = await s.get(Version, version_id, with_for_update=True, populate_existing=True)
+        if v is None or (nombre_config is None and v.estado != "pendiente"):
+            return 0
+        await rf.borrar_fragmentos(s, version_id, config_id)
         await rf.insertar_fragmentos(
             s,
             [
@@ -289,6 +331,47 @@ async def indexar_version(version_id: int, nombre_config: str | None = None) -> 
             await s.execute(update(Version).where(Version.id == version_id).values(estado="lista"))
     registro.info("versión %s: %d fragmentos en %.1f s", version_id, len(trozos), time.perf_counter() - t0)
     return len(trozos)
+
+
+# Lo que se queda a medias: qué pasó, dicho en claro, y si «Reintentar» puede arreglarlo.
+
+
+def explicar_problema(estado: str, motivo: str | None, con_texto: bool, fragmentos: int) -> tuple[str, str | None]:
+    """(qué pasó, a qué estado vuelve con Reintentar; None si reintentar no lo arregla). ("", None) si no hay problema."""
+    m = motivo or ""
+    if estado == "lista" and fragmentos == 0:
+        return "Está guardado pero sin ningún trozo indexado: el tutor no lo encuentra.", "pendiente" if con_texto else None
+    if estado != "cuarentena":
+        return "", None
+    if m.startswith("no se pudo indexar") and con_texto:
+        return "Se descargó y se leyó, pero falló al trocearlo e indexarlo.", "pendiente"
+    if m.startswith("no se pudo extraer") or not con_texto:
+        return "No se pudo sacar el texto.", "recibida"
+    if "caracteres de texto" in m:
+        return "Casi no tiene texto: la página se carga con JavaScript o pide registrarse.", None
+    if "escaneado" in m:
+        return "Parece un PDF escaneado, sin texto. Sube una copia con texto.", None
+    if m.startswith("validez"):
+        return "El texto sale con muchos caracteres raros (la codificación o el PDF están mal).", None
+    return "Se apartó al leerlo.", None
+
+
+async def reintentar_version(version_id: int) -> str:
+    """Vuelve a poner una versión a medias en la tubería; el bucle de fondo la recoge. Devuelve el estado nuevo."""
+    async with nueva_sesion() as s, s.begin():
+        v = await s.get(Version, version_id, with_for_update=True)
+        if v is None:
+            raise LookupError("versión no encontrada")
+        n = await s.scalar(select(func.count()).select_from(Fragmento).where(Fragmento.version_id == version_id)) or 0
+        claro, destino = explicar_problema(v.estado, v.motivo, v.texto is not None, n)
+        if destino is None:
+            raise ValueError(f"{claro} Reintentar no lo arregla." if claro else "Este documento no tiene nada que reintentar.")
+        mas_nueva = await s.scalar(select(Version.id).where(
+            Version.documento_id == v.documento_id, Version.id > v.id, Version.estado.in_(("recibida", "pendiente", "lista"))))
+        if mas_nueva is not None:
+            raise ValueError("Este documento ya tiene una versión más nueva.")
+        v.estado, v.motivo = destino, None
+        return destino
 
 
 async def procesar_pendientes(al_quedar_lista=None) -> int:

@@ -106,6 +106,48 @@ def test_hechas_no_se_reprograman() -> None:
     assert sum(s.horas for s in c.sesiones if s.clave == "L2") == 1.5
 
 
+def test_el_dia_acaba_a_medianoche() -> None:
+    """3,5 h desde las 21:30: solo caben 2,5 h. Nada sale «a las 00:30» del mismo día ni antes de sus dependencias."""
+    from magister.plan.calendario import horas_utiles
+
+    plan = fijo("plan_ok.json", Plan)
+    noches = [3.5] * 5 + [0, 0]
+    inicios = [time(21, 30)] * 5 + [None, None]
+    assert horas_utiles(noches, inicios) == [2.5] * 5 + [0, 0]
+    c = calendarizar(plan, noches, inicios, HOY, None, {}, ReglasCalendario())
+    assert isinstance(c, Calendario)
+    for s in c.sesiones:
+        assert s.inicio is not None and s.inicio >= time(21, 30)
+        assert s.inicio.hour * 60 + s.inicio.minute + s.horas * 60 <= 24 * 60 + 1e-6
+    por_orden = sorted(c.sesiones, key=lambda s: (s.fecha, s.inicio))
+    assert [s.clave for s in por_orden] == [s.clave for s in c.sesiones]
+    assert abs(sum(s.horas for s in c.sesiones) - plan.total_horas) < 0.05
+    # Con plazo, la capacidad que cuenta es la efectiva: 5 días de 2,5 h no dan para 12 h con holgura.
+    corto = calendarizar(plan, noches, inicios, HOY, date(2026, 11, 13), {}, ReglasCalendario(holgura=0.15))
+    assert isinstance(corto, NoCabe) and corto.horas_disponibles == 12.5
+
+
+def test_lo_hecho_hoy_ocupa_su_hueco() -> None:
+    """Has estudiado 1 h de L1 hoy y recolocas: lo que queda empieza detrás (19:00), no otra vez a las 18:00."""
+    plan = fijo("plan_ok.json", Plan)
+    c = calendarizar(plan, SEMANA, INICIOS, HOY, None, {"L1": 1}, ReglasCalendario(), usado_inicial=60)
+    assert isinstance(c, Calendario)
+    primera = c.sesiones[0]
+    assert (primera.fecha, primera.inicio, primera.clave, primera.horas) == (HOY, time(19), "L1", 0.5)
+    # Si hoy ya está lleno, lo siguiente va a mañana.
+    lleno = calendarizar(plan, SEMANA, INICIOS, HOY, None, {"L1": 1.5}, ReglasCalendario(), usado_inicial=90)
+    assert isinstance(lleno, Calendario) and lleno.sesiones[0].fecha == date(2026, 11, 10)
+
+
+def test_mas_de_doce_horas_al_dia_se_recortan() -> None:
+    """El extractor dio 15 h al día: se recorta a 12 al validar, y un perfil guardado con 15 se sigue leyendo."""
+    viejo = {"tema": "topografía", "horas_por_dia": [15, 15, 15, 15, 15, 0, 0], "inicio_por_dia": ["09:00"] * 5 + [None, None]}
+    p = Perfil.model_validate(viejo)
+    assert p.horas_por_dia == [12, 12, 12, 12, 12, 0, 0]
+    assert Perfil.model_validate({"horas_por_dia": [1.5] * 7}).horas_por_dia == [1.5] * 7
+    assert Perfil.model_validate({}).horas_por_dia is None
+
+
 # Propiedades
 
 

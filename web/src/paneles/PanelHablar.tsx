@@ -120,13 +120,14 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
         cid.current = c.id
         alCambiar?.()
       }
-      control.current = new AbortController()
+      const c = new AbortController()
+      control.current = c
       let respuesta = ''
       // Empieza a hablar con la primera frase, sin esperar a la respuesta entera.
       const l = locutor.current
       l.nueva()
       l.alFrase = () => setEstado('hablando')
-      for await (const ev of enviar(cid.current, texto, control.current.signal, true, true)) {
+      for await (const ev of enviar(cid.current, texto, c.signal, true, true)) {
         if (ev.tipo === 'delta') {
           respuesta += ev.t
           l.empujar(respuesta)
@@ -135,6 +136,8 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
       }
       l.empujar(respuesta, true)
       await l.terminado()
+      // Si has pulsado «Parar», se queda quieto: no vuelve a abrir el micrófono.
+      if (c.signal.aborted) return
       setEstado('quieto')
       if (seguido && Reconocedor) escuchar()
     } catch (e) {

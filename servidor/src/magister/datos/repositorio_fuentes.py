@@ -88,6 +88,29 @@ async def documentos_de_fuente(s: AsyncSession, fuente_id: int) -> list[tuple[Do
     return salida
 
 
+async def ultimas_versiones(s: AsyncSession) -> list[dict]:
+    """Cada documento de todas las fuentes con su última versión (sin las «retirada · sin cambios») y sus fragmentos."""
+    filas = await s.execute(text(
+        "select distinct on (d.id) d.id, d.titulo, d.uri, f.id, f.nombre, v.id, v.estado, v.motivo, v.metadatos, "
+        "v.texto is not null, (select count(*) from fragmentos g where g.version_id = v.id), v.ingerida_en "
+        "from documentos d join fuentes f on f.id = d.fuente_id join versiones v on v.documento_id = d.id "
+        "where not (v.estado = 'retirada' and coalesce(v.motivo, '') = 'sin cambios') "
+        "order by d.id, v.id desc"
+    ))
+    claves = ("documento_id", "titulo", "uri", "fuente_id", "fuente", "version_id", "estado", "motivo", "metadatos",
+              "con_texto", "fragmentos", "ingerida_en")
+    return [dict(zip(claves, f, strict=True)) for f in filas.all()]
+
+
+async def version_viva_de_uri(s: AsyncSession, uri: str) -> int | None:
+    """La versión viva (recibida, pendiente o lista) más nueva de un documento con esta URI, en cualquier fuente."""
+    return await s.scalar(
+        select(Version.id).join(Documento, Documento.id == Version.documento_id)
+        .where(Documento.uri == uri, Version.estado.in_(("recibida", "pendiente", "lista")))
+        .order_by(Version.id.desc()).limit(1)
+    )
+
+
 async def retirar_version(s: AsyncSession, version_id: int, motivo: str) -> None:
     await s.execute(update(Version).where(Version.id == version_id).values(estado="retirada", motivo=motivo))
     await s.execute(update(Fragmento).where(Fragmento.version_id == version_id).values(embedding=None))
@@ -106,6 +129,21 @@ async def versiones_por_estado(s: AsyncSession, estado: str, limite: int = 20) -
 async def insertar_fragmentos(s: AsyncSession, filas: Sequence[dict]) -> None:
     for f in filas:
         s.add(Fragmento(**f))
+
+
+async def borrar_fragmentos(s: AsyncSession, version_id: int, config_id: int) -> None:
+    """Los fragmentos de una versión con una configuración: indexar otra vez los sustituye, no los duplica."""
+    from sqlalchemy import delete
+
+    await s.execute(delete(Fragmento).where(Fragmento.version_id == version_id, Fragmento.config_id == config_id))
+
+
+async def anotar_escalon(busqueda_id: int, escalon: str) -> None:
+    """En qué escalón se resolvió una búsqueda (lexica, densa, reranker o nada): lo decide quien mira los umbrales."""
+    from magister.datos.fuentes import Busqueda
+
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(update(Busqueda).where(Busqueda.id == busqueda_id).values(escalon=escalon))
 
 
 async def contar(s: AsyncSession) -> dict:

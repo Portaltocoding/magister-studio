@@ -83,6 +83,12 @@ async def marcar_sesion(sesion_id: int, cuerpo: EstadoSesion, s: AsyncSession = 
     return {"id": fila.id, "estado": fila.estado}
 
 
+@rutas.patch("/planes/{plan_id}/lecciones/{clave}/hecha")
+async def marcar_leccion(plan_id: int, clave: str, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
+    """Cerrar una lección: todas sus sesiones pendientes pasan a hechas, también las de otros días."""
+    return {"plan_id": plan_id, "clave": clave, "marcadas": await dp.marcar_leccion_hecha(s, plan_id, clave)}
+
+
 @rutas.get("/calendario")
 async def ver_calendario(
     desde: date | None = None, hasta: date | None = None, s: AsyncSession = Depends(sesion_por_peticion)

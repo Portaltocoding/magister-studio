@@ -2,9 +2,11 @@
 
 from collections import defaultdict
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from magister.config import ajustes
 from magister.datos import plan as dp
 from magister.datos import repositorio_fuentes as rf
 from magister.flujo.nodos.calendarizar import reglas_calendario
@@ -143,12 +145,16 @@ async def recalcular(s: AsyncSession, tema_id: int, desde: date) -> dict | str |
     perfil = Perfil.model_validate(fila.perfil)
     plan = await _plan_pydantic(s, fila.id)
     hechas: dict[str, float] = defaultdict(float)
+    hoy_hechas = 0.0  # lo ya estudiado el día `desde`: lo siguiente va detrás, no a la misma hora
     for x in await dp.sesiones(s, fila.id):
         if x.estado in ("hecha", "saltada"):
             hechas[x.leccion_clave] += x.horas if x.estado == "hecha" else 0
+        if x.estado == "hecha" and x.fecha == desde:
+            hoy_hechas += x.horas
     inicios = [a_hora(h) for h in (perfil.inicio_por_dia or [None] * 7)]
     resultado = calendarizar(
-        plan, perfil.horas_por_dia or [0] * 7, inicios, desde, None, dict(hechas), reglas_calendario()
+        plan, perfil.horas_por_dia or [0] * 7, inicios, desde, None, dict(hechas), reglas_calendario(),
+        usado_inicial=round(hoy_hechas * 60),
     )
     if isinstance(resultado, NoCabe):
         return resultado.mensaje()
@@ -231,7 +237,9 @@ async def proponer_reajuste(s: AsyncSession, tema_id: int, ahora) -> dict | None
     dominadas = {k for k, v in por_leccion.items() if v and all(e == "dominado" for e in v)}
     carga = {x.fecha: x.minutos / 60 for x in await prever_carga(ahora, 28)}
     inicios = [a_hora(h) for h in (perfil.inicio_por_dia or [None] * 7)]
-    nuevo, avisos = reajustar(plan, perfil.horas_por_dia or [0] * 7, inicios, ahora.date(), perfil.plazo, dict(hechas), carga,
+    # «Hoy» en tu zona, no en UTC: entre las 00:00 y la 01:00 (02:00 en verano) serían días distintos.
+    hoy = ahora.astimezone(ZoneInfo(ajustes.zona)).date()
+    nuevo, avisos = reajustar(plan, perfil.horas_por_dia or [0] * 7, inicios, hoy, perfil.plazo, dict(hechas), carga,
                               dominadas, reglas_calendario())
     if isinstance(nuevo, NoCabe):
         return {"cambios": [], "avisos": [nuevo.mensaje()], "sesiones": None, "texto": nuevo.mensaje()}

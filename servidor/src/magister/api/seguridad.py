@@ -1,4 +1,4 @@
-"""La seguridad mínima de la API: token local y tamaño máximo del cuerpo.
+"""La seguridad mínima de la API: token local, nada que venga de otra web y tamaño máximo del cuerpo.
 
 Es un middleware ASGI puro (sin BaseHTTPMiddleware) para no tocar el flujo SSE.
 No hay CORSMiddleware a propósito: con un solo origen no hace falta, y sin él el
@@ -7,6 +7,7 @@ navegador no deja a otras páginas leer las respuestas.
 
 import hmac
 import json
+import re
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -26,6 +27,16 @@ async def _responder(send: Send, codigo: int, detalle: str) -> None:
         }
     )
     await send({"type": "http.response.body", "body": cuerpo})
+
+
+ORIGENES_ESCRITORIO = {"magister://app"}
+EQUIPO_LOCAL = re.compile(r"^http://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$")
+
+
+def origen_propio(origen: str, host: str) -> bool:
+    """La propia app: servida por la API, por Vite o Caddy en este equipo (cualquier puerto) o por el escritorio."""
+    return (origen in ORIGENES_ESCRITORIO or bool(EQUIPO_LOCAL.match(origen))
+            or (bool(host) and origen in (f"http://{host}", f"https://{host}")))
 
 
 class Proteccion:
@@ -52,6 +63,17 @@ class Proteccion:
             recibido = cabeceras.get("x-magister-token", "")
             if not hmac.compare_digest(recibido.encode(), ajustes.token.encode()):
                 await _responder(send, 401, "falta el token o no es válido")
+                return
+
+        # Sin token (uvicorn en el 127.0.0.1:8000 a pelo), otra web abierta en el navegador podría lanzar contra la API
+        # un POST sin cuerpo o un GET que gasta modelo (un <img>). Con token no hace falta: esa web no puede ponerlo.
+        if not ajustes.token and ruta.startswith("/api/") and ruta not in RUTAS_LIBRES:
+            if cabeceras.get("sec-fetch-site") == "cross-site":
+                await _responder(send, 403, "petición desde otra web: no se acepta")
+                return
+            origen = cabeceras.get("origin")
+            if metodo in ("POST", "PUT", "PATCH", "DELETE") and origen is not None and not origen_propio(origen, cabeceras.get("host", "")):
+                await _responder(send, 403, "petición desde otra web: no se acepta")
                 return
 
         longitud = cabeceras.get("content-length")

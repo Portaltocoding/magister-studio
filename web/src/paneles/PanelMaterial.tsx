@@ -9,6 +9,8 @@ import {
   type ResumenPlan,
   type VistaPlan,
 } from '../api.ts'
+import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
+import { colorDeTema } from '../componentes/colorTema.ts'
 import Cuestionario, { type Respuestas } from '../componentes/Cuestionario.tsx'
 import { PREGUNTAS_MATERIAL } from '../componentes/cuestionarios.ts'
 import LectorLibro, { TextoLibro } from '../componentes/LectorLibro.tsx'
@@ -132,7 +134,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     listarPlanes()
       .then((ps) => {
         setPlanes(ps)
-        const elegido = ps.find((p) => p.tema_id === Number(temaRuta)) ?? ps[0]
+        const elegido = planActivo(ps, temaRuta ? Number(temaRuta) : null)
         if (temaRuta) window.history.replaceState(null, '', `#/${modoVista === 'video' ? 'video' : 'fichas'}`)
         if (!elegido) return setPlanes(ps)
         // La lista se enseña cuando también ha llegado el plan: si este falla, sale «Reintentar» y no una lista vacía.
@@ -366,26 +368,33 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
     <div className="bloques" ref={raiz} style={variables(acentoDe(colores, clave))}>
       <aside className="bloques-lista" aria-label="Lecciones">
         {planes.length > 1 ? (
-          <select
-            aria-label="Plan"
-            value={plan?.tema_id ?? ''}
-            onChange={(e) =>
-              verPlan(Number(e.target.value))
-                .then((v) => {
-                  setPlan(v)
-                  setClave(v.lecciones[0]?.clave ?? null)
-                })
-                .catch((err) => setError(`No he podido abrir ese plan: ${mensajeDe(err)}`))
-            }
-          >
-            {planes.map((p) => (
-              <option key={p.plan_id} value={p.tema_id}>
-                {p.tema}
-              </option>
-            ))}
-          </select>
+          <div className="selector-tema">
+            <span className="punto-tema" style={colorDeTema(plan?.tema_id, planes)?.estilo} aria-hidden="true" />
+            <select
+              aria-label="Plan"
+              value={plan?.tema_id ?? ''}
+              onChange={(e) =>
+                verPlan(Number(e.target.value))
+                  .then((v) => {
+                    recordarPlan(v.tema_id)
+                    setPlan(v)
+                    setClave(v.lecciones[0]?.clave ?? null)
+                  })
+                  .catch((err) => setError(`No he podido abrir ese plan: ${mensajeDe(err)}`))
+              }
+            >
+              {planes.map((p) => (
+                <option key={p.plan_id} value={p.tema_id}>
+                  {p.tema}
+                </option>
+              ))}
+            </select>
+          </div>
         ) : (
-          <p className="bloques-plan">{temaNombre}</p>
+          <p className="bloques-plan con-punto-tema">
+            <span className="punto-tema" style={colorDeTema(plan?.tema_id, planes)?.estilo} aria-hidden="true" />
+            {temaNombre}
+          </p>
         )}
         {(indice?.temas ?? [{ nombre: '', lecciones: plan?.lecciones.map((l) => l.clave) ?? [], trata: [] }]).map((t) => (
           <div key={t.nombre || 'todas'} className="bloques-tema">

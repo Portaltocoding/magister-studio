@@ -1,5 +1,7 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { enviarJson, listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
+import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
+import { colorDeTema } from '../componentes/colorTema.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { DetalleTecnico, mayuscula, mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import { errorLegible } from '../componentes/errores.ts'
@@ -634,8 +636,9 @@ export default function PanelVideo() {
     listarPlanes()
       .then(async (ps) => {
         setPlanes(ps)
-        if (!ps[0]) return setPlan(null)
-        const v = await verPlan(ps[0].tema_id)
+        const activo = planActivo(ps)
+        if (!activo) return setPlan(null)
+        const v = await verPlan(activo.tema_id)
         setPlan(v)
         await cargar(v)
       })
@@ -719,13 +722,15 @@ export default function PanelVideo() {
       <div className="cabecera-panel">
         <h1>Vídeo</h1>
         {planes.length > 1 && plan && (
+          <span className="selector-tema video-plan">
+          <span className="punto-tema" style={colorDeTema(plan.tema_id, planes)?.estilo} aria-hidden="true" />
           <select
-            className="video-plan"
             aria-label="Plan"
             value={plan.tema_id}
             onChange={(e) =>
               verPlan(Number(e.target.value))
                 .then(async (v) => {
+                  recordarPlan(v.tema_id)
                   setPlan(v)
                   setElegido(null)
                   setNuevo(false)
@@ -740,6 +745,7 @@ export default function PanelVideo() {
               </option>
             ))}
           </select>
+          </span>
         )}
         {!nuevo && (
           <span style={{ display: 'flex', gap: 8 }}>

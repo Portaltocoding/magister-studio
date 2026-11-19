@@ -87,6 +87,21 @@ def a_hora(texto: str | None) -> time | None:
     return datetime.strptime(texto, "%H:%M").time()
 
 
+def _capacidades(disponibilidad: list[float], inicio_por_dia: list[time | None]) -> list[int]:
+    """Minutos útiles de cada día de la semana: los que dijiste, pero el día acaba a las 24:00."""
+    salida = []
+    for i, h in enumerate(disponibilidad):
+        inicio = inicio_por_dia[i] if i < len(inicio_por_dia) else None
+        tope = 24 * 60 - (inicio.hour * 60 + inicio.minute) if inicio is not None else None
+        salida.append(min(_min(h), tope) if tope is not None else _min(h))
+    return salida
+
+
+def horas_utiles(disponibilidad: list[float], inicio_por_dia: list[time | None]) -> list[float]:
+    """Las horas que caben de verdad cada día de la semana, sin pasar de medianoche."""
+    return [_h(m) for m in _capacidades(disponibilidad, inicio_por_dia)]
+
+
 def calendarizar(
     plan: Plan,
     disponibilidad: list[float],
@@ -95,29 +110,32 @@ def calendarizar(
     plazo: date | None,
     hechas: dict[str, float],
     reglas: ReglasCalendario,
+    usado_inicial: int = 0,
 ) -> Calendario | NoCabe:
+    """`usado_inicial`: minutos de `desde` ya ocupados (lo que ya has estudiado hoy); lo siguiente empieza detrás."""
     pendientes = {
         lec.clave: max(0, _min(lec.horas) - _min(hechas.get(lec.clave, 0.0))) for lec in plan.lecciones
     }
     total = sum(pendientes.values())
+    capacidades = _capacidades(disponibilidad, inicio_por_dia)
     if plazo is not None:
-        cap = 0
+        cap = -min(usado_inicial, capacidades[desde.weekday()])
         d = desde
         while d <= plazo:
-            cap += _min(disponibilidad[d.weekday()])
+            cap += capacidades[d.weekday()]
             d += timedelta(days=1)
         necesarias = total * (1 + reglas.holgura)
         if necesarias > cap + 0.5:
-            return NoCabe(round(necesarias / 60, 2), _h(cap))
-    if sum(_min(h) for h in disponibilidad) == 0 and total > 0:
+            return NoCabe(round(necesarias / 60, 2), _h(max(cap, 0)))
+    if sum(capacidades) == 0 and total > 0:
         return NoCabe(_h(total), 0.0)
 
     sesiones: list[Sesion] = []
     dia = desde
-    usado = 0  # minutos usados en `dia`
+    usado = usado_inicial  # minutos usados en `dia`
 
     def capacidad_dia(d: date) -> int:
-        return _min(disponibilidad[d.weekday()])
+        return capacidades[d.weekday()]
 
     def siguiente_dia() -> None:
         nonlocal dia, usado
@@ -139,7 +157,7 @@ def calendarizar(
             continue
         if reglas.dia_nuevo_por_leccion and usado > 0:
             siguiente_dia()
-        if not reglas.partir_lecciones and resto <= max(_min(h) for h in disponibilidad):
+        if not reglas.partir_lecciones and resto <= max(capacidades):
             # La lección entera en un solo día, si cabe en algún día completo.
             while capacidad_dia(dia) - usado < resto:
                 siguiente_dia()

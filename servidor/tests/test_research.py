@@ -278,3 +278,55 @@ def test_reanudar_recuerda_permitidas_y_leidas() -> None:
     })
     assert set(h.permitidas) == {"https://a.example/colas", "https://b.example/mm1"}
     assert h.leidas["https://a.example/colas"].error is None and h.leidas["https://a.example/colas"].extracto == "colas"
+
+
+async def _plan_de_prueba() -> int:
+    import json
+    from pathlib import Path
+
+    from magister.datos.plan import guardar_plan
+
+    fijos = Path(__file__).parent / "fijos"
+    plan = json.loads((fijos / "Plan.json").read_text(encoding="utf-8"))
+    perfil = json.loads((fijos / "Perfil.json").read_text(encoding="utf-8"))
+    _, plan_id = await guardar_plan("teoría de colas", None, perfil, plan, [], "x", "eco")
+    return plan_id
+
+
+def _research_con_dos_propuestas() -> None:
+    eco.encolar(Consultas, [{"consultas": ["colas", "M/M/1", "utilización"]}])
+    eco.encolar(Notas, [{"notas": [
+        {"url": "https://a.example/colas", "puntos": 3, "motivo": "clara"},
+        {"url": "https://b.example/mm1", "puntos": 2, "motivo": "fórmulas"},
+    ]}])
+
+
+async def test_al_acabar_el_research_sus_propuestas_entran_solas(base) -> None:
+    from magister.research import tareas
+    from magister.trabajos import incorporar
+
+    plan_id = await _plan_de_prueba()
+    _research_con_dos_propuestas()
+    [tid] = await tareas.crear(plan_id, ["L1"])
+    await tareas.correr(tid, web=WebFalsa())
+    r = await incorporar.leer()
+    assert r is not None and r["automatica"] and r["total"] == 2 and r["estado"] == "pendiente"
+    assert (await tareas.tarea(tid))["incorporar"] is True
+
+
+async def test_sin_incorporar_solas_esperan_tu_aprobacion(base, monkeypatch) -> None:
+    from magister.config import Ajustes, ajustes
+    from magister.research import tareas
+    from magister.trabajos import incorporar
+
+    # El ajuste existe de verdad: la variable de entorno lo apaga (antes se ignoraba).
+    monkeypatch.setenv("MAGISTER_RESEARCH_INCORPORAR", "false")
+    assert Ajustes().research_incorporar is False
+    monkeypatch.setattr(ajustes, "research_incorporar", False)
+    plan_id = await _plan_de_prueba()
+    _research_con_dos_propuestas()
+    [tid] = await tareas.crear(plan_id, ["L1"])
+    await tareas.correr(tid, web=WebFalsa())
+    assert await incorporar.leer() is None
+    assert len(await tareas.propuestas()) == 2
+    assert (await tareas.tarea(tid))["incorporar"] is False

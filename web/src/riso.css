@@ -254,3 +254,13 @@ html[data-tema="riso"] .afinar-segmentos button[aria-checked="true"] { backgroun
 html[data-tema="riso"] .afinar-segmentos button + button { border-left: 0; }
 html[data-tema="riso"] .avisos-boton { border: 2px solid color-mix(in srgb, var(--rojo) 40%, #fff); background: var(--rojo-pastel); color: color-mix(in srgb, var(--rojo) 75%, var(--linea)); }
 html[data-tema="riso"] .avisos-caja { border: 2px solid var(--borde); border-radius: 22px; }
+
+/* ---- Parchís es siempre claro: con el sistema en oscuro, sus @media (prefers-color-scheme: dark) no deben aplicarse ---- */
+html[data-tema="riso"] .progreso-panel { --viz-ord-1: #86b6ef; --viz-ord-2: #3987e5; --viz-ord-3: #184f95; --viz-pista: #e4e2de; --viz-serie: #2a78d6; --viz-rejilla: #e4e2de; }
+html[data-tema="riso"] .diagrama-vivo { --dg-realce: #b9770e; --dg-mal: #c0392b; --dg-bien: #2e8b57; }
+html[data-tema="riso"] .mascota { --m-cuerpo: #111; --m-claro: #f4f2ed; --m-medio: #8d8a83; --m-pupila: #161514; }
+html[data-tema="riso"] .mascota .mascota-cuerpo { stroke: none !important; }
+html[data-tema="riso"] .voto-bien { color: #2f8a5b; border-color: #2f8a5b; }
+html[data-tema="riso"] .voto-mal { color: #c2453a; border-color: #c2453a; }
+html[data-tema="riso"] .voto-bien:hover, html[data-tema="riso"] .voto-bien.votado { background: #2f8a5b; color: #fff; }
+html[data-tema="riso"] .voto-mal:hover, html[data-tema="riso"] .voto-mal.votado { background: #c2453a; color: #fff; }

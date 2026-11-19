@@ -197,9 +197,10 @@ export function EscenaMitades({ e, dur }: { e: Mitades; dur: number }) {
     intervalos.push(objetivo < m ? [lo, m] : [m, hi])
   }
   // Los seis primeros pasos despacio, el resto de corrido.
-  const lentos = 6
+  // Con una lista corta (seis pasos o menos) todos van despacio y no hay pasos rápidos que repartir.
+  const lentos = Math.max(1, Math.min(6, pasos))
   const lento = Math.round(Math.min(26, (dur * 0.4) / lentos))
-  const rapido = Math.max(3, Math.round((dur * 0.2) / (pasos - lentos)))
+  const rapido = pasos > lentos ? Math.max(3, Math.round((dur * 0.2) / (pasos - lentos))) : lento
   const inicio = Math.round(dur * 0.22)
   const comienzo = (k: number) => inicio + Math.min(k, lentos) * lento + Math.max(0, k - lentos) * rapido
   let k = 0
@@ -273,7 +274,8 @@ export function EscenaArbol({ e, dur }: { e: Arbol; dur: number }) {
       return caja
     })
   })
-  const salto = Math.round(Math.min(60, (dur * 0.3) / niveles))
+  // Al menos 12 fotogramas por salto: cada rama se dibuja en [llegaA(i) + 8, llegaA(i + 1)], que tiene que crecer.
+  const salto = Math.max(12, Math.round(Math.min(60, (dur * 0.3) / niveles)))
   const empieza = Math.round(dur * 0.5)
   const llegaA = (i: number) => empieza + i * salto
   const nombres = (i: number) => (i === 0 ? 'raíz' : i === niveles - 1 ? 'hojas' : 'intermedio')

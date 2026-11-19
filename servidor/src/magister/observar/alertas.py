@@ -1,4 +1,5 @@
-"""Las alertas: se evalúan al arrancar la API y cada hora; escriben en `alertas` las que saltan.
+"""Las alertas: se evalúan al arrancar la API y cada hora; escriben en `alertas` las que saltan
+(una abierta por nombre, con la cifra al día) y cierran las que ya no se cumplen.
 
     uv run python -m magister.observar.alertas
 
@@ -49,17 +50,26 @@ async def evaluar() -> list[tuple[str, str]]:
 
 
 async def escribir(nombre: str, detalle: str) -> None:
+    """Una sola abierta por nombre: si ya la hay, se le pone la cifra de ahora en vez de abrir otra."""
     async with nueva_sesion() as s, s.begin():
-        ya = await s.scalar(text("select 1 from alertas where nombre = :n and not resuelta and creada > now() - interval '24 hours'"),
-                            {"n": nombre})
-        if not ya:
+        ya = await s.scalar(text("select id from alertas where nombre = :n and not resuelta order by id desc limit 1"), {"n": nombre})
+        if ya:
+            await s.execute(text("update alertas set detalle = :d where id = :i"), {"d": detalle, "i": ya})
+        else:
             await s.execute(text("insert into alertas (nombre, detalle) values (:n, :d)"), {"n": nombre, "d": detalle})
+
+
+# Las que se evalúan aquí y se cierran solas cuando dejan de cumplirse. El freno de llamadas avisa por su cuenta.
+EVALUADAS = ("errores", "latencia", "negativas", "tono")
 
 
 async def comprobar() -> list[tuple[str, str]]:
     saltan = await evaluar()
     for nombre, detalle in saltan:
         await escribir(nombre, detalle)
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(text("update alertas set resuelta = true, leida = true where not resuelta and nombre = any(:e) "
+                             "and not (nombre = any(:s))"), {"e": list(EVALUADAS), "s": [n for n, _ in saltan]})
     return saltan
 
 

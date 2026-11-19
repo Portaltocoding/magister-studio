@@ -94,6 +94,7 @@ async def crear_conversacion(
 async def borrar_conversacion(cid: int, s: AsyncSession = Depends(sesion_por_peticion)) -> None:
     if not await dc.borrar_conversacion(s, cid):
         raise HTTPException(404, "conversación no encontrada")
+    await ejecutar.borrar_hilo(cid)
 
 
 @rutas.get("/conversaciones/{cid}/mensajes")

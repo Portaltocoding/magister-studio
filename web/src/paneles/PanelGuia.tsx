@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
-import { pedir, rutaExamen } from '../api.ts'
+import { hoyIso, pedir, rutaExamen } from '../api.ts'
 import Mascota from '../Mascota.tsx'
 import type { IdModo } from '../modos.ts'
 import { irARuta } from '../componentes/Vacio.tsx'
@@ -27,7 +27,6 @@ interface Paso {
   horas?: number
 }
 
-const hoyIso = () => new Date().toISOString().slice(0, 10)
 const claveDia = () => `magister-tutor-${hoyIso()}`
 
 interface Dia {

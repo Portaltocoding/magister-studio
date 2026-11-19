@@ -4,16 +4,19 @@
                                          \\--no se puede--> aclarar -> END
 """
 
+import asyncio
+import logging
 import re
 
 from pydantic import BaseModel, Field
 
 from magister.cerebro.citas import comprobar
-from magister.cerebro.contratos import Buscador, Filtros
+from magister.cerebro.contratos import Buscador, Filtros, ResultadoBusqueda, Similitud, titulo_para_atributo
 from magister.cerebro.estructura import ErrorEstructura, estructurar
 from magister.cerebro.modelo import Turno
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
+from magister.datos import repositorio_fuentes as rf
 from magister.flujo.comun import (
     acciones_de_estudio,
     decir,
@@ -28,6 +31,7 @@ from magister.flujo.comun import (
 from magister.flujo.estado import Estado
 
 K = 5
+registro = logging.getLogger("magister.rag")
 PISTAS = re.compile(
     r"^(y|e|o|pero)\b|\b(eso|esto|ese|esa|esos|esas|aquello|lo anterior|lo mismo|el otro|la otra|"
     r"los otros|las otras|ello|él|ella|ellos|ellas|ahí|antes|lo de)\b",
@@ -86,10 +90,12 @@ def hacer_recuperar(buscador: Buscador):
             return {"recuperados": [], "busqueda_id": None}
         fase("recuperar")
         consulta = estado.get("consulta") or estado.get("mensaje", "")
-        r = await buscador.buscar(
-            consulta, K, Filtros(tema_id=estado.get("tema_id")), None, consulta_original=estado.get("mensaje")
-        )
-        hay = bool(r.recuperados) and r.mejor_similitud >= ajustes.umbral_fuentes
+        tema_id = estado.get("tema_id")
+        # Acotar y ampliar: con tema, primero sus fuentes (y las que no tienen tema); solo si ahí no hay nada, toda la
+        # biblioteca. Sin tema, toda la biblioteca de una vez.
+        r, hay = await _buscar_y_decidir(buscador, consulta, Filtros(tema_id=tema_id), estado.get("mensaje"))
+        if not hay and tema_id is not None:
+            r, hay = await _buscar_y_decidir(buscador, consulta, Filtros(), estado.get("mensaje"))
         return {
             "recuperados": [
                 {"id": x.fragmento_id, "texto": x.texto, "titulo": x.documento_titulo, "tipo": x.fuente_tipo, "uri": x.uri}
@@ -103,6 +109,18 @@ def hacer_recuperar(buscador: Buscador):
     return recuperar
 
 
+async def _buscar_y_decidir(buscador: Buscador, consulta: str, filtros: Filtros, original: str | None) -> tuple[ResultadoBusqueda, bool]:
+    r = await buscador.buscar(consulta, K, filtros, None, consulta_original=original)
+    # El coseno o, si no llega (pregunta en español, fuente en inglés), el reranker (ADR-0018).
+    escalon = r.escalon(ajustes.umbral_fuentes, ajustes.umbral_reranker)
+    if r.busqueda_id is not None:
+        try:
+            await rf.anotar_escalon(r.busqueda_id, escalon)
+        except Exception:  # noqa: BLE001 la traza nunca rompe la respuesta
+            registro.warning("no se pudo anotar el escalón de la búsqueda %s", r.busqueda_id, exc_info=True)
+    return r, escalon != "nada"
+
+
 def _es_externo(x: dict) -> bool:
     # Una URL guardada en una fuente que no es «web» sigue siendo contenido de la web.
     return x["tipo"] == "web" or (x.get("uri") or "").startswith(("http://", "https://"))
@@ -114,12 +132,22 @@ def _bloque(recuperados: list[dict]) -> str:
     partes = []
     for x in recuperados:
         texto = marcar_externo(x["texto"], x["id"], "web") if _es_externo(x) else x["texto"]
-        partes.append(f'<fragmento id="{x["id"]}" fuente="{x["titulo"]} ({x["tipo"]})">\n{texto}\n</fragmento>')
+        partes.append(f'<fragmento id="{x["id"]}" fuente="{titulo_para_atributo(x["titulo"])} ({x["tipo"]})">\n{texto}\n</fragmento>')
     aviso = AVISO + "\n\n" if any(_es_externo(x) for x in recuperados) else ""
     return aviso + "\n\n".join(partes)
 
 
-async def responder(estado: Estado) -> dict:
+def hacer_responder(buscador: Buscador | None):
+    """El buscador ofrece `similitud_frases` (e5 ya cargado) para comprobar citas entre idiomas; sin ella, por palabras."""
+    similitud: Similitud | None = getattr(buscador, "similitud_frases", None)
+
+    async def responder(estado: Estado) -> dict:
+        return await _responder(estado, similitud)
+
+    return responder
+
+
+async def _responder(estado: Estado, similitud: Similitud | None) -> dict:
     fase("responder")
     historial = historial_reciente(estado)
     recuperados = estado.get("recuperados", [])
@@ -133,7 +161,8 @@ async def responder(estado: Estado) -> dict:
         return {"citas": []}
     sistema = await sistema_de_estudio(cargar("responder").texto, estado) + "\n\n<fragmentos>\n" + _bloque(recuperados) + "\n</fragmentos>"
     texto = await hablar(sistema, historial, tarea)
-    citas =[c.a_dict() for c in comprobar(texto, {x["id"]: x["texto"] for x in recuperados})]
+    # Con similitud, comprobar embebe frases (CPU): en un hilo para no parar el bucle.
+    citas = [c.a_dict() for c in await asyncio.to_thread(comprobar, texto, {x["id"]: x["texto"] for x in recuperados}, similitud)]
     escribir(citas=citas, busqueda_id=estado.get("busqueda_id"), sin_fuentes=False)
     await acciones_de_estudio(estado, sin_fuentes=False)
     return {"citas": citas}

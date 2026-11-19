@@ -6,12 +6,42 @@ configuración del índice.
 """
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from magister.fuentes.embeber import contar_tokens
 
 SEPARADORES = ["\n\n", "\n", ". ", "; ", ", ", " "]
 ENCABEZADO = re.compile(r"^(#{1,6})\s+(.+)$", re.M)
+
+# Secciones que no son contenido (bibliografía, notas, cómo citar, avisos del editor), ya normalizadas. En los textos
+# web reales eran el 39 % de los trozos y salían las primeras (ADR-0018). Lista cerrada: la configuración del índice
+# guarda la suya en `secciones_fuera`, así una configuración siempre trocea igual aunque esta lista cambie.
+SECCIONES_FUERA = [
+    # inglés
+    "references", "reference list", "bibliography", "select bibliography", "notes", "footnotes", "endnotes",
+    "notes and references", "references and notes", "works cited", "literature cited", "further reading",
+    "external links", "see also", "related entries", "cite this article", "cite this chapter",
+    "how to cite this entry", "download citation", "copyright information", "rights and permissions",
+    "academic tools", "other internet resources", "about this article", "about this chapter", "publishers note",
+    "additional information", "editor information", "editors and affiliations", "authors and affiliations",
+    "author information", "similar content being viewed by others", "acknowledgements", "acknowledgments",
+    # español
+    "referencias", "referencias bibliograficas", "bibliografia", "bibliografia seleccionada", "notas",
+    "notas al pie", "notas y referencias", "obras citadas", "lecturas recomendadas", "lecturas adicionales",
+    "otras lecturas", "enlaces externos", "vease tambien", "como citar", "como citar este articulo",
+    "citar este articulo", "agradecimientos",
+]
+_NUMERACION = re.compile(r"^(?:\d+(?:\.\d+)*\.?|[ivxlc]+[.)]|[a-z][.)])\s+")
+
+
+def normalizar_encabezado(t: str) -> str:
+    """«2.1 Bibliografía:» → «bibliografia»: sin tildes, sin mayúsculas, sin numeración delante ni signos."""
+    t = "".join(c for c in unicodedata.normalize("NFKD", t.lower()) if not unicodedata.combining(c))
+    t = re.sub(r"['’`]", "", t)
+    t = re.sub(r"[^\w\s.)]", " ", t).strip()
+    t = _NUMERACION.sub("", t)
+    return " ".join(re.sub(r"[^\w\s]", " ", t).split())
 
 
 @dataclass
@@ -98,14 +128,28 @@ def _recortar(texto: str, a: int, b: int) -> tuple[int, int]:
 
 def trocear(texto: str, titulo: str, fuente_tipo: str, params: dict) -> list[Trozo]:
     maximo = int(params.get("tokens", 400))
-    solape = int(params.get("solape", 50))
     modelo = params.get("modelo")
-    contextual = params.get("encabezado_contextual", True)
-    trozos: list[Trozo] = []
     if fuente_tipo == "vault" and params.get("vault_por_parrafos", True) and contar_tokens(texto, modelo) <= maximo:
         rangos = [(0, len(texto), [])]
     else:
         rangos = _secciones(texto)
+    # Tus notas del vault no se filtran: un «## Notas» tuyo es contenido.
+    fuera = {normalizar_encabezado(x) for x in params.get("secciones_fuera") or []} if fuente_tipo != "vault" else set()
+    # Fuera si cualquier encabezado de la ruta lo está: «References > Citations» también es bibliografía.
+    utiles = [r for r in rangos if not any(normalizar_encabezado(h) in fuera for h in r[2])]
+    trozos = _trocear_rangos(texto, titulo, fuente_tipo, params, utiles)
+    if not trozos and len(utiles) < len(rangos):
+        # Un documento que solo tiene secciones de esas no se queda sin fragmentos.
+        trozos = _trocear_rangos(texto, titulo, fuente_tipo, params, rangos)
+    return trozos
+
+
+def _trocear_rangos(texto: str, titulo: str, fuente_tipo: str, params: dict, rangos: list[tuple[int, int, list[str]]]) -> list[Trozo]:
+    maximo = int(params.get("tokens", 400))
+    solape = int(params.get("solape", 50))
+    modelo = params.get("modelo")
+    contextual = params.get("encabezado_contextual", True)
+    trozos: list[Trozo] = []
     for ini, fin, ruta in rangos:
         if fuente_tipo == "vault" and params.get("vault_por_parrafos", True) and contar_tokens(texto[ini:fin], modelo) > maximo:
             tramos = []

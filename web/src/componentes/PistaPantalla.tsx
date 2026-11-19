@@ -8,7 +8,7 @@ export const PISTAS: Record<string, string> = {
   hoy: 'Aquí empieza cada día: lo que te toca repasar y la lección de hoy. Si no sabes por dónde seguir, vuelve aquí.',
   libre: 'Pregunta lo que quieras, como a un profesor. Si escribes «hazme un plan de…», te monta un plan de estudio con su calendario.',
   roadmap: 'Tu plan: las lecciones en orden, cuánto llevas y qué vídeos te propongo. Si te atrasas, «Me he atrasado» lo recoloca.',
-  calendario: 'Cuándo toca cada sesión de estudio. Si un día no puedes, muévela y el resto se recoloca.',
+  calendario: 'Cuándo toca cada sesión de estudio. Si un día no puedes, en Roadmap pulsa «Me he atrasado» y el resto se recoloca.',
   temas: 'Lo que estudias y de dónde sale: tus PDF, apuntes y webs. De aquí sacan los apuntes sus explicaciones y sus citas.',
   fichas: 'Los apuntes y las fichas de cada lección. «Estudiar» te lleva idea a idea; lo demás (rehacer, el PDF) es opcional.',
   foco: 'Una lección idea a idea, sin distracciones. Cuando acabes una, te pregunta para ver si se ha quedado.',

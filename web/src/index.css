@@ -211,7 +211,7 @@ h2 {
 /* v0.3: citas y fuentes */
 .marca-cita { font: inherit; font-size: 0.72rem; vertical-align: super; padding: 0 4px; margin: 0 1px; border: 1px solid var(--borde); border-radius: 4px; background: var(--fondo); color: var(--texto); cursor: pointer; }
 .cita-dudosa { border-color: #c08a2e; color: #c08a2e; }
-.panel-cita { position: fixed; right: 0; top: 0; bottom: 0; width: min(440px, calc(92vw / var(--zoom-ui, 1))); background: var(--fondo); border-left: 1px solid var(--borde); padding: 16px; overflow-y: auto; z-index: 10; box-shadow: -6px 0 18px rgba(0, 0, 0, 0.12); text-align: left; }
+.panel-cita { position: fixed; right: 0; top: 0; bottom: 0; width: min(440px, calc(92vw / var(--zoom-ui, 1))); background: var(--fondo); border-left: 1px solid var(--borde); padding: 16px; overflow-y: auto; z-index: 50; box-shadow: -6px 0 18px rgba(0, 0, 0, 0.12); text-align: left; }
 .texto-fragmento { white-space: pre-wrap; line-height: 1.55; font-size: 0.92rem; }
 .contexto { color: var(--suave); }
 .fragmento-citado { background: var(--panel); }
@@ -503,6 +503,51 @@ body { overflow: hidden; }
 .fondo-plan:hover { opacity: 0.95; outline: 1px solid var(--acento); }
 .item-plan { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .item-plan label { flex: 1; min-width: 0; }
+
+/* ===== Cada tema, su color (colorTema.ts pone --tema-color y --tema-fondo en el style) =====
+   El color acompaña, no sustituye: el nombre del tema va siempre escrito al lado. */
+.punto-tema {
+  display: inline-block; width: 0.6em; height: 0.6em; border-radius: 50%; flex: 0 0 auto; margin-right: 0.4em;
+  background: var(--tema-color, currentColor); vertical-align: 0.05em;
+}
+.tema-etiqueta { display: inline-flex; align-items: center; font-weight: 600; color: var(--texto); overflow-wrap: anywhere; }
+.leyenda-temas { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; max-width: 100%; }
+.chip-tema {
+  font: inherit; font-size: 0.8rem; line-height: 1.3; display: inline-flex; align-items: center; max-width: 100%; padding: 4px 11px;
+  border-radius: 999px; border: 1px solid var(--tema-color); background: var(--tema-fondo); color: var(--texto); cursor: pointer;
+  text-align: left; overflow-wrap: anywhere;
+}
+.chip-tema[aria-pressed="false"] { background: transparent; border-style: dashed; border-color: var(--borde); color: var(--suave); text-decoration: line-through; }
+.chip-tema[aria-pressed="false"] .punto-tema { background: transparent; box-shadow: inset 0 0 0 1.5px var(--tema-color); }
+.chip-tema[aria-disabled="true"] { cursor: default; }
+.chip-tema:focus-visible { outline: 2px solid var(--tema-color); outline-offset: 2px; }
+/* En la celda: el nombre corto del tema y debajo sus sesiones, con su franja y su fondo suave. */
+.cal-grupo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cal-grupo-nombre {
+  display: block; font-size: 0.64rem; font-weight: 650; color: var(--suave); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; margin-top: 2px;
+}
+.cal-grupo-nombre::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: 0.08em;
+  background: var(--tema-color);
+}
+.fondo-plan.con-tema {
+  opacity: 1; border: 0; border-left: 3px solid var(--tema-color); border-radius: 2px 5px 5px 2px; background: var(--tema-fondo);
+  color: var(--texto);
+}
+.fondo-plan.con-tema:hover { outline-color: var(--tema-color); }
+.fondo-plan.con-tema.pastilla-hecha { opacity: 0.5; }
+.lista-dia .item-plan.con-tema { opacity: 1; border-left: 3px solid var(--tema-color); background: var(--tema-fondo); }
+.dia-tema + .dia-tema { margin-top: 10px; }
+.dia-tema-nombre { margin: 8px 0 6px; font-size: 0.85rem; font-weight: 400; }
+/* Junto a un selector o un título de plan (Roadmap, Lecciones, Vídeo, Progreso, Examen, Hoy). */
+.con-punto-tema { display: inline-flex; align-items: center; gap: 0; max-width: 100%; }
+.tarjeta .con-punto-tema { overflow-wrap: anywhere; }
+.selector-tema { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.selector-tema select { min-width: 0; flex: 1 1 auto; }
+.bloques-lista .selector-tema { margin-bottom: 12px; }
+.bloques-lista .selector-tema select { margin-bottom: 0; }
+.tu-dia-tema { font-size: 0.78rem; font-weight: 600; color: var(--suave); white-space: nowrap; }
 
 
 /* ===== Revisión: contraste y movimiento ===== */

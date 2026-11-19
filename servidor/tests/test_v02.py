@@ -109,3 +109,30 @@ async def test_ahora_no_descarta_el_plan_propuesto(cliente) -> None:
 async def test_tema_sin_plan_da_404(cliente) -> None:
     t = (await cliente.post("/api/temas", json={"nombre": "Redes"})).json()
     assert (await cliente.get(f"/api/temas/{t['id']}/plan")).status_code == 404
+
+
+def plan_partido() -> dict:
+    lec = lambda clave, deps: {"clave": clave, "titulo": f"Lección {clave}", "objetivos": ["Explicar algo"],  # noqa: E731
+                               "conceptos": [{"id": f"c-{clave.lower()}", "nombre": clave}], "horas": 1.0, "depende_de": deps}
+    return {"razonamiento": "x", "lecciones": [lec("L1", []), lec("L2", ["L1"])]}
+
+
+async def test_cerrar_una_leccion_partida_marca_todas_sus_sesiones(cliente) -> None:
+    """L1 va partida en dos días: al cerrarla en el foco se marcan las dos y L2 no se toca."""
+    from magister.datos import plan as dp
+
+    sesiones = [{"clave": "L1", "fecha": "2026-11-18", "inicio": "18:00", "horas": 0.5},
+                {"clave": "L1", "fecha": "2026-11-19", "inicio": "18:00", "horas": 0.5},
+                {"clave": "L2", "fecha": "2026-11-20", "inicio": "18:00", "horas": 1.0}]
+    tema_id, plan_id = await dp.guardar_plan("Topografía", None, {"horas_por_dia": [0.5] * 7}, plan_partido(), sesiones, None, None)
+    vista = (await cliente.get(f"/api/temas/{tema_id}/plan")).json()
+    ids = [x["id"] for s in vista["semanas"] for d in s["dias"] for x in d["sesiones"]]
+
+    r = await cliente.patch(f"/api/planes/{plan_id}/lecciones/L1/hecha")
+    assert r.status_code == 200 and r.json()["marcadas"] == 2
+    vista = (await cliente.get(f"/api/temas/{tema_id}/plan")).json()
+    estados = {x["id"]: x["estado"] for s in vista["semanas"] for d in s["dias"] for x in d["sesiones"]}
+    assert [estados[i] for i in ids] == ["hecha", "hecha", "pendiente"]
+    assert next(lec for lec in vista["lecciones"] if lec["clave"] == "L1")["estado"] == "hecha"
+    # Otra vez: no hay nada pendiente que marcar.
+    assert (await cliente.patch(f"/api/planes/{plan_id}/lecciones/L1/hecha")).json()["marcadas"] == 0

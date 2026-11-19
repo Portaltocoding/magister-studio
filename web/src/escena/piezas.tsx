@@ -3,15 +3,24 @@ import type { CSSProperties, ReactNode } from 'react'
 import { interpolate, useCurrentFrame } from 'remotion'
 import { C, F, aparecer, rampa } from './estilo.ts'
 
-// «Concepto · tesis», arriba a la izquierda. El concepto en blanco, la tesis en gris.
-export function Titulo({ concepto, tesis }: { concepto: string; tesis: string }) {
+// «Concepto · tesis», arriba a la izquierda. El concepto en blanco, la tesis en gris. Si es muy largo, se corta con «…»
+// antes del borde. `entraConcepto` = el concepto aparece (no si sigue el del tramo anterior); las opacidades, las del
+// fundido cruzado entre tramos.
+export function Titulo({
+  concepto, tesis, entraConcepto = true, opacidad = 1, opacidadConcepto = opacidad,
+}: { concepto: string; tesis: string; entraConcepto?: boolean; opacidad?: number; opacidadConcepto?: number }) {
   const frame = useCurrentFrame()
-  const a = aparecer(frame, 0, 10)
+  const a = entraConcepto ? aparecer(frame, 0, 10) : 1
   const b = aparecer(frame, 6, 12)
   return (
-    <div style={{ position: 'absolute', left: 76, top: 38, fontFamily: F.serif, fontSize: 36, letterSpacing: -0.3, whiteSpace: 'nowrap' }}>
-      <span style={{ color: C.texto, opacity: a }}>{concepto}</span>
-      <span style={{ color: C.gris, opacity: b }}> · {tesis}</span>
+    <div
+      style={{
+        position: 'absolute', left: 76, top: 38, maxWidth: 1128, overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: F.serif, fontSize: 36,
+        letterSpacing: -0.3, whiteSpace: 'nowrap', color: `color-mix(in srgb, ${C.gris} ${Math.round(b * opacidad * 100)}%, transparent)`,
+      }}
+    >
+      <span style={{ color: C.texto, opacity: a * opacidadConcepto }}>{concepto}</span>
+      <span style={{ color: C.gris, opacity: b * opacidad }}> · {tesis}</span>
     </div>
   )
 }
@@ -94,7 +103,7 @@ function pintar(linea: string): ReactNode[] {
 }
 
 // El código se escribe letra a letra entre `desde` y `hasta` (en fotogramas); las líneas resaltadas llevan marco ámbar
-// y el resto se atenúa cuando hay resaltado.
+// y el resto se atenúa cuando hay resaltado. `resaltar` cuenta desde 1, como los números que se ven (y como el servidor).
 export function Codigo({ lineas, resaltar = [], desde = 0, hasta = 0, tamano = 16 }: { lineas: string[]; resaltar?: number[]; desde?: number; hasta?: number; tamano?: number }) {
   const frame = useCurrentFrame()
   const total = lineas.reduce((n, l) => n + l.length + 1, 0)
@@ -106,7 +115,7 @@ export function Codigo({ lineas, resaltar = [], desde = 0, hasta = 0, tamano = 1
     <div style={{ fontFamily: F.mono, fontSize: tamano, lineHeight: 1.65, color: C.texto }}>
       {lineas.map((l, i) => {
         const quedan = Math.max(0, Math.min(l.length, visibles - empieza[i]))
-        const marcada = resaltar.includes(i)
+        const marcada = resaltar.includes(i + 1)
         const op = resaltar.length ? interpolate(foco, [0, 1], [1, marcada ? 1 : 0.32]) : 1
         return (
           <div key={i} style={{ display: 'flex', gap: 14, opacity: op, position: 'relative' }}>

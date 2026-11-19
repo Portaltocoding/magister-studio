@@ -54,6 +54,12 @@ class Ajustes(BaseSettings):
     umbral_apoyo: float = 0.85  # similitud densa mínima para contar un fragmento como apoyo (medido: lo ajeno da 0,78-0,81)
     min_apoyo: int = 2  # fragmentos por encima del umbral para no estar «sin material»
     umbral_fuentes: float = 0.85  # por debajo, la búsqueda no cuenta como «hay fuentes» (medido con e5-small)
+    # Segunda puerta (ADR-0018): si el coseno no llega, el reranker puntúa los recuperados y hay fuentes si el mejor
+    # pasa de esto. Medido con preguntas en español y fuentes en inglés: lo que contestan da 3,7 a 8,0; lo ajeno, -2,8 a
+    # -6,5, y las 29 lecciones de tus planes (de otro tema) contra esos textos, -0,3 a -6,0.
+    umbral_reranker: float = 1.5
+    # Una cita sin palabras en común con el fragmento (otro idioma) vale si la similitud de e5 llega a esto (ADR-0018).
+    umbral_cita_semantica: float = 0.85
     procesar_fondo: bool = True  # la API procesa las versiones recibidas y pendientes en segundo plano
 
     # Material (Parte IV)
@@ -107,6 +113,9 @@ class Ajustes(BaseSettings):
     research_llamadas: int = 8
     research_propuestas: int = 5
     research_segundos: int = 180
+    # Al acabar una tarea de research, sus propuestas entran solas en tus fuentes (trabajo «incorporar», sin modelo,
+    # ADR-0019). Con false esperan tu aprobación, como antes.
+    research_incorporar: bool = True
     # Researcher (el agente mejorado): novedad, juez, cobertura y coste
     research_novedad: float = 0.9  # similitud coseno >= esto: la fuente repite una ya propuesta (redundante)
     research_juez_min: float = 2.0  # media de la rúbrica (0-3) por debajo de la cual no se propone

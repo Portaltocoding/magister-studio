@@ -282,8 +282,14 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .grupos-modos .pronto { font-size: 0.68rem; }
 
 /* ===== Animaciones de espera: Rubik, Hanói, ordenar, Fourier y Lissajous ===== */
-.pensando { display: inline-flex; align-items: center; gap: 14px; color: var(--suave); }
-.pensando-texto { font-size: 0.92rem; }
+/* Flotan: sin caja ni fondo, el dibujo a la izquierda y el texto a su derecha, a la altura del centro del dibujo.
+   El texto nunca baja debajo: si no cabe, se parte en líneas dentro de su columna. */
+.pensando { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 14px; color: var(--suave); background: none; max-width: 100%; }
+.pensando-texto { font-size: 0.92rem; line-height: 1.35; min-width: 0; text-align: left; }
+.pensando-anim { flex: none; }
+/* Donde va metida, lo que la envuelve tampoco pone caja mientras solo espera. */
+.burbuja.burbuja-esperando { background: none; border: 0; box-shadow: none; padding-left: 2px; padding-right: 0; }
+.progreso:has(> .pensando) { border: 0; background: none; padding-left: 0; padding-right: 0; }
 .pensando-anim {
   display: inline-grid; place-items: center; min-width: 64px; min-height: 56px;
   /* Discretas: gris suave, sin color de acento. */
@@ -780,6 +786,12 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .biblioteca-enlaces { width: 100%; box-sizing: border-box; font: inherit; font-family: var(--mono, ui-monospace, monospace); font-size: 0.9rem; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 10px 0; resize: vertical; }
 .biblioteca-opciones { gap: 14px; align-items: center; flex-wrap: wrap; }
 .biblioteca-opciones select { font: inherit; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 8px; padding: 4px 8px; }
+/* Arriba de la Biblioteca, cómo están tus fuentes; y meter de una vez lo que propuso el research. */
+.biblioteca-estado, .biblioteca section.biblioteca-estado { margin: 8px 0 14px; padding: 10px 14px; border: 1px solid var(--borde); border-radius: 12px; background: var(--tarjeta); }
+.biblioteca-estado > .nota:first-child { margin-top: 0; }
+.biblioteca-incorporar { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; }
+.biblioteca-incorporar [role="status"] { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.biblioteca-incorporar summary { cursor: pointer; color: var(--suave); font-size: 0.9rem; }
 
 /* Desde Estudio libre, el camino al plan. */
 .libre-a-plan {
@@ -832,3 +844,10 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .videos-plan-lista > li > span { display: flex; flex-direction: column; min-width: 0; }
 .videos-plan-lista small { color: var(--suave, inherit); opacity: 0.8; }
 .videos-plan-confirmar { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
+.videos-plan-confirmar p { margin: 0; }
+.videos-plan-lista small.videos-plan-cuota { opacity: 1; font-weight: 600; margin-bottom: -4px; }
+/* Cómo va el trabajo de la fila, y el porqué si ha fallado. */
+.videos-plan-lista small.videos-plan-estado { opacity: 1; color: var(--texto); font-weight: 600; max-width: 16em; text-align: right; }
+.videos-plan-lista > li > .videos-plan-accion { flex-direction: row; align-items: center; gap: 8px; }
+.videos-plan-fallo { grid-column: 1 / -1; }
+.videos-plan-fallo p { margin: 0; }

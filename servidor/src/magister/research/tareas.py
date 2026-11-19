@@ -1,7 +1,7 @@
 """Las tareas de research: una por lección, en segundo plano, de dos en dos.
 
 Cada tarea deja su fila en `tareas_research` con la trayectoria; sus propuestas van a
-`propuestas` y esperan tu aprobación. Al arrancar la API, las `en_curso` pasan a `cortada`.
+`propuestas` y, con MAGISTER_RESEARCH_INCORPORAR, entran solas (si no, esperan tu aprobación). Al arrancar la API, las `en_curso` pasan a `cortada`.
 """
 
 import asyncio
@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
+from magister.config import ajustes
 from magister.datos import plan as dp
 from magister.datos.fuentes import Propuesta, TareaResearch
 from magister.datos.modelos import Tema
@@ -102,7 +103,23 @@ async def correr(tarea_id: int, web: Web | None = None, previo: dict | None = No
         motivo_fin=r.get("motivo_fin"),
         acabada_en=datetime.now(timezone.utc),
     )
+    await incorporar_solas(tarea_id, plan_id, clave)
     return r
+
+
+async def incorporar_solas(tarea_id: int, plan_id: int, clave: str) -> int | None:
+    """Con MAGISTER_RESEARCH_INCORPORAR (por defecto, sí), lo que propone la tarea entra solo en tus fuentes: se encola
+    el trabajo «incorporar», sin modelo. El juez del research ya filtró y el texto entra marcado como web (no confiable)."""
+    if not ajustes.research_incorporar:
+        return None
+    try:
+        from magister.trabajos import incorporar
+
+        tid, _ = await incorporar.encolar(plan_id, clave, tarea_id, automatica=True)
+        return tid
+    except Exception:  # noqa: BLE001 si no se encola, las propuestas siguen ahí para aprobarlas a mano
+        registro.exception("no se pudieron encolar las propuestas de la tarea %s", tarea_id)
+        return None
 
 
 async def crear(plan_id: int, claves: list[str], sistema: str = "fijo") -> list[int]:
@@ -153,6 +170,7 @@ async def tarea(tarea_id: int) -> dict | None:
         "id": t.id, "plan_id": t.plan_id, "leccion_clave": t.leccion_clave, "sistema": t.sistema, "estado": t.estado,
         "pasos": t.pasos, "llamadas_modelo": t.llamadas_modelo, "motivo_fin": t.motivo_fin,
         "paso_actual": (t.trayectoria or [])[-1] if t.trayectoria else None,
+        "incorporar": ajustes.research_incorporar,
     }
 
 

@@ -34,6 +34,153 @@ def test_subtitulos_srt() -> None:
     assert "1\n00:00:00,000 --> 00:00:01,250\nHola.\n" in srt and "2\n01:01:01,500 --> 01:01:02,000\nAdiós.\n" in srt
 
 
+def test_las_escenas_se_encadenan_en_un_solo_wav_y_se_mide_cada_una(tmp_path) -> None:
+    rutas = []
+    for i, s in enumerate((1.37, 0.5, 2.013)):
+        rutas.append(tmp_path / f"e{i}.wav")
+        rutas[-1].write_bytes(_wav(s))
+    duraciones = video._encadenar_wav(rutas, tmp_path / "voz.wav")
+    assert duraciones == pytest.approx([1.37, 0.5, 2.013], abs=1e-4)
+    assert video.duracion_wav((tmp_path / "voz.wav").read_bytes()) == pytest.approx(sum(duraciones), abs=1e-9)
+    (tmp_path / "otra.wav").write_bytes(_wav(0.2, hz=16000))
+    with pytest.raises(video.ErrorVideo):
+        video._encadenar_wav([rutas[0], tmp_path / "otra.wav"], tmp_path / "mal.wav")
+
+
+def test_los_subtitulos_se_desplazan_por_lo_que_dura_cada_escena() -> None:
+    subs = video._colocar_subtitulos(
+        [([(0.0, 1.0), (1.25, 2.0)], ["A.", "B."]), ([(0.0, 0.5)], ["C."]), ([(0.1, 0.9)], ["D."])],
+        [2.7, 1.2, 1.6],
+    )
+    assert [t for _, _, t in subs] == ["A.", "B.", "C.", "D."]
+    assert subs[2][:2] == pytest.approx((2.7, 3.2)) and subs[3][:2] == pytest.approx((4.0, 4.8))
+    with pytest.raises(ValueError):
+        video._colocar_subtitulos([([(0.0, 1.0)], ["A."])], [1.0, 2.0])
+
+
+def test_lista_de_imagenes_con_su_duracion(tmp_path) -> None:
+    lista = video._lista_imagenes([tmp_path / "a.png", tmp_path / "b.png"], [1.5, 2.25])
+    assert lista.splitlines() == [
+        "ffconcat version 1.0", "file 'a.png'", "duration 1.500000", "file 'b.png'", "duration 2.250000", "file 'b.png'",
+    ]
+    with pytest.raises(video.ErrorVideo):
+        video._lista_imagenes([tmp_path / "a.png"], [1.0, 2.0])
+
+
+def test_una_sola_codificacion_con_imagenes_audio_y_subtitulos(tmp_path) -> None:
+    orden = video._orden_montaje(tmp_path / "l.txt", tmp_path / "v.wav", tmp_path / "s.srt", tmp_path / "o.mp4", 12.3456, "L1")
+    assert orden[:3] == ["-f", "concat", "-safe"] and orden[-1] == str(tmp_path / "o.mp4")
+    assert "copy" not in orden  # nada de unir trozos ya codificados
+    assert [orden[i + 1] for i, x in enumerate(orden) if x == "-map"] == ["0:v", "1:a", "2:s"]
+    assert [orden[i + 1] for i, x in enumerate(orden) if x == "-i"] == [str(tmp_path / n) for n in ("l.txt", "v.wav", "s.srt")]
+    assert "libx264" in orden and "aac" in orden and "mov_text" in orden
+    assert orden[orden.index("-t") + 1] == "12.346"
+
+
+@pytest.mark.anyio
+async def test_exportar_codifica_una_vez_y_los_subtitulos_salen_de_los_wav(monkeypatch, tmp_path) -> None:
+    from PIL import Image
+
+    from magister.voz import piper
+
+    monkeypatch.setattr(piper, "disponibles", lambda: [piper.Voz("sharvard-f", "Sharvard", "x.onnx", 1)])
+    # Duraciones raras a propósito: nada de esto se puede estimar contando palabras.
+    largos = {"uno": 1.37, "dos": 0.81, "tres": 2.013, "cuatro": 0.4}
+
+    async def sintetizar(texto: str, voz_id: str) -> bytes:
+        return _wav(largos[texto])
+
+    monkeypatch.setattr(piper, "sintetizar", sintetizar)
+    llamadas: list[list[str]] = []
+    vistos: dict[str, str] = {}
+
+    async def ffmpeg_falso(*args: str) -> None:
+        llamadas.append(list(args))
+        entradas = [args[i + 1] for i, x in enumerate(args) if x == "-i"]
+        vistos["lista"] = Path(entradas[0]).read_text(encoding="utf-8")
+        vistos["srt"] = Path(entradas[2]).read_text(encoding="utf-8")
+        vistos["voz"] = str(video.duracion_wav(Path(entradas[1]).read_bytes()))
+        for linea in vistos["lista"].splitlines():
+            if linea.startswith("file "):
+                with Image.open(Path(entradas[0]).parent / linea[6:-1]) as img:
+                    assert img.size == (video.ANCHO, video.ALTO)
+        Path(args[-1]).write_bytes(b"mp4")
+
+    monkeypatch.setattr(video, "_ffmpeg", ffmpeg_falso)
+    pasos: list[tuple[int, int]] = []
+
+    async def avance(paso: int, total: int) -> None:
+        pasos.append((paso, total))
+
+    escenas = [
+        video.EscenaVideo("intuicion", (video.Frase("Uno.", "uno"), video.Frase("Dos.", "dos"))),
+        video.EscenaVideo("teoria", (video.Frase("Tres.", "tres"),)),
+        video.EscenaVideo("vacia", ()),
+        video.EscenaVideo("cierre", (video.Frase("Cuatro.", "cuatro"),)),
+    ]
+    destino = tmp_path / "sal" / "v.mp4"
+    total = await video.exportar(escenas, "sharvard-f", destino, titulo="L1", avance=avance)
+
+    assert len(llamadas) == 1  # una sola pasada de ffmpeg
+    assert destino.read_bytes() == b"mp4" and not destino.with_suffix(".tmp.mp4").exists()
+    assert pasos == [(1, 3), (2, 3), (3, 3)]
+    f, e = video.RESPIRO_FRASE, video.RESPIRO_ESCENA
+    d1, d2, d3 = 1.37 + f + 0.81 + e, 2.013 + e, 0.4 + e
+    assert total == pytest.approx(d1 + d2 + d3, abs=1e-3)
+    assert float(vistos["voz"]) == pytest.approx(total, abs=1e-9)
+    duraciones = [float(x.split()[1]) for x in vistos["lista"].splitlines() if x.startswith("duration ")]
+    assert duraciones == pytest.approx([d1, d2, d3], abs=1e-3)
+    assert sum(duraciones) == pytest.approx(total, abs=1e-5)  # la imagen dura lo mismo que el audio
+    # El subtítulo de la última escena empieza justo donde acaba el audio de las anteriores.
+    subs = {}
+    for bloque in vistos["srt"].strip().split("\n\n"):
+        _, tiempos, texto = bloque.splitlines()
+        subs[texto] = [_segundos(x) for x in tiempos.split(" --> ")]
+    assert list(subs) == ["Uno.", "Dos.", "Tres.", "Cuatro."]
+    assert subs["Dos."] == pytest.approx([1.37 + f, 1.37 + f + 0.81], abs=2e-3)
+    assert subs["Tres."] == pytest.approx([d1, d1 + 2.013], abs=2e-3)
+    assert subs["Cuatro."] == pytest.approx([d1 + d2, d1 + d2 + 0.4], abs=2e-3)
+
+
+def _segundos(t: str) -> float:
+    h, m, resto = t.split(":")
+    s, ms = resto.split(",")
+    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
+
+
+@pytest.mark.anyio
+async def test_ffmpeg_es_el_de_magister_ffmpeg(monkeypatch) -> None:
+    from magister.config import ajustes
+
+    monkeypatch.setattr(ajustes, "ffmpeg", "C:/herramientas/mi-ffmpeg.exe")
+    lanzados: list[tuple] = []
+
+    class Proc:
+        returncode = 0
+
+        async def communicate(self):
+            return b"", b""
+
+    async def lanzar(*args, **kw):
+        lanzados.append(args)
+        return Proc()
+
+    monkeypatch.setattr(video.asyncio, "create_subprocess_exec", lanzar)
+    await video._ffmpeg("-i", "x")
+    assert lanzados[0][0] == "C:/herramientas/mi-ffmpeg.exe" and lanzados[0][-2:] == ("-i", "x")
+
+
+def test_una_pagina_se_encaja_al_tamano_del_video(tmp_path) -> None:
+    from PIL import Image
+
+    ruta = tmp_path / "pagina.png"
+    Image.new("RGBA", (991, 720), (0, 0, 0, 255)).save(ruta)
+    video._encajar(ruta)
+    with Image.open(ruta) as img:
+        assert img.size == (video.ANCHO, video.ALTO) and img.mode == "RGB"
+        assert img.getpixel((5, 360)) == (255, 255, 255) and img.getpixel((640, 360)) == (0, 0, 0)
+
+
 def test_tarjeta_de_escena(tmp_path) -> None:
     from PIL import Image
 

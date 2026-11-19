@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  cancelarTrabajo,
   crearFuente,
   decidirPropuesta,
   enviarJson,
+  incorporarPropuestas,
   lanzarResearch,
   listarDocumentos,
   listarFuentes,
@@ -10,16 +12,23 @@ import {
   listarPropuestas,
   listarTemas,
   pedir,
+  reintentarVersion,
+  resumenFuentes,
   subirUrl,
+  ultimaIncorporacion,
+  verIncorporacion,
   verPlan,
   verResearch,
   type DocumentoInfo,
+  type DocumentoResumen,
   type Fuente,
+  type Incorporacion,
   type PropuestaInfo,
+  type ResumenFuentes,
   type Tema,
 } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
-import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
+import Cargando, { DetalleTecnico, mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 
 // La Biblioteca, más allá de tus fuentes: rastrear la web en busca de buenas fuentes y guardar páginas o PDF
 // desde un enlace (se descargan, se limpian y se indexan para que el tutor las cite).
@@ -45,10 +54,11 @@ async function fuenteWeb(fuentes: Fuente[], elegida: number | null): Promise<num
 const QUE_HACER = 'Vuelve a lanzarla o sube tú un PDF o una URL.'
 
 // Cómo terminó la búsqueda de una lección, con qué hacer si no salió nada.
-function comoAcabo(clave: string, estado: string, motivo: string | null): string {
+function comoAcabo(clave: string, estado: string, motivo: string | null, solas = false): string {
   if (estado === 'cortada') return `La búsqueda para ${clave} se cortó (${motivo ?? 'sin motivo'}). ${QUE_HACER}`
   const n = /^(\d+) propuestas/.exec(motivo ?? '')
-  if (n && Number(n[1]) > 0) return `Búsqueda para ${clave} acabada: ${n[1]} ${n[1] === '1' ? 'propuesta' : 'propuestas'}, abajo.`
+  if (n && Number(n[1]) > 0)
+    return `Búsqueda para ${clave} acabada: ${n[1]} ${n[1] === '1' ? 'propuesta' : 'propuestas'}${solas ? ', que entran solas en tus fuentes.' : ', abajo.'}`
   if (n) return `La búsqueda para ${clave} acabó sin propuestas. ${QUE_HACER}`
   return `La búsqueda para ${clave} no salió bien (${motivo ?? 'sin motivo'}). ${QUE_HACER}`
 }
@@ -69,6 +79,8 @@ function Buscar() {
   const [leccion, setLeccion] = useState('')
   const [aviso, setAviso] = useState<string | null>(null)
   const [fuentes, setFuentes] = useState<Fuente[]>([])
+  // Sube cuando algo nuevo entra en tus fuentes: el resumen de arriba y el último trabajo de incorporar se recargan.
+  const [senal, setSenal] = useState(0)
 
   const cargarPropuestas = useCallback(() => listarPropuestas().then(setPropuestas).catch(() => undefined), [])
   useEffect(() => {
@@ -101,9 +113,10 @@ function Buscar() {
       if (!vivo) return
       const acabadas = estados.flatMap(({ t, r }) => (r && r.estado !== 'en_curso' ? [{ t, r }] : []))
       if (!acabadas.length) return
-      setAviso(acabadas.map(({ t, r }) => comoAcabo(t.clave, r.estado, r.motivo_fin)).join(' '))
+      setAviso(acabadas.map(({ t, r }) => comoAcabo(t.clave, r.estado, r.motivo_fin, r.incorporar)).join(' '))
       const ids = new Set(acabadas.map(({ t }) => t.id))
       setEnMarcha((ts) => ts.filter((x) => !ids.has(x.id)))
+      if (acabadas.some(({ r }) => r.incorporar)) setSenal((n) => n + 1)
     }
     const intervalo = window.setInterval(mirar, 5000)
     // Tope de seguridad: si en 15 minutos no ha acabado, deja de mirar.
@@ -150,16 +163,24 @@ function Buscar() {
     try {
       await decidirPropuesta(id, accion)
       setAviso(accion === 'aprobar' ? 'Guardada en tus fuentes: se está indexando.' : 'Descartada.')
+      if (accion === 'aprobar') setSenal((n) => n + 1)
     } catch (e) {
       setAviso(String((e as Error).message))
     }
     cargarPropuestas()
   }
 
+  const elegida = lecciones.find((x) => `${x.plan_id}:${x.clave}` === leccion) ?? null
+  const alAcabarIncorporar = useCallback(() => {
+    cargarPropuestas()
+    setSenal((n) => n + 1)
+  }, [cargarPropuestas])
+
   return (
     <div className="panel biblioteca">
       <h1>Buscar fuentes</h1>
-      <p className="nota">Magister rastrea la web, lee las páginas y te propone las mejores, con el porqué. Tú decides cuáles se guardan.</p>
+      <p className="nota">Magister rastrea la web, lee las páginas y te propone las mejores, con el porqué.</p>
+      <EstadoFuentes senal={senal} />
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
 
       <section>
@@ -236,6 +257,7 @@ function Buscar() {
 
       <section>
         <h2>Propuestas por revisar {propuestas.length ? `(${propuestas.length})` : ''}</h2>
+        <Incorporar propuestas={propuestas} leccion={elegida} senal={senal} alAcabar={alAcabarIncorporar} />
         {propuestas.length === 0 ? (
           <p className="vacio">No hay propuestas pendientes.</p>
         ) : (
@@ -264,6 +286,227 @@ function Buscar() {
         )}
       </section>
     </div>
+  )
+}
+
+const vivo = (t: Incorporacion | null) => !!t && (t.estado === 'pendiente' || t.estado === 'en_curso')
+
+// «Incorporar todas»: las propuestas pendientes entran en tus fuentes de una vez, por la cola y sin gastar cuota.
+// Si una no se puede (no existe, no es una página, está vacía), se dice por qué y se sigue con las demás.
+function Incorporar({
+  propuestas,
+  leccion,
+  senal,
+  alAcabar,
+}: {
+  propuestas: PropuestaInfo[]
+  leccion: { plan_id: number; clave: string } | null
+  senal: number
+  alAcabar: () => void
+}) {
+  const [t, setT] = useState<Incorporacion | null>(null)
+  const [solas, setSolas] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  useEffect(() => {
+    ultimaIncorporacion()
+      .then((r) => {
+        setT((previo) => (vivo(previo) ? previo : r.ultimo))
+        setSolas(r.solas)
+      })
+      .catch(() => undefined)
+  }, [senal])
+
+  const id = t?.trabajo_id
+  const enMarcha = vivo(t)
+  useEffect(() => {
+    if (id == null || !enMarcha) return
+    const intervalo = window.setInterval(() => {
+      verIncorporacion(id)
+        .then((n) => {
+          setT(n)
+          if (!vivo(n)) alAcabar()
+        })
+        .catch(() => undefined)
+    }, 2000)
+    return () => window.clearInterval(intervalo)
+  }, [id, enMarcha, alAcabar])
+
+  const lanzar = async (filtro: { plan_id?: number; leccion_clave?: string }) => {
+    setAviso(null)
+    try {
+      const r = await incorporarPropuestas(filtro)
+      if (r.trabajo_id == null) {
+        setAviso('No hay propuestas pendientes.')
+        return
+      }
+      setT(await verIncorporacion(r.trabajo_id))
+    } catch (e) {
+      setAviso(`No he podido empezar: ${mensajeDe(e)}`)
+    }
+  }
+
+  const deLeccion = leccion ? propuestas.filter((p) => p.plan_id === leccion.plan_id && p.leccion_clave === leccion.clave).length : 0
+  const fallos = t?.fallidas.length ?? 0
+
+  return (
+    <div className="biblioteca-incorporar">
+      {solas && <p className="nota">Lo que propone la búsqueda para una lección entra solo en tus fuentes, marcado como web. Puedes quitarlo arriba.</p>}
+      {propuestas.length > 0 && (
+        <span className="biblioteca-botones">
+          <button className="boton boton-principal" disabled={enMarcha} onClick={() => lanzar({})}>
+            Incorporar todas ({propuestas.length})
+          </button>
+          {leccion && deLeccion > 0 && (
+            <button className="boton" disabled={enMarcha} onClick={() => lanzar({ plan_id: leccion.plan_id, leccion_clave: leccion.clave })}>
+              Solo las de {leccion.clave} ({deLeccion})
+            </button>
+          )}
+        </span>
+      )}
+      {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
+      {t && enMarcha && (
+        <div role="status">
+          <Pensando texto={`Incorporando: van ${t.van} de ${t.total} (han entrado ${t.entradas}${fallos ? `, ${fallos} no` : ''}). No gasta cuota.`} />
+          <button
+            className="boton-mini"
+            onClick={() => cancelarTrabajo(t.trabajo_id).catch((e) => setAviso(`No he podido cancelar: ${mensajeDe(e)}`))}
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+      {t && !enMarcha && t.total > 0 && (
+        <div role="status">
+          <p className="nota">
+            {t.automatica ? 'Lo último que entró solo del research: han' : 'Han'} entrado {t.entradas} de {t.total}
+            {fallos ? `; ${fallos} no se ${fallos === 1 ? 'ha' : 'han'} podido.` : '.'}
+            {t.entradas > 0 ? ' Se están indexando: el tutor podrá citarlas en unos minutos.' : ''}
+            {t.estado === 'cancelado' ? ' Lo cancelaste: las que faltaban siguen pendientes.' : ''}
+          </p>
+          {t.estado === 'fallido' && <TextoError texto={t.error} antes="El trabajo se paró: " className="nota" />}
+          {fallos > 0 && (
+            <details>
+              <summary>Por qué no han entrado</summary>
+              <ul className="biblioteca-lista">
+                {t.fallidas.map((f) => (
+                  <li key={f.propuesta_id}>
+                    <div>
+                      <a href={f.url} target="_blank" rel="noreferrer">
+                        {f.titulo || f.url}
+                      </a>
+                      <small>{f.leccion_clave}</small>
+                      <TextoError texto={f.motivo} rol="status" className="nota" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const ESTADO_CORTO: Record<string, string> = { ...ESTADOS, lista: 'lista para citar' }
+
+// Arriba de la Biblioteca: cuántos documentos hay listos, indexándose y con problema; qué pasó con los que fallan, con
+// «Reintentar»; y lo que vino del research (lo que entró solo se ve aquí y se puede quitar).
+function EstadoFuentes({ senal }: { senal: number }) {
+  const [r, setR] = useState<ResumenFuentes | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const cargar = useCallback(() => {
+    resumenFuentes()
+      .then(setR)
+      .catch(() => undefined)
+  }, [])
+  useEffect(cargar, [cargar, senal])
+  const indexando = r?.indexando ?? 0
+  useEffect(() => {
+    if (!indexando) return
+    const t = window.setInterval(cargar, 4000)
+    return () => window.clearInterval(t)
+  }, [indexando, cargar])
+
+  if (!r || r.listos + r.indexando + r.con_problema === 0) return null
+
+  const reintentar = async (d: DocumentoResumen) => {
+    try {
+      await reintentarVersion(d.version_id)
+      setAviso(`«${d.titulo}» vuelve a indexarse.`)
+    } catch (e) {
+      setAviso(`No se pudo reintentar: ${mensajeDe(e)}`)
+    }
+    cargar()
+  }
+  const quitar = async (d: DocumentoResumen) => {
+    if (!confirm(`¿Quitar «${d.titulo}» de tus fuentes? El tutor dejará de citarlo.`)) return
+    try {
+      await pedir(`/api/fuentes/${d.fuente_id}/documentos/${d.documento_id}`, { method: 'DELETE' })
+    } catch (e) {
+      setAviso(`No he podido quitarlo: ${mensajeDe(e)}`)
+    }
+    cargar()
+  }
+  const solos = r.del_research.filter((d) => d.automatica).length
+
+  return (
+    <section className="biblioteca-estado">
+      <p className="nota" role="status">
+        Tus fuentes: {r.listos} {r.listos === 1 ? 'documento listo' : 'documentos listos'} · {r.indexando} indexándose · {r.con_problema} con problema
+      </p>
+      {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
+      {r.problemas.length > 0 && (
+        <ul className="biblioteca-lista">
+          {r.problemas.map((d) => (
+            <li key={d.documento_id}>
+              <div>
+                <a href={d.uri} target="_blank" rel="noreferrer">
+                  {d.titulo}
+                </a>
+                <small>
+                  {d.fuente} · {d.que_paso}
+                </small>
+                <DetalleTecnico detalle={d.motivo} />
+              </div>
+              {d.reintentable && (
+                <button className="boton-mini" onClick={() => reintentar(d)}>
+                  Reintentar
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {r.del_research.length > 0 && (
+        <details>
+          <summary>
+            Del research: {r.del_research.length} {r.del_research.length === 1 ? 'documento' : 'documentos'}
+            {solos ? ` (${solos} ${solos === 1 ? 'entró solo' : 'entraron solos'})` : ''}
+          </summary>
+          <ul className="biblioteca-lista">
+            {r.del_research.map((d) => (
+              <li key={d.documento_id}>
+                <div>
+                  <a href={d.uri} target="_blank" rel="noreferrer">
+                    {d.titulo}
+                  </a>
+                  <small>
+                    {d.automatica ? 'entró solo' : 'lo guardaste tú'}
+                    {d.leccion_clave ? ` · para ${d.leccion_clave}` : ''} · {ESTADO_CORTO[d.estado] ?? d.estado}
+                    {d.fragmentos ? ` · ${d.fragmentos} fragmentos` : ''}
+                  </small>
+                </div>
+                <button className="borrar" aria-label={`Quitar ${d.titulo}`} title="Quitar de tus fuentes" onClick={() => quitar(d)}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
   )
 }
 
@@ -377,6 +620,7 @@ function GuardarWeb() {
           {enlaces.length > 1 ? `Guardar ${enlaces.length} enlaces` : 'Guardar'}
         </button>
       </div>
+      <EstadoFuentes senal={docs.length} />
       {fallo && <Cargando error={fallo} reintentar={cargarFuentes} />}
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
       {destino != null && (

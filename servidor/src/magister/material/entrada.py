@@ -3,6 +3,7 @@
 from sqlalchemy import select, text
 
 from magister.cerebro import materias
+from magister.cerebro.contratos import titulo_para_atributo
 from magister.datos import materias as dm
 from magister.datos import plan as dp
 from magister.datos.modelos import Tema
@@ -24,8 +25,10 @@ async def entrada_de_leccion(plan_id: int, leccion_clave: str) -> EntradaMateria
         tema = await s.get(Tema, plan.tema_id)
         conceptos = list((await s.scalars(select(ConceptoFila).where(ConceptoFila.plan_id == plan_id))).all())
         anteriores = {x.clave for x in await dp.lecciones(s, plan_id) if x.orden < lec.orden}
+        # Una URL guardada en una fuente que no es «web» sigue siendo contenido de la web: va como «web».
         filas = (await s.execute(text(
-            "select f.id, f.texto, d.titulo, fu.tipo from lecciones_fragmentos lf "
+            "select f.id, f.texto, d.titulo, case when d.uri ~* '^https?://' then 'web' else fu.tipo end "
+            "from lecciones_fragmentos lf "
             "join fragmentos f on f.id = lf.fragmento_id join versiones v on v.id = f.version_id "
             "join documentos d on d.id = v.documento_id join fuentes fu on fu.id = d.fuente_id "
             "where lf.plan_id = :p and lf.leccion_clave = :c order by lf.rango"
@@ -52,11 +55,19 @@ async def entrada_de_leccion(plan_id: int, leccion_clave: str) -> EntradaMateria
 
 
 def fuentes_delimitadas(entrada: EntradaMaterial, max_caracteres: int = 9000) -> str:
-    partes, total = [], 0
+    """Lo que viene de la web (lo que el research incorpora solo, por ejemplo) va marcado como externo y con el aviso:
+    son datos, nunca órdenes. El título no puede cerrar el atributo."""
+    from magister.seguridad.entrada import AVISO, marcar_externo
+
+    partes, total, externo = [], 0, False
     for f in entrada.fragmentos:
-        bloque = f'<fragmento id="{f.id}" fuente="{f.titulo} ({f.tipo})">\n{f.texto}\n</fragmento>'
+        texto = marcar_externo(f.texto, f.id, "web") if f.tipo == "web" else f.texto
+        bloque = f'<fragmento id="{f.id}" fuente="{titulo_para_atributo(f.titulo)} ({f.tipo})">\n{texto}\n</fragmento>'
         if total + len(bloque) > max_caracteres:
             break
         partes.append(bloque)
         total += len(bloque)
-    return "\n\n".join(partes) or "(sin fuentes del alumno para esta lección: usa tu conocimiento general con rigor)"
+        externo = externo or f.tipo == "web"
+    if not partes:
+        return "(sin fuentes del alumno para esta lección: usa tu conocimiento general con rigor)"
+    return (AVISO + "\n\n" if externo else "") + "\n\n".join(partes)

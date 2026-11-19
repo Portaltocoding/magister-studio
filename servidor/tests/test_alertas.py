@@ -44,3 +44,23 @@ async def test_tono_solo_con_la_rubrica_actual(cliente) -> None:
     await _notas([1.0] * 4 + [0.0] * 6, rubrica()[1])
     (tono,) = [a for a in await alertas.evaluar() if a[0] == "tono"]
     assert "40%" in tono[1] and "de 10" in tono[1]
+
+
+@pytest.mark.anyio
+async def test_una_abierta_por_nombre_al_dia_y_se_cierra_sola(cliente) -> None:
+    async def abiertas() -> list[tuple[str, str]]:
+        async with nueva_sesion() as s:
+            return [tuple(f) for f in (await s.execute(text("select nombre, detalle from alertas where not resuelta order by id"))).all()]
+
+    await alertas.escribir("freno_llamadas", "el freno ha saltado")
+    await _mensajes([30000] * 10)
+    await alertas.comprobar()
+    await _mensajes([40000] * 10)
+    await alertas.comprobar()
+    latencia = [d for n, d in await abiertas() if n == "latencia"]
+    assert len(latencia) == 1 and "de 20 respuestas" in latencia[0]  # la misma alerta, con la cifra de ahora
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(text("delete from mensajes"))
+    await alertas.comprobar()
+    # Ya no se cumple: se cierra. La del freno no es de las que se evalúan aquí y se queda.
+    assert await abiertas() == [("freno_llamadas", "el freno ha saltado")]

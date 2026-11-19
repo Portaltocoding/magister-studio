@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from magister.config import RAIZ_SERVIDOR
+from magister.config import RAIZ_SERVIDOR, ajustes
 from magister.datos.produccion import Alerta, CandidatoBanco, Puntuacion
 from magister.datos.sesion import sesion_por_peticion
 from magister.observar import afinado, juez_online, trazas
@@ -38,6 +38,18 @@ class Triaje(BaseModel):
     juez_acerto: bool | None = None
 
 
+async def _pregunta_de(s: AsyncSession, traza_id: str) -> str | None:
+    """Lo que preguntaste justo antes de la respuesta del tutor de esa traza (en su conversación), o None."""
+    return await s.scalar(text(
+        "select (select u.contenido from mensajes u where u.conversacion_id = t.conversacion_id "
+        "and u.rol = 'usuario' and u.id < t.id order by u.id desc limit 1) "
+        "from mensajes t where t.traza_id = :t and t.rol = 'tutor' order by t.id desc limit 1"), {"t": traza_id})
+
+
+def _sin_canario(texto: str | None) -> str | None:
+    return texto.replace(ajustes.canario, "") if texto and ajustes.canario else texto
+
+
 @rutas.post("/trazas/{traza_id}/feedback")
 async def feedback(traza_id: str, cuerpo: Feedback, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     """Votar dos veces la misma traza sobrescribe: una sola puntuación `feedback_usuario`."""
@@ -47,8 +59,7 @@ async def feedback(traza_id: str, cuerpo: Feedback, s: AsyncSession = Depends(se
     if previo is None or bool(previo) != cuerpo.bien:
         await afinado.registrar_valoracion(cuerpo.bien, cuerpo.motivos)
     if not cuerpo.bien:
-        entrada = await s.scalar(text(
-            "select contenido from mensajes m where m.rol = 'usuario' and m.creado_en <= now() order by m.id desc limit 1")) or ""
+        entrada = await _pregunta_de(s, traza_id) or ""
         await juez_online.candidato(traza_id, "otra_explicacion" if cuerpo.otra else "feedback", entrada, None, cuerpo.comentario)
     if cuerpo.otra:
         await puntuar(traza_id, "otra_explicacion", 1.0, cuerpo.comentario, sobrescribir=True)
@@ -132,10 +143,14 @@ async def triar(cid: int, cuerpo: Triaje, s: AsyncSession = Depends(sesion_por_p
     if cuerpo.accion == "aceptar":
         if not cuerpo.banco:
             raise HTTPException(422, "falta el banco")
+        # La entrada es tu pregunta, del hilo; la que guarda el juez es el prompt de sistema (con el canario) y no va al banco.
+        entrada = await _pregunta_de(s, c.traza_id)
+        if entrada is None and c.origen != "juez":
+            entrada = c.entrada
         carpeta = RAIZ_SERVIDOR / "evals" / "banco" / cuerpo.banco
         carpeta.mkdir(parents=True, exist_ok=True)
         (carpeta / f"{c.traza_id}.json").write_text(json.dumps(
-            {"trace_id": c.traza_id, "origen": c.origen, "entrada": c.entrada, "salida_mala": c.salida,
+            {"trace_id": c.traza_id, "origen": c.origen, "entrada": _sin_canario(entrada), "salida_mala": _sin_canario(c.salida),
              "respuesta_buena": cuerpo.respuesta_buena, "nota": c.nota, "comentario": cuerpo.comentario, "motivos": motivos},
             ensure_ascii=False, indent=1), encoding="utf-8")
     # Si dices si el juez acertó, cuenta como tu valoración de esa respuesta (una sola vez, aunque deshagas y vuelvas).

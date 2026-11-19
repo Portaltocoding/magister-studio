@@ -54,4 +54,7 @@
   .boton-buscar kbd, .boton-buscar .buscar-texto { display: none; }
   .boton-buscar::before { content: "⌕"; font-size: 1.1rem; }
   .estado-texto { display: none; }
+  /* La ventana de avisos se ancla a la barra entera (sticky) y no se sale por la izquierda. */
+  .avisos { position: static; }
+  .avisos-caja { left: 12px; right: 12px; width: auto; }
 }

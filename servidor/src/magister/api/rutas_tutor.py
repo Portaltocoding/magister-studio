@@ -41,7 +41,7 @@ async def examen_pendiente(hoy_: date) -> dict | None:
         ids = [fila.id for fila, _ in planes]
         lecs = (await s.execute(select(dp.LeccionFila.plan_id, dp.LeccionFila.clave).where(dp.LeccionFila.plan_id.in_(ids))
                                 .order_by(dp.LeccionFila.plan_id, dp.LeccionFila.orden))).all()
-        ses = (await s.execute(select(dp.SesionFila.plan_id, dp.SesionFila.leccion_clave, dp.SesionFila.fecha)
+        ses = (await s.execute(select(dp.SesionFila.plan_id, dp.SesionFila.leccion_clave, dp.SesionFila.fecha, dp.SesionFila.estado)
                                .where(dp.SesionFila.plan_id.in_(ids)))).all()
         exs = (await s.execute(select(Examen.plan_id, Examen.lecciones, Examen.nota)
                                .where(Examen.plan_id.in_(ids), Examen.terminado.is_not(None)))).all()
@@ -49,14 +49,18 @@ async def examen_pendiente(hoy_: date) -> dict | None:
     for pid, clave in lecs:
         claves[pid].append(clave)
     ultima: dict[int, dict] = defaultdict(dict)
-    for pid, clave, fecha in ses:
+    # Las lecciones con algo aún por estudiar: su parcial no se propone hasta cerrarlas (las saltadas sí cuentan como vistas).
+    pendientes: dict[int, set[str]] = defaultdict(set)
+    for pid, clave, fecha, estado in ses:
         ultima[pid][clave] = max(ultima[pid].get(clave, fecha), fecha)
+        if estado == "pendiente":
+            pendientes[pid].add(clave)
     hechos: dict[int, list] = defaultdict(list)
     for pid, lecciones_examen, nota in exs:
         hechos[pid].append((set(lecciones_examen or []), nota))
     for fila, nombre in planes:
         for h in con_estado(hitos(claves[fila.id], ultima[fila.id]), hechos[fila.id]):
-            if not h["hecho"] and date.fromisoformat(h["fecha"]) <= hoy_:
+            if not h["hecho"] and date.fromisoformat(h["fecha"]) <= hoy_ and not set(h["lecciones"]) & pendientes[fila.id]:
                 return {**h, "plan_id": fila.id, "tema": nombre}
     return None
 

@@ -16,6 +16,8 @@ import { irARuta } from './componentes/Vacio.tsx'
 import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
 import { aBurbuja, usarConversacion } from './componentes/usarConversacion.ts'
+import { escribirEnChat } from './componentes/preferencias.ts'
+import { recienCreadaTras } from './componentes/turnos.ts'
 import Mascota from './Mascota.tsx'
 import PropuestaPlan from './PropuestaPlan.tsx'
 import { SelectorIdioma, SelectorModo } from './componentes/Modos.tsx'
@@ -52,7 +54,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     },
     [conversacionId, noCuenta],
   )
-  const { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar: mandar, correr, parar } = usarConversacion(
+  const { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar: mandar, correr, parar, soltar } = usarConversacion(
     abrir,
     setPropuesta,
     alGuardado,
@@ -67,11 +69,16 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     let vigente = true
     setError(null)
     setPropuesta(null)
+    recienCreada.current = recienCreadaTras(recienCreada.current, conversacionId)
     if (conversacionId == null) {
+      soltar()
       setBurbujas([])
       return
     }
+    // La recién creada: su primera respuesta acaba de empezar y no se suelta.
     if (recienCreada.current === conversacionId) return
+    // Si la anterior seguía respondiendo, termina en segundo plano (se guarda entera) y no se mezcla con esta.
+    soltar()
     // Otra pantalla la acaba de crear con su primer mensaje («Me he atascado» de Proyectos): se envía al abrirla.
     try {
       const guardado = JSON.parse(sessionStorage.getItem('magister-enviar-al-abrir') ?? 'null') as { cid: number; texto: string } | null
@@ -94,7 +101,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     return () => {
       vigente = false
     }
-  }, [conversacionId, setBurbujas])
+  }, [conversacionId, setBurbujas, soltar])
 
   // La primera pregunta crea la conversación y se envía cuando ya existe.
   useEffect(() => {
@@ -116,6 +123,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
         alCrear(c.id)
       } catch (e) {
         setError(String((e as Error).message))
+        escribirEnChat(texto) // lo que escribiste vuelve a la caja
       }
       return
     }

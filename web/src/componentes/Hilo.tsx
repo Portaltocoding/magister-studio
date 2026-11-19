@@ -18,6 +18,7 @@ import Valorar from './Valorar.tsx'
 import Acciones, { type AccionArnes } from './Acciones.tsx'
 import { ACEPTA, type Adjunto } from './usarAdjuntos.ts'
 import { BotonGuardar, GuardarMarcado, usarGuardadas } from './GuardarNota.tsx'
+import { demasiadoLargo, largoMensaje, LIMITE_MENSAJE } from './turnos.ts'
 
 export interface Burbuja {
   clave: string
@@ -239,9 +240,12 @@ export default function Hilo({
     if (ultima?.rol === 'usuario') pegado.current = true
   }, [burbujas])
 
+  // El servidor no admite mensajes de más de 20.000 caracteres: se avisa y no se envía (recortar en la caja lo haría sin decirlo).
+  const largo = demasiadoLargo(borrador)
+
   const mandar = () => {
     const texto = borrador.trim()
-    if (!texto || escribiendo || deshabilitado) return
+    if (!texto || escribiendo || deshabilitado || largo) return
     setBorrador('')
     alEnviar(texto)
     caja.current?.focus()
@@ -262,7 +266,11 @@ export default function Hilo({
         {burbujas.map((b, i) => {
           const mid = b.clave.startsWith('m-') ? Number(b.clave.slice(2)) : null
           return (
-          <div key={i} className={`burbuja burbuja-${b.rol} burbuja-${b.estado}`} data-mensaje={mid ?? undefined}>
+          <div
+            key={i}
+            className={`burbuja burbuja-${b.rol} burbuja-${b.estado}${b.rol === 'tutor' && b.estado === 'llegando' && !b.contenido ? ' burbuja-esperando' : ''}`}
+            data-mensaje={mid ?? undefined}
+          >
             {b.notaGuardada && (
               <p className="aviso-nota">
                 Guardado en <a href="#/notas">Mis notas</a>
@@ -366,11 +374,18 @@ export default function Hilo({
             Parar
           </button>
         ) : (
-          <button type="submit" className="boton boton-principal" disabled={!borrador.trim() || deshabilitado}>
+          <button type="submit" className="boton boton-principal" disabled={!borrador.trim() || deshabilitado || largo}>
             Enviar
           </button>
         )}
       </form>
+      {largo && (
+        <p className="nota" role="alert">
+          Tu mensaje tiene {largoMensaje(borrador.trim()).toLocaleString('es-ES')} caracteres y el máximo es{' '}
+          {LIMITE_MENSAJE.toLocaleString('es-ES')}: recórtalo para enviarlo
+          {alAdjuntar ? ' o adjúntalo como fichero' : ''}.
+        </p>
+      )}
     </div>
   )
 }

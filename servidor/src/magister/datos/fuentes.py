@@ -129,6 +129,8 @@ class Busqueda(Base):
     reranker: Mapped[list | None] = mapped_column(JSONB)
     ms: Mapped[int] = mapped_column(Integer)
     ms_reranker: Mapped[int | None] = mapped_column(Integer)
+    # Dónde se resolvió «hay fuentes»: lexica, densa, reranker o nada (nulo en las búsquedas de antes).
+    escalon: Mapped[str | None] = mapped_column(String(10))
     creada_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
 
 

@@ -70,8 +70,13 @@ export function EscenaTablero({ e }: { e: Tablero }) {
                         {k + 1}
                       </span>
                     </div>
-                    <div style={{ fontFamily: F.serif, fontSize: anchoIdea > 190 ? 25 : 21, color: actual ? C.foco : C.texto, marginTop: 12, lineHeight: 1.15 }}>{idea.nombre}</div>
-                    <div style={{ fontFamily: F.serif, fontSize: anchoIdea > 190 ? 19 : 17, color: C.gris, marginTop: 10, lineHeight: 1.3 }}>{idea.que}</div>
+                    {/* Con muchas ideas la tarjeta es estrecha: una palabra larga se parte en vez de montarse en la de al lado. */}
+                    <div style={{ fontFamily: F.serif, fontSize: anchoIdea > 190 ? 25 : 21, color: actual ? C.foco : C.texto, marginTop: 12, lineHeight: 1.15, overflowWrap: 'anywhere', hyphens: 'auto' }}>
+                      {idea.nombre}
+                    </div>
+                    <div style={{ fontFamily: F.serif, fontSize: anchoIdea > 190 ? 19 : 17, color: C.gris, marginTop: 10, lineHeight: 1.3, overflowWrap: 'anywhere', hyphens: 'auto' }}>
+                      {idea.que}
+                    </div>
                   </div>
                 )
               })}
@@ -91,6 +96,8 @@ const ZONAS = {
   pantalla: { x: 980, w: 236 },
 } as const
 const ALTO_ZONA = 350
+// Filas de memoria que caben en ALTO_ZONA (cada una mide unos 41 px con su hueco).
+const FILAS_MEMORIA = 6
 
 const ANIMACIONES = `
 @keyframes escena-entra { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
@@ -112,6 +119,9 @@ export function EscenaPorDentro({ e, dur }: { e: PorDentro; dur: number }) {
   const yCable = (i: number) => ARRIBA + 190 + i * 92
   const borde = (z: keyof typeof ZONAS) => ({ izq: ZONAS[z].x, der: ZONAS[z].x + ZONAS[z].w })
   const ultima = e.memoria.filas[e.memoria.filas.length - 1]
+  // En la ventana de memoria caben unas seis filas: las repetidas que no caben se cuentan en «+N más».
+  const caben = Math.max(1, FILAS_MEMORIA - e.memoria.filas.length)
+  const repetidasVistas = repetidas > caben ? caben - 1 : repetidas
 
   return (
     <>
@@ -126,12 +136,17 @@ export function EscenaPorDentro({ e, dur }: { e: PorDentro; dur: number }) {
             const a = aparecer(frame, memoriaDesde + i * 10, 10)
             return <Fila key={i} clave={f.clave} valor={f.valor} color={colorDe(f.estado ?? 'nuevo')} opacidad={a} />
           })}
-          {Array.from({ length: repetidas }, (_, i) =>
+          {Array.from({ length: repetidasVistas }, (_, i) =>
             e.repetir === 'acumula' && ultima ? (
               <div key={`r${i}`} style={{ animation: 'escena-entra .35s ease-out both' }}>
                 <Fila clave={ultima.clave} valor={ultima.valor} color={C.mal} opacidad={1} />
               </div>
             ) : null,
+          )}
+          {e.repetir === 'acumula' && ultima && repetidas > repetidasVistas && (
+            <div key={`mas${repetidas}`} style={{ fontFamily: F.mono, fontSize: 17, color: C.mal, padding: '2px 10px', animation: 'escena-entra .35s ease-out both' }}>
+              +{repetidas - repetidasVistas} más
+            </div>
           )}
         </div>
         {e.repetir === 'igual' && repetidas > 0 && (

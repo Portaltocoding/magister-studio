@@ -80,6 +80,10 @@ async def ciclo_de_vida(_: FastAPI):
 
         # Cargar e5 lleva unos 20 s: se hace ya, en un hilo, y no en la primera pregunta.
         asyncio.create_task(asyncio.to_thread(embeber, ["calentar"], "consulta"))
+        from magister.fuentes import reranker
+
+        # El reranker es la segunda puerta de «hay fuentes» (ADR-0018): unos 5 s de carga, también ya y en un hilo.
+        asyncio.create_task(asyncio.to_thread(reranker.calentar))
     fondo = asyncio.create_task(bucle_de_fondo(al_quedar_listas)) if ajustes.procesar_fondo else None
     from magister.trabajos.trabajador import bucle as bucle_trabajos
 

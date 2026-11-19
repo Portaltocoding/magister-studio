@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import update
 
+from magister.config import ajustes
 from magister.datos import plan as dp
 from magister.datos import repositorio_fuentes as rf
 from magister.datos.fuentes import Propuesta
@@ -14,6 +15,7 @@ from magister.datos.sesion import nueva_sesion
 from magister.fuentes import ingesta
 from magister.research import tareas
 from magister.seguridad.politica import UrlProhibida, comprobar_url
+from magister.trabajos import cola, incorporar
 
 rutas = APIRouter(prefix="/api")
 
@@ -46,6 +48,38 @@ async def ver(tarea_id: int) -> dict:
     return t
 
 
+class Incorporar(BaseModel):
+    plan_id: int | None = None
+    leccion_clave: str | None = Field(default=None, max_length=20)
+
+
+@rutas.post("/incorporar", status_code=202)
+async def incorporar_pendientes(cuerpo: Incorporar) -> dict:
+    """Todas las propuestas pendientes (o las de un plan o una lección) entran en tus fuentes por la cola, sin modelo."""
+    previo = await incorporar.en_marcha()
+    if previo is not None:
+        r = await incorporar.leer(previo)
+        return {"trabajo_id": previo, "total": r["total"] if r else 0, "ya_en_marcha": True}
+    # Dos clics seguidos dan un solo trabajo; otro rato, otra ronda (lo que falló por la red se vuelve a intentar).
+    ronda = cola.ahora().strftime("%Y%m%d%H%M")
+    tid, n = await incorporar.encolar(cuerpo.plan_id, cuerpo.leccion_clave, ronda=ronda)
+    return {"trabajo_id": tid, "total": n, "ya_en_marcha": False}
+
+
+@rutas.get("/incorporar/ultimo")
+async def ultima_incorporacion() -> dict:
+    """El último trabajo de incorporar (también los que lanzó solo el research) y si lo propuesto entra solo."""
+    return {"ultimo": await incorporar.leer(), "solas": ajustes.research_incorporar}
+
+
+@rutas.get("/incorporar/{tid}")
+async def ver_incorporacion(tid: int) -> dict:
+    r = await incorporar.leer(tid)
+    if r is None:
+        raise HTTPException(404, "trabajo no encontrado")
+    return r
+
+
 @rutas.get("/propuestas")
 async def listar(estado: str | None = "pendiente") -> list[dict]:
     return await tareas.propuestas(estado or None)
@@ -53,7 +87,7 @@ async def listar(estado: str | None = "pendiente") -> list[dict]:
 
 @rutas.post("/propuestas/{pid}")
 async def decidir(pid: int, cuerpo: Decision) -> dict:
-    """Aprobar manda la URL a la ingesta entera (validación, duplicados, cuarentena) en la fuente `web`."""
+    """Aprobar manda la URL a la ingesta entera (validación, duplicados, cuarentena) en la fuente del research."""
     async with nueva_sesion() as s:
         p = await s.get(Propuesta, pid)
         if p is None:
@@ -62,21 +96,24 @@ async def decidir(pid: int, cuerpo: Decision) -> dict:
             raise HTTPException(409, "esta propuesta ya está decidida")
         plan = await dp.plan_por_id(s, p.plan_id)
         url, tema_id = p.url, plan.tema_id if plan else None
+        origen = {"origen": "research", "automatica": False, "propuesta_id": pid, "plan_id": p.plan_id,
+                  "leccion_clave": p.leccion_clave}
     version_id = None
     if cuerpo.accion == "aprobar":
         try:
             await asyncio.to_thread(comprobar_url, url)
         except UrlProhibida as e:
             raise HTTPException(422, f"la dirección ya no es válida: {e}") from None
-        fuente = await rf.fuente_o_nueva("web", "web", 1)
+        fuente = await rf.fuente_o_nueva(incorporar.FUENTE, "web", 1)
         try:
-            crudo, tipo = await ingesta.descargar(url)
+            crudo, tipo = await ingesta.descargar(url, externa=True)
         except Exception as e:  # noqa: BLE001
-            raise HTTPException(422, f"no se pudo descargar: {e}") from None
-        version_id = await ingesta.recibir(fuente.id, crudo, url, url, tema_id, tipo)
+            raise HTTPException(422, f"no se pudo descargar: {incorporar.motivo_de(e)}") from None
+        version_id = await ingesta.recibir(fuente.id, crudo, url, url, tema_id, tipo, origen)
     async with nueva_sesion() as s, s.begin():
         await s.execute(
-            update(Propuesta).where(Propuesta.id == pid).values(
+            # Solo si sigue pendiente: el trabajo de incorporar pudo meterla mientras tanto.
+            update(Propuesta).where(Propuesta.id == pid, Propuesta.estado == "pendiente").values(
                 estado="aprobada" if cuerpo.accion == "aprobar" else "rechazada", version_id=version_id
             )
         )

@@ -2,21 +2,25 @@
 // norte, proyecciones), fórmulas de verdad con KaTeX y sus símbolos explicados, y una cuenta hecha a mano.
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import { memo, useMemo } from 'react'
 import { useCurrentFrame } from 'remotion'
 import { ARRIBA, C, F, aparecer, colorDe, rampa } from './estilo.ts'
 import type { Calculo, Figura, Formula } from './tipos.ts'
 
 
-// LaTeX a HTML; si está mal escrito se ve tal cual, en rojo, en vez de romper el vídeo.
-function Tex({ tex, grande = false }: { tex: string; grande?: boolean }) {
-  let html: string
-  try {
-    html = katex.renderToString(tex, { displayMode: grande, throwOnError: true, output: 'html' })
-  } catch {
-    return <span style={{ color: C.mal, fontFamily: F.mono }}>{tex}</span>
-  }
+// LaTeX a HTML; si está mal escrito se ve tal cual, en rojo, en vez de romper el vídeo. Se calcula una vez por fórmula,
+// no en cada fotograma: la escena se repinta 30 veces por segundo, pero la fórmula no cambia.
+const Tex = memo(function Tex({ tex, grande = false }: { tex: string; grande?: boolean }) {
+  const html = useMemo(() => {
+    try {
+      return katex.renderToString(tex, { displayMode: grande, throwOnError: true, output: 'html' })
+    } catch {
+      return null
+    }
+  }, [tex, grande])
+  if (html === null) return <span style={{ color: C.mal, fontFamily: F.mono }}>{tex}</span>
   return <span dangerouslySetInnerHTML={{ __html: html }} />
-}
+})
 
 // Cuándo entra cada paso: repartidos a lo largo de la escena.
 const momentos = (pasos: number, dur: number) => (k: number) => Math.round(10 + (k * dur * 0.78) / Math.max(1, pasos))

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import Pensando from './componentes/Pensando.tsx'
+import Pensando, { NOMBRES, VARIANTES } from './componentes/Pensando.tsx'
 import FalloPantalla from './componentes/FalloPantalla.tsx'
 import EstudioLibre from './EstudioLibre.tsx'
 import { familiaDe, type IdModo } from './modos.ts'
@@ -137,10 +137,10 @@ function Panel({
           <h1>Animaciones de espera</h1>
           <p className="nota">Salen al azar mientras el tutor piensa o genera.</p>
           <div className="galeria-animaciones">
-            {(['rubik', 'hanoi', 'ordenar', 'fourier', 'lissajous'] as const).map((v) => (
+            {VARIANTES.map((v) => (
               <figure key={v}>
                 <Pensando variante={v} />
-                <figcaption>{{ rubik: 'Cubo de Rubik', hanoi: 'Torre de Hanói', ordenar: 'Ordenación', fourier: 'Fourier', lissajous: 'Lissajous' }[v]}</figcaption>
+                <figcaption>{NOMBRES[v]}</figcaption>
               </figure>
             ))}
           </div>

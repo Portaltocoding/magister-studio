@@ -1,8 +1,10 @@
 """Exportar un vídeo de la lección a MP4: la misma narración que el reproductor, con la voz de Magister (Piper).
 
 Cada escena es una imagen fija (su diapositiva si la lección tiene diapositivas en PDF; si no, una tarjeta con la marca
-y la primera frase) y su audio (las frases dichas una tras otra, con un respiro entre ellas). ffmpeg monta un trozo por
-escena y luego los une sin recodificar; los subtítulos van como pista aparte (se activan en el reproductor).
+y la primera frase) y su audio (las frases dichas una tras otra, con un respiro entre ellas). Los WAV de todas las escenas
+se juntan en uno solo y ffmpeg codifica una vez: las imágenes, cada una con lo que dura su audio medido, ese único audio
+y los subtítulos (pista aparte, se activan en el reproductor). Así cada subtítulo cae donde suena su frase, también al
+final de un vídeo largo (unir trozos ya codificados los iba retrasando poco a poco).
 
 El texto llega ya preparado para la voz (glosario de pronunciación aplicado en la web): aquí no se reescribe nada.
 Solo importa de `magister.config` (y de la propia voz).
@@ -85,6 +87,42 @@ def duracion_wav(datos: bytes) -> float:
         return r.getnframes() / r.getframerate()
 
 
+def _encadenar_wav(rutas: list[Path], destino: Path) -> list[float]:
+    """Escribe en `destino` los WAV de las escenas uno tras otro (sin tocar sus muestras) y devuelve lo que dura cada
+    uno, medido en su cabecera. Lee y escribe por bloques: no carga la lección entera en memoria."""
+    duraciones: list[float] = []
+    formato = None
+    with wave.open(str(destino), "wb") as w:
+        for ruta in rutas:
+            with wave.open(str(ruta)) as r:
+                p = r.getparams()
+                if formato is None:
+                    formato = (p.nchannels, p.sampwidth, p.framerate)
+                    w.setnchannels(p.nchannels)
+                    w.setsampwidth(p.sampwidth)
+                    w.setframerate(p.framerate)
+                elif (p.nchannels, p.sampwidth, p.framerate) != formato:
+                    raise ErrorVideo("las escenas tienen formatos de audio distintos")
+                while bloque := r.readframes(65536):
+                    w.writeframes(bloque)
+                duraciones.append(p.nframes / p.framerate)
+    if formato is None:
+        raise ErrorVideo("el vídeo no tiene escenas")
+    return duraciones
+
+
+def _colocar_subtitulos(por_escena: list[tuple[list[tuple[float, float]], list[str]]],
+                        duraciones: list[float]) -> list[tuple[float, float, str]]:
+    """Los subtítulos de todo el vídeo: los tiempos de cada frase dentro de su escena, desplazados por lo que duran de
+    verdad los audios de las escenas anteriores."""
+    salida: list[tuple[float, float, str]] = []
+    t0 = 0.0
+    for (tiempos, textos), dur in zip(por_escena, duraciones, strict=True):
+        salida += [(t0 + a, t0 + b, texto) for (a, b), texto in zip(tiempos, textos)]
+        t0 += dur
+    return salida
+
+
 # ---------- Imagen ----------
 
 
@@ -134,6 +172,18 @@ def paginas_pdf(pdf: Path, paginas: list[int], carpeta: Path) -> dict[int, Path]
     return salida
 
 
+def _encajar(ruta: Path) -> None:
+    """Deja la imagen justo del tamaño del vídeo (escalada y centrada sobre blanco): todas las escenas van en una sola
+    pista y así ninguna cambia de tamaño a mitad."""
+    from PIL import Image, ImageOps
+
+    with Image.open(ruta) as img:
+        if img.size == (ANCHO, ALTO) and img.mode == "RGB":
+            return
+        lista = ImageOps.pad(img.convert("RGB"), (ANCHO, ALTO), color=(255, 255, 255))
+    lista.save(ruta, "PNG")
+
+
 # ---------- ffmpeg ----------
 
 
@@ -159,6 +209,31 @@ def _srt(tiempos: list[tuple[float, float, str]]) -> str:
     return "\n".join(f"{i}\n{t(a)} --> {t(b)}\n{texto}\n" for i, (a, b, texto) in enumerate(tiempos, start=1))
 
 
+def _lista_imagenes(imagenes: list[Path], duraciones: list[float]) -> str:
+    """La lista del demuxer concat de ffmpeg: cada imagen con lo que dura su escena. La última se repite sin duración,
+    porque si no ffmpeg ignora la duración de la última entrada."""
+    if not imagenes or len(imagenes) != len(duraciones):
+        raise ErrorVideo("las imágenes no cuadran con las escenas")
+    lineas = ["ffconcat version 1.0"]
+    for img, dur in zip(imagenes, duraciones):
+        lineas += [f"file '{img.name}'", f"duration {dur:.6f}"]
+    lineas.append(f"file '{imagenes[-1].name}'")
+    return "\n".join(lineas) + "\n"
+
+
+def _orden_montaje(lista: Path, audio: Path, srt: Path, salida: Path, total: float, titulo: str) -> list[str]:
+    """Los argumentos de la única pasada de ffmpeg: imágenes (lista concat), un solo audio y los subtítulos, todo
+    codificado a la vez y cortado a lo que dura el audio."""
+    return [
+        "-f", "concat", "-safe", "0", "-i", str(lista), "-i", str(audio), "-i", str(srt),
+        "-map", "0:v", "-map", "1:a", "-map", "2:s",
+        "-vf", "format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-r", "25",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "1",
+        "-c:s", "mov_text", "-metadata:s:s:0", "language=spa", "-metadata", f"title={titulo}",
+        "-t", f"{total:.3f}", "-movflags", "+faststart", str(salida),
+    ]
+
+
 Avance = Callable[[int, int], Awaitable[None]]
 
 
@@ -176,9 +251,11 @@ async def exportar(escenas: list[EscenaVideo], voz_id: str, destino: Path, *, pd
         imagenes: dict[int, Path] = {}
         if pdf is not None and pdf.exists():
             imagenes = await asyncio.to_thread(paginas_pdf, pdf, [e.pagina for e in escenas if e.pagina], carpeta)
-        trozos: list[Path] = []
-        subtitulos: list[tuple[float, float, str]] = []
-        t0 = 0.0
+        for ruta in imagenes.values():
+            await asyncio.to_thread(_encajar, ruta)
+        audios: list[Path] = []
+        fotos: list[Path] = []
+        por_escena: list[tuple[list[tuple[float, float]], list[str]]] = []
         for i, e in enumerate(escenas):
             wavs = [await piper.sintetizar(f.dicho, voz_id) for f in e.frases]
             audio, tiempos = await asyncio.to_thread(_juntar_wav, wavs)
@@ -188,32 +265,23 @@ async def exportar(escenas: list[EscenaVideo], voz_id: str, destino: Path, *, pd
             if imagen is None:
                 imagen = carpeta / f"tarjeta-{i:03d}.png"
                 await asyncio.to_thread(tarjeta, e.marca, e.frases[0].texto, imagen, titulo)
-            dur = duracion_wav(audio)
-            trozo = carpeta / f"trozo-{i:03d}.mp4"
-            await _ffmpeg(
-                "-loop", "1", "-framerate", "25", "-i", str(imagen), "-i", str(ruta_audio),
-                "-vf", f"scale={ANCHO}:{ALTO}:force_original_aspect_ratio=decrease,"
-                       f"pad={ANCHO}:{ALTO}:(ow-iw)/2:(oh-ih)/2:color=white,format=yuv420p",
-                "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-r", "25",
-                "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "1", "-t", f"{dur:.3f}", str(trozo),
-            )
-            trozos.append(trozo)
-            subtitulos += [(t0 + a, t0 + b, f.texto) for (a, b), f in zip(tiempos, e.frases)]
-            t0 += dur
+            audios.append(ruta_audio)
+            fotos.append(imagen)
+            por_escena.append((tiempos, [f.texto for f in e.frases]))
             if avance:
                 await avance(i + 1, len(escenas))
-        lista = carpeta / "lista.txt"
-        await asyncio.to_thread(lista.write_text, "".join(f"file '{p.name}'\n" for p in trozos), encoding="utf-8")
+        # Un solo audio con todas las escenas seguidas; las duraciones salen de medirlo, no de una estimación.
+        voz = carpeta / "voz.wav"
+        duraciones = await asyncio.to_thread(_encadenar_wav, audios, voz)
+        total = sum(duraciones)
+        lista = carpeta / "imagenes.txt"
+        await asyncio.to_thread(lista.write_text, _lista_imagenes(fotos, duraciones), encoding="utf-8")
         srt = carpeta / "subtitulos.srt"
-        await asyncio.to_thread(srt.write_text, _srt(subtitulos), encoding="utf-8")
+        await asyncio.to_thread(srt.write_text, _srt(_colocar_subtitulos(por_escena, duraciones)), encoding="utf-8")
         await asyncio.to_thread(destino.parent.mkdir, parents=True, exist_ok=True)
         provisional = destino.with_suffix(".tmp.mp4")
-        await _ffmpeg(
-            "-f", "concat", "-safe", "0", "-i", str(lista), "-i", str(srt),
-            "-map", "0:v", "-map", "0:a", "-map", "1:s", "-c:v", "copy", "-c:a", "copy", "-c:s", "mov_text",
-            "-metadata:s:s:0", "language=spa", "-metadata", f"title={titulo}", "-movflags", "+faststart", str(provisional),
-        )
+        await _ffmpeg(*_orden_montaje(lista, voz, srt, provisional, total, titulo))
         await asyncio.to_thread(provisional.replace, destino)
-        return t0
+        return total
     finally:
         await asyncio.to_thread(shutil.rmtree, carpeta, True)

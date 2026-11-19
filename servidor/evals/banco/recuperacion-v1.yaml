@@ -1,0 +1,65 @@
+# Juego fijo de preguntas para comprobar el índice de tu biblioteca (protocolo de reindexado y de consulta).
+# Preguntas en español, como las harías tú, sobre documentos que están en inglés: es justo el caso que fallaba.
+# Cada pregunta dice qué documento debe salir (por un trozo de su título) y, si se sabe, en qué sección (por un
+# trozo de su encabezado). Las de `sin_fuentes` no deben recuperar nada: son de otros temas.
+# No se evalúa por id de fragmento, para que el juego sirva antes y después de reindexar.
+#
+#   uv run python -m evals.recuperacion            (desde servidor/; solo modelos locales, no gasta cuota)
+
+version: 1
+preguntas:
+  - pregunta: ¿Los delirios son creencias de verdad o son otra cosa?
+    documento: Delusion
+    seccion: Are delusions beliefs
+  - pregunta: ¿Qué diferencia hay entre las teorías de un factor y las de dos factores sobre cómo se forma un delirio?
+    documento: Delusion
+    seccion: One-factor, two-factor
+  - pregunta: ¿Qué es el error de predicción y cómo explicaría un delirio?
+    documento: Delusion
+    seccion: One-factor, two-factor
+  - pregunta: ¿Cómo se define un delirio y qué problemas tiene esa definición?
+    documento: Delusion
+    seccion: Defining delusion
+  - pregunta: ¿Qué tipos de delirio se distinguen?
+    documento: Delusion
+    seccion: Types of delusion
+  - pregunta: ¿Son irracionales los delirios?
+    documento: Delusion
+    seccion: Are delusions irrational
+  - pregunta: ¿En qué se parecen los delirios al autoengaño o a creer en teorías de la conspiración?
+    documento: Delusion
+    seccion: self-deception
+  - pregunta: ¿Por qué le interesan los delirios a la filosofía de la mente?
+    documento: Delusion
+    seccion: philosophy of mind
+  - pregunta: ¿Los delirios se explican de abajo arriba, desde una experiencia rara, o de arriba abajo, desde las creencias?
+    documento: Delusion
+    seccion: Bottom-up versus top-down
+  - pregunta: ¿Una creencia irracional es siempre mala para quien la tiene?
+    documento: Three Myths
+    seccion: Always Bad for Us
+  - pregunta: ¿Qué es un delirio motivado y qué consigue la persona con él?
+    documento: Three Myths
+    seccion: Motivated Delusions
+  - pregunta: ¿Se puede entender e interpretar a alguien que tiene creencias irracionales?
+    documento: Three Myths
+    seccion: Make Interpretation Impossible
+  - pregunta: ¿Las creencias irracionales son una excepción o son lo normal en la gente?
+    documento: Three Myths
+    seccion: Are the Exception
+  - pregunta: ¿Las personas con delirios cambian de opinión cuando se les enseña evidencia en contra?
+    documento: evidence-responsiveness
+  - pregunta: ¿Por qué se dice que los delirios no responden a la evidencia y es verdad?
+    documento: evidence-responsiveness
+
+  # De otros temas: no deben encontrar apoyo en esta biblioteca.
+  - pregunta: ¿Cómo funciona un índice B-tree en Postgres?
+    sin_fuentes: true
+  - pregunta: ¿Qué dice el teorema de Bernoulli sobre la presión y la velocidad?
+    sin_fuentes: true
+  - pregunta: ¿Cómo se configura CORS en una API con FastAPI?
+    sin_fuentes: true
+  - pregunta: ¿Cuál es la capital de Mongolia?
+    sin_fuentes: true
+  - pregunta: ¿Cómo se convierte un ángulo de grados a radianes?
+    sin_fuentes: true

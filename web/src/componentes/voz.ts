@@ -141,6 +141,14 @@ export function vozMagister(): string | null {
   return null
 }
 
+// El audio (WAV) de una frase con una voz de Magister, o null si el servidor no puede. Es la misma petición para la
+// llamada, Hablar y el vídeo, así que el servidor sirve de su caché lo que ya ha dicho.
+export function pedirVozMagister(frase: string, voz: string, signal?: AbortSignal): Promise<Blob | null> {
+  return fetch('/api/voz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: pronunciar(frase), voz }), signal }).then(
+    (r) => (r.ok ? r.blob() : null),
+  )
+}
+
 // Cómo se llama la voz que suena (para el registro de la llamada).
 export function nombreVozActual(): string {
   const m = vozMagister()
@@ -164,6 +172,12 @@ export function frases(t: string): string[] {
     else salida.push(x)
   }
   return salida
+}
+
+// Las frases de una respuesta con bloques (diagramas, conceptos, código): cada trozo entre bloques se corta por
+// separado, así lo que viene después de un bloque es una frase nueva y no se pega a una que ya se ha dicho.
+export function frasesDeRespuesta(visible: string): string[] {
+  return visible.split(/```[\s\S]*?```/).flatMap((trozo) => frases(paraLeer(trozo)))
 }
 
 const palabras = (t: string) =>
@@ -209,7 +223,7 @@ export class Locutor {
     // Un bloque abierto (un diagrama que se está dibujando) no se lee, y lo dicho antes de él ya está completo.
     const bloqueAbierto = (visible.match(/```/g) ?? []).length % 2 === 1
     if (bloqueAbierto) visible = visible.slice(0, visible.lastIndexOf('```'))
-    const lista = frases(paraLeer(visible))
+    const lista = frasesDeRespuesta(visible)
     const completas = terminado || bloqueAbierto ? lista.length : Math.max(0, lista.length - 1)
     for (; this.enviadas < completas; this.enviadas++) this.decir(lista[this.enviadas])
     if (terminado) this.cerrar()
@@ -218,6 +232,13 @@ export class Locutor {
   decir(frase: string) {
     this.cola.push(frase)
     if (!this.hablando) this.siguiente()
+  }
+
+  // Varias frases de golpe: se encolan todas antes de empezar, así la primera ya pide el audio de las dos siguientes
+  // (con decir() una a una, la cola está vacía al empezar y la segunda se pide tarde: un hueco de silencio).
+  decirTodo(lista: string[]) {
+    this.cola.push(...lista)
+    if (!this.hablando && this.cola.length) this.siguiente()
   }
 
   // Ya no llegará más: cuando acabe lo que tiene en cola, avisa.
@@ -292,8 +313,7 @@ export class Locutor {
     const clave = `${voz}|${frase}`
     let p = this.audios.get(clave)
     if (!p) {
-      p = fetch('/api/voz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: pronunciar(frase), voz }) })
-        .then((r) => (r.ok ? r.blob() : null))
+      p = pedirVozMagister(frase, voz)
         .then((b) => (b ? URL.createObjectURL(b) : null))
         .catch(() => null)
       this.audios.set(clave, p)
@@ -366,9 +386,13 @@ export class Locutor {
 export class Oido {
   private r: Reconocimiento | null = null
   private activo = false
+  // Fallos seguidos del dictado: con tres (o uno sin arreglo, como no tener micro) deja de reintentar.
+  private fallos = 0
   alParcial: (t: string) => void = () => undefined
   alFinal: (t: string) => void = () => undefined
   alError: (e: string) => void = () => undefined
+  // El oído se ha rendido: quien lo usa debe ofrecer escribir. Si nadie lo engancha, se avisa como un error.
+  alBloqueo: ((mensaje: string) => void) | null = null
 
   disponible() {
     return !!Reconocedor
@@ -377,6 +401,7 @@ export class Oido {
   empezar() {
     if (!Reconocedor || this.activo) return
     this.activo = true
+    this.fallos = 0
     this.arrancar()
   }
 
@@ -387,6 +412,7 @@ export class Oido {
     r.interimResults = true
     r.continuous = true
     r.onresult = (e) => {
+      this.fallos = 0
       let provisional = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const x = e.results[i]
@@ -396,10 +422,12 @@ export class Oido {
       this.alParcial(provisional.trim())
     }
     r.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        this.activo = false
-        this.alError('No tengo permiso para usar el micrófono. Dale permiso en el candado de la barra de direcciones.')
-      } else if (e.error !== 'no-speech' && e.error !== 'aborted') this.alError(`El dictado falló (${e.error}).`)
+      if (e.error === 'no-speech' || e.error === 'aborted') return
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed')
+        return this.bloquear('No tengo permiso para usar el micrófono. Dale permiso en el candado de la barra de direcciones, o escríbeme abajo.')
+      this.fallos++
+      if (e.error === 'audio-capture' || this.fallos >= 3) return this.bloquear('No te oigo: revisa el micrófono o la conexión, o escríbeme abajo.')
+      this.alError(`El dictado falló (${e.error}).`)
     }
     r.onend = () => {
       this.r = null
@@ -411,6 +439,13 @@ export class Oido {
     } catch {
       /* ya estaba en marcha */
     }
+  }
+
+  // Deja de escuchar (sin reintentar) y avisa una sola vez.
+  private bloquear(mensaje: string) {
+    this.activo = false
+    if (this.alBloqueo) this.alBloqueo(mensaje)
+    else this.alError(mensaje)
   }
 
   parar() {

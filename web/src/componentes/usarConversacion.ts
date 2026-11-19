@@ -2,6 +2,8 @@ import { useCallback, useRef, useState } from 'react'
 import { ErrorApi, EVENTO_NOTAS, type EventoTutor, type Mensaje, type Propuesta } from '../api.ts'
 import type { Burbuja } from './Hilo.tsx'
 import { errorLegible } from './errores.ts'
+import { escribirEnChat } from './preferencias.ts'
+import { crearTurnos, trasFalloAlEnviar } from './turnos.ts'
 
 let contador = 0
 const claveNueva = () => `tmp-${++contador}`
@@ -62,6 +64,7 @@ export function usarConversacion(
   const [opciones, setOpciones] = useState<{ valor: string; etiqueta: string }[]>([])
   const [espera, setEspera] = useState<Espera>(ESPERA_VACIA)
   const control = useRef<AbortController | null>(null)
+  const [turnos] = useState(crearTurnos)
 
   const actualizarUltima = (cambio: (b: Burbuja) => Burbuja) =>
     setBurbujas((previas) => (previas.length ? [...previas.slice(0, -1), cambio(previas[previas.length - 1])] : previas))
@@ -78,10 +81,14 @@ export function usarConversacion(
       setEspera(ESPERA_VACIA)
       const c = new AbortController()
       control.current = c
+      const mio = turnos.nuevo()
       let empezo = false
       try {
         for await (const ev of flujo(c.signal)) {
           empezo = true
+          // Soltado (cambiaste de conversación): se sigue leyendo para que el servidor la acabe, sin tocar este hilo.
+          // Solo pasa «guardado»: el plan que aceptaste se guarda igual y su búsqueda de fuentes no se pierde.
+          if (!turnos.vigente(mio) && ev.tipo !== 'guardado') continue
           switch (ev.tipo) {
             case 'delta':
               setFase(null)
@@ -134,29 +141,40 @@ export function usarConversacion(
           }
         }
         // Sin texto (por ejemplo, solo se propuso un plan): se quita la burbuja vacía.
-        setBurbujas((previas) => {
-          const u = previas[previas.length - 1]
-          return u && u.rol === 'tutor' && !u.contenido && u.estado !== 'error' ? previas.slice(0, -1) : previas
-        })
+        if (turnos.vigente(mio))
+          setBurbujas((previas) => {
+            const u = previas[previas.length - 1]
+            return u && u.rol === 'tutor' && !u.contenido && u.estado !== 'error' ? previas.slice(0, -1) : previas
+          })
       } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') {
+        if (!turnos.vigente(mio)) {
+          // Ya no es el hilo que ves: su fallo no se pinta en otra conversación.
+        } else if (e instanceof DOMException && e.name === 'AbortError') {
           actualizarUltima((b) => ({ ...b, estado: 'interrumpido' }))
         } else if (!empezo && e instanceof ErrorApi) {
-          setBurbujas((previas) => [
-            ...previas.slice(0, -nuevas.length),
-            { clave: claveNueva(), rol: 'tutor', contenido: `No se pudo enviar: ${e.message}`, estado: 'error' },
-          ])
+          // Tu mensaje se queda en el hilo y su texto vuelve a la caja para reenviarlo.
+          setBurbujas((previas) =>
+            trasFalloAlEnviar(previas, {
+              clave: claveNueva(),
+              rol: 'tutor',
+              contenido: `No se pudo enviar: ${e.message}`,
+              estado: 'error',
+            }),
+          )
+          if (propia !== null) escribirEnChat(propia)
         } else {
           actualizarUltima((b) => ({ ...b, contenido: String(e), estado: 'error' }))
         }
       } finally {
-        setEscribiendo(false)
-        setFase(null)
-        control.current = null
+        if (turnos.vigente(mio)) {
+          setEscribiendo(false)
+          setFase(null)
+          control.current = null
+        }
         alAcabar?.()
       }
     },
-    [alPlan, alGuardado],
+    [alPlan, alGuardado, turnos],
   )
 
   const enviar = useCallback(
@@ -166,5 +184,15 @@ export function usarConversacion(
 
   const parar = useCallback(() => control.current?.abort(), [])
 
-  return { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar, correr, parar }
+  // Al cambiar de conversación: la respuesta en curso termina en segundo plano y deja de pintarse aquí.
+  const soltar = useCallback(() => {
+    turnos.soltar()
+    control.current = null
+    setEscribiendo(false)
+    setFase(null)
+    setEspera(ESPERA_VACIA)
+    setOpciones([])
+  }, [turnos])
+
+  return { burbujas, setBurbujas, escribiendo, fase, espera, opciones, enviar, correr, parar, soltar }
 }

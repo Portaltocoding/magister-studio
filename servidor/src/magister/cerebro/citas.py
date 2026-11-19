@@ -4,6 +4,9 @@ del fragmento más parecida a la afirmación se parezca de verdad."""
 import re
 from dataclasses import dataclass
 
+from magister.cerebro.contratos import Similitud
+from magister.config import ajustes
+
 MARCA = re.compile(r"\[(\d{1,9})\]")
 SIMILITUD_MIN = 0.12  # solapamiento de palabras con significado; criterio general
 VACIAS = set(
@@ -45,20 +48,32 @@ def _afirmaciones(respuesta: str) -> dict[int, list[str]]:
     return salida
 
 
-def comprobar(respuesta: str, fragmentos: dict[int, str]) -> list[Cita]:
+def comprobar(respuesta: str, fragmentos: dict[int, str], similitud: Similitud | None = None) -> list[Cita]:
+    """Sin `similitud`, solo el solapamiento de palabras. Con ella (la ofrece el buscador), una cita que no comparte
+    palabras, como una afirmación en español sobre un fragmento en inglés, vale si su similitud llega a
+    `MAGISTER_UMBRAL_CITA_SEMANTICA`. Es CPU: quien la llama desde código async, en un hilo."""
     citas: list[Cita] = []
     for fid, afirmaciones in _afirmaciones(respuesta).items():
         if fid not in fragmentos:
             citas.append(Cita(fid, "", True))
             continue
         objetivo = set().union(*(_palabras(a) for a in afirmaciones))
+        frases = _frases(fragmentos[fid])
         mejor, puntos = "", 0.0
-        for frase in _frases(fragmentos[fid]):
+        for frase in frases:
             p = _palabras(frase)
             if not p or not objetivo:
                 continue
             s = len(p & objetivo) / len(p | objetivo)
             if s > puntos:
                 mejor, puntos = frase, s
-        citas.append(Cita(fid, mejor[:500], puntos < SIMILITUD_MIN))
+        if puntos >= SIMILITUD_MIN or similitud is None or not frases:
+            citas.append(Cita(fid, mejor[:500], puntos < SIMILITUD_MIN))
+            continue
+        cosenos = similitud(" ".join(afirmaciones), frases)
+        if len(cosenos) != len(frases):
+            citas.append(Cita(fid, mejor[:500], True))
+            continue
+        i = max(range(len(frases)), key=lambda n: cosenos[n])
+        citas.append(Cita(fid, frases[i][:500], cosenos[i] < ajustes.umbral_cita_semantica))
     return citas

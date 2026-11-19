@@ -77,6 +77,10 @@ async def ejecutar_uno(quien: str) -> bool:
             from magister.trabajos.video import ejecutar as ejecutar_video
 
             await ejecutar_video(t.id, t.parametros)
+        elif t.tipo == "incorporar":
+            from magister.trabajos.incorporar import ejecutar as ejecutar_incorporar
+
+            await ejecutar_incorporar(t.id, t.parametros)
         else:
             await cola.terminar(t.id, "fallido", f"tipo de trabajo desconocido: {t.tipo}")
             return True

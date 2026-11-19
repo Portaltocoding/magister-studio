@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { crearConversacion, enviar, enviarJson, listarPlanes, pedir, verPlan, type ExtraMensaje, type VistaPlan } from '../api.ts'
+import { planActivo } from '../componentes/planActivo.ts'
 import { esEco, frases, guardarAjustesVoz, leerAjustesVoz, Locutor, nombreVozActual, Oido, paraLeer, VELOCIDADES } from '../componentes/voz.ts'
 import { conPreguntas, narrarApuntes, type FraseClase } from '../componentes/narracion.ts'
 import { todosLosModos, usarPreferencias } from '../componentes/preferencias.ts'
@@ -185,6 +186,10 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
   const bloqueEnPizarra = useRef<string | null>(null)
   const notasRef = useRef<Nota[]>([])
   const preguntaPendiente = useRef<{ enunciado: string; bloque?: string } | null>(null)
+  // La pregunta de la clase que estás contestando mientras piensa: si sigues hablando, lo que se junta sigue siendo respuesta.
+  const preguntaEnCurso = useRef<{ enunciado: string; bloque?: string } | null>(null)
+  // Lo que decía cuando le cortaste (para que sepa qué has oído y qué no).
+  const cortadoEn = useRef('')
   const registro = useRef<{ t0: number; eventos: EventoRegistro[]; enviado: boolean }>({ t0: Date.now(), eventos: [], enviado: true })
 
   const apuntar = useCallback((e: string, d?: Record<string, unknown>) => {
@@ -210,8 +215,9 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     setFalloLecciones(null)
     listarPlanes()
       .then(async (ps) => {
-        if (!ps[0]) return
-        const v = await verPlan(ps[0].tema_id)
+        const activo = planActivo(ps)
+        if (!activo) return
+        const v = await verPlan(activo.tema_id)
         setPlan(v)
         const [estados, videos] = await Promise.all([
           pedir<Record<string, { tipos: Record<string, string>; ids?: Record<string, number> }>>(`/api/planes/${v.plan_id}/materiales`),
@@ -370,7 +376,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       if (narracion.current.activa) {
         narracion.current.activa = false
         esperandoSeguir.current = true
-      }
+      } else if (estadoRef.current === 'hablando' && locutor.current.ocupado()) cortadoEn.current = locutor.current.reciente
       control.current?.abort()
       locutor.current.parar()
       setEstado('escuchando')
@@ -586,6 +592,8 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       setParcial('')
       setError(null)
       window.clearTimeout(silencio.current)
+      const cortado = cortadoEn.current
+      cortadoEn.current = ''
       const n = narracion.current
       const enClase = datos.current.tipo === 'clase' && n.lista.length > 0 && !n.acabada
       const pregunta = enClase ? preguntaPendiente.current : null
@@ -637,7 +645,11 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           `Es una clase por voz de la lección ${datos.current.clave} «${datos.current.titulo}». Ahora ibas por ${aqui.marca} y estabas ` +
           `diciendo: «${aqui.texto}» (manda sobre dónde ibas en turnos anteriores). El alumno te ha interrumpido: contesta a lo que dice y termina con «¿sigo?».`
         esperandoSeguir.current = false
-      } else como('turno')
+      } else {
+        como('turno')
+        if (cortado) contexto = `Te ha cortado mientras decías: «${cortado}». Lo que venía después no lo ha oído.`
+      }
+      preguntaEnCurso.current = pregunta
       turno(texto, contexto, true, !!pregunta)
     },
     [narrar, turno, decirSuelto, apuntar],
@@ -689,6 +701,8 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         apuntar('junta', { texto: corto(t) })
         control.current?.abort()
         ponerTurnos((x) => (x.length && x[x.length - 1].rol === 'tutor' ? x.slice(0, ultimoVisible.current ? -2 : -1) : x))
+        // Si estabas contestando su pregunta, lo que se junta sigue siendo tu respuesta (y se corrige).
+        if (preguntaEnCurso.current) preguntaPendiente.current = preguntaEnCurso.current
         acumular(buffer.current ? t : `${ultimaPregunta.current} ${t}`)
       } else {
         if (Date.now() - finHabla.current < VENTANA_ECO && esEco(t, l.reciente)) return apuntar('eco', { texto: corto(t), tras_hablar: true })
@@ -697,6 +711,13 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     }
     o.alError = (err) => {
       apuntar('error-oido', { detalle: err })
+      setError(err)
+    }
+    // El oído se ha rendido (sin permiso, sin micro o fallos seguidos): micro silenciado y la caja para escribir.
+    // Pulsar el micro vuelve a intentarlo.
+    o.alBloqueo = (err) => {
+      apuntar('error-oido', { detalle: err, bloqueo: true })
+      setMudo(true)
       setError(err)
     }
   }, [acumular, interrumpir, apuntar])
@@ -724,6 +745,8 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     narracion.current = { lista: [], pos: 0, activa: false, acabada: false, gen: narracion.current.gen + 1 }
     esperandoSeguir.current = false
     preguntaPendiente.current = null
+    preguntaEnCurso.current = null
+    cortadoEn.current = ''
     registro.current = { t0: Date.now(), eventos: [], enviado: false }
     apuntar('llamar', { tipo, leccion: clave || null, voz: nombreVozActual(), velocidad: leerAjustesVoz().velocidad, micro: !mudo, dictado: oido.current.disponible() })
     try {
@@ -835,13 +858,15 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           !datos.current.noCuenta,
           true,
           {
+            llamada: true,
             modo: 'entrevista',
             plan_id: datos.current.clave && plan ? plan.plan_id : null,
             leccion_clave: datos.current.clave || null,
             contexto:
               'La entrevista ha terminado. ' +
               (media != null ? `Su nota media es ${String(media).replace('.', ',')} sobre 10 (ya calculada: dila tal cual, sin enseñar cuentas). ` : 'Da una sola nota media de 0 a 10. ') +
-              'Después, una frase con lo mejor de sus respuestas y dos frases con lo que más debe repasar. Máximo 5 frases, sin listas ni bloques, sin mencionar otras lecciones.',
+              'Después, una frase con lo mejor de sus respuestas y dos frases con lo que más debe repasar. Máximo 5 frases, sin listas ni bloques, sin mencionar otras lecciones. ' +
+              'No hagas más preguntas: la llamada ha terminado.',
           },
         )) {
           if (ev.tipo === 'delta') {

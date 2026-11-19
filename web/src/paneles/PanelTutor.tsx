@@ -5,7 +5,8 @@ import Companera from '../componentes/Companera.tsx'
 import MapaConceptos, { usarMapa } from '../componentes/MapaConceptos.tsx'
 import Calentamiento, { ApuestasRevisadas, guardarCalentamiento, leerCalentamiento, type Apuestas, type DatosCalentamiento } from '../componentes/Calentamiento.tsx'
 import Markdown from '../componentes/Markdown.tsx'
-import { flujo, listarPlanes, marcarSesion, pedir, rutaExamen, verPlan, type HitoExamen } from '../api.ts'
+import { enviarJson, flujo, hoyIso, listarPlanes, marcarSesion, pedir, rutaExamen, verPlan, type HitoExamen, type ResumenPlan } from '../api.ts'
+import { colorDeTema, nombreCorto } from '../componentes/colorTema.ts'
 import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
@@ -450,7 +451,13 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
   )
 
   const cerrar = async () => {
-    if (sesionId) await marcarSesion(sesionId, 'hecha')
+    // Has visto la lección entera: se marcan todas sus sesiones pendientes, no solo la de hoy (una lección partida
+    // en dos días volvería a salir en «Hoy»). Solo si hoy ya marcaba algo, para no tocar lecciones abiertas por adelantado.
+    if (sesionId) {
+      if (leccion.plan_id != null)
+        await pedir(`/api/planes/${leccion.plan_id}/lecciones/${encodeURIComponent(leccion.leccion_clave)}/hecha`, enviarJson({}, 'PATCH'))
+      else await marcarSesion(sesionId, 'hecha')
+    }
     guardarAvance(mid, null)
     setCerrada(true)
   }
@@ -772,9 +779,12 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
 
 // Si hoy (o antes) tocaba un examen del plan y no lo has aprobado, el tutor te lo propone.
 // «Hoy»: lo que toca, en orden (repasar, las lecciones, el examen al final) y cuánto queda.
-function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | null; irA: (m: IdModo) => void }) {
+function TuDia({ hoy, minutosRepaso, irA, planes = [] }: { hoy: Hoy; minutosRepaso: number | null; irA: (m: IdModo) => void; planes?: ResumenPlan[] }) {
   const dia = hoy.dia ?? []
   const indice = usarIndice(hoy.plan_id)
+  // Si hoy toca más de un plan, cada sesión lleva el nombre y el color de su tema.
+  const variosPlanes = new Set(dia.map((s) => s.plan_id).filter((p) => p != null)).size > 1
+  const temaDeSesion = (planId?: number) => planes.find((p) => p.plan_id === planId)
   if (!dia.length && !hoy.examen && !hoy.temas?.length) return null
   const horas = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',')
   const quedan = dia.filter((s) => s.estado !== 'hecha').reduce((a, s) => a + s.horas, 0) +
@@ -804,15 +814,26 @@ function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | 
             <small>unos {minutosRepaso ?? '·'} min</small>
           </li>
         )}
-        {dia.map((s) => (
-          <li key={s.clave} className={s.estado === 'hecha' ? 'hecho' : ''}>
-            <span className="tu-dia-num">{s.estado === 'hecha' ? '✓' : ++n}</span>
-            <span>
-              <b className="tu-dia-clave">{s.clave}</b> {tituloSencillo(indice, s.clave, s.titulo)}
-            </span>
-            <small>{horas(s.horas)} h</small>
-          </li>
-        ))}
+        {dia.map((s) => {
+          const p = variosPlanes ? temaDeSesion(s.plan_id) : undefined
+          // El índice (los títulos sencillos) es el del plan de hoy: a las sesiones de otro plan no se les aplica.
+          const ix = s.plan_id == null || s.plan_id === hoy.plan_id ? indice : null
+          return (
+            <li key={s.sesion_id ?? `${s.plan_id}-${s.clave}`} className={s.estado === 'hecha' ? 'hecho' : ''}>
+              <span className="tu-dia-num">{s.estado === 'hecha' ? '✓' : ++n}</span>
+              <span>
+                <b className="tu-dia-clave">{s.clave}</b> {tituloSencillo(ix, s.clave, s.titulo)}
+              </span>
+              {p && (
+                <span className="tu-dia-tema con-punto-tema" title={p.tema}>
+                  <span className="punto-tema" style={colorDeTema(p.tema_id, planes)?.estilo} aria-hidden="true" />
+                  {nombreCorto(p.tema, 18)}
+                </span>
+              )}
+              <small>{horas(s.horas)} h</small>
+            </li>
+          )
+        })}
         {hoy.examen && (
           <li className={hoy.examen.hecho ? 'hecho' : ''}>
             <span className="tu-dia-num">{hoy.examen.hecho ? '✓' : ++n}</span>
@@ -826,7 +847,7 @@ function TuDia({ hoy, minutosRepaso, irA }: { hoy: Hoy; minutosRepaso: number | 
 }
 
 function TarjetaExamen({ examen, despues }: { examen: HitoExamen; despues?: string[] }) {
-  const atrasado = examen.fecha < new Date().toISOString().slice(0, 10)
+  const atrasado = examen.fecha < hoyIso()
   return (
     <section className="tutor-examen">
       <div>
@@ -859,6 +880,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
   const indiceHoy = usarIndice(hoy?.plan_id)
   const [leccion, setLeccion] = useState<Leccion | null>(null)
   const [otras, setOtras] = useState<Opcion[]>([])
+  const [planes, setPlanes] = useState<ResumenPlan[]>([])
   const [avance, setAvance] = useState<Avance | null>(null)
   const [minutosRepaso, setMinutosRepaso] = useState<number | null>(null)
   const [semana, setSemana] = useState<{ hechas: number; total: number; sesiones: number; hechasN: number } | null>(null)
@@ -900,6 +922,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
       .then((c) => setMinutosRepaso(Math.round(c.reduce((a, x) => a + x.minutos, 0))))
       .catch(() => undefined)
     listarPlanes().then(async (ps) => {
+      setPlanes(ps)
       // Cada plan con su vista y sus materiales, todos a la vez (antes iban uno tras otro y el primero dos veces).
       const vistas = await Promise.all(
         ps.map((p) =>
@@ -909,8 +932,8 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
       // Esta semana: horas y sesiones hechas frente a las previstas (lunes a domingo).
       if (vistas[0]) {
         const v = vistas[0][0]
-        const hoyIso = new Date().toISOString().slice(0, 10)
-        const s = v.semanas.find((w) => w.dias.some((d) => d.fecha === hoyIso)) ?? v.semanas[0]
+        const dia = hoyIso()
+        const s = v.semanas.find((w) => w.dias.some((d) => d.fecha === dia)) ?? v.semanas[0]
         const ses = s ? s.dias.flatMap((d) => d.sesiones) : []
         setSemana({
           total: ses.reduce((a, x) => a + x.horas, 0),
@@ -1023,7 +1046,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
           <small>{hoy.examen ? `${hoy.examen.titulo} →` : 'Hacer uno cuando quieras →'}</small>
         </button>
       </div>
-      <TuDia hoy={hoy} minutosRepaso={minutosRepaso} irA={irA} />
+      <TuDia hoy={hoy} minutosRepaso={minutosRepaso} irA={irA} planes={planes} />
       {hoy.examen && !examenDespues.length && <TarjetaExamen examen={hoy.examen} />}
       {hoy.titulo && hoy.estado !== 'solo_repaso' ? (
         <section className="tutor-hoy">
@@ -1032,6 +1055,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
             <span className="bloques-clave">{hoy.leccion_clave}</span> {tituloSencillo(indiceHoy, hoy.leccion_clave ?? '', hoy.titulo)}
           </h1>
           <p className="nota">
+            {planes.length > 1 && <span className="punto-tema" style={colorDeTema(hoy.tema_id, planes)?.estilo} aria-hidden="true" />}
             {hoy.tema} · {String(hoy.horas).replace('.', ',')} h previstas
           </p>
           {hoy.estado === 'sin_preparar' || !hoy.material_id ? (

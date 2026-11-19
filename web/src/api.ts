@@ -404,6 +404,10 @@ export interface VersionInfo {
   extractor: string | null
   duplicado_de: number | null
   ingerida_en: string | null
+  // De dónde vino: «research» si lo propuso la búsqueda de una lección (y si entró solo), null si lo subiste tú.
+  origen?: 'research' | null
+  automatica?: boolean
+  leccion_clave?: string | null
 }
 
 export interface DocumentoInfo {
@@ -463,7 +467,54 @@ export const verResearch = (id: number) =>
     motivo_fin: string | null
     pasos: number
     paso_actual: Record<string, unknown> | null
+    incorporar?: boolean
   }>(`/api/research/${id}`)
+
+// Incorporar en bloque: las propuestas pendientes entran en tus fuentes por la cola, sin modelo.
+export interface Incorporacion {
+  trabajo_id: number
+  estado: 'pendiente' | 'en_curso' | 'hecho' | 'fallido' | 'cancelado'
+  error: string | null
+  total: number
+  van: number
+  entradas: number
+  fallidas: { propuesta_id: number; url: string; titulo: string | null; leccion_clave: string; motivo: string }[]
+  automatica: boolean
+  acabado_en: string | null
+}
+export const incorporarPropuestas = (filtro: { plan_id?: number; leccion_clave?: string } = {}) =>
+  pedir<{ trabajo_id: number | null; total: number; ya_en_marcha: boolean }>('/api/incorporar', enviarJson(filtro))
+export const verIncorporacion = (tid: number) => pedir<Incorporacion>(`/api/incorporar/${tid}`)
+export const ultimaIncorporacion = () => pedir<{ ultimo: Incorporacion | null; solas: boolean }>('/api/incorporar/ultimo')
+export const cancelarTrabajo = (tid: number) => pedir<{ cancelado: boolean }>(`/api/trabajos/${tid}/cancelar`, { method: 'POST' })
+
+// Lo que se queda a medias en tus fuentes, de un vistazo.
+export interface DocumentoResumen {
+  documento_id: number
+  titulo: string
+  uri: string
+  fuente_id: number
+  fuente: string
+  version_id: number
+  estado: VersionInfo['estado']
+  motivo: string | null
+  fragmentos: number
+  origen: 'research' | null
+  automatica?: boolean
+  leccion_clave?: string | null
+  que_paso: string | null
+  reintentable: boolean
+}
+export interface ResumenFuentes {
+  listos: number
+  indexando: number
+  con_problema: number
+  problemas: DocumentoResumen[]
+  del_research: DocumentoResumen[]
+}
+export const resumenFuentes = () => pedir<ResumenFuentes>('/api/fuentes/resumen')
+export const reintentarVersion = (vid: number) =>
+  pedir<{ version_id: number; estado: string }>(`/api/versiones/${vid}/reintentar`, { method: 'POST' })
 export const listarPropuestas = () => pedir<PropuestaInfo[]>('/api/propuestas?estado=pendiente')
 export const decidirPropuesta = (id: number, accion: 'aprobar' | 'rechazar') =>
   pedir<{ estado: string }>(`/api/propuestas/${id}`, enviarJson({ accion }))

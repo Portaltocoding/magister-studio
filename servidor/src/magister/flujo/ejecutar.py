@@ -4,6 +4,7 @@ Eventos que salen: {"tipo": "fase", "nodo"}, {"tipo": "delta", "t"} y
 {"tipo": "plan", ...propuesta}. Errores del modelo salen como ErrorModelo.
 """
 
+import logging
 from collections.abc import AsyncIterator
 from datetime import date
 
@@ -11,6 +12,8 @@ from langgraph.types import Command
 
 from magister.flujo.grafo import grafo
 from magister.flujo.intencion import rechaza_plan
+
+registro = logging.getLogger("magister.flujo")
 
 
 def _config(cid: int) -> dict:
@@ -33,6 +36,14 @@ async def propuesta_pendiente(cid: int) -> dict | None:
 async def fase_actual(cid: int) -> str | None:
     estado = await grafo().aget_state(_config(cid))
     return (estado.values or {}).get("fase")
+
+
+async def borrar_hilo(cid: int) -> None:
+    """Al borrar una conversación, su hilo del grafo (con tus mensajes) también se va. Un fallo aquí no rompe el borrado."""
+    try:
+        await grafo().checkpointer.adelete_thread(str(cid))
+    except Exception:  # noqa: BLE001
+        registro.warning("no se pudo borrar el hilo %s del grafo", cid, exc_info=True)
 
 
 async def _correr(entrada: dict | Command, cid: int) -> AsyncIterator[dict]:
