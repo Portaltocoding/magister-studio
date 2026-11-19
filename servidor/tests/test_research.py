@@ -263,7 +263,7 @@ def test_reglas_de_las_consultas() -> None:
     bien = Consultas(consultas=[ConsultaObjetivo(objetivo=1, consulta="HTTP methods status codes MDN"),
                                 ConsultaObjetivo(objetivo=2, consulta="JSON parse stringify JavaScript")])
     assert reglas(bien) == []
-    for mal in ("HTTP methods; JSON parse stringify", 'HTTP "methods" status codes', "HTTP " * 11, "HTTP"):
+    for mal in ("HTTP methods; JSON parse stringify", 'HTTP "methods" status codes', "HTTP " * 15, "HTTP"):
         c = Consultas(consultas=[ConsultaObjetivo(objetivo=1, consulta=mal), bien.consultas[1]])
         assert reglas(c), mal
     falta = Consultas(consultas=[bien.consultas[0]])
@@ -979,7 +979,7 @@ async def test_las_llamadas_cuentan_los_reintentos_y_las_reglas_no_piden_de_mas(
 
     reglas = reglas_consultas([1])
     assert reglas(Consultas(consultas=[consulta(1, "Big-O notation", "CORS")])) == []
-    assert reglas(Consultas(consultas=[consulta(1, "colas")])) == ["la consulta del objetivo 1 tiene 1 palabras (de 2 a 10)"]
+    assert reglas(Consultas(consultas=[consulta(1, "colas")])) == ["la consulta del objetivo 1 tiene 1 palabras (de 2 a 14)"]
     # Un tipo raro o una profundidad de 4 no tiran el lote del juez.
     n = Nota(url="https://a.example/x", objetivos=[1], tipo="blog", profundidad=4, autoridad=-1, cita="")
     assert n.tipo == "articulo" and n.profundidad == 3 and n.autoridad == 0
@@ -988,3 +988,27 @@ async def test_las_llamadas_cuentan_los_reintentos_y_las_reglas_no_piden_de_mas(
     eco.encolar(Notas, [{"notas": [nota("https://a.example/colas", [1], "Una cola M/M/1 tiene llegadas de Poisson")]}])
     r = await research_fijo(LECCION, Herramientas(WebFalsa(), 1, "L1"))
     assert r["llamadas"] == 3
+
+
+async def test_una_propuesta_pendiente_se_pone_al_dia_y_lo_decidido_no_se_toca(base) -> None:
+    """La misma página propuesta otra vez para la misma lección: si seguía pendiente, vale el juez de ahora (entra con
+    su ficha); si ya la aprobaste o la rechazaste, se queda como estaba."""
+    from sqlalchemy import text
+
+    from magister.datos.sesion import nueva_sesion
+    from magister.research import tareas
+
+    plan_id = await _plan_de_prueba()
+    [vieja] = await tareas.crear(plan_id, ["L1"])
+    [nueva] = await tareas.crear(plan_id, ["L1"])
+    assert await tareas._guardar_propuesta(vieja, plan_id, "L1", "https://a.example/x", "X", "antes")
+    assert await tareas._guardar_propuesta(vieja, plan_id, "L1", "https://a.example/y", "Y", "antes")
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(text("update propuestas set estado = 'rechazada' where url = 'https://a.example/y'"))
+    assert await tareas._guardar_propuesta(nueva, plan_id, "L1", "https://a.example/x", "X", "ahora", {"tipo": "oficial"})
+    assert not await tareas._guardar_propuesta(nueva, plan_id, "L1", "https://a.example/y", "Y", "ahora", {"tipo": "oficial"})
+    async with nueva_sesion() as s:
+        filas = {u: (t, m, e) for u, t, m, e in (await s.execute(text(
+            "select url, tarea_id, motivo, estado from propuestas order by url"))).all()}
+    assert filas["https://a.example/x"] == (nueva, "ahora", "pendiente")
+    assert filas["https://a.example/y"] == (vieja, "antes", "rechazada")

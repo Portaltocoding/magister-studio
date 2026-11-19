@@ -110,6 +110,9 @@ export default function BarraCuota({ accion, compacta = false }: { accion?: Acci
   const pasa = estimacion && estado.sesion && estimacion.sesion.extra != null && estado.sesion.uso + estimacion.sesion.extra > 1
   // Si gasta poco y te sobra sesión, basta una línea: las barras, para lo que de verdad pesa.
   const extra = estimacion?.sesion.extra
+  // En compacto, un gasto pequeño no se ve en la barra (es una raya de menos de un píxel): se dice con palabras.
+  if (compacta && estado.sesion && extra != null && extra < POCO && estado.sesion.uso < 0.8)
+    return <small className="nota cuota-poco">Gasta {extra < 0.005 ? 'menos del 1' : `un ${pct(extra)}`} % de tu sesión.</small>
   if (!compacta && estado.sesion && extra != null && extra < POCO && estado.sesion.uso < 0.8)
     return (
       <p className="nota cuota-poco" title={`Semana: ${estado.semana ? pct(estado.semana.uso) : '—'} % usado`}>

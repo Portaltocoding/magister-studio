@@ -158,6 +158,9 @@ def elegir(notas_validas: list[Nota], n_objetivos: int, max_propuestas: int = 6,
     return elegidas, [o for o in a_cubrir if o not in cubiertos]
 
 
+MAX_PALABRAS = 14  # el prompt pide hasta 10; un par de más no merece repetir la llamada entera
+
+
 def reglas_consultas(pedidos: list[int]):
     """Una consulta por objetivo pedido (o 3 con el objetivo 0 si no hay objetivos), de 2 a 10 palabras («Big-O
     notation» vale), sin «;» ni comillas: lo que juntaba dos objetivos daba 0 resultados. La alternativa, opcional, solo
@@ -184,8 +187,8 @@ def reglas_consultas(pedidos: list[int]):
                     continue
                 palabras = len(texto.split())
                 minimo = 2 if etiqueta == "consulta" else 1
-                if not minimo <= palabras <= 10:
-                    errores.append(f"la {etiqueta} del objetivo {x.objetivo} tiene {palabras} palabras (de {minimo} a 10)")
+                if not minimo <= palabras <= MAX_PALABRAS:
+                    errores.append(f"la {etiqueta} del objetivo {x.objetivo} tiene {palabras} palabras (de {minimo} a {MAX_PALABRAS})")
                 if ";" in texto or any(q in texto for q in '"«»“”'):
                     errores.append(f"la {etiqueta} del objetivo {x.objetivo} lleva «;» o comillas")
         return errores

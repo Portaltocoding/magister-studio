@@ -70,11 +70,14 @@ def separar_por_necesidad(lecciones: dict, claves: list[str], forzar: bool) -> t
 async def _guardar_propuesta(tarea_id: int, plan_id: int, clave: str, url: str, titulo: str, motivo: str,
                              ficha: dict | None = None) -> bool:
     async with nueva_sesion() as s, s.begin():
+        valores = dict(tarea_id=tarea_id, titulo=titulo, motivo=motivo, ficha=ficha)
+        # Si la misma página ya estaba propuesta para esa lección y sigue pendiente, vale lo que dice el juez de ahora
+        # (así entra con su ficha); lo que ya aprobaste o rechazaste no se toca.
         r = await s.execute(
             insert(Propuesta)
-            .values(tarea_id=tarea_id, url=url, titulo=titulo, plan_id=plan_id, leccion_clave=clave, motivo=motivo,
-                    ficha=ficha)
-            .on_conflict_do_nothing(constraint="uq_propuestas_url_leccion")
+            .values(url=url, plan_id=plan_id, leccion_clave=clave, **valores)
+            .on_conflict_do_update(constraint="uq_propuestas_url_leccion", set_=valores,
+                                   where=Propuesta.estado == "pendiente")
         )
         return bool(r.rowcount)
 

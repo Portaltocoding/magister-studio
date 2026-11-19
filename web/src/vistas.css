@@ -274,6 +274,7 @@ body.en-foco { overflow: hidden; }
   .foco-barra { grid-template-columns: 1fr; }
   .foco-pasos { justify-content: center; }
   .foco-atajos { display: none; }
+  .foco-herramientas { flex-wrap: wrap; justify-content: center; }
   .foco-papel.lector-texto { padding: 26px 22px; }
 }
 .foco-pregunta p { margin: 0; }
