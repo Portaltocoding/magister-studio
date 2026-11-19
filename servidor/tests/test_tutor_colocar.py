@@ -1,6 +1,6 @@
 """El modo foco: cada comprobación pregunta por una idea de SU bloque (`colocar_preguntas`, sin base)."""
 
-from magister.api.rutas_tutor import colocar_preguntas
+from magister.api.rutas_tutor import colocar_preguntas, con_tipo
 
 BLOQUES = [
     {"clave": "b1", "conceptos": ["c-a", "c-b"]},
@@ -42,6 +42,13 @@ def test_en_cada_bloque_gana_la_primera_y_cada_pregunta_ocupa_uno() -> None:
     assert r["b1"] == {"pregunta_id": "p1", "enunciado": "¿AC?", "concepto_id": "c-a"}
     assert r["b2"]["pregunta_id"] == "p3"
     assert "b3" not in r
+
+
+def test_cada_comprobacion_lleva_su_tipo() -> None:
+    """El foco ofrece dictar en las «habladas»: el tipo viaja con la pregunta (sin tipo conocido, None)."""
+    r = con_tipo(colocar_preguntas([("p1", "b1", "¿A?", "c-a"), ("p2", "b2", "¿C?", "c-c")], BLOQUES), {"p1": "hablada"})
+    assert r["b1"] == {"pregunta_id": "p1", "enunciado": "¿A?", "concepto_id": "c-a", "tipo": "hablada"}
+    assert r["b2"]["tipo"] is None
 
 
 def test_sin_contrato_se_queda_en_su_donde() -> None:

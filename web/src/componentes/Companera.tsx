@@ -8,7 +8,7 @@ import Mascota, { type GestoMascota } from '../Mascota.tsx'
 // Lo único que ofrece sola: un punto si el párrafo tiene un término en negrita que aún no está en tu mapa, y como
 // mucho un globito por idea si llevas rato delante de un bloque de código.
 
-type Accion = 'facil' | 'ejemplo' | 'porque' | 'clave' | 'codigo' | 'pregunta'
+export type Accion = 'facil' | 'ejemplo' | 'porque' | 'clave' | 'codigo' | 'pregunta'
 
 const ACCIONES: [Accion, string][] = [
   ['facil', 'Más fácil'],
@@ -41,9 +41,14 @@ interface Props {
   abrir?: number
   // Milisegundos desde el último desplazamiento de la página.
   desplazadoHace?: () => number
+  // «No lo entiendo»: el párrafo activo es (o deja de ser) una duda. Marcar no llama al modelo.
+  esDuda?: boolean
+  alDuda?: () => void
+  // Cada explicación que da, para guardarla debajo de su párrafo.
+  alRespuesta?: (parrafo: HTMLElement, accion: Accion, texto: string) => void
 }
 
-export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalabras, enMapa = [], abrir = 0, desplazadoHace }: Props) {
+export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalabras, enMapa = [], abrir = 0, desplazadoHace, esDuda, alDuda, alRespuesta }: Props) {
   const [abierta, setAbierta] = useState(false)
   const [respuesta, setRespuesta] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
@@ -119,6 +124,7 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
         enviarJson({ clave: claveBloque, parrafo: parrafo.innerText.slice(0, 3900), accion, pregunta: texto ?? null }),
       )
       setRespuesta(r.texto)
+      alRespuesta?.(parrafo, accion, r.texto)
       if (accion === 'clave' && alPalabras) {
         const palabras = (r.texto.match(/«([^»]{2,40})»|\*\*([^*]{2,40})\*\*/g) ?? []).map((x) => x.replace(/[«»*]/g, ''))
         if (palabras.length) alPalabras(palabras)
@@ -128,6 +134,12 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
       setRespuesta(`No he podido: ${(e as Error).message}`)
     } finally {
       setCargando(false)
+      // El botón pulsado se desactiva mientras piensa y el foco del teclado se cae al cuerpo: se devuelve al
+      // bocadillo para que Esc lo cierre a él (y no saque del modo foco).
+      window.requestAnimationFrame(() => {
+        const a = document.activeElement
+        if (!a || a === document.body) bocadillo.current?.focus({ preventScroll: true })
+      })
     }
   }
 
@@ -187,7 +199,7 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
           </div>
         )}
         {abierta && (
-          <div className="companera-bocadillo" role="dialog" aria-label="Ayuda con el párrafo" ref={bocadillo}>
+          <div className="companera-bocadillo" role="dialog" aria-label="Ayuda con el párrafo" ref={bocadillo} tabIndex={-1}>
             {termino && alPalabras && !cargando && !respuesta && (
               <p className="companera-mapa">
                 <span>¿Añado «{termino}» a tu mapa?</span>
@@ -198,7 +210,16 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
             )}
             {cargando && <p className="companera-pensando">Déjame pensar…</p>}
             {respuesta && <p className="companera-respuesta">{respuesta.replace(/\*\*/g, '')}</p>}
+            {respuesta && alRespuesta && <p className="companera-guardada">Te lo dejo guardado debajo del párrafo.</p>}
+            {esDuda && !cargando && !respuesta && (
+              <p className="companera-guardada">Marcado como duda: te lo recuerdo antes de la comprobación y al acabar. ¿Te lo explico más fácil?</p>
+            )}
             <div className="companera-acciones">
+              {alDuda && (
+                <button type="button" className="opcion opcion-chip" aria-pressed={!!esDuda} disabled={cargando} onClick={alDuda} title="Marcar este párrafo como duda (N)">
+                  {esDuda ? 'Ya lo entiendo' : 'No lo entiendo (N)'}
+                </button>
+              )}
               {ACCIONES.map(([a, t]) => (
                 <button key={a} type="button" className="opcion opcion-chip" disabled={cargando} onClick={() => pedirAyuda(a)}>
                   {t}

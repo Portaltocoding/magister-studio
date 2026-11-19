@@ -114,3 +114,16 @@ test('curva: empieza en 0, acaba en 1 y va más deprisa al principio', () => {
   assert.equal(curva(1), 1)
   assert.ok(curva(0.25) > 0.6)
 })
+
+test('unidades: la nota guardada de la mascota (entre párrafos) no cuenta como unidad', () => {
+  const papel = el('DIV', '', [el('P', 'Uno'), el('DIV', 'La mascota te lo explicó así', [], ['foco-nota-hueco']), el('P', 'Dos')])
+  assert.deepEqual(
+    unidades(papel).map((x) => x.textContent),
+    ['Uno', 'Dos'],
+  )
+})
+
+test('debeIgnorar: Espacio sobre el resumen de una nota plegable es suyo (la abre), no del foco', () => {
+  const resumen = { closest: (s: string) => (s.split(',').some((x) => x.trim() === 'summary') ? {} : null) }
+  assert.equal(debeIgnorar({ key: ' ', target: resumen }, { pantalla: 'idea', menuAbierto: false }), true)
+})

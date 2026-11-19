@@ -28,8 +28,33 @@ import Mascota from '../Mascota.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import type { IdModo } from '../modos.ts'
 import { aCss } from '../componentes/escala.ts'
+import { AVISO_DICTADO, enVivo, leerPermisoDictado, olvidarPermisoDictado, unirDictado, usarDictado } from '../componentes/dictado.ts'
 import { debeIgnorar, desplazarA, usarParrafoActivo, type Pantalla } from '../componentes/parrafos.ts'
-import { guardarZen, leerZen, PIE_ASOMA_MS, pieVisible, progresoLeccion, relojZen } from '../componentes/zen.ts'
+import { guardarZen, leerZen, PIE_ASOMA_MS, pieVisible, progresoLeccion } from '../componentes/zen.ts'
+import { usarPomodoro } from '../componentes/pomodoro.ts'
+import { crearPomodoro, mmssDe, relojParado, textoReloj } from '../componentes/relojFoco.ts'
+import { usarLeerEnVoz } from '../componentes/usarLeerEnVoz.ts'
+import NotasFoco from '../componentes/NotasFoco.tsx'
+import {
+  alternarDuda,
+  claveNota,
+  dudasDeOtroDia,
+  guardarDudas,
+  guardarNotas,
+  inicio40,
+  leerDudas,
+  leerNotas,
+  localizar,
+  loQueFlojeo,
+  MAX_PARRAFO,
+  ponerNota,
+  quitarDuda,
+  sinExplicar,
+  textoAvisoDudas,
+  type Duda,
+  type Flojo,
+  type Nota,
+} from '../componentes/dudas.ts'
 import {
   aMedias,
   claveListo,
@@ -43,6 +68,17 @@ import {
   type MaterialListo,
   type UltimaConversacion,
 } from '../componentes/aMedias.ts'
+import {
+  aplicarIdea,
+  esRutaLeccion,
+  leerRutaFoco,
+  leerRutaRecordada,
+  olvidarRutaRecordada,
+  rutaDeVuelta,
+  rutaFoco,
+  textoSeguir,
+  volverA,
+} from '../componentes/retomar.ts'
 
 export interface Hoy {
   estado: 'propuesta' | 'adelantar' | 'sin_preparar' | 'sin_plan' | 'solo_repaso'
@@ -67,7 +103,8 @@ interface Bloque {
   clave: string
   titulo: string
   texto: string
-  pregunta: { pregunta_id: string; enunciado: string; concepto_id: string } | null
+  // tipo: «hablada», «conceptual»… (las habladas se pueden dictar).
+  pregunta: { pregunta_id: string; enunciado: string; concepto_id: string; tipo?: string | null } | null
 }
 
 interface Definicion {
@@ -152,7 +189,6 @@ function guardarRitmo(r: Ritmo) {
     /* sin almacenamiento */
   }
 }
-const DESCANSO = 5 * 60
 
 // El ancho de la página del foco, en caracteres (ch de la letra del papel): lo eliges en Ajustes o arrastrando su
 // borde derecho. Una medida de 64 se lee cómoda.
@@ -255,6 +291,8 @@ function AsaAncho({ ancho, alCambiar, papel }: { ancho: number; alCambiar: (n: n
   )
 }
 
+const almacenLocal = () => (typeof localStorage === 'undefined' ? null : localStorage)
+
 const claveAvance = (mid: number) => `magister-foco-${mid}`
 export function leerAvance(mid: number): Avance | null {
   try {
@@ -288,12 +326,15 @@ function Comprobar({
   confianza,
   alCambiar,
   alAcabar,
+  dictar = 0,
 }: {
   pregunta: NonNullable<Bloque['pregunta']>
   valor: string
   confianza: number | null
   alCambiar: (b: Borrador) => void
   alAcabar: (nota: string) => void
+  // Sube con la tecla D (fuera de la caja): dictar o dejar de dictar, en las habladas.
+  dictar?: number
 }) {
   const [nota, setNota] = useState<string | null>(null)
   const [explicacion, setExplicacion] = useState('')
@@ -305,8 +346,30 @@ function Comprobar({
   const setConfianza = (c: number) => alCambiar({ respuesta, confianza: c })
   const puedeEnviar = !enviando && !!respuesta.trim() && confianza != null
 
+  // Las habladas («explícalo en voz alta») se contestan hablando: lo dictado va llenando la caja y se corrige igual.
+  const ultimo = useRef({ respuesta, confianza, alCambiar })
+  ultimo.current = { respuesta, confianza, alCambiar }
+  const dictado = usarDictado((t) => {
+    const u = ultimo.current
+    const r = unirDictado(u.respuesta, t)
+    ultimo.current = { ...u, respuesta: r }
+    u.alCambiar({ respuesta: r, confianza: u.confianza })
+  })
+  const hablada = pregunta.tipo === 'hablada' && dictado.disponible
+  const botonDictar = useRef<HTMLButtonElement | null>(null)
+  const dictarVisto = useRef(dictar)
+  useEffect(() => {
+    if (dictar === dictarVisto.current) return
+    dictarVisto.current = dictar
+    if (!hablada || nota || enviando) return
+    botonDictar.current?.focus({ preventScroll: true })
+    dictado.alternar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dictar])
+
   // Si el corrector falla, no se inventa un «Fallada»: se dice y puedes volver a comprobar.
   const enviar = async () => {
+    dictado.parar()
     setEnviando(true)
     setError(null)
     let final: string | null = null
@@ -335,13 +398,55 @@ function Comprobar({
 
   return (
     <div className="foco-comprobar">
-      <span className="foco-etq">Comprueba que lo tienes</span>
+      <div className="foco-comprobar-cabeza">
+        <span className="foco-etq">Comprueba que lo tienes</span>
+        {hablada && !nota && (
+          <>
+            <span className={`foco-escuchando ${dictado.escuchando ? 'si' : ''}`} aria-live="polite">
+              {dictado.escuchando && (
+                <>
+                  <i aria-hidden="true" />
+                  Escuchando en español…
+                </>
+              )}
+            </span>
+            <button
+              ref={botonDictar}
+              type="button"
+              className="foco-boton foco-dictar"
+              aria-pressed={dictado.escuchando}
+              disabled={enviando}
+              onClick={dictado.alternar}
+              title="Dictar la respuesta en voz alta (D)"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <rect x="5" y="1" width="6" height="9" rx="3" fill="currentColor" />
+                <path d="M3 7a5 5 0 0 0 10 0M8 12v3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+              </svg>
+              {dictado.escuchando ? 'Parar (D)' : 'Dictar (D)'}
+            </button>
+          </>
+        )}
+      </div>
       <div className="foco-pregunta">
         <Markdown>{pregunta.enunciado}</Markdown>
       </div>
+      {hablada && dictado.preguntando && (
+        <div className="foco-dictado-aviso" role="group" aria-label="Permiso para dictar">
+          <span>{AVISO_DICTADO} ¿Lo activo?</span>
+          <button type="button" className="boton boton-principal" onClick={() => dictado.responder(true)} autoFocus>
+            Sí, dictar
+          </button>
+          <button type="button" className="boton" onClick={() => dictado.responder(false)}>
+            No, escribo
+          </button>
+        </div>
+      )}
+      {hablada && dictado.error && <p className="foco-dictado-error" role="alert">{dictado.error}</p>}
       <textarea
-        value={respuesta}
+        value={dictado.escuchando ? enVivo(respuesta, dictado.parcial) : respuesta}
         disabled={!!nota || enviando}
+        readOnly={dictado.escuchando}
         onChange={(e) => setRespuesta(e.target.value)}
         onKeyDown={(e) => {
           // Ctrl (o Cmd) + Intro: enviar; si falta decir cómo de seguro estás, al primer botón.
@@ -350,7 +455,7 @@ function Comprobar({
           if (puedeEnviar) enviar()
           else if (confianza == null) chips.current?.querySelector<HTMLElement>('[role="radio"]')?.focus()
         }}
-        placeholder="Con tus palabras, sin mirar arriba"
+        placeholder={hablada ? 'Pulsa «Dictar» (D) y explícalo en voz alta, o escríbelo' : 'Con tus palabras, sin mirar arriba'}
         aria-label="Tu respuesta"
       />
       {!nota && (
@@ -477,6 +582,8 @@ function usarEstrecho(): boolean {
 }
 
 const SALIDA_MS = 160
+// Lo que dura el «Seguías aquí» al retomar.
+const SEGUIAS_MS = 4000
 
 // Una lección en modo foco: una idea cada vez, con su comprobación.
 export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA }: PropsFoco) {
@@ -493,12 +600,29 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
   const [letra, setLetra] = useState(leerLetra)
   const [cuerpo, setCuerpo] = useState<HTMLDivElement | null>(null)
   const [abrirAyuda, setAbrirAyuda] = useState(0)
+  const [dictar, setDictar] = useState(0)
+  // Para volver a pintar los ajustes al quitar el permiso de dictado.
+  const [, setPermisoQuitado] = useState(0)
+  // «No lo entiendo» (N): las dudas y lo que te explicó la mascota de cada párrafo, guardados por lección.
+  const [dudas, setDudas] = useState<Duda[]>(() => leerDudas(almacenLocal(), leccion.material_id))
+  const [notas, setNotas] = useState<Nota[]>(() => leerNotas(almacenLocal(), leccion.material_id))
+  const [notasAbiertas, setNotasAbiertas] = useState<Set<string>>(() => new Set())
+  const [explicando, setExplicando] = useState<string | null>(null)
+  const [errorExplicar, setErrorExplicar] = useState<string | null>(null)
+  // El aviso de antes de la comprobación, ya contestado («No, sigo») en estas ideas.
+  const [avisoDudasVisto, setAvisoDudasVisto] = useState<Set<string>>(() => new Set())
+  // Al volver otro día con dudas, lo primero es «Te quedaron estas dudas».
+  const [verDudas, setVerDudas] = useState(() => dudasDeOtroDia(leerDudas(almacenLocal(), leccion.material_id), Date.now()))
+  // Lo que se anuncia al lector de pantalla (duda marcada, lectura en voz alta…).
+  const [anuncio, setAnuncio] = useState('')
   const estrecho = usarEstrecho()
   const botonSeguir = useRef<HTMLButtonElement | null>(null)
   const [segundos, setSegundos] = useState(inicial?.segundos ?? 0)
+  // Un solo reloj: el pomodoro (el Tomate) es el del foco. Su descanso abre la pantalla de descanso de aquí.
+  // `pausado` solo cuenta sin pomodoro («sin pausa»).
+  const pomo = usarPomodoro()
   const [pausado, setPausado] = useState(false)
-  const [descanso, setDescanso] = useState<number | null>(null)
-  const [avisoPausa, setAvisoPausa] = useState(false)
+  const enPausa = relojParado(pomo.p, pausado)
   const [glosario, setGlosario] = useState(false)
   const [cerrada, setCerrada] = useState(false)
   // Calentamiento (priming): antes de la primera idea, si no lo has hecho ya con esta lección y empiezas de cero.
@@ -539,8 +663,20 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
   const puedeSeguir = !b.pregunta || !!comprobado[b.clave]
   const pendiente = !!b.pregunta && !comprobado[b.clave]
   const hayGlosario = leccion.definiciones.length + leccion.formulas.length > 0
+  // El descanso es el del pomodoro. Reexplicar va por encima: al cerrarlo, si el descanso sigue, vuelves a él.
+  const descanso = pomo.p.fase === 'descanso' && !cerrada
   const pantalla: Pantalla =
-    descanso != null ? 'descanso' : reexplicando && leccion.plan_id != null ? 'reexplicar' : calentando && leccion.calentamiento ? 'calentamiento' : cerrada ? 'cierre' : 'idea'
+    reexplicando && leccion.plan_id != null
+      ? 'reexplicar'
+      : descanso
+        ? 'descanso'
+        : verDudas && dudas.length > 0 && !cerrada
+          ? 'dudas'
+          : calentando && leccion.calentamiento
+            ? 'calentamiento'
+            : cerrada
+              ? 'cierre'
+              : 'idea'
 
   // Al cambiar de idea (o de pantalla), la zona vuelve arriba; el párrafo activo coloca después el suyo.
   useLayoutEffect(() => {
@@ -549,10 +685,118 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
 
   // El párrafo activo: ↑ ↓ (y j k, Espacio) van de uno en uno; al volver, se sigue por el que dejaste.
   const uInicial = useRef(inicial?.i === i ? (inicial?.u ?? null) : null)
-  const { u, unidades: lista, mover, ir: irUnidad, marca, ultimoScroll } = usarParrafoActivo(papel, cuerpo, b.clave, uInicial.current)
+  // Mientras lee en voz alta, el ratón quieto encima no cambia el párrafo.
+  const [leyendoVoz, setLeyendoVoz] = useState(false)
+  const { u, unidades: lista, mover, ir: irUnidad, marca, ultimoScroll } = usarParrafoActivo(papel, cuerpo, b.clave, uInicial.current, leyendoVoz)
   useEffect(() => {
     if (lista.length) uInicial.current = null
   }, [lista])
+
+  // Leer en voz alta (P): el párrafo activo y los siguientes, con la voz de Magister (Piper). Se para al llegar a la
+  // comprobación, que se señala.
+  const lectura = usarLeerEnVoz({
+    lista,
+    u,
+    mover,
+    clave: b.clave,
+    activa: pantalla === 'idea' && !saliendo,
+    alFinal: () => {
+      if (!pendiente) return 'Fin de la idea'
+      reclamarRef.current(false)
+      return 'Me paro aquí: toca la comprobación'
+    },
+  })
+  useEffect(() => setLeyendoVoz(lectura.leyendo), [lectura.leyendo])
+  useEffect(() => {
+    if (lectura.estado) setAnuncio(lectura.estado)
+  }, [lectura.estado])
+  const reclamarRef = useRef<(enfocar?: boolean) => void>(() => undefined)
+
+  // ----- Dudas («No lo entiendo») -----
+  useEffect(() => guardarDudas(almacenLocal(), mid, dudas), [mid, dudas])
+  useEffect(() => guardarNotas(almacenLocal(), mid, notas), [mid, notas])
+  const textoUnidad = (el: HTMLElement) => (el.innerText || el.textContent || '').trim()
+  const textosIdea = () => lista.map(textoUnidad)
+  const dudasIdea = dudas.filter((d) => d.clave === b.clave)
+  const esDudaActiva = !!lista[u] && dudasIdea.some((d) => localizar(textosIdea(), d.u, d.texto) === u)
+  const alternarDudaActiva = useCallback(() => {
+    const el = lista[u]
+    if (!el) return
+    const t = textoUnidad(el)
+    const d: Duda = { clave: b.clave, u, texto: inicio40(t), parrafo: t.slice(0, MAX_PARRAFO), en: Date.now() }
+    const n = alternarDuda(dudas, d)
+    setDudas(n)
+    setAnuncio(n.length > dudas.length ? `Párrafo ${u + 1} marcado como duda.` : `Párrafo ${u + 1}: duda quitada.`)
+  }, [lista, u, b.clave, dudas])
+  // Ir a un párrafo de otra idea (o de esta): la idea cambia y el párrafo activo empieza en él.
+  const irAParrafo = (idea: number, parrafo: number) => {
+    setCerrada(false)
+    setVerDudas(false)
+    if (idea === i && lista.length) irUnidad(parrafo)
+    else {
+      uInicial.current = parrafo
+      setI(idea)
+    }
+  }
+  // «Explícame»: lo único que llama al modelo. Una llamada corta por duda, la misma de la mascota (tecla A).
+  const explicar = async (cuales: Duda[]) => {
+    if (!cuales.length || explicando) return
+    setErrorExplicar(null)
+    for (const [k, d] of cuales.entries()) {
+      setExplicando(cuales.length > 1 ? `Explicando ${k + 1} de ${cuales.length}…` : 'Explicando…')
+      try {
+        const r = await pedir<{ texto: string }>(`/api/estudio/${mid}/parrafo`, enviarJson({ clave: d.clave, parrafo: d.parrafo, accion: 'facil', pregunta: null }))
+        const n: Nota = { clave: d.clave, u: d.u, texto: d.texto, respuesta: r.texto, accion: 'facil', en: Date.now() }
+        setNotas((ns) => ponerNota(ns, n))
+        setNotasAbiertas((s) => new Set(s).add(claveNota(n)))
+      } catch (e) {
+        setErrorExplicar(`No he podido explicártelo: ${mensajeDe(e)}`)
+        break
+      }
+    }
+    setExplicando(null)
+  }
+  // Lo que la mascota explica de un párrafo se queda guardado debajo de él.
+  const guardarRespuesta = (el: HTMLElement, accion: string, respuesta: string) => {
+    const k = lista.indexOf(el)
+    if (k < 0) return
+    const n: Nota = { clave: b.clave, u: k, texto: inicio40(textoUnidad(el)), respuesta, accion, en: Date.now() }
+    setNotas((ns) => ponerNota(ns, n))
+    setNotasAbiertas((s) => new Set(s).add(claveNota(n)))
+  }
+  const notaDe = (d: Duda) => notas.find((n) => n.clave === d.clave && n.texto === d.texto)
+
+  // La ruta, mientras la lección está abierta: #/foco/<apuntes>/<idea> (recargar te deja aquí). La historia guarda
+  // a dónde volver; al salir con «Salir» o Esc, vuelves allí (Hoy, la lista, Lecciones…).
+  const [desde] = useState(() =>
+    rutaDeVuelta({ estado: window.history.state, recordada: leerRutaRecordada(Date.now()), actual: window.location.hash }),
+  )
+  useEffect(() => {
+    olvidarRutaRecordada()
+    return () => {
+      // Si sales por otro camino (Repasar ahora, Examinarme…), la ruta de la lección no se queda puesta.
+      if (esRutaLeccion(window.location.hash)) window.history.replaceState(null, '', desde)
+    }
+  }, [desde])
+  useEffect(() => {
+    window.history.replaceState({ ...(window.history.state ?? {}), desde }, '', rutaFoco(mid, i))
+  }, [mid, i, desde])
+  const salirFoco = useCallback(() => {
+    alSalir()
+    volverA(desde)
+  }, [alSalir, desde])
+
+  // «Seguías aquí»: al volver a una lección empezada, la marca se ilumina un momento en el párrafo donde ibas.
+  const reanudada = useRef(!!inicial && (inicial.i > 0 || (inicial.u ?? 0) > 0))
+  const [seguias, setSeguias] = useState(false)
+  const tSeguias = useRef(0)
+  useEffect(() => () => window.clearTimeout(tSeguias.current), [])
+  useEffect(() => {
+    if (!reanudada.current || pantalla !== 'idea' || !marca) return
+    reanudada.current = false
+    setSeguias(true)
+    tSeguias.current = window.setTimeout(() => setSeguias(false), SEGUIAS_MS)
+  }, [pantalla, marca])
 
   const ideaVista = useRef(i)
   useEffect(() => {
@@ -567,28 +811,31 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
     }
   }, [i, zen])
 
-  // Reloj: solo cuenta con la pestaña a la vista, sin pausa y sin descanso.
+  // Lo que llevas de estudio (para el cierre): solo cuenta con la pestaña a la vista, sin pausa y sin descanso.
   useEffect(() => {
-    if (pausado || descanso != null || cerrada) return
+    if (enPausa || descanso || cerrada) return
     const t = setInterval(() => {
       if (document.visibilityState === 'visible') setSegundos((s) => s + 1)
     }, 1000)
     return () => clearInterval(t)
-  }, [pausado, descanso, cerrada])
+  }, [enPausa, descanso, cerrada])
 
+  // Sin pomodoro en marcha, el ajuste «Pausa» crea uno (también al acabar un descanso). Al salir, sigue fuera.
+  const { empezar: empezarPomodoro } = pomo
   useEffect(() => {
-    if (ritmo.pausa > 0 && segundos > 0 && segundos % (ritmo.pausa * 60) === 0) setAvisoPausa(true)
-  }, [segundos])
-
-  useEffect(() => {
-    if (descanso == null) return
-    if (descanso <= 0) {
-      setDescanso(null)
-      return
-    }
-    const t = setTimeout(() => setDescanso((d) => (d == null ? null : d - 1)), 1000)
-    return () => clearTimeout(t)
-  }, [descanso])
+    if (crearPomodoro(pomo.p, ritmo.pausa, cerrada)) empezarPomodoro(ritmo.pausa, pomo.p.descanso)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pomo.p.fase, ritmo.pausa, cerrada])
+  const volverDelDescanso = () => empezarPomodoro(ritmo.pausa > 0 ? ritmo.pausa : pomo.p.foco, pomo.p.descanso)
+  const cambiarPausa = (min: number) => {
+    const r = { ...ritmo, pausa: min }
+    setRitmo(r)
+    guardarRitmo(r)
+    // El pomodoro que corre se rehace con la nueva medida (el descanso en curso, no); «sin pausa» lo para.
+    if (min > 0 && pomo.p.fase !== 'descanso') empezarPomodoro(min, pomo.p.descanso)
+    else if (min === 0 && pomo.p.fase === 'foco') pomo.parar()
+  }
+  const relojTexto = textoReloj({ p: pomo.p, quedan: pomo.quedan, segundos, zen })
 
   useEffect(() => {
     if (!cerrada) guardarAvance(mid, { i, comprobado, segundos, u, borradores, servidas, n: bloques.length, en: Date.now() })
@@ -654,23 +901,25 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
   )
 
   // Con la comprobación pendiente, → (o ↓ en el último párrafo) te lleva a ella y la señala un momento.
-  const reclamar = useCallback(() => {
+  const reclamar = useCallback((enfocar = true) => {
     const caja = cuerpo?.querySelector<HTMLElement>('.foco-comprobar')
     if (!caja || !cuerpo) return
     const zona = cuerpo.getBoundingClientRect()
     const r = caja.getBoundingClientRect()
     const escala = cuerpo.offsetHeight ? zona.height / cuerpo.offsetHeight : 1
     desplazarA(cuerpo, cuerpo.scrollTop + (r.top - (zona.top + zona.height * 0.2)) / escala)
-    caja.querySelector('textarea')?.focus({ preventScroll: true })
+    if (enfocar) caja.querySelector('textarea')?.focus({ preventScroll: true })
     caja.classList.add('reclama')
     window.setTimeout(() => caja.classList.remove('reclama'), 1200)
   }, [cuerpo])
+  reclamarRef.current = reclamar
 
   const teclas = useCallback(
     (e: KeyboardEvent, ctx: { menuAbierto: boolean }) => {
       // Esc cierra capa a capa: los atajos, «+ Al mapa», el mapa y el glosario. Sin nada abierto, sales.
       if (e.key === 'Escape') {
         if (chuleta) setChuleta(false)
+        else if (lectura.leyendo) lectura.parar('Lectura parada')
         else if (seleccion) {
           setSeleccion(null)
           window.getSelection()?.removeAllRanges()
@@ -686,7 +935,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         cambiarZen()
         return true
       }
-      if (cerrada || descanso != null || calentando || reexplicando) return false
+      if (cerrada || descanso || calentando || reexplicando) return false
       if (debeIgnorar(e, { pantalla, menuAbierto: ctx.menuAbierto })) return false
       const k = e.key
       if (k === 'ArrowDown' || k === 'j' || (k === ' ' && !e.shiftKey)) {
@@ -704,12 +953,18 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       else if (k === 'g' && hayGlosario) setGlosario((g) => !g)
       else if (k === 'm') setVerMapa((v) => !v)
       else if (k === 'a') setAbrirAyuda((x) => x + 1)
-      else if (k === '?') setChuleta((c) => !c)
+      else if (k === 'n' || k === 'N') alternarDudaActiva()
+      else if (k === 'p' || k === 'P') void lectura.alternar()
+      else if ((k === 'd' || k === 'D') && pendiente && b.pregunta?.tipo === 'hablada') {
+        // D: a la comprobación hablada y dictar (o dejar de dictar). El foco va al botón, no a la caja: otra D para.
+        reclamar(false)
+        setDictar((x) => x + 1)
+      } else if (k === '?') setChuleta((c) => !c)
       else return false
       e.preventDefault()
       return true
     },
-    [ir, glosario, cerrada, descanso, calentando, reexplicando, hayGlosario, chuleta, seleccion, verMapa, pantalla, lista, u, pendiente, reclamar, mover, irUnidad, zen, cambiarZen],
+    [ir, glosario, cerrada, descanso, calentando, reexplicando, hayGlosario, chuleta, seleccion, verMapa, pantalla, lista, u, pendiente, reclamar, mover, irUnidad, zen, cambiarZen, b.pregunta, alternarDudaActiva, lectura],
   )
 
   const cerrar = async () => {
@@ -731,10 +986,41 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
     setCerrada(true)
   }
 
-  const notas = Object.values(comprobado)
+  const notasComprobadas = Object.values(comprobado)
   // Lo que vuelve en tu repaso: lo fallado y lo que salió a medias. Lo saltado no cuenta (no contestaste).
   const flojas = Object.entries(comprobado).filter(([, n]) => n === 'fallo' || n === 'parcial')
   const saltadas = Object.entries(comprobado).filter(([, n]) => n === 'saltada')
+  // «Lo que flojeó»: las dudas por párrafo, lo fallado y lo que salió a medias; cada duda con su explicación, si la hay.
+  const flojo = loQueFlojeo(bloques, comprobado, dudas)
+  const porExplicar = sinExplicar(dudas, notas)
+  const listaFlojo = (items: Flojo[]) => (
+    <ul className="foco-flojeo-lista">
+      {items.map((x) => {
+        const d = x.tipo === 'duda' ? dudas.find((y) => y.clave === x.clave && y.u === x.u && y.texto === x.texto) : undefined
+        const nota = d ? notaDe(d) : undefined
+        return (
+          <li key={`${x.tipo}-${x.clave}-${x.u ?? ''}`}>
+            <span className={`chip ${x.tipo === 'duda' ? 'chip-duda' : `nota-${x.tipo}`}`}>{x.tipo === 'duda' ? 'Duda' : (NOTA[x.tipo] ?? x.tipo)}</span>
+            <span className="foco-flojeo-texto">
+              Idea {x.idea + 1}
+              {x.u != null ? `, párrafo ${x.u + 1}` : ''}: {x.tipo === 'duda' ? `«${x.texto}…»` : x.titulo}
+            </span>
+            {d && (
+              <button className="boton-mini" onClick={() => setDudas((ds) => quitarDuda(ds, d))} title="Quitar la duda">
+                Ya lo entiendo
+              </button>
+            )}
+            {nota && (
+              <details className="foco-nota" open={notasAbiertas.has(claveNota(nota))}>
+                <summary>La mascota te lo explicó así</summary>
+                <p>{nota.respuesta.replace(/\*\*/g, '')}</p>
+              </details>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
   const contestarSaltadas = () => {
     const claves = new Set(saltadas.map(([k]) => k))
     const n = bloques.findIndex((x) => claves.has(x.clave))
@@ -749,7 +1035,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       titulo={tituloFoco}
       placa={leccion.leccion_clave}
       leccion={leccion.leccion_clave}
-      alSalir={alSalir}
+      alSalir={salirFoco}
       teclas={teclas}
       alCuerpo={setCuerpo}
       zen={zen}
@@ -778,9 +1064,20 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         </ol>
       }
       reloj={
-        <button className={`foco-reloj ${pausado ? 'pausado' : ''}`} onClick={() => setPausado(!pausado)} title={pausado ? 'Seguir' : 'Pausar el reloj'}>
-          {pausado ? 'En pausa ▶' : '❚❚'} {zen ? relojZen(segundos) : reloj(segundos)}
-          {previsto > 0 && !zen && <small> / {reloj(previsto)}</small>}
+        <button
+          className={`foco-reloj ${enPausa ? 'pausado' : ''}`}
+          onClick={() => (pomo.p.fase ? (enPausa ? pomo.seguir() : pomo.pausar()) : setPausado(!pausado))}
+          title={
+            pomo.p.fase
+              ? `${enPausa ? 'Seguir' : 'Pausar'} el pomodoro (es el mismo que el Tomate de la barra)`
+              : enPausa
+                ? 'Seguir'
+                : 'Pausar el reloj'
+          }
+        >
+          {enPausa ? 'En pausa ▶' : '❚❚'} {relojTexto.tiempo}
+          {!zen && relojTexto.fase && <small> · {relojTexto.fase}</small>}
+          {!zen && !relojTexto.fase && previsto > 0 && <small> / {reloj(previsto)}</small>}
         </button>
       }
       herramientas={
@@ -788,6 +1085,11 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
           {hayGlosario && (
             <button className="foco-boton" aria-pressed={glosario} onClick={() => { setGlosario(!glosario); setVerMapa(false) }} title="Términos y fórmulas (G)">
               {leccion.formulas.length ? 'Términos y fórmulas' : 'Términos'}
+            </button>
+          )}
+          {pantalla === 'idea' && (
+            <button className="foco-boton" aria-pressed={lectura.leyendo} onClick={() => void lectura.alternar()} title="Leer en voz alta desde el párrafo activo, con la voz de Magister (P)">
+              {lectura.leyendo ? 'Parar la lectura' : 'Leer en voz alta'}
             </button>
           )}
           <button className="foco-boton" aria-pressed={verMapa} onClick={() => { setVerMapa(!verMapa); setGlosario(false) }} title="Tu mapa de palabras clave (M)">
@@ -800,31 +1102,23 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
           )}
         </>
       }
-      aviso={
-        avisoPausa &&
-        descanso == null &&
-        !cerrada && (
-          <div className="foco-aviso" role="status">
-            Llevas {Math.round(segundos / 60)} minutos concentrado. Una pausa corta ahora hace que lo siguiente entre mejor.
-            {leccion.plan_id != null && ritmo.reexplicar === 'pausa' && (
-              <button className="boton boton-principal" onClick={() => { setAvisoPausa(false); setReexplicando(true) }} title="Explícate sin mirar lo que llevas; luego la pausa">
-                Reexplica lo que llevas
-              </button>
-            )}
-            <button className="boton" onClick={() => { setAvisoPausa(false); setDescanso(DESCANSO) }}>
-              Pausa de 5 min
-            </button>
-            <button className="boton" onClick={() => setAvisoPausa(false)}>
-              Sigo
-            </button>
-          </div>
-        )
-      }
       ajustes={
         <>
         <button className="foco-boton" aria-pressed={zen} onClick={() => cambiarZen()} title="Esconder la barra y el pie mientras lees (Z)">
           {zen ? '✓ ' : ''}Modo zen (Z)
         </button>
+        {leerPermisoDictado(typeof localStorage === 'undefined' ? null : localStorage) === 'si' && (
+          <button
+            className="foco-boton"
+            onClick={() => {
+              olvidarPermisoDictado()
+              setPermisoQuitado((x) => x + 1)
+            }}
+            title="El dictado usa el servicio de voz del navegador (en Chrome, los servidores de Google). Se volverá a preguntar."
+          >
+            Quitar el permiso de dictado
+          </button>
+        )}
         <span className="foco-ritmo-ajustes">
           <span className="foco-ancho">
             Ancho de la página
@@ -847,15 +1141,15 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
               ))}
             </span>
           </span>
-          <label>
+          <label title="El pomodoro del foco: es el mismo que el Tomate de la barra">
             Pausa
-            <select value={ritmo.pausa} onChange={(e) => { const r = { ...ritmo, pausa: Number(e.target.value) }; setRitmo(r); guardarRitmo(r) }}>
+            <select value={ritmo.pausa} onChange={(e) => cambiarPausa(Number(e.target.value))}>
               {[15, 25, 40, 50].map((m) => (
                 <option key={m} value={m}>
                   cada {m} min
                 </option>
               ))}
-              <option value={0}>sin aviso</option>
+              <option value={0}>sin pausa</option>
             </select>
           </label>
           <label>
@@ -903,7 +1197,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         ) : null
       }
       pie={
-        calentando ? (
+        pantalla === 'calentamiento' ? (
           <>
             <span className="foco-atajos">Unos minutos para tener el mapa antes de los detalles.</span>
             <button
@@ -917,7 +1211,8 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             </button>
           </>
         ) : !cerrada &&
-        descanso == null && (
+        !descanso &&
+        pantalla !== 'dudas' && (
           <>
             <button className="boton" disabled={i === 0} onClick={() => ir(-1)}>
               ← Anterior
@@ -925,6 +1220,11 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             {errorCierre ? (
               <span className="foco-atajos foco-error-cierre" role="alert" title={errorCierre}>
                 No he podido marcarla como hecha; tu avance sigue guardado.
+              </span>
+            ) : lectura.estado ? (
+              <span className="foco-atajos foco-lectura-estado">
+                {lectura.leyendo && <i className="foco-leyendo-punto" aria-hidden="true" />}
+                {lectura.estado}
               </span>
             ) : (
               <span className="foco-atajos">
@@ -950,10 +1250,20 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
                   <dd>Idea anterior y siguiente</dd>
                   <dt>A</dt>
                   <dd>La mascota te ayuda con el párrafo</dd>
+                  <dt>N</dt>
+                  <dd>No lo entiendo: marcar el párrafo como duda</dd>
+                  <dt>P</dt>
+                  <dd>Leer en voz alta desde el párrafo (P o Esc para)</dd>
                   <dt>L</dt>
                   <dd>Atenuar lo demás</dd>
                   <dt>Z</dt>
                   <dd>Modo zen: solo la página</dd>
+                  {b.pregunta?.tipo === 'hablada' && (
+                    <>
+                      <dt>D</dt>
+                      <dd>Dictar la respuesta de la comprobación</dd>
+                    </>
+                  )}
                   {hayGlosario && (
                     <>
                       <dt>G</dt>
@@ -980,6 +1290,9 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
                 enMapa={mapa?.nodos.map((n) => n.texto) ?? []}
                 abrir={abrirAyuda}
                 desplazadoHace={() => Date.now() - ultimoScroll.current}
+                esDuda={esDudaActiva}
+                alDuda={alternarDudaActiva}
+                alRespuesta={guardarRespuesta}
               />
             )}
             {pendiente && (
@@ -1007,16 +1320,17 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       <div className="solo-lector" aria-live="polite">
         {pantalla === 'idea' ? `Idea ${i + 1} de ${bloques.length}: ${b.titulo}` : ''}
       </div>
-      {descanso != null ? (
-        <section className="foco-descanso">
-          <span className="foco-etq">Descanso</span>
-          <strong>{reloj(descanso)}</strong>
-          <p>Levántate, mira lejos, bebe agua. Nada de pantallas: el cerebro ordena lo que acabas de leer mientras no haces nada.</p>
-          <button className="boton" onClick={() => setDescanso(null)}>
-            Volver ya
-          </button>
-        </section>
-      ) : reexplicando && leccion.plan_id != null ? (
+      <div className="solo-lector" aria-live="polite">
+        {anuncio}
+      </div>
+      {/* En zen, la barra y el pie están apartados: lo que hace la lectura va en una pastilla pequeña, solo mientras dura. */}
+      {zen && lectura.estado && (
+        <span className="foco-leyendo-pastilla" aria-hidden="true">
+          {lectura.leyendo && <i className="foco-leyendo-punto" />}
+          {lectura.estado}
+        </span>
+      )}
+      {reexplicando && leccion.plan_id != null ? (
         <Volcado
           planId={leccion.plan_id}
           clave={leccion.leccion_clave}
@@ -1028,11 +1342,50 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             if (n >= 0) setI(n)
             setReexplicando(false)
           }}
-          alCerrar={() => {
-            setReexplicando(false)
-            setDescanso(DESCANSO)
-          }}
+          // «Ahora no» (o acabar) solo cierra Reexplicar: si el pomodoro está en su descanso, se vuelve a él.
+          alCerrar={() => setReexplicando(false)}
         />
+      ) : descanso ? (
+        <section className="foco-descanso">
+          <span className="foco-etq">Descanso</span>
+          <strong>{mmssDe(pomo.quedan ?? 0)}</strong>
+          <p>
+            Levántate, mira lejos, bebe agua. Nada de pantallas: el cerebro ordena lo que acabas de leer mientras no haces nada. Es el
+            mismo pomodoro que llevas fuera del foco.
+          </p>
+          <div className="botones">
+            {leccion.plan_id != null && ritmo.reexplicar === 'pausa' && (
+              <button className="boton" onClick={() => setReexplicando(true)} title="Explícate sin mirar lo que llevas">
+                Antes, reexplica lo que llevas
+              </button>
+            )}
+            <button className="boton boton-principal" onClick={volverDelDescanso}>
+              Seguir leyendo
+            </button>
+          </div>
+        </section>
+      ) : pantalla === 'dudas' ? (
+        <section className="foco-cierre foco-dudas">
+          <span className="foco-etq">Antes de seguir</span>
+          <h1>Te quedaron estas dudas</h1>
+          <div className="foco-flojeo">
+            {listaFlojo(loQueFlojeo(bloques, {}, dudas))}
+            <div className="botones">
+              {porExplicar.length > 0 && (
+                <button className="boton boton-principal" disabled={!!explicando} onClick={() => explicar(porExplicar)} title="Una explicación corta de cada duda (llama al modelo)">
+                  {explicando ?? 'Explícamelas'}
+                </button>
+              )}
+              <button className="boton" onClick={() => { const x = loQueFlojeo(bloques, {}, dudas)[0]; if (x) irAParrafo(x.idea, x.u ?? 0) }}>
+                Ir a la primera
+              </button>
+              <button className="boton" onClick={() => setVerDudas(false)}>
+                Seguir donde lo dejé
+              </button>
+            </div>
+            {errorExplicar && <TextoError texto={errorExplicar} />}
+          </div>
+        </section>
       ) : calentando && leccion.calentamiento ? (
         <Calentamiento
           mid={mid}
@@ -1058,7 +1411,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             </div>
             <div>
               <strong>
-                {notas.filter((n) => n === 'bien' || n === 'perfecta').length} de {bloques.filter((x) => x.pregunta).length}
+                {notasComprobadas.filter((n) => n === 'bien' || n === 'perfecta').length} de {bloques.filter((x) => x.pregunta).length}
               </strong>
               <span>comprobaciones bien</span>
             </div>
@@ -1081,17 +1434,23 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
               </div>
             </>
           )}
-          {flojas.length > 0 ? (
-            <>
-              <p>Vuelve en tu repaso, antes que lo demás:</p>
-              <ul className="foco-flojas">
-                {flojas.map(([k, n]) => (
-                  <li key={k}>
-                    {bloques.find((x) => x.clave === k)?.titulo ?? k} <span className={`chip nota-${n}`}>{NOTA[n] ?? n}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
+          {flojo.length > 0 ? (
+            <div className="foco-flojeo">
+              <h2>Lo que flojeó</h2>
+              {flojas.length > 0 && <p className="nota">Lo fallado y lo que salió a medias vuelve en tu repaso, antes que lo demás.</p>}
+              {listaFlojo(flojo)}
+              <div className="botones">
+                {porExplicar.length > 0 && (
+                  <button className="boton boton-principal" disabled={!!explicando} onClick={() => explicar(porExplicar)} title="Una explicación corta de cada duda (llama al modelo)">
+                    {explicando ?? 'Explícame estas'}
+                  </button>
+                )}
+                <button className="boton" onClick={() => irAParrafo(flojo[0].idea, flojo[0].u ?? 0)} title="Vuelve a la lección, a la primera">
+                  Repasar estas
+                </button>
+              </div>
+              {errorExplicar && <TextoError texto={errorExplicar} />}
+            </div>
           ) : (
             !saltadas.length && <p>Todo bien. Los conceptos de hoy volverán en el repaso justo antes de que se te olviden.</p>
           )}
@@ -1104,7 +1463,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             <button className="boton" onClick={() => { alSalir(); irA('examen') }}>
               Examinarme de esta lección
             </button>
-            <button className="boton" onClick={alSalir}>
+            <button className="boton" onClick={salirFoco}>
               Salir del foco
             </button>
           </div>
@@ -1133,7 +1492,12 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             }}
           >
             <TextoLibro markdown={b.texto} className="foco-papel" />
-            {marca && <div className="foco-marca" aria-hidden="true" style={{ top: marca.top, height: marca.height }} />}
+            {marca && <div className={`foco-marca ${seguias ? 'seguias' : ''}`} aria-hidden="true" style={{ top: marca.top, height: marca.height }} />}
+            {marca && seguias && (
+              <span className="foco-seguias" role="status" style={{ top: marca.top - 26 }}>
+                Seguías aquí
+              </span>
+            )}
             <AsaAncho ancho={ancho} alCambiar={cambiarAncho} papel={papel} />
             {seleccion && (
               <button
@@ -1162,15 +1526,32 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
                 enMapa={mapa?.nodos.map((n) => n.texto) ?? []}
                 abrir={abrirAyuda}
                 desplazadoHace={() => Date.now() - ultimoScroll.current}
+                esDuda={esDudaActiva}
+                alDuda={alternarDudaActiva}
+                alRespuesta={guardarRespuesta}
               />
             )}
+            <NotasFoco lista={lista} clave={b.clave} dudas={dudas} notas={notas} abiertas={notasAbiertas} />
           </div>
+          {pendiente && !avisoDudasVisto.has(b.clave) && sinExplicar(dudasIdea, notas).length > 0 && (
+            <div className="foco-aviso-dudas" role="status">
+              <span>{textoAvisoDudas(sinExplicar(dudasIdea, notas).length)}</span>
+              <button className="boton boton-principal" disabled={!!explicando} onClick={() => explicar(sinExplicar(dudasIdea, notas))}>
+                {explicando ?? 'Sí, explícamelo'}
+              </button>
+              <button className="boton" onClick={() => setAvisoDudasVisto((s) => new Set(s).add(b.clave))}>
+                No, sigo
+              </button>
+              {errorExplicar && <TextoError texto={errorExplicar} />}
+            </div>
+          )}
           {b.pregunta && !comprobado[b.clave] && (
             <Comprobar
               key={b.clave}
               pregunta={b.pregunta}
               valor={borradores[b.clave]?.respuesta ?? ''}
               confianza={borradores[b.clave]?.confianza ?? null}
+              dictar={dictar}
               alCambiar={(x) => setBorradores((bs) => ({ ...bs, [b.clave]: x }))}
               alAcabar={(n) => {
                 setComprobado((c) => ({ ...c, [b.clave]: n }))
@@ -1315,6 +1696,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
   const [otras, setOtras] = useState<Opcion[]>([])
   const [planes, setPlanes] = useState<ResumenPlan[]>([])
   const [avance, setAvance] = useState<Avance | null>(null)
+  const [inicialFoco, setInicialFoco] = useState<Avance | null>(null)
   const [minutosRepaso, setMinutosRepaso] = useState<number | null>(null)
   const [semana, setSemana] = useState<{ hechas: number; total: number; sesiones: number; hechasN: number } | null>(null)
   // «Lo dejaste a medias»: el material que terminó desde tu visita anterior, las últimas conversaciones y lo descartado.
@@ -1328,8 +1710,10 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     setIntento((x) => x + 1)
   }, [])
 
-  const abrir = useCallback(async (mid: number) => {
-    setAvance(leerAvance(mid))
+  const abrir = useCallback(async (mid: number, idea: number | null = null) => {
+    // Lo que llevabas de la lección que abres va aparte del avance de la de hoy (la tarjeta): si no, la respuesta
+    // de /api/hoy que llega después lo pisaría y empezarías arriba.
+    setInicialFoco(aplicarIdea(leerAvance(mid), idea))
     try {
       setLeccion(await cargarLeccion(mid))
     } catch (e) {
@@ -1337,21 +1721,23 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     }
   }, [])
 
+  // La ruta se lee una sola vez, al llegar (si luego cambia lo de hoy, no se vuelve a abrir la lección).
+  const rutaLeida = useRef(false)
   useEffect(() => {
     // #/hoy/foco entra en la lección de hoy; #/hoy/foco/12, en la de esos apuntes.
-    // En la vista foco, #/foco abre la lista, #/foco/hoy la de hoy y #/foco/12 esos apuntes.
-    // #/foco abre la lista; #/foco/12, esos apuntes directamente.
-    const partes = window.location.hash.replace(/^#\/?/, '').split('/')
-    const foco = vista === 'foco' ? (partes[1] ? 'foco' : null) : partes[1]
-    const mid = vista === 'foco' ? (partes[1] === 'hoy' ? '' : partes[1]) : partes[2]
-    if (foco === 'foco') window.history.replaceState(null, '', vista === 'foco' ? '#/foco' : '#/hoy')
+    // En la vista foco, #/foco abre la lista, #/foco/hoy la de hoy, #/foco/12 esos apuntes y #/foco/12/3 su idea 3
+    // (es la ruta que lleva una lección abierta: recargar te deja donde estabas).
+    const ruta = rutaLeida.current ? { entrar: false, mid: null, idea: null } : leerRutaFoco(window.location.hash, vista)
+    rutaLeida.current = true
+    // La historia guarda a dónde volver al salir: no se pierde al limpiar la ruta.
+    if (ruta.entrar) window.history.replaceState(window.history.state, '', vista === 'foco' ? '#/foco' : '#/hoy')
     pedir<Hoy>('/api/hoy')
       .then((h) => {
         setHoy(h)
         if (h.material_id) setAvance(leerAvance(h.material_id))
-        if (foco === 'foco') {
-          const elegido = Number(mid) || (h.estado !== 'sin_preparar' ? h.material_id : null)
-          if (elegido) abrir(elegido)
+        if (ruta.entrar) {
+          const elegido = ruta.mid || (h.estado !== 'sin_preparar' ? h.material_id : null)
+          if (elegido) abrir(elegido, ruta.idea)
         }
       })
       .catch((e) => setFallo(mensajeDe(e)))
@@ -1448,7 +1834,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
           (leccion.material_id === hoy.material_id ? hoy.horas : undefined)
         }
         repasos={hoy.repasos}
-        inicial={avance}
+        inicial={inicialFoco}
         irA={irA}
         alSalir={() => {
           setLeccion(null)
@@ -1477,7 +1863,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
       </div>
     )
 
-  const seguir = avance && hoy.material_id ? `Seguir por la idea ${avance.i + 1}` : null
+  const seguir = avance && hoy.material_id ? textoSeguir(avance, Date.now()) : null
   const avisosAMedias = aMedias(
     {
       avances: leerAvancesFoco(),
@@ -1652,7 +2038,7 @@ function ElegirFoco({ hoy, otras, empezar }: { hoy: Hoy; otras: Opcion[]; empeza
           </h1>
           <div className="vacio-acciones">
             <button className="boton boton-principal" onClick={() => empezar(deHoy.material_id!)}>
-              {avanceHoy ? `Seguir por la idea ${avanceHoy.i + 1}` : 'Empezar'}
+              {avanceHoy ? textoSeguir(avanceHoy, Date.now()) : 'Empezar'}
             </button>
             {avanceHoy && (
               <button className="boton" onClick={() => empezar(deHoy.material_id!, true)}>
@@ -1679,7 +2065,7 @@ function ElegirFoco({ hoy, otras, empezar }: { hoy: Hoy; otras: Opcion[]; empeza
                     >
                       <span className="bloques-clave">{o.clave}</span>
                       <span>{tituloSencillo(ix, o.clave, o.titulo)}</span>
-                      <small>{!o.material_id ? 'Prepararla →' : av ? `a medias · idea ${av.i + 1}` : 'Empezar →'}</small>
+                      <small>{!o.material_id ? 'Prepararla →' : av ? textoSeguir(av, Date.now()) : 'Empezar →'}</small>
                     </button>
                   </li>
                 )

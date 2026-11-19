@@ -15,6 +15,8 @@ export interface Nodo {
 }
 
 const SALTAR = new Set(['H1', 'H2', 'H3', 'H4', 'HR'])
+// La clase del hueco donde va una nota bajo su párrafo (NotasFoco.tsx).
+export const HUECO_NOTA = 'foco-nota-hueco'
 const LISTAS = new Set(['UL', 'OL'])
 
 const tieneContenido = (n: Nodo) => !!n.textContent?.trim() || !!n.querySelector('svg, img, table')
@@ -27,6 +29,8 @@ export function unidades<T extends Nodo>(papel: { children: ArrayLike<T> }): T[]
   for (const hijo of Array.from(papel.children)) {
     const etiqueta = hijo.tagName.toUpperCase()
     if (SALTAR.has(etiqueta)) continue
+    // Lo que el foco pone entre párrafos (la explicación guardada de la mascota) no es una unidad del texto.
+    if (hijo.classList.contains(HUECO_NOTA)) continue
     if (LISTAS.has(etiqueta)) {
       for (const li of Array.from(hijo.children)) if (li.tagName.toUpperCase() === 'LI' && tieneContenido(li)) lista.push(li as T)
       continue
@@ -59,7 +63,8 @@ export function elegirPorLinea(rects: { top: number; bottom: number }[], linea: 
   return mejor
 }
 
-export type Pantalla = 'idea' | 'calentamiento' | 'reexplicar' | 'descanso' | 'cierre'
+// «dudas»: al volver otro día a una lección con dudas, lo primero que ves.
+export type Pantalla = 'idea' | 'calentamiento' | 'reexplicar' | 'descanso' | 'cierre' | 'dudas'
 
 export interface TeclaFoco {
   key: string
@@ -73,7 +78,7 @@ export interface TeclaFoco {
 
 const CAMPOS = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
 const CAJAS = '.companera-bocadillo, .foco-ajustes-caja, .foco-glosario, .foco-mapa, [role="dialog"]:not(.foco)'
-const PULSABLES = 'button, a, [role="button"]'
+const PULSABLES = 'button, a, summary, [role="button"]'
 
 // Si la tecla no es del modo foco: escribes, es un atajo del navegador, estás en una caja que tiene sus teclas, o la
 // pantalla no es la de leer una idea.
@@ -155,8 +160,11 @@ export interface Marca {
 // Lo que el ratón tiene que quedarse en un párrafo para activarlo.
 const ESPERA_RATON_MS = 400
 
-export function usarParrafoActivo(papel: HTMLElement | null, cuerpo: HTMLElement | null, claveIdea: string, inicial?: number | null) {
+// `sinRaton`: el ratón quieto encima no cambia el párrafo (mientras se lee en voz alta, no se salta solo).
+export function usarParrafoActivo(papel: HTMLElement | null, cuerpo: HTMLElement | null, claveIdea: string, inicial?: number | null, sinRaton = false) {
   const [u, setU] = useState(0)
+  const sinRatonRef = useRef(sinRaton)
+  sinRatonRef.current = sinRaton
   const [lista, setLista] = useState<HTMLElement[]>([])
   const [marca, setMarca] = useState<Marca | null>(null)
   const uRef = useRef(0)
@@ -310,7 +318,7 @@ export function usarParrafoActivo(papel: HTMLElement | null, cuerpo: HTMLElement
       espera = window.setTimeout(() => {
         const k = listaRef.current.indexOf(el)
         const quieto = Date.now() - ultimoScroll.current > ESPERA_RATON_MS
-        if (candidata === el && k >= 0 && quieto && !(window.getSelection()?.toString() ?? '').trim()) setU(k)
+        if (candidata === el && k >= 0 && quieto && !sinRatonRef.current && !(window.getSelection()?.toString() ?? '').trim()) setU(k)
         candidata = null
       }, ESPERA_RATON_MS)
     }

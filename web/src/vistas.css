@@ -259,7 +259,7 @@ body.en-foco { overflow: hidden; }
 .chip.nota-fallo { background: #e8c1bc; }
 .chip.nota-parcial { background: #ecd3a6; }
 .chip.nota-saltada { background: #d6d3cc; }
-.foco-cierre .botones { justify-content: center; flex-wrap: wrap; }
+.foco-cierre .botones, .foco-descanso .botones { justify-content: center; flex-wrap: wrap; }
 
 .foco-glosario {
   position: absolute; top: 57px; right: 0; bottom: 0; width: min(380px, calc(90vw / var(--zoom-ui, 1))); background: #201f1c; border-left: 1px solid #36352f;
@@ -392,6 +392,93 @@ body.en-foco .tomate-boton .tomate-icono, body.en-foco .riel-hoy.con-aviso svg {
   :root .foco.zen .foco-hecho.nota-fallo { color: #c8463c; }
   :root .foco.zen .foco-hecho.nota-parcial { color: #b0700a; }
 }
+
+/* ===== Retomar: «Seguías aquí» en la marca al volver a una lección empezada ===== */
+.foco-marca.seguias { animation: foco-seguias 4s var(--foco-curva); }
+@keyframes foco-seguias {
+  0% { box-shadow: 0 0 0 0 transparent; }
+  12% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--t-acento, #f2c200) 35%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.foco-seguias {
+  position: absolute; left: -12px; z-index: 6; font-size: 0.72rem; font-weight: 700; line-height: 1; padding: 4px 8px; border-radius: 999px;
+  background: var(--t-acento, #f2c200); color: var(--t-oscuro, #141414); white-space: nowrap; pointer-events: none;
+  animation: foco-desvanecer 4s forwards;
+}
+@keyframes foco-desvanecer { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ===== «No lo entiendo» (N): la duda subrayada, la explicación guardada debajo y lo que flojeó ===== */
+.foco .foco-papel [data-u].duda {
+  text-decoration: underline dotted color-mix(in srgb, #e5817a 75%, transparent); text-decoration-thickness: 2px; text-underline-offset: 4px;
+}
+.foco-nota-hueco { margin: 0.5em 0 0.85em; }
+.foco-nota {
+  padding: 8px 14px; border-radius: 10px; border-left: 3px solid var(--t-acento, #f2c200);
+  background: color-mix(in srgb, var(--t-acento, #f2c200) 9%, transparent); font-size: 0.86em; line-height: 1.55;
+}
+.foco-nota summary { cursor: pointer; font-weight: 700; font-size: 0.92em; opacity: 0.9; }
+/* Plegada, casi no se ve: una línea suave bajo el párrafo. */
+.foco-nota:not([open]) { background: transparent; padding-top: 2px; padding-bottom: 2px; border-left-color: color-mix(in srgb, var(--t-acento, #f2c200) 45%, transparent); }
+.foco-nota:not([open]) summary { font-weight: 600; opacity: 0.6; }
+.foco-nota p { margin: 6px 0 0; white-space: pre-line; }
+.foco-aviso-dudas {
+  margin-top: 26px; padding: 12px 16px; border-radius: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  background: #2a2614; color: #f3e6b0; border: 1px solid #4a4220; font-size: 0.95rem;
+}
+.foco-aviso-dudas > span { flex: 1 1 260px; }
+.foco-aviso-dudas .boton { padding: 5px 12px; }
+.foco-aviso-dudas .boton:not(.boton-principal) { background: transparent; color: #f3e6b0; border-color: #6b5e2a; }
+.foco-flojeo { margin: 0 auto 22px; text-align: left; max-width: 560px; }
+.foco-flojeo h2 { font-size: 1.05rem; margin: 0 0 6px; color: #fff; }
+.foco-flojeo .nota { margin: 0 0 10px; font-size: 0.85rem; opacity: 0.75; }
+.foco-flojeo-lista { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-direction: column; gap: 8px; }
+.foco-flojeo-lista li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; font-size: 0.92rem; }
+.foco-flojeo-lista .foco-flojeo-texto { flex: 1 1 260px; }
+.foco-flojeo-lista .foco-nota { flex-basis: 100%; }
+.foco-flojeo-lista .chip { color: var(--t-oscuro, #141414); }
+.chip.chip-duda { background: #e8d9f0; }
+.foco-flojeo .botones { justify-content: flex-start; }
+.companera-guardada { font-size: 0.8rem; opacity: 0.7; margin: 4px 0 8px; }
+:root .foco.zen .foco-aviso-dudas { background: var(--zen-caja); color: var(--zen-texto); border-color: var(--zen-caja-borde); }
+:root .foco.zen .foco-aviso-dudas .boton:not(.boton-principal) { color: var(--zen-texto); border-color: var(--zen-boton-borde); }
+:root .foco.zen .foco-flojeo h2 { color: var(--zen-texto); }
+:root .foco.zen .foco-nota { color: var(--zen-tinta); background: color-mix(in srgb, var(--zen-acento-texto) 10%, var(--zen-papel)); border-left-color: var(--zen-marca); }
+:root .foco.zen .foco-nota:not([open]) { background: transparent; border-left-color: color-mix(in srgb, var(--zen-marca) 40%, transparent); }
+@media (prefers-color-scheme: light) {
+  :root .foco.zen .foco-papel [data-u].duda { text-decoration-color: color-mix(in srgb, #c8463c 70%, transparent); }
+}
+
+/* ===== Leer en voz alta (P): el estado, en el pie (o en una pastilla en zen) ===== */
+.foco-lectura-estado { display: inline-flex; align-items: center; opacity: 0.9; }
+.foco-leyendo-punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--t-acento, #f2c200); margin-right: 7px; flex: none; animation: foco-latido 1s infinite; }
+.foco-leyendo-pastilla {
+  position: fixed; left: 16px; bottom: 12px; z-index: 45; display: inline-flex; align-items: center; max-width: calc(100% - 32px);
+  font-size: 0.75rem; padding: 4px 10px; border-radius: 999px; pointer-events: none;
+  background: color-mix(in srgb, var(--zen-texto, #e9e9e9) 10%, transparent); color: var(--zen-texto, #e9e9e9);
+}
+:root .foco.zen .foco-leyendo-punto { background: var(--zen-marca); }
+
+/* ===== Comprobaciones habladas: «Dictar» (D) ===== */
+.foco-comprobar-cabeza { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+.foco-dictar { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
+.foco-dictar svg { width: 14px; height: 14px; }
+.foco-dictar[aria-pressed="true"] { border-color: #e5817a; color: #e5817a; }
+.foco-escuchando { margin-left: auto; font-size: 0.82rem; opacity: 0; transition: opacity var(--foco-rapido) var(--foco-curva); display: inline-flex; align-items: center; }
+.foco-escuchando + .foco-dictar { margin-left: 0; }
+.foco-escuchando.si { opacity: 0.85; }
+.foco-escuchando i { width: 8px; height: 8px; border-radius: 50%; background: #e5817a; margin-right: 6px; animation: foco-latido 0.9s infinite; }
+@keyframes foco-latido { 50% { opacity: 0.35; } }
+.foco-dictado-aviso {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 12px; padding: 10px 14px; border-radius: 10px;
+  background: #2a2614; color: #f3e6b0; border: 1px solid #4a4220; font-size: 0.9rem; line-height: 1.45;
+}
+.foco-dictado-aviso span { flex: 1 1 280px; }
+.foco-dictado-aviso .boton { padding: 5px 12px; }
+.foco-dictado-aviso .boton:not(.boton-principal) { background: transparent; color: #f3e6b0; border-color: #6b5e2a; }
+.foco-dictado-error { margin: 0 0 10px; font-size: 0.88rem; color: #f3b8b2; }
+:root .foco.zen .foco-dictado-aviso { background: var(--zen-caja); color: var(--zen-texto); border-color: var(--zen-caja-borde); }
+:root .foco.zen .foco-dictado-aviso .boton:not(.boton-principal) { color: var(--zen-texto); border-color: var(--zen-boton-borde); }
+@media (prefers-color-scheme: light) { :root .foco.zen .foco-dictado-error { color: #c8463c; } }
 
 /* ===== Barra lateral por secciones ===== */
 .grupos-modos { display: flex; flex-direction: column; gap: 14px; }

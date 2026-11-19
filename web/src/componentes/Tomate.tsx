@@ -5,7 +5,7 @@ import { mmss, usarPomodoro } from './pomodoro.ts'
 
 function IconoTomate({ fase }: { fase: 'foco' | 'descanso' | null }) {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden className={`tomate-icono ${fase ?? ''}`}>
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden className={`tomate-icono ${fase ? `fase-${fase}` : ''}`}>
       <path className="tomate-cuerpo" d="M12 6.2c4.6 0 8 2.9 8 7.1 0 4.3-3.6 7.2-8 7.2s-8-2.9-8-7.2c0-4.2 3.4-7.1 8-7.1z" />
       <path className="tomate-hoja" d="M12 7.2c-.6-1.4-2-2.1-3.6-1.8 1 .5 1.7 1.2 2 2.1-1.5-.4-3-.1-4 .9 1.6.1 3 .6 3.9 1.4M12 7.2c.6-1.4 2-2.1 3.6-1.8-1 .5-1.7 1.2-2 2.1 1.5-.4 3-.1 4 .9-1.6.1-3 .6-3.9 1.4M12 7.2V4" />
     </svg>
@@ -40,7 +40,7 @@ export default function Tomate() {
     <div className="tomate" ref={caja}>
       <button
         type="button"
-        className={`tomate-boton ${fase ?? ''} ${fase && !pomo.p.fin ? 'pausado' : ''}`}
+        className={`tomate-boton ${fase ? `fase-${fase}` : ''} ${fase && !pomo.p.fin ? 'pausado' : ''}`}
         onClick={() => setAbierto(!abierto)}
         aria-label="Pomodoro"
         title={fase ? `Pomodoro: ${fase === 'foco' ? 'foco' : 'descanso'}` : 'Pomodoro'}

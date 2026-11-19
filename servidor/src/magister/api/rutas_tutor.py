@@ -149,6 +149,11 @@ def colocar_preguntas(preguntas, bloques_contrato: list[dict]) -> dict[str, dict
     return por_bloque
 
 
+def con_tipo(por_bloque: dict[str, dict], tipos: dict[str, str]) -> dict[str, dict]:
+    """Cada comprobación con su tipo: en las «habladas», el foco ofrece dictar la respuesta."""
+    return {clave: {**p, "tipo": tipos.get(p["pregunta_id"])} for clave, p in por_bloque.items()}
+
+
 @rutas.get("/tutor/leccion/{material_id}")
 async def leccion(material_id: int, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     m = await s.get(Material, material_id)
@@ -156,14 +161,14 @@ async def leccion(material_id: int, s: AsyncSession = Depends(sesion_por_peticio
         raise HTTPException(404, "material no encontrado")
     bloques = (await s.execute(text(
         "select clave, titulo, texto from bloques_material where material_id = :m order by length(clave), clave"), {"m": material_id})).all()
-    preguntas = (await s.execute(
-        select(Pregunta.id, Pregunta.donde, Pregunta.enunciado, PreguntaConcepto.concepto_id)
+    filas = (await s.execute(
+        select(Pregunta.id, Pregunta.donde, Pregunta.enunciado, PreguntaConcepto.concepto_id, Pregunta.tipo)
         .join(PreguntaConcepto, PreguntaConcepto.pregunta_id == Pregunta.id)
         .where(Pregunta.plan_id == m.plan_id, Pregunta.leccion_clave == m.leccion_clave, Pregunta.estado == "activa")
         .order_by(Pregunta.id))).all()
     titulo, tema, _ = await almacen.datos_leccion(m.plan_id, m.leccion_clave)
     contrato = m.contrato or {}
-    por_bloque = colocar_preguntas(preguntas, contrato.get("bloques", []))
+    por_bloque = con_tipo(colocar_preguntas([f[:4] for f in filas], contrato.get("bloques", [])), {f[0]: f[4] for f in filas})
     return {"plan_id": m.plan_id, "leccion_clave": m.leccion_clave, "titulo": titulo, "tema": tema,
             "definiciones": contrato.get("definiciones", []), "formulas": contrato.get("formulas", []),
             "bloques": [{"clave": c, "titulo": t, "texto": x, "pregunta": por_bloque.get(c)} for c, t, x in bloques],
