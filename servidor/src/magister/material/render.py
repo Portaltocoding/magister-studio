@@ -50,13 +50,29 @@ class Render:
     error: str | None = None
 
 
+# Lo único que el render (python, pandoc, node y Chromium, que pinta HTML hecho en parte con fuentes de la web) hereda
+# del entorno: lista blanca. Nada de PGPASSWORD, CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_*, MAGISTER_* ni rutas de secretos.
+_HEREDA = (
+    "PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TMPDIR", "TMP", "TEMP",
+    # Windows: sin ellas Python, node o Chrome no arrancan (SYSTEMROOT) o no encuentran dónde escribir.
+    "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "USERPROFILE", "LOCALAPPDATA", "APPDATA",
+    "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMDATA", "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE",
+    # Marp: el navegador que usa y, para que npx descargue, el proxy si lo hay.
+    "CHROME_PATH", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+)
+
+
+def entorno_minimo() -> dict:
+    """El entorno de un proceso que pinta (motor del PDF, Marp): solo lo de `_HEREDA`."""
+    return {k: v for k in _HEREDA if (v := os.environ.get(k)) is not None}
+
+
 def _entorno(estilo: str = "libro", acento: str | None = None) -> dict:
     extra = [ajustes.pandoc, str(GIT_BIN)]
     # La maqueta del libro (practica.css), no la de las fichas generales.
-    entorno = {**os.environ, "PATH": os.pathsep.join([*extra, os.environ.get("PATH", "")]), "PYTHONUTF8": "1",
+    entorno = {**entorno_minimo(), "PATH": os.pathsep.join([*extra, os.environ.get("PATH", "")]), "PYTHONUTF8": "1",
                "FICHA_CSS": ESTILOS.get(estilo, "practica.css"),
                "FICHA_CHROME": ajustes.chrome, "FICHA_CHROME_ARGS": ajustes.chrome_args}
-    entorno.pop("FICHA_ACENTO", None)
     if acento and _HEX.fullmatch(acento):
         entorno["FICHA_ACENTO"] = acento
     return entorno

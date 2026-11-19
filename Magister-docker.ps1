@@ -119,7 +119,7 @@ if (-not (TokenValido)) {
         claude setup-token
     } else {
         Decir "Preparando Magister (la primera vez descarga varios GB y puede tardar de 10 a 40 minutos)..."
-        docker build -t $imagenApi servidor
+        docker compose --profile docker build api
         if ($LASTEXITCODE -ne 0) { Salir "No he podido preparar Magister. Mira el mensaje de arriba y comprueba tu conexión y el espacio en disco." }
         Decir "Ahora sigue las instrucciones: abre el enlace que sale, inicia sesión y copia el código que te dan."
         docker run --rm -it --entrypoint claude $imagenApi setup-token

@@ -1,5 +1,8 @@
 # La API de Magister Studio en dos etapas (Parte VI, «Todo en Docker Compose»). Sirve para amd64 y arm64 (Mac con M1+).
-FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-bookworm-slim AS dependencias
+# uv sale de su imagen mínima: las de uv con Python ya no se publican sobre bookworm, y así las dos etapas son la
+# misma Debian (el .venv se copia tal cual).
+FROM python:3.12-slim-bookworm AS dependencias
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 COPY pyproject.toml uv.lock README.md ./
@@ -27,16 +30,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # funciona sin voz: el tutor no habla en voz alta y exportar vídeo dice que falta Piper. CON_VOZ=0 la quita.
 ARG CON_VOZ=1
 ARG PIPER_VERSION=2023.11.14-2
+# Las voces, fijadas a una revisión: las de `main` (noviembre de 2026) traen fonemas de varios caracteres que este
+# Piper no entiende y se cae con cada frase. La prueba del final (decir «Hola» con cada voz) lo comprueba.
+ARG PIPER_VOCES_REV=e7229f7d33a10e145e109b886d661984201ac3c4
 ARG TARGETARCH
 RUN if [ "$CON_VOZ" = "1" ]; then \
       arq="$([ "$TARGETARCH" = "arm64" ] && echo aarch64 || echo x86_64)"; \
-      voces="https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_ES"; \
+      voces="https://huggingface.co/rhasspy/piper-voices/resolve/${PIPER_VOCES_REV}/es/es_ES"; \
       ( set -e; mkdir -p /opt/piper-voces \
         && curl -fsSL "https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_${arq}.tar.gz" | tar -xz -C /opt \
         && for v in sharvard davefx; do for ext in onnx onnx.json; do \
              curl -fsSL -o "/opt/piper-voces/es_ES-${v}-medium.${ext}" "${voces}/${v}/medium/es_ES-${v}-medium.${ext}"; \
            done; done \
-        && test -x /opt/piper/piper ) \
+        && for v in sharvard davefx; do \
+             echo Hola | /opt/piper/piper -q --model "/opt/piper-voces/es_ES-${v}-medium.onnx" --output_file /tmp/prueba.wav \
+             && test -s /tmp/prueba.wav && rm /tmp/prueba.wav || exit 1; \
+           done ) \
       || { echo "AVISO: no se ha podido instalar Piper; Magister funcionará sin voz"; rm -rf /opt/piper /opt/piper-voces; }; \
     fi
 
@@ -49,13 +58,16 @@ COPY --chown=magister:magister alembic.ini ./
 COPY --chown=magister:magister config ./config
 COPY --chown=magister:magister evals ./evals
 COPY --chown=magister:magister entrada.sh ./entrada.sh
+# Las reglas de tono, el glosario y la rúbrica del juez viven en docs/ del repo (fuera de servidor/): llegan por el
+# contexto «docs» de compose.yaml (additional_contexts) y van a /docs, donde las busca magister.tono.
+COPY --from=docs tono.md glosario.md rubrica.md /docs/
 # Todo lo que se guarda va a /datos (volumen) y las copias de la base a /copias (otro volumen); los modelos de
 # embeddings (unos 600 MB) se descargan una vez a /datos/hf y sobreviven a actualizar.
 ENV PATH="/app/.venv/bin:$PATH" HOME=/home/magister PYTHONUTF8=1 HF_HOME=/datos/hf \
     MAGISTER_CHECKPOINTS=/datos/checkpoints.sqlite MAGISTER_CRUDO=/datos/crudo MAGISTER_SALIDAS=/datos/salidas \
     MAGISTER_REGISTROS=/datos/registros MAGISTER_SERVIR_WEB=false \
     MAGISTER_VOZ_PIPER=/opt/piper/piper MAGISTER_VOZ_DIR=/opt/piper-voces \
-    MAGISTER_CHROME=/usr/bin/chromium MAGISTER_CHROME_ARGS=--no-sandbox CHROME_PATH=/usr/bin/chromium \
+    MAGISTER_CHROME=/usr/bin/chromium CHROME_PATH=/usr/bin/chromium \
     MAGISTER_COPIAS=/copias MAGISTER_CONTENEDOR_DB= MAGISTER_COPIA_DIARIA=true
 USER magister
 EXPOSE 8000

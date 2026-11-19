@@ -4,7 +4,6 @@ Se pintan con `npx @marp-team/marp-cli` a HTML y a PDF (sin `--allow-local-files
 """
 
 import asyncio
-import os
 import re
 import shutil
 
@@ -14,6 +13,7 @@ from magister.cerebro.estructura import estructurar
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
 from magister.material.almacen import carpeta_salidas
+from magister.material.render import entorno_minimo
 from magister.tono.hallazgo import Hallazgo
 
 MAX_LINEAS, MAX_PALABRAS = 5, 16
@@ -164,7 +164,7 @@ async def pintar_marp(marp: str, plan_id: int, clave: str) -> dict:
         try:
             proc = await asyncio.create_subprocess_exec(
                 npx, "--yes", ajustes.marp, str(md), f"--{formato}", "-o", str(salida),
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env={**os.environ},
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=entorno_minimo(),
             )
             await asyncio.wait_for(proc.communicate(), timeout=240)
         except (TimeoutError, OSError) as e:

@@ -5,27 +5,63 @@ import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const [htmlPath, outArg, footer = ''] = process.argv.slice(2);
 const html = pathToFileURL(resolve(htmlPath)).href;
 const out = resolve(outArg);
 const profile = mkdtempSync(join(tmpdir(), 'ficha-chrome-'));
-// El navegador llega de MAGISTER_CHROME (FICHA_CHROME); en Docker es Chromium con --no-sandbox (FICHA_CHROME_ARGS).
+// El navegador llega de MAGISTER_CHROME (FICHA_CHROME) y sus argumentos de más de MAGISTER_CHROME_ARGS.
 const exe = process.env.FICHA_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const extra = (process.env.FICHA_CHROME_ARGS || '').split(/\s+/).filter(Boolean);
-const chrome = spawn(exe, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-  '--no-first-run', '--disable-gpu', '--allow-file-access-from-files', ...extra, 'about:blank'], { stdio: 'ignore' });
-chrome.on('error', (e) => {
+// La página que se pinta sale en parte del modelo y de fuentes de la web: sin red (todo nombre resuelve a nada y,
+// abajo, Fetch corta lo que no sea file: o data:), sin JavaScript propio (KaTeX lo mete este script por CDP) y con
+// un perfil de usar y tirar.
+const lanzar = (mas = []) => spawn(exe, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  '--no-first-run', '--disable-gpu', '--allow-file-access-from-files', '--host-resolver-rules=MAP * ~NOTFOUND',
+  '--disable-background-networking', '--disable-sync', '--disable-extensions', '--disable-component-update',
+  ...extra, ...mas, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+let chrome = lanzar();
+const KATEX_JS = readFileSync(fileURLToPath(new URL('./katex/katex.min.js', import.meta.url)), 'utf8');
+const PINTAR_FORMULAS = String.raw`(() => {
+  document.querySelectorAll('span.math').forEach(e => {
+    const d = e.classList.contains('display');
+    const t = e.textContent.replace(/^\\[\(\[]/, '').replace(/\\[\)\]]$/, '');
+    katex.render(t, e, { displayMode: d, throwOnError: false, strict: false });
+  });
+  return true;
+})()`;
+const sinNavegador = (e) => {
   console.error(`No encuentro el navegador para pintar el PDF (${exe}): ${e.message}. Ajusta MAGISTER_CHROME.`);
   process.exit(2);
-});
+};
+chrome.on('error', sinNavegador);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Espera a que Chromium abra su puerto de depuración; false si el proceso muere antes (p. ej., sin sandbox usable).
+const esperarPuerto = async (proc, portFile) => {
+  let errores = '';
+  proc.stderr.on('data', (d) => { errores += d; });
+  for (let i = 0; i < 100 && !existsSync(portFile); i++) {
+    if (proc.exitCode !== null) return { ok: false, errores };
+    await sleep(100);
+  }
+  return { ok: existsSync(portFile), errores };
+};
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 try {
   const portFile = join(profile, 'DevToolsActivePort');
-  for (let i = 0; i < 100 && !existsSync(portFile); i++) await sleep(100);
+  let arranque = await esperarPuerto(chrome, portFile);
+  // En Linux, Chromium usa su sandbox (en Docker, gracias al perfil seccomp de compose.yaml). Si el sistema no lo
+  // permite, se pinta igual sin él, con la red y el JavaScript de la página ya cortados, y se dice en la salida.
+  if (!arranque.ok && process.platform === 'linux' && /sandbox/i.test(arranque.errores) && !extra.includes('--no-sandbox')) {
+    console.error('NOTA: Chromium no puede usar su sandbox aquí; pinto el PDF con --no-sandbox.');
+    chrome = lanzar(['--no-sandbox']);
+    chrome.on('error', sinNavegador);
+    arranque = await esperarPuerto(chrome, portFile);
+  }
+  if (!arranque.ok) throw new Error(`Chromium no arranca: ${arranque.errores.slice(-500)}`);
   const port = readFileSync(portFile, 'utf8').split('\n')[0];
   const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
   const ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
@@ -39,6 +75,11 @@ try {
       const { res, rej } = pending.get(m.id);
       pending.delete(m.id);
       m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result);
+    } else if (m.method === 'Fetch.requestPaused') {
+      // Solo ficheros locales (el HTML, la hoja de KaTeX y sus fuentes) y data:; lo demás, cortado.
+      const local = /^(file|data):/i.test(m.params.request.url);
+      ws.send(JSON.stringify({ id: ++id, method: local ? 'Fetch.continueRequest' : 'Fetch.failRequest',
+        params: local ? { requestId: m.params.requestId } : { requestId: m.params.requestId, errorReason: 'BlockedByClient' } }));
     } else if (m.method) waiters.filter((w) => w.method === m.method).forEach((w) => w.res(m.params));
   });
   const send = (method, params = {}) => new Promise((res, rej) => {
@@ -49,15 +90,15 @@ try {
   const evaluate = (expression) => send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
 
   await send('Page.enable');
+  await send('Emulation.setScriptExecutionDisabled', { value: true });
+  await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
   const loaded = once('Page.loadEventFired');
   await send('Page.navigate', { url: html });
   await loaded;
-  // KaTeX lo renderiza el propio HTML y deja window.__listo = true (o un texto de error).
-  for (let i = 0; i < 200; i++) {
-    const { result } = await evaluate('window.__listo');
-    if (result.value === true) break;
-    if (typeof result.value === 'string') throw new Error('KaTeX: ' + result.value);
-    await sleep(100);
+  // Los scripts de la página no corren: KaTeX y las fórmulas los evalúa CDP, que no depende de ese permiso.
+  for (const codigo of [KATEX_JS, PINTAR_FORMULAS]) {
+    const r = await send('Runtime.evaluate', { expression: codigo, returnByValue: true });
+    if (r.exceptionDetails) throw new Error('KaTeX: ' + (r.exceptionDetails.exception?.description || r.exceptionDetails.text));
   }
   await evaluate('document.fonts.ready.then(() => true)');
   const { result: kerr } = await evaluate('document.querySelectorAll(".katex-error").length');

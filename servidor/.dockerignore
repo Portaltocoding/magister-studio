@@ -10,4 +10,9 @@ checkpoints.sqlite*
 evals/resultados/
 evals/olvido/
 registros/
-__pycache__
+# En .dockerignore los patrones van desde la raíz del contexto: sin **/, los __pycache__ de src/ (los deja cada
+# pytest o uv run) entran en la imagen y obligan a rehacer el uv sync y la capa de 2 GB en cada arranque.
+**/__pycache__
+**/*.pyc
+.pytest_cache/
+tests/

@@ -110,18 +110,8 @@ def to_html(md, m):
         # El acento que elegiste en la app: números, etiquetas y resaltes del PDF.
         css += f"\n:root {{ --amarillo: {acento}; --amarillo-claro: color-mix(in srgb, {acento} 30%, #fff); }}\n"
     return f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><title>{H.escape(m['titulo'])}</title>
-<link rel="stylesheet" href="{KATEX_URL}/katex.min.css"><style>{css}</style>
-<script src="{KATEX_URL}/katex.min.js"></script></head><body>{body}
-<script>
-try {{
-  document.querySelectorAll('span.math').forEach(e => {{
-    const d = e.classList.contains('display');
-    const t = e.textContent.replace(/^\\\\[\\(\\[]/, '').replace(/\\\\[\\)\\]]$/, '');
-    katex.render(t, e, {{ displayMode: d, throwOnError: false, strict: false }});
-  }});
-  window.__listo = true;
-}} catch (err) {{ window.__listo = String(err); }}
-</script></body></html>"""
+<link rel="stylesheet" href="{KATEX_URL}/katex.min.css"><style>{css}</style></head><body>{body}</body></html>"""
+# Sin <script>: la página se pinta con JavaScript desactivado y KaTeX lo mete render_win.mjs por CDP.
 
 def fill_report(pdf, work):
     prev = os.path.join(work, "prev")

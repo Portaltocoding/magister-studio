@@ -290,3 +290,17 @@ async def test_idioma_de_las_respuestas(cliente):
     assert p["idioma"] == "en" and texto_preferencias(p).startswith("- " + IDIOMA_INGLES)
     # El material y las correcciones siguen en español.
     assert IDIOMA_INGLES not in await para_explicar()
+
+
+def test_el_render_del_pdf_no_hereda_secretos(monkeypatch):
+    from magister.material import render
+
+    for k, v in {"PGPASSWORD": "clave", "PGHOST": "db", "CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-x", "ANTHROPIC_API_KEY": "k",
+                 "MAGISTER_DB_URL": "postgresql://u:clave@db/m", "MAGISTER_DIR_SECRETOS": "/run/secrets",
+                 "HOME": "/home/magister", "LANG": "C.UTF-8"}.items():
+        monkeypatch.setenv(k, v)
+    entorno = render._entorno("libro", "#112233")
+    assert not any(k.startswith(("PG", "CLAUDE", "ANTHROPIC", "MAGISTER")) for k in entorno)
+    assert "clave" not in str(entorno) and "/run/secrets" not in str(entorno)
+    assert entorno["HOME"] == "/home/magister" and entorno["LANG"] == "C.UTF-8" and entorno["FICHA_ACENTO"] == "#112233"
+    assert set(entorno) <= set(render._HEREDA) | {"PYTHONUTF8", "FICHA_CSS", "FICHA_CHROME", "FICHA_CHROME_ARGS", "FICHA_ACENTO"}

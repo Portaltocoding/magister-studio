@@ -32,11 +32,19 @@ services:
 
   api:
     profiles: ["docker"]
-    build: ./servidor
+    build:
+      context: ./servidor
+      # docs/tono.md, glosario.md y rubrica.md (el lint y el juez de tono) están fuera de servidor/.
+      additional_contexts:
+        docs: ./docs
     env_file: .env.compose
     secrets: [claude_token, postgres_password, canario]
     # tini como PID 1: recoge los procesos que deja claude al cortarlo (en Linux kill() no llega a los hijos).
     init: true
+    # El perfil seccomp por defecto de Docker más clone/unshare/setns: lo justo para que Chromium (el PDF) use su
+    # sandbox sin --no-sandbox ni SYS_ADMIN. Si el sistema aun así no lo deja, render_win.mjs pinta sin sandbox y lo dice.
+    security_opt:
+      - seccomp=./servidor/seccomp-chromium.json
     volumes:
       - magister-studio-api:/datos
       - magister-studio-copias:/copias
