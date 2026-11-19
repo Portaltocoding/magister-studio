@@ -231,7 +231,8 @@ def calcular_capas(series: list[list[tuple]], fraccion: float = 0.25) -> dict:
     capas = {"fsrs_defecto": _metricas(p["fsrs_defecto"], ys), "red": _metricas(p["red"], y_red)}
     if ajustado:
         capas["fsrs_ajustado"] = _metricas(p["fsrs_ajustado"], ys)
-    elegida = "red" if decision["estado"] == "activa" else "fsrs_ajustado" if ajuste.get("hecho") else "fsrs_defecto"
+    # Una sola pasada: la red cuenta como elegida si gana aquí (en producción, además, ha de ganar dos veces seguidas).
+    elegida = "red" if decision.get("gana") else "fsrs_ajustado" if ajuste.get("hecho") else "fsrs_defecto"
     p_e, y_e = (p["red"], y_red) if elegida == "red" else (p[elegida], ys)
     return {"corte": corte.isoformat(timespec="minutes"), "repasos_entreno": len(tr), "repasos_prueba": len(ys),
             "ajuste": {k: ajuste.get(k) for k in ("hecho", "etapa", "conceptos", "perdida_antes", "perdida_despues", "motivo")},

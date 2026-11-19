@@ -250,7 +250,8 @@ async def bucle() -> None:
                 antes = (red.meta() or {}).get("estado")
                 rr = await red.entrenar()
                 if rr.get("estado") == "activa" and antes != "activa":
-                    await anotar("La red neuronal de olvido ya predice tus aciertos mejor que FSRS: ahora decide ella.")
+                    await anotar(f"La red neuronal de olvido ha ganado a FSRS en {red.RACHA_NECESARIA} entrenamientos "
+                                 "seguidos: ahora decide ella.")
             except Exception:  # noqa: BLE001
                 registro.exception("ajuste personal")
         await asyncio.sleep(INTERVALO_S)

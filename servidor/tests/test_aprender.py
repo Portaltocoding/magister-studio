@@ -190,14 +190,10 @@ def test_ajuste_personal_con_escalones():
 
 
 
-def test_la_red_aprende_lo_que_fsrs_no_ve():
-    """Un alumno inventado que de noche recuerda mucho peor (FSRS no mira la hora): la red lo aprende, gana a FSRS
-    en lo que no ha visto y pasa a mandar. Con pocos datos, ni se entrena."""
+def _alumno_nocturno(repasos: int = 5) -> list[list[tuple]]:
+    """Un alumno inventado que de noche recuerda mucho peor (FSRS no mira la hora). Con menos `repasos` por concepto
+    sale el mismo alumno, solo que antes en el tiempo: lo de después son repasos nuevos."""
     import random
-    from datetime import datetime, timedelta, timezone
-
-    from magister.aprender.programador import FSRS
-    from magister.aprender.red import calcular
 
     rng = random.Random(7)
     t0 = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
@@ -210,10 +206,64 @@ def test_la_red_aprende_lo_que_fsrs_no_ve():
             acierta = rng.random() < (0.95 if momento.hour == 9 else 0.3)
             serie.append((momento, "bien" if acierta else "fallo", 0.75, 20000))
             t += timedelta(days=2 + k * 2)
-        series.append(serie)
-    r = calcular(series, FSRS())
-    assert r["estado"] == "activa" and r["perdida_red"] < r["perdida_fsrs"], r
-    assert calcular(series[:5], FSRS())["estado"] == "sin_datos"
+        series.append(serie[:repasos])
+    return series
+
+
+def _sin_red(r: dict) -> dict:
+    return {k: v for k, v in r.items() if not k.startswith("_")}
+
+
+def test_la_red_aprende_lo_que_fsrs_no_ve_y_manda_tras_ganar_dos_veces_seguidas():
+    """La red aprende lo de la noche y gana a FSRS en lo que no ha visto; una victoria sola la deja en sombra, otra
+    con repasos nuevos la pone a mandar. Con pocos datos, ni se entrena."""
+    from magister.aprender.programador import FSRS
+    from magister.aprender.red import RACHA_NECESARIA, calcular
+
+    assert RACHA_NECESARIA == 2
+    primera = calcular(_alumno_nocturno(4), FSRS())
+    assert primera["gana"] and primera["perdida_red"] < primera["perdida_fsrs"], primera
+    assert (primera["estado"], primera["racha"]) == ("sombra", 1)
+    segunda = calcular(_alumno_nocturno(5), FSRS(), _sin_red(primera))
+    assert segunda["gana"] and (segunda["estado"], segunda["racha"]) == ("activa", 2), segunda
+    assert segunda["nuevos"] == 70
+    assert calcular(_alumno_nocturno()[:5], FSRS())["estado"] == "sin_datos"
+
+
+def test_reentrenar_sin_repasos_nuevos_no_cuenta_como_otra_victoria():
+    from magister.aprender.programador import FSRS
+    from magister.aprender.red import calcular
+
+    series = _alumno_nocturno(4)
+    primera = _sin_red(calcular(series, FSRS()))
+    otra = calcular(series, FSRS(), primera)  # «Ajustar ahora» dos veces seguidas, sin repasar entre medias
+    assert otra["gana"] and (otra["estado"], otra["racha"], otra["nuevos"]) == ("sombra", 1, 0), otra
+    assert otra["racha_hasta"] == primera["racha_hasta"]
+
+
+def test_la_racha_de_la_red():
+    """La cuenta, sin entrenar: ganar-ganar con repasos nuevos suma 2; perder la pone a cero; ganar sin bastantes
+    repasos nuevos desde la última victoria contada no cuenta (ni suma ni borra)."""
+    from magister.aprender.red import MIN_NUEVOS, siguiente_racha
+
+    t0 = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
+    momentos = lambda n: [t0 + timedelta(hours=k) for k in range(n)]  # noqa: E731
+    uno = siguiente_racha(None, True, momentos(200))
+    assert uno["racha"] == 1 and uno["racha_hasta"] == momentos(200)[-1].isoformat()
+    dos = siguiente_racha(uno, True, momentos(200 + MIN_NUEVOS))
+    assert dos["racha"] == 2 and dos["nuevos"] == MIN_NUEVOS
+    assert siguiente_racha(uno, True, momentos(200 + MIN_NUEVOS - 1))["racha"] == 1  # no cuenta: se queda en 1
+    # gana, pierde, gana: vuelve a empezar desde 1
+    cero = siguiente_racha(uno, False, momentos(260))
+    assert cero["racha"] == 0 and cero["racha_hasta"] is None
+    assert siguiente_racha(cero, True, momentos(320))["racha"] == 1
+    # la red ya activa que pierde deja de mandar: la racha vuelve a cero
+    assert siguiente_racha(dos, False, momentos(400))["racha"] == 0
+    # lo guardado antes de la racha: si estaba activa, cuenta como una victoria hasta su fecha
+    viejo = {"estado": "activa", "fecha": momentos(200)[-1].isoformat()}
+    assert siguiente_racha(viejo, True, momentos(210))["racha"] == 1
+    assert siguiente_racha(viejo, True, momentos(200 + MIN_NUEVOS))["racha"] == 2
+    assert siguiente_racha({"estado": "sombra"}, True, momentos(200))["racha"] == 1
 
 
 def test_la_red_recien_creada_es_fsrs():
@@ -282,6 +332,9 @@ def test_progreso_dice_en_que_capa_vas_y_que_falta():
     r = resumen(20, {"etapa": "inicial", "conceptos": 20}, {"estado": "sombra", "perdida_fsrs": 0.5, "perdida_red": 0.51})
     assert (r["capa"], r["faltan"]) == ("inicial", UMBRAL_COMPLETO - 20)
     assert "llevas 20" in r["lineas"][1] and "en sombra" in r["lineas"][2] and "el ajuste" in r["lineas"][2]
+    assert "2 entrenamientos seguidos" in r["lineas"][2]
+    r = resumen(20, None, {"estado": "sombra", "racha": 1, "racha_necesaria": 2})
+    assert "ha ganado 1 de 2 entrenamientos seguidos al programador estándar" in r["lineas"][2]
     r = resumen(80, {"etapa": "completo", "conceptos": 80}, {"estado": "activa", "perdida_fsrs": 0.5, "perdida_red": 0.48})
     assert (r["capa"], r["faltan"], r["red"]) == ("completo", None, "activa")
     assert "4 % mejor" in r["lineas"][2]

@@ -219,7 +219,14 @@ def resumen(con_dos: int, activo: dict | None, red: dict | None) -> dict:
             mejora = round(100 * (r["perdida_fsrs"] - r["perdida_red"]) / r["perdida_fsrs"])
             tercera = f"Decide la red neuronal: en tus últimos repasos predice un {mejora} % mejor que {contra}."
     elif estado_red == "sombra":
-        tercera = f"La red neuronal va en sombra: aún no predice mejor que {contra}."
+        necesaria = r.get("racha_necesaria") or 2
+        if r.get("racha"):
+            a_contra = "al ajuste" if activo else "al programador estándar"
+            tercera = (f"La red neuronal va en sombra: ha ganado {r['racha']} de {necesaria} entrenamientos seguidos "
+                       f"{a_contra}; el siguiente cuenta cuando haya repasos nuevos.")
+        else:
+            tercera = (f"La red neuronal va en sombra: aún no predice mejor que {contra}. Decide cuando le gane en "
+                       f"{necesaria} entrenamientos seguidos.")
     else:
         tercera = (f"La red neuronal se entrena a partir de {r.get('minimo', 0)} repasos (sin contar el primero de cada "
                    f"concepto): llevas {r.get('repasos', 0)}.")
@@ -230,7 +237,8 @@ def _red_meta() -> dict | None:
     from magister.aprender import red
 
     m = red.meta()
+    fijos = {"minimo": red.MIN_ENTRENAR + red.MIN_VALIDAR, "racha_necesaria": red.RACHA_NECESARIA}
     if not m:
-        return {"estado": "sin_datos", "repasos": 0, "minimo": red.MIN_ENTRENAR + red.MIN_VALIDAR}
-    return {k: m.get(k) for k in ("estado", "repasos", "validacion", "perdida_fsrs", "perdida_red", "fecha", "faltan")} | {
-        "minimo": red.MIN_ENTRENAR + red.MIN_VALIDAR}
+        return {"estado": "sin_datos", "repasos": 0, "racha": 0} | fijos
+    claves = ("estado", "repasos", "validacion", "perdida_fsrs", "perdida_red", "fecha", "faltan", "racha")
+    return {k: m.get(k) for k in claves} | fijos

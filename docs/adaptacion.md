@@ -26,11 +26,16 @@ repaso, si te pasaste de seguro, la hora, tu racha, tu acierto reciente, la esta
 - Recién creada es exactamente tu FSRS (la última capa empieza a cero) y un castigo la mantiene cerca salvo que los
   datos digan otra cosa.
 - Se entrena una vez al día (y con «Ajustar ahora») a partir de 160 repasos predecibles. Se valida con el último
-  cuarto en el tiempo, que no ha visto: solo decide si baja la pérdida de FSRS al menos un 1 %. Si no, queda «en
-  sombra». Validada, se reentrena con todo.
+  cuarto en el tiempo, que no ha visto: gana si baja la pérdida de FSRS al menos un 1 %, y solo decide si gana en
+  dos entrenamientos seguidos (`RACHA_NECESARIA`). Una victoria con 40 ejemplos de prueba puede ser suerte; dos,
+  con datos nuevos entre medias, mucho menos. Para que la segunda cuente hacen falta al menos 40 repasos nuevos
+  (`MIN_NUEVOS`, una ventana mínima de prueba) desde la última victoria contada: reentrenar sin repasar entre medias
+  no suma. Perder pone la racha a cero y, si mandaba, deja de mandar. Mientras tanto queda «en sombra». Validada, se
+  reentrena con todo. La racha se guarda con el resto del entrenamiento (ajuste `red_olvido`: `racha`,
+  `racha_hasta`, `nuevos`); lo guardado antes de contar rachas, si estaba activa, cuenta como una victoria.
 - Nunca programa más tarde que FSRS con sus topes de lo recién aprendido.
 - Con un alumno inventado que de noche recuerda peor, la red baja la pérdida en lo no visto de 0,63 a 0,39 y pasa a
-  mandar (`tests/test_aprender.py`).
+  mandar tras ganar dos veces seguidas (`tests/test_aprender.py`).
 
 ## 2. Qué repasas primero
 

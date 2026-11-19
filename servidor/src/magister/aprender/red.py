@@ -6,8 +6,10 @@ pasaste de seguro la última vez y tu acierto reciente, y aprende una correcció
     p = sigmoide(logit(p_FSRS) + red(características))
 
 La última capa empieza a cero: recién creada, la red ES tu FSRS. Se entrena una vez al día con tus repasos y se
-evalúa con los más recientes, que no ha visto (corte temporal). Solo manda si predice mejor que FSRS en esos;
-si no, se queda «en sombra» (entrenada, medida, sin decidir). Con pocos datos, ni se entrena.
+evalúa con los más recientes, que no ha visto (corte temporal). Solo manda si predice mejor que FSRS en esos en
+dos entrenamientos seguidos, con repasos nuevos entre uno y otro; si no, se queda «en sombra» (entrenada, medida,
+sin decidir). Un entrenamiento que pierde pone la racha a cero y, si mandaba, deja de mandar. Con pocos datos, ni
+se entrena.
 El entrenamiento y la carga van en un hilo: son CPU y no deben bloquear la API.
 """
 
@@ -24,6 +26,10 @@ CLAVE = "red_olvido"
 MIN_ENTRENAR = 120  # repasos que se pueden predecir (del segundo en adelante)
 MIN_VALIDAR = 40
 MEJORA_MINIMA = 0.01  # 1 % menos de pérdida logarítmica que FSRS en lo no visto
+RACHA_NECESARIA = 2  # victorias seguidas sobre FSRS para mandar: una sola, con 40 ejemplos de prueba, puede ser suerte
+# Repasos nuevos desde la última victoria contada para que otra cuente: una ventana mínima de prueba entera, así la
+# segunda victoria se mide sobre al menos tantos repasos que la primera no vio como los que tuvo ella.
+MIN_NUEVOS = MIN_VALIDAR
 NOTAS = ("fallo", "parcial", "bien", "perfecta")
 N_CARACTERISTICAS = 18
 
@@ -144,21 +150,48 @@ def _perdida_red(red, xs, ys) -> float:
         return float(torch.nn.functional.binary_cross_entropy_with_logits(logit, torch.tensor(ys, dtype=torch.float32)))
 
 
-def calcular(series: list[list[tuple]], base) -> dict:
-    """Entrena y decide. Puro salvo por torch: se puede probar con datos inventados."""
+def siguiente_racha(previo: dict | None, gana: bool, momentos: list[datetime]) -> dict:
+    """Cuántas veces seguidas ha ganado la red a FSRS tras este entrenamiento. Pura.
+
+    `previo`: lo guardado del entrenamiento anterior (o None); `momentos`: los de los ejemplos de este. Perder pone
+    la racha a cero. Ganar suma uno solo si, desde la última victoria contada (`racha_hasta`, el momento de su último
+    ejemplo), hay al menos MIN_NUEVOS ejemplos nuevos; si no, esta victoria no cuenta y la racha sigue como estaba."""
+    previo = previo or {}
+    racha, hasta = previo.get("racha"), previo.get("racha_hasta")
+    if racha is None and previo.get("estado") == "activa":  # guardado antes de contar rachas: era una victoria
+        racha, hasta = 1, previo.get("fecha")
+    racha = int(racha or 0)
+    if not gana:
+        return {"racha": 0, "racha_hasta": None, "nuevos": None}
+    nuevos = None
+    if racha and hasta:
+        desde = datetime.fromisoformat(hasta)
+        nuevos = sum(1 for m in momentos if m > desde)
+        if nuevos < MIN_NUEVOS:
+            return {"racha": racha, "racha_hasta": hasta, "nuevos": nuevos}
+    return {"racha": racha + 1, "racha_hasta": max(momentos).isoformat(), "nuevos": nuevos}
+
+
+def calcular(series: list[list[tuple]], base, previo: dict | None = None) -> dict:
+    """Entrena y decide. Puro salvo por torch: se puede probar con datos inventados.
+    `previo`: lo que dejó el entrenamiento anterior (para la racha); sin él, es el primero."""
     datos = muestras(series, base)
     if len(datos) < MIN_ENTRENAR + MIN_VALIDAR:
-        return {"estado": "sin_datos", "repasos": len(datos), "faltan": MIN_ENTRENAR + MIN_VALIDAR - len(datos)}
+        return {"estado": "sin_datos", "repasos": len(datos), "faltan": MIN_ENTRENAR + MIN_VALIDAR - len(datos),
+                "racha": 0, "racha_necesaria": RACHA_NECESARIA}
     corte = max(MIN_VALIDAR, len(datos) // 4)
     entreno, prueba = datos[:-corte], datos[-corte:]
     red = _entrenar([d[1] for d in entreno], [d[2] for d in entreno])
     xs_p, ys_p = [d[1] for d in prueba], [d[2] for d in prueba]
     fsrs, propia = _perdida_fsrs(xs_p, ys_p), _perdida_red(red, xs_p, ys_p)
     gana = propia < fsrs * (1 - MEJORA_MINIMA)
-    if gana:  # validada: se reentrena con todo lo que hay
+    racha = siguiente_racha(previo, gana, [d[0] for d in datos])
+    activa = gana and racha["racha"] >= RACHA_NECESARIA
+    if activa:  # validada: se reentrena con todo lo que hay
         red = _entrenar([d[1] for d in datos], [d[2] for d in datos])
     ultimos = [d[2] for d in datos[-20:]]
-    return {"estado": "activa" if gana else "sombra", "repasos": len(datos), "validacion": len(prueba),
+    return {"estado": "activa" if activa else "sombra", "gana": gana, **racha, "racha_necesaria": RACHA_NECESARIA,
+            "repasos": len(datos), "validacion": len(prueba),
             "perdida_fsrs": round(fsrs, 4), "perdida_red": round(propia, 4),
             "tasa": sum(ultimos) / len(ultimos), "_red": red}
 
@@ -242,7 +275,7 @@ async def cargar() -> None:
 
 
 async def entrenar() -> dict:
-    """Entrena con tus repasos, decide si manda y lo guarda."""
+    """Entrena con tus repasos, decide si manda (con la racha que dejó el anterior) y lo guarda."""
     global _red, _meta
     from sqlalchemy.dialects.postgresql import insert
 
@@ -254,7 +287,10 @@ async def entrenar() -> dict:
     series = await personal.series(con_extras=True)
     pp = personal.parametros_guardados()
     base = FSRS(parametros=pp["parametros"]) if pp else FSRS()
-    r = await asyncio.to_thread(calcular, series, base)
+    async with nueva_sesion() as s:  # la racha sale de lo guardado, no de la memoria del proceso
+        fila = await s.get(Ajuste, CLAVE)
+    previo = (fila.valor if fila else None) or None
+    r = await asyncio.to_thread(calcular, series, base, previo)
     red = r.pop("_red", None)
     valor = {**r, "fecha": datetime.now(timezone.utc).isoformat(timespec="minutes")}
     if red is not None:

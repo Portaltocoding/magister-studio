@@ -178,7 +178,16 @@ interface EstadoModelo {
   umbral_inicial: number
   umbral_completo: number
   activo: { etapa: string; fecha: string; perdida_antes: number; perdida_despues: number; conceptos: number } | null
-  red: { estado: 'sin_datos' | 'sombra' | 'activa'; repasos: number; minimo: number; perdida_fsrs?: number; perdida_red?: number; fecha?: string } | null
+  red: {
+    estado: 'sin_datos' | 'sombra' | 'activa'
+    repasos: number
+    minimo: number
+    perdida_fsrs?: number
+    perdida_red?: number
+    fecha?: string
+    racha?: number | null
+    racha_necesaria?: number
+  } | null
   // En qué capa vas y qué falta para la siguiente, ya redactado por el servidor (umbrales y recuentos salen de allí).
   resumen?: { capa: 'estandar' | 'inicial' | 'completo'; faltan: number | null; red: string; lineas: string[] }
 }
@@ -260,11 +269,18 @@ function TuModelo() {
           <p className="pg-explica">
             Encima de FSRS, una red pequeña aprende de lo que FSRS no ve: tu seguridad al responder, lo que tardas, la hora, tu
             racha y si te pasaste de seguro. Recién creada es igual que FSRS; se entrena cada día y solo decide cuando acierta más
-            que FSRS con tus repasos más recientes, que no ha visto.
+            que FSRS con tus repasos más recientes, que no ha visto, en {e.red.racha_necesaria ?? 2} entrenamientos seguidos y con
+            repasos nuevos entre uno y otro. Si luego pierde, vuelve a decidir FSRS.
           </p>
           <p>
             <strong>
-              {e.red.estado === 'activa' ? 'Activa: decide ella' : e.red.estado === 'sombra' ? 'En sombra: entrenada, aún no gana a FSRS' : 'Esperando datos'}
+              {e.red.estado === 'activa'
+                ? 'Activa: decide ella'
+                : e.red.estado === 'sombra'
+                  ? e.red.racha
+                    ? `En sombra: ha ganado ${e.red.racha} de ${e.red.racha_necesaria ?? 2} entrenamientos seguidos`
+                    : 'En sombra: entrenada, aún no gana a FSRS'
+                  : 'Esperando datos'}
             </strong>
             {e.red.estado === 'sin_datos'
               ? ` · ${e.red.repasos} de ${e.red.minimo} repasos para empezar a entrenarse`
