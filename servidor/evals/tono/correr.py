@@ -1,6 +1,7 @@
 """El harness del tono: evalúa el prompt actual de los bloques o lo compara con una variante.
 
-    uv run python -m evals.tono.correr
+    uv run python -m evals.tono.correr                       corto: 5 bloques, tope 15 llamadas
+    uv run python -m evals.tono.correr --nivel completo      toda la partición `validar`, tope 300
     uv run python -m evals.tono.correr --variante src/magister/cerebro/prompts/experimentos/apuntes_bloque_trato.md
 
 Sobre la partición `validar`: regenera cada bloque con su contrato (solo si no hay salida
@@ -10,12 +11,11 @@ binomial exacta, bootstrap pareado y no inferioridad (margen de 5 puntos, ADR de
 """
 
 import argparse
-import asyncio
 import hashlib
 import json
-import sys
 from pathlib import Path
 
+from evals import regresion, tope
 from evals.estadistica import binomial_cola, bootstrap_pareado, kappa, mcnemar, tabla_de
 from evals.tono.comun import RESULTADOS, bloques_de, etiquetas
 from magister.cerebro.modelo import Turno, generar
@@ -24,6 +24,7 @@ from magister.tono.juez import DIMENSIONES, FalloJuez, juzgar
 from magister.tono.lint import revisar, vetos
 
 MARGEN = 0.05
+BLOQUES_CORTO = 5
 CACHE = RESULTADOS / "tono-salidas"
 
 
@@ -39,12 +40,18 @@ async def regenerar(plantilla: str, version: str, bloque: dict) -> str:
     return texto
 
 
-async def evaluar(plantilla: str, bloques: list[dict]) -> list[dict]:
+async def evaluar(plantilla: str, bloques: list[dict], t: tope.Tope | None = None) -> list[dict]:
+    """Con `t`, se para limpio al llegar al tope: devuelve los bloques que le dio tiempo a evaluar."""
     version = hashlib.sha256(plantilla.encode()).hexdigest()[:12]
     salida = []
     for b in bloques:
-        texto = await regenerar(plantilla, version, b)
-        j = await juzgar(texto, [h for h in revisar(texto) if h.gravedad == "sospecha"])
+        try:
+            texto = await regenerar(plantilla, version, b)
+            j = await juzgar(texto, [h for h in revisar(texto) if h.gravedad == "sospecha"])
+        except tope.TopeAlcanzado:
+            if t is not None:
+                t.cortado = True
+            break
         salida.append({"bloque": [b["material_id"], b["clave"]], "version": version, "longitud": len(texto.split()),
                        "vetos": len(vetos(revisar(texto))),
                        "veredicto": None if isinstance(j, FalloJuez) else {d: getattr(j.veredicto, d).aprueba for d in DIMENSIONES}})
@@ -61,22 +68,41 @@ def resumen(filas: list[dict], mias: dict) -> None:
     print(f"longitud media {sum(f['longitud'] for f in filas) / max(1, len(filas)):.0f} palabras · vetos {sum(f['vetos'] for f in filas)}")
 
 
+def metricas(filas: list[dict]) -> dict:
+    """Para `evals.regresion`: por dimensión, si el juez aprueba cada bloque (los FalloJuez no cuentan)."""
+    return {d: regresion.proporcion({f"{f['bloque'][0]}/{f['bloque'][1]}": (int(f["veredicto"][d]), 1)
+                                     for f in filas if f["veredicto"]}) for d in DIMENSIONES}
+
+
 async def principal(args) -> None:
-    bloques = await bloques_de("validar")
+    t = args.tope
+    bloques = tope.del_nivel(await bloques_de("validar"), args.nivel, BLOQUES_CORTO)
     if not bloques:
         raise SystemExit("No hay partición validar: reparte el banco desde el panel Etiquetar.")
     mias = await etiquetas(1)
-    actual = cargar("apuntes_bloque").texto
-    a = await evaluar(actual, bloques)
+    plantilla = cargar("apuntes_bloque")
+    actual = plantilla.texto
+    a = await evaluar(actual, bloques, t)
     print("Actual:")
     resumen(a, mias)
     filas = a
+    prompts = regresion.versiones(["apuntes_bloque", "juez_tono"])
+    if a:
+        ej = regresion.ejecucion("tono", args.nivel, prompts, metricas(a), t)
+        print(f"Guardada para comparar: {regresion.guardar(ej)}")
     if args.variante:
-        b = await evaluar(Path(args.variante).read_text(encoding="utf-8"), bloques)
+        texto_variante = Path(args.variante).read_text(encoding="utf-8")
+        b = await evaluar(texto_variante, bloques, t)
         print("\nVariante:")
         resumen(b, mias)
+        if b:
+            # La variante se guarda como otra ejecución de la misma eval: `evals.regresion comparar --eval tono` la
+            # compara con la actual, caso a caso.
+            variante = {**prompts, "apuntes_bloque": hashlib.sha256(texto_variante.encode()).hexdigest()[:12]}
+            print(f"Guardada para comparar: {regresion.guardar(regresion.ejecucion('tono', args.nivel, variante, metricas(b), t))}")
         for d in DIMENSIONES:
-            pares = [(x["veredicto"][d], y["veredicto"][d]) for x, y in zip(a, b, strict=True) if x["veredicto"] and y["veredicto"]]
+            # Solo los bloques que las dos llegaron a evaluar (el tope puede cortar la variante antes).
+            pares = [(x["veredicto"][d], y["veredicto"][d]) for x, y in zip(a, b, strict=False) if x["veredicto"] and y["veredicto"]]
             gana = sum(1 for x, y in pares if not x and y)
             pierde = sum(1 for x, y in pares if x and not y)
             dif, lo, hi = bootstrap_pareado([(float(x), float(y)) for x, y in pares], 5000) if pares else (0, 0, 0)
@@ -93,6 +119,9 @@ async def principal(args) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--variante")
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    asyncio.run(principal(ap.parse_args()))
+    # Por bloque: regenerarlo (1 llamada, 0 si ya está en la caché de disco) y juzgarlo (1, más 1 reintento). Con
+    # --variante, el doble. Corto: 5 bloques de `validar`.
+    tope.argumentos(ap, corto=15, completo=300)
+    args = ap.parse_args()
+    args.tope = tope.de_args(args)
+    tope.correr(principal(args), args.tope)

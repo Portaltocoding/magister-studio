@@ -1,0 +1,177 @@
+# Línea base del research por objetivos (ADR-0020 y ADR-0021, evals/research_base.py).
+# Cada lección lleva, puesto a mano:
+#   espera      lo que debería decir el plan en `necesita_fuentes` (no, conviene, imprescindible), con su porqué
+#   paginas     la web falsa que devuelve cualquier búsqueda. De cada página, a mano:
+#     autoridad   0 a 3, como la rúbrica del juez: 0 comercial o sin autor, 1 blog o foro, 2 tutorial serio o apuntes
+#                 de universidad, 3 la referencia oficial o la fuente primaria
+#     cubre       los números de los objetivos que explica de verdad
+#     mala        true si no debería proponerse nunca (portada, comercial, espejo): la eval cuenta si se cuela
+# v1: revísalas tú; si cambias una etiqueta, sube la versión del fichero (v2) para no mezclar medidas.
+
+- id: http-json
+  tema: Desarrollo web
+  titulo: HTTP y JSON
+  objetivos: [Explicar qué es una petición HTTP y para qué sirve cada método, Leer y escribir un documento JSON válido]
+  espera: conviene
+  porque: estable, pero una buena referencia (MDN) mejora mucho los detalles
+  paginas:
+    - url: https://mdn.example/docs/web/http/overview
+      titulo: Visión general de HTTP
+      cuerpo: HTTP es un protocolo de petición y respuesta. El cliente envía una petición con un método como GET, POST, PUT o DELETE y el servidor responde con un código de estado y un cuerpo.
+      autoridad: 3
+      cubre: [1]
+    - url: https://json.example/es/especificacion
+      titulo: Introducción a JSON
+      cuerpo: JSON representa objetos entre llaves con pares clave y valor, listas entre corchetes, cadenas entre comillas dobles, números, true, false y null. Una coma de más al final lo invalida.
+      autoridad: 3
+      cubre: [2]
+    - url: https://blogdeprogramar.example/http-y-json-en-5-minutos
+      titulo: HTTP y JSON en 5 minutos
+      cuerpo: En este artículo repasamos rápido las peticiones HTTP y el formato JSON con un ejemplo de una API de tareas que devuelve una lista de objetos.
+      autoridad: 1
+      cubre: [1, 2]
+    - url: https://cursos-premium.example/oferta-desarrollo-web
+      titulo: Curso de desarrollo web con descuento
+      cuerpo: Apúntate hoy al curso de desarrollo web con un 50 por ciento de descuento y aprende HTTP, JSON y mucho más con nuestros profesores certificados.
+      autoridad: 0
+      cubre: []
+      mala: true
+
+- id: indices-btree
+  tema: Bases de datos
+  titulo: Índices B-tree
+  objetivos: [Explicar cómo un índice B-tree acelera una búsqueda, Decidir qué columnas indexar en una consulta con WHERE y ORDER BY]
+  espera: conviene
+  porque: la teoría es estable; la documentación del motor aporta los detalles prácticos
+  paginas:
+    - url: https://postgresql.example/docs/current/indexes-types
+      titulo: Tipos de índices en PostgreSQL
+      cuerpo: Un índice B-tree mantiene las claves ordenadas en un árbol equilibrado, de modo que encontrar una clave cuesta un número logarítmico de lecturas de página en lugar de recorrer la tabla entera.
+      autoridad: 3
+      cubre: [1]
+    - url: https://use-the-index.example/es/orden-y-where
+      titulo: Índices para WHERE y ORDER BY
+      cuerpo: Un índice compuesto sirve a la vez al filtro y al orden si la columna del WHERE va primero y la del ORDER BY después. Con el orden al revés el motor tiene que ordenar aparte.
+      autoridad: 2
+      cubre: [2]
+    - url: https://apuntes-uni.example/bd/tema5-indices
+      titulo: Tema 5. Índices
+      cuerpo: Apuntes de la asignatura de bases de datos sobre árboles B, árboles B más, su altura, la inserción con división de nodos y el coste de las búsquedas por rango.
+      autoridad: 2
+      cubre: [1]
+    - url: https://foro-sql.example/hilo/9981
+      titulo: Mi consulta va lenta
+      cuerpo: Hola, mi consulta con ORDER BY tarda mucho, alguien sabe por qué. Respuesta de otro usuario, prueba a poner un índice en todas las columnas a ver qué pasa.
+      autoridad: 1
+      cubre: []
+
+- id: regresion-logistica
+  tema: Machine learning
+  titulo: Regresión logística
+  objetivos: [Explicar la función sigmoide y qué probabilidad devuelve, Interpretar los coeficientes como cambios en las odds, Evaluar un clasificador con la matriz de confusión]
+  espera: conviene
+  porque: estable; unos buenos apuntes o la guía de scikit-learn ayudan con los ejemplos
+  paginas:
+    - url: https://scikit.example/stable/modules/linear_model
+      titulo: Modelos lineales, regresión logística
+      cuerpo: La regresión logística modela la probabilidad de la clase positiva con la función sigmoide aplicada a una combinación lineal de las variables. Cada coeficiente multiplica las odds por la exponencial de su valor.
+      autoridad: 3
+      cubre: [1, 2]
+    - url: https://estadistica-facil.example/matriz-de-confusion
+      titulo: La matriz de confusión explicada
+      cuerpo: La matriz de confusión cuenta verdaderos positivos, falsos positivos, falsos negativos y verdaderos negativos. De ella salen la precisión, la exhaustividad y la exactitud.
+      autoridad: 2
+      cubre: [3]
+    - url: https://espejo-apuntes.example/copia/linear_model
+      titulo: Modelos lineales (copia)
+      cuerpo: Copia de la documentación de modelos lineales con anuncios intercalados. La regresión logística modela la probabilidad de la clase positiva con la función sigmoide.
+      autoridad: 0
+      cubre: [1]
+      mala: true
+    - url: https://mooc.example/ml/semana3
+      titulo: Semana 3, clasificación
+      cuerpo: Vídeo y transcripción de la semana 3 del curso, donde se introduce la sigmoide, la frontera de decisión y un ejemplo de clasificación de correos.
+      autoridad: 2
+      cubre: [1]
+
+- id: rgpd-plazos
+  tema: Protección de datos
+  titulo: Plazos del RGPD
+  objetivos: [Indicar el plazo para notificar una brecha de seguridad a la autoridad, Indicar el plazo para responder a una solicitud de acceso del interesado]
+  espera: imprescindible
+  porque: exige la fuente oficial y la cita exacta del artículo
+  paginas:
+    - url: https://eur-lex.example/eli/reg/2016/679/art33
+      titulo: Reglamento 2016/679, artículo 33
+      cuerpo: En caso de violación de la seguridad de los datos personales, el responsable la notificará a la autoridad de control competente sin dilación indebida y, de ser posible, a más tardar 72 horas después de que haya tenido constancia de ella.
+      autoridad: 3
+      cubre: [1]
+    - url: https://aepd.example/derechos/acceso
+      titulo: El derecho de acceso
+      cuerpo: El responsable debe responder a la solicitud de acceso en el plazo de un mes desde su recepción, prorrogable otros dos meses en función de la complejidad y el número de solicitudes.
+      autoridad: 3
+      cubre: [2]
+    - url: https://consultora-rgpd.example/blog/plazos
+      titulo: Todos los plazos del RGPD (actualizado)
+      cuerpo: Resumen de los plazos del RGPD para empresas. Contrata nuestro servicio de delegado de protección de datos y olvídate de los plazos.
+      autoridad: 1
+      cubre: [1, 2]
+    - url: https://portal-legal.example/
+      titulo: Portal legal, inicio
+      cuerpo: Bienvenido al portal legal. Noticias, formularios, cursos y servicios para profesionales. Inicia sesión para ver más contenidos.
+      autoridad: 0
+      cubre: []
+      mala: true
+
+- id: fracciones
+  tema: Matemáticas básicas
+  titulo: Sumar fracciones
+  objetivos: [Calcular el mínimo común múltiplo de dos denominadores, Sumar dos fracciones con distinto denominador]
+  espera: "no"
+  porque: procedimiento elemental y estable; si se busca, que al menos elija bien
+  paginas:
+    - url: https://matematicas-cole.example/fracciones/suma
+      titulo: Suma de fracciones con distinto denominador
+      cuerpo: Para sumar fracciones con distinto denominador se busca el mínimo común múltiplo de los denominadores, se convierte cada fracción a ese denominador y se suman los numeradores.
+      autoridad: 2
+      cubre: [1, 2]
+    - url: https://khan.example/math/fracciones/mcm
+      titulo: El mínimo común múltiplo
+      cuerpo: El mínimo común múltiplo de dos números es el menor número que es múltiplo de los dos. Se obtiene descomponiendo en factores primos y tomando cada factor con su mayor exponente.
+      autoridad: 2
+      cubre: [1]
+    - url: https://juegos-mates.example/fracciones-juego
+      titulo: Juega con fracciones
+      cuerpo: Un juego para practicar fracciones con pizzas. Desbloquea niveles y consigue estrellas. Versión completa en la tienda de aplicaciones.
+      autoridad: 0
+      cubre: []
+      mala: true
+
+- id: react-hooks
+  tema: React
+  titulo: Los hooks de estado y efecto
+  objetivos: [Usar useState para guardar estado en un componente, Usar useEffect con su lista de dependencias y su limpieza]
+  espera: imprescindible
+  porque: cambia entre versiones, así que hace falta la documentación de la versión actual
+  paginas:
+    - url: https://react.example/reference/react/useState
+      titulo: useState
+      cuerpo: useState devuelve el valor actual y una función para cambiarlo. Llamar a la función provoca un nuevo renderizado con el valor nuevo; el estado se conserva entre renderizados.
+      autoridad: 3
+      cubre: [1]
+    - url: https://react.example/reference/react/useEffect
+      titulo: useEffect
+      cuerpo: useEffect sincroniza el componente con un sistema externo. Se vuelve a ejecutar cuando cambia algún valor de su lista de dependencias y la función que devuelve hace la limpieza antes de la siguiente ejecución.
+      autoridad: 3
+      cubre: [2]
+    - url: https://blog-front.example/hooks-2019
+      titulo: Hooks en React 16.8
+      cuerpo: Guía de 2019 sobre los hooks recién salidos en React 16.8, con ejemplos de componentes de clase convertidos a funciones con useState y useEffect.
+      autoridad: 1
+      cubre: [1, 2]
+    - url: https://tienda-plantillas.example/react-admin
+      titulo: Plantilla de administración en React
+      cuerpo: Compra nuestra plantilla de panel de administración en React con más de 200 componentes y hooks listos para usar.
+      autoridad: 0
+      cubre: []
+      mala: true

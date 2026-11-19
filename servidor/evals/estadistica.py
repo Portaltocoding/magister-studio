@@ -4,7 +4,8 @@ Ningún número de una eval lo calcula el modelo: sale de aquí, con tests.
 
 - Tasas: `margen_wilson`, `ic_proporcion`.
 - Acuerdo: `kappa(tabla)`, `kappa_ponderada(tabla)`, `tabla_de(a, b)`, `spearman`.
-- Comparar versiones: `mcnemar`, `binomial_cola`, `bootstrap_ic`, `bootstrap_pareado`.
+- Comparar versiones: `mcnemar`, `binomial_cola`, `binomial_dos_colas`, `bootstrap_ic`, `bootstrap_pareado`; sin
+  casos comunes, `newcombe` (proporciones) y `bootstrap_diferencia` (medias).
 - Modelo de olvido (Parte V): `brier`, `log_loss`, `auc`, `calibracion`.
 """
 
@@ -120,6 +121,37 @@ def bootstrap_pareado(casos: Sequence[tuple[float, float]], n: int = 10000, semi
         raise ValueError("hacen falta pares")
     lo, hi = bootstrap_ic(diffs, lambda xs: sum(xs) / len(xs), n, semilla)
     return sum(diffs) / len(diffs), lo, hi
+
+
+def newcombe(k_a: int, n_a: int, k_b: int, n_b: int) -> tuple[float, float, float]:
+    """Diferencia de dos proporciones independientes (b - a) con su IC al 95 % por el método híbrido de Newcombe
+    (las dos de Wilson, sin corrección). Para comparar dos ejecuciones que no comparten casos."""
+    if n_a == 0 or n_b == 0:
+        raise ValueError("hacen falta casos en las dos proporciones")
+    pa, la, ua = margen_wilson(k_a, n_a)
+    pb, lb, ub = margen_wilson(k_b, n_b)
+    d = pb - pa
+    return d, d - math.sqrt((pb - lb) ** 2 + (ua - pa) ** 2), d + math.sqrt((ub - pb) ** 2 + (pa - la) ** 2)
+
+
+def bootstrap_diferencia(a: Sequence[float], b: Sequence[float], n: int = 10000, semilla: int = 7) -> tuple[float, float, float]:
+    """Diferencia de medias (b - a) de dos muestras independientes, con su IC al 95 % remuestreando cada una."""
+    if not a or not b:
+        raise ValueError("hacen falta valores en las dos muestras")
+    rng = random.Random(semilla)
+    ma, mb = sum(a) / len(a), sum(b) / len(b)
+    difs = sorted(
+        sum(b[rng.randrange(len(b))] for _ in b) / len(b) - sum(a[rng.randrange(len(a))] for _ in a) / len(a)
+        for _ in range(n)
+    )
+    return mb - ma, difs[int(0.025 * n)], difs[int(0.975 * n) - 1]
+
+
+def binomial_dos_colas(b: int, c: int) -> float:
+    """p exacto a dos colas de los discordantes (McNemar exacto): ¿son b y c distintos de 50/50?"""
+    if b + c == 0:
+        return 1.0
+    return min(1.0, 2 * binomial_cola(max(b, c), b + c))
 
 
 def media(xs: Sequence[float]) -> float:

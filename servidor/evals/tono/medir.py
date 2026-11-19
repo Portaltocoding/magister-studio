@@ -2,18 +2,22 @@
 
     uv run python -m evals.tono.medir lint --carpeta ../salidas          CSV para marcar a mano (columna `real`)
     uv run python -m evals.tono.medir lint --leer resultados/lint.csv    precisión por regla (un veto < 0,9 baja a aviso)
-    uv run python -m evals.tono.medir variacion --n 10                   cuántos bloques cambian de veredicto en 3 juicios
-    uv run python -m evals.tono.medir sesgos --n 10                      verbosidad y posición, en modo pairwise
+    uv run python -m evals.tono.medir variacion          cuántos bloques cambian de veredicto en 3 juicios (corto: 3 bloques)
+    uv run python -m evals.tono.medir sesgos             verbosidad y posición, en modo pairwise (corto: 3 bloques)
+    uv run python -m evals.tono.medir variacion --nivel completo     10 bloques (o los de --n)
+
+Lint no llama al modelo. Variación: 3 juicios por bloque; sesgos: 2 por bloque (cada uno con su reintento). El tope
+duro (corto 18, completo 60, o --max-llamadas) corta limpio y dice cuántas llamadas ha hecho.
 """
 
 import argparse
 import asyncio
 import csv
-import sys
 from pathlib import Path
 
 from pydantic import BaseModel
 
+from evals import tope
 from evals.estadistica import binomial_cola, ic_proporcion
 from evals.tono.comun import RESULTADOS, bloques_de
 from magister.cerebro.estructura import ErrorEstructura, estructurar
@@ -52,11 +56,16 @@ def lint_precision(ruta: str) -> None:
         print(f"{regla:<18} marcas {len(v):>3} · verdaderas {sum(v):>3} · precisión {sum(v) / len(v):.2f} [{lo:.2f}, {hi:.2f}]")
 
 
-async def variacion(n: int) -> None:
+async def variacion(n: int, t: tope.Tope | None = None) -> None:
     bloques = (await bloques_de("alinear"))[:n]
     cambian = 0
     for b in bloques:
-        juicios = [j for j in await asyncio.gather(*(juzgar(b["texto"]) for _ in range(3))) if not isinstance(j, FalloJuez)]
+        if t is not None and not t.cabe(3):
+            t.cortado = True
+            bloques = bloques[:bloques.index(b)]
+            break
+        juicios = [j for j in await tope.a_la_vez(t, (juzgar(b["texto"]) for _ in range(3)))
+                   if j is not None and not isinstance(j, FalloJuez)]
         vistos = {tuple(getattr(j.veredicto, d).aprueba for d in DIMENSIONES) for j in juicios}
         cambian += len(vistos) > 1
     print(f"Cambian de veredicto {cambian} de {len(bloques)} bloques")
@@ -71,13 +80,19 @@ async def pairwise(a: str, b: str) -> str | None:
     return r.mejor.strip().upper()[:1]
 
 
-async def sesgos(n: int) -> None:
+async def sesgos(n: int, t: tope.Tope | None = None) -> None:
     bloques = (await bloques_de("alinear"))[:n]
     larga, posicion_estable, total = 0, 0, 0
     for b in bloques:
+        if t is not None and not t.cabe(2):
+            t.cortado = True
+            break
         corto, largo = b["texto"], b["texto"] + RELLENO
-        r1 = await pairwise(corto, largo)
-        r2 = await pairwise(largo, corto)
+        try:
+            r1 = await pairwise(corto, largo)
+            r2 = await pairwise(largo, corto)
+        except tope.TopeAlcanzado:
+            break
         if r1 is None or r2 is None:
             continue
         total += 1
@@ -95,16 +110,15 @@ def main() -> None:
     ap.add_argument("modo", choices=["lint", "variacion", "sesgos"])
     ap.add_argument("--carpeta", default="../salidas")
     ap.add_argument("--leer")
-    ap.add_argument("--n", type=int, default=10)
+    ap.add_argument("--n", type=int, default=None, help="cuántos bloques (por defecto, 3 en corto y 10 en completo)")
+    tope.argumentos(ap, corto=18, completo=60)
     args = ap.parse_args()
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     if args.modo == "lint":
         lint_precision(args.leer) if args.leer else asyncio.run(lint_csv(args.carpeta))
-    elif args.modo == "variacion":
-        asyncio.run(variacion(args.n))
-    else:
-        asyncio.run(sesgos(args.n))
+        return
+    t = tope.de_args(args)
+    n = args.n or {"corto": 3, "completo": 10}[args.nivel]
+    tope.correr(variacion(n, t) if args.modo == "variacion" else sesgos(n, t), t)
 
 
 if __name__ == "__main__":

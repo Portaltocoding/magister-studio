@@ -7,8 +7,12 @@ necesita fuentes. El código cuenta aciertos y, aparte, los fallos caros: «no»
 
 Llama a `claude` (gasta cuota): se lanza solo a mano y solo con --gastar. Sin él, dice cuántas llamadas haría.
 
-    uv run python -m evals.cuando_research            # cuántas llamadas haría (no gasta nada)
-    uv run python -m evals.cuando_research --gastar   # 3 llamadas con el banco v1 (30 lecciones, de 10 en 10)
+    uv run python -m evals.cuando_research                                    # cuántas llamadas haría (no gasta nada)
+    uv run python -m evals.cuando_research --gastar                           # corto: 9 lecciones, 1 llamada (tope 3)
+    uv run python -m evals.cuando_research --gastar --nivel completo          # 30 lecciones, 3 llamadas (tope 9)
+
+Cada reintento de una salida que no vale es otra llamada: el tope (`--max-llamadas`) los cuenta. Al acabar se guarda la
+ejecución para `evals.regresion` con la versión de `cuando_research`.
 """
 
 import argparse
@@ -20,11 +24,17 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
+from evals import regresion, tope
 from evals.estadistica import kappa, margen_wilson, tabla_de
 from magister.plan.esquemas import NECESIDADES, Necesidad
 
 BANCO = Path(__file__).parent / "banco" / "cuando-research-v1.yaml"
 LOTE = 10  # lecciones por llamada: pocas llamadas y cada lección con su número
+# El nivel corto: 3 lecciones de cada etiqueta (las más claras y una dudosa por etiqueta), en una sola llamada.
+CORTO = ["dividir-decimales", "bucle-for", "tabla-multiplicar",
+         "derivadas", "indices-sql", "recursividad",
+         "ultima-version-react", "irpf-tramos", "usucapion"]
+TOPES = {"corto": 3, "completo": 9}  # cada lote, 1 llamada y hasta 2 reintentos
 
 
 class EtiquetaLeccion(BaseModel):
@@ -95,15 +105,22 @@ def recuento(casos: list[dict], predichas: dict[str, str | None]) -> dict:
     }
 
 
-async def etiquetar(casos: list[dict], tamano: int = LOTE) -> dict[str, str | None]:
+async def etiquetar(casos: list[dict], tamano: int = LOTE, t: tope.Tope | None = None) -> dict[str, str | None]:
+    """Con `t`, no empieza un lote si no cabe ni su primera llamada, y un lote cortado por el tope deja sus lecciones
+    sin respuesta (fuera del recuento, ver `recuento(solo_respondidas=...)`)."""
     from magister.cerebro.estructura import ErrorEstructura, estructurar
     from magister.cerebro.prompts import cargar
 
     predichas: dict[str, str | None] = {}
     for lote in lotes(casos, tamano):
+        if t is not None and not t.cabe(1):
+            t.cortado = True
+            break
         sistema = cargar("cuando_research").texto
         try:
             salida = await estructurar(sistema, entrada_de(lote), Etiquetas, reglas_de(len(lote)), tarea="planificar")
+        except tope.TopeAlcanzado:
+            break
         except ErrorEstructura as e:
             print(f"  un lote no dio salida válida: {e}")
             predichas.update({c["id"]: None for c in lote})
@@ -130,23 +147,42 @@ def informe(r: dict, version: str) -> str:
     )
 
 
+def metricas(casos: list[dict], predichas: dict[str, str | None]) -> dict:
+    """Para `evals.regresion`: acierto por lección y, en las de «imprescindible», si fue un fallo caro."""
+    return {
+        "aciertos": regresion.proporcion({c["id"]: (int(predichas.get(c["id"]) == c["espera"]), 1) for c in casos}),
+        "fallos_caros": regresion.proporcion({c["id"]: (int(predichas.get(c["id"]) == "no"), 1) for c in casos
+                                              if c["espera"] == "imprescindible"}, mejor="bajo"),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--gastar", action="store_true", help="lanzarla de verdad con el modelo (gasta cuota)")
     ap.add_argument("--lote", type=int, default=LOTE, help="lecciones por llamada")
     ap.add_argument("--banco", type=Path, default=BANCO)
+    tope.argumentos(ap, **TOPES)
     args = ap.parse_args(argv)
     casos = cargar_banco(args.banco)
+    casos = tope.del_nivel(casos, args.nivel, CORTO if args.banco == BANCO else LOTE)
+    t = tope.de_args(args)
     n = llamadas_previstas(len(casos), args.lote)
-    print(f"{len(casos)} lecciones de {args.banco.name}, de {args.lote} en {args.lote}: {n} llamadas al modelo "
-          f"(tarea planificar), más algún reintento si una salida no vale.")
+    print(f"Nivel {args.nivel}: {len(casos)} lecciones de {args.banco.name}, de {args.lote} en {args.lote}: {n} llamadas al "
+          f"modelo (tarea planificar), más algún reintento si una salida no vale. Tope duro: {t.maximo}.")
     if not args.gastar:
         print("No lanzo nada. Para gastarlas, añade --gastar.")
         return 2
     from magister.cerebro.prompts import cargar
 
-    predichas = asyncio.run(etiquetar(casos, args.lote))
-    print(informe(recuento(casos, predichas), cargar("cuando_research").version))
+    with tope.contar(t):
+        predichas = asyncio.run(etiquetar(casos, args.lote, t))
+    hechos = [c for c in casos if c["id"] in predichas]
+    if hechos:
+        print(informe(recuento(hechos, predichas), cargar("cuando_research").version))
+        ej = regresion.ejecucion("cuando_research", args.nivel, regresion.versiones(["cuando_research"]),
+                                 metricas(hechos, predichas), t, regresion.huella(args.banco))
+        print(f"Guardada para comparar: {regresion.guardar(ej)}")
+    print(t.resumen())
     return 0
 
 

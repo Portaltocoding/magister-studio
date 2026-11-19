@@ -56,7 +56,9 @@ def test_sin_gastar_no_llama_al_modelo(monkeypatch, capsys) -> None:
     monkeypatch.setattr(estructura, "estructurar", no_llames)
     assert cr.main([]) == 2
     salida = capsys.readouterr().out
-    assert "3 llamadas al modelo" in salida and "--gastar" in salida
+    assert "Nivel corto: 9 lecciones" in salida and "1 llamadas al modelo" in salida and "--gastar" in salida
+    assert cr.main(["--nivel", "completo"]) == 2
+    assert "3 llamadas al modelo" in capsys.readouterr().out
 
 
 @pytest.mark.anyio

@@ -28,3 +28,17 @@ bancos:
   - nombre: criterios_v05
     tarea: null
     comando: python -m evals.criterios_v05
+  # Las de la ampliación, en nivel corto (cada una con su tope duro de llamadas; --nivel completo, a mano).
+  - nombre: research_base
+    tarea: null
+    comando: python -m evals.research_base --nivel corto
+  - nombre: rubrica_plan
+    tarea: planificar
+    comando: python -m evals.rubrica_plan --nivel corto
+  - nombre: asesor_plan
+    tarea: asesor
+    comando: python -m evals.asesor plan --nivel corto
+  # Sin modelo: los guiones gráficos guardados en MAGISTER_SALIDAS.
+  - nombre: video
+    tarea: null
+    comando: python -m evals.video

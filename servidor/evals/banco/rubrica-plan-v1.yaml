@@ -1,0 +1,52 @@
+# Rúbrica de planes y roadmaps (evals/rubrica_plan.py).
+# Cada caso: lo que pide el alumno y, puesto a mano, `debe_cubrir`: los términos que un plan que lleve al objetivo
+# tiene que nombrar en algún sitio (títulos, objetivos, conceptos, pasos). «a|b» acepta cualquiera de los dos. Sin
+# tildes ni mayúsculas: se compara normalizado. Es una comprobación de mínimos (que esté), no de calidad: lo demás lo
+# mira el juez.
+# v1: revísalos tú; si cambias uno, sube la versión del fichero (v2) para no mezclar medidas.
+
+planes:
+  - id: derivadas
+    tema: Derivadas
+    objetivo: saber derivar y aplicar derivadas en bachillerato
+    nivel: basico
+    horas_por_dia: [2, 2, 2, 2, 2, 0, 0]
+    plazo_dias: 30
+    debe_cubrir: ["limite", "derivada", "regla de la cadena|cadena", "producto|cociente", "maximo|minimo|optimizacion"]
+  - id: bbdd
+    tema: Bases de datos
+    objetivo: "preparar entrevistas de backend: modelar, SQL, índices y transacciones"
+    nivel: basico
+    horas_por_dia: [1.5, 1.5, 1.5, 1.5, 1.5, 3, 0]
+    plazo_dias: 45
+    debe_cubrir: ["modelo|modelado|entidad", "sql|consulta", "indice", "transaccion", "join"]
+  - id: acimut
+    tema: Topografía
+    objetivo: entender qué es el acimut y calcularlo entre dos puntos
+    nivel: basico
+    horas_por_dia: [1, 1, 1, 1, 1, 0, 0]
+    plazo_dias: 14
+    debe_cubrir: ["acimut", "coordenada", "norte"]
+  - id: usucapion
+    tema: Derecho civil
+    objetivo: "entender la usucapión: requisitos, plazos y clases"
+    nivel: basico
+    horas_por_dia: [2, 2, 2, 2, 2, 0, 0]
+    plazo_dias: 21
+    debe_cubrir: ["usucapion", "posesion", "plazo", "buena fe|justo titulo", "ordinaria|extraordinaria"]
+
+roadmaps:
+  - id: agente-aws
+    nombre: Copiloto cloud agéntico
+    idea: Un agente que lee una cuenta AWS de pruebas y propone un plan de ahorro sin tocar nada; luego lo aplica tras mi aprobación.
+    objetivo: Demostrar en entrevistas que sé construir agentes seguros
+    sabes: Python intermedio, algo de AWS
+    ritmo: 6 horas a la semana
+    debe_cubrir: ["boto3", "presupuesto|budget|coste", "aprob", "dry-run|dry run|simulacion", "test|prueba"]
+  - id: api-tareas
+    nombre: API de tareas
+    idea: Una API REST de tareas con usuarios, autenticación y una base de datos, desplegada en un servidor barato.
+    objetivo: Mi primer proyecto backend para el portfolio
+    sabes: Python básico
+    ritmo: 5 horas a la semana
+    debe_cubrir: ["endpoint|ruta", "base de datos|sql|postgres|sqlite", "autentica|login|token", "test|prueba", "despleg"]

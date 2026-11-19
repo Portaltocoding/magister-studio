@@ -1,20 +1,22 @@
 """Calibrar el juez de tono contra tus etiquetas.
 
-    uv run python -m evals.tono.calibrar --particion alinear|validar
-    uv run python -m evals.tono.calibrar --techo          kappa entre tu ronda 1 y tu ronda 2
+    uv run python -m evals.tono.calibrar --particion alinear|validar       corto: 6 bloques, tope 12 llamadas
+    uv run python -m evals.tono.calibrar --particion validar --nivel completo   toda la partición, tope 200
+    uv run python -m evals.tono.calibrar --techo          kappa entre tu ronda 1 y tu ronda 2 (sin modelo)
 
 Por dimensión: tabla 2x2, kappa con IC por bootstrap, y recall y precisión de los suspensos.
 Se niega a correr sobre la reserva. El informe se guarda con el SHA-256 del juez y de la rúbrica.
 """
 
 import argparse
-import asyncio
-import sys
 
+from evals import tope
 from evals.estadistica import bootstrap_ic, kappa, tabla_de
 from evals.tono.comun import bloques_de, etiquetas, guardar
 from magister.cerebro.prompts import cargar
 from magister.tono.juez import DIMENSIONES, FalloJuez, juzgar, rubrica
+
+BLOQUES_CORTO = 6
 
 
 def informe(pares: list[tuple[bool, bool]], nombre: str) -> dict:
@@ -40,12 +42,14 @@ async def principal(args) -> None:
             pares = [(r1[k], v) for k, v in r2.items() if k[2] == d and k in r1]
             print(informe(pares, d))
         return
-    bloques = await bloques_de(args.particion)
+    bloques = tope.del_nivel(await bloques_de(args.particion), args.nivel, BLOQUES_CORTO)
     mias = await etiquetas(1)
-    juicios = await asyncio.gather(*(juzgar(b["texto"]) for b in bloques))
+    juicios = await tope.a_la_vez(args.tope, (juzgar(b["texto"]) for b in bloques))
     filas, fallos = [], 0
     pares: dict[str, list[tuple[bool, bool]]] = {d: [] for d in DIMENSIONES}
     for b, j in zip(bloques, juicios, strict=True):
+        if j is None:  # cortado por el tope: ni fallo ni veredicto
+            continue
         if isinstance(j, FalloJuez):
             fallos += 1
             continue
@@ -66,6 +70,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--particion", default="validar", choices=["alinear", "validar", "reserva"])
     ap.add_argument("--techo", action="store_true")
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    asyncio.run(principal(ap.parse_args()))
+    # Un juicio por bloque (con un reintento: 2 llamadas como mucho). Corto: los 6 primeros de la partición.
+    tope.argumentos(ap, corto=12, completo=200)
+    args = ap.parse_args()
+    args.tope = tope.de_args(args)
+    tope.correr(principal(args), args.tope)
