@@ -71,6 +71,20 @@ def _normal(t: str) -> str:
     return " " + re.sub(r"[^a-z0-9ñ]+", " ", "".join(c for c in t if unicodedata.category(c) != "Mn")) + " "
 
 
+def errores_paso(p: PasoGen) -> list[str]:
+    """Un paso completo y comprobable (lo usan el roadmap, el detalle de un nivel y los cambios del asesor)."""
+    errores = []
+    if len(p.hecho_si.strip()) < 20 or _HECHO_VAGO.search(p.hecho_si):
+        errores.append(f"El paso «{p.titulo}» necesita un «hecho_si» comprobable (un comando que responde, una prueba que pasa, algo que se ve), no «{p.hecho_si.strip()[:40]}».")
+    if len(p.antes.strip()) < 20:
+        errores.append(f"El paso «{p.titulo}» necesita su «antes»: lo mínimo que hay que saber, en 2 a 4 frases.")
+    if len(p.que_haces.strip()) < 20:
+        errores.append(f"El paso «{p.titulo}» necesita un «que_haces» concreto.")
+    if not 10 <= p.minutos <= 240:
+        errores.append(f"El paso «{p.titulo}» dura {p.minutos} min: pártelo o júntalo para que dure de 10 min a 4 h.")
+    return errores
+
+
 def _con_pasos(bloques: list[BloqueGen], donde: str) -> list[str]:
     """El esqueleto de un nivel detallado: bloques de 2 a 6 pasos, y cada paso completo y comprobable."""
     errores = []
@@ -78,14 +92,7 @@ def _con_pasos(bloques: list[BloqueGen], donde: str) -> list[str]:
         if not 2 <= len(b.pasos) <= 6:
             errores.append(f"El bloque «{b.titulo}» de {donde} necesita de 2 a 6 pasos (tiene {len(b.pasos)}).")
         for p in b.pasos:
-            if len(p.hecho_si.strip()) < 20 or _HECHO_VAGO.search(p.hecho_si):
-                errores.append(f"El paso «{p.titulo}» necesita un «hecho_si» comprobable (un comando que responde, una prueba que pasa, algo que se ve), no «{p.hecho_si.strip()[:40]}».")
-            if len(p.antes.strip()) < 20:
-                errores.append(f"El paso «{p.titulo}» necesita su «antes»: lo mínimo que hay que saber, en 2 a 4 frases.")
-            if len(p.que_haces.strip()) < 20:
-                errores.append(f"El paso «{p.titulo}» necesita un «que_haces» concreto.")
-            if not 10 <= p.minutos <= 240:
-                errores.append(f"El paso «{p.titulo}» dura {p.minutos} min: pártelo o júntalo para que dure de 10 min a 4 h.")
+            errores += errores_paso(p)
     titulos = [p.titulo.strip().lower() for b in bloques for p in b.pasos]
     repetidos = sorted({t for t in titulos if titulos.count(t) > 1})
     if repetidos:
@@ -166,9 +173,15 @@ def montar(r: RoadmapGen) -> dict:
     }
 
 
-def _bloques(prefijo: str, bloques: list[BloqueGen]) -> list[dict]:
+def _bloques(prefijo: str, bloques: list[BloqueGen], ocupados: frozenset[str] = frozenset()) -> list[dict]:
+    """Ids n1-b2 y n1-b2-p3 por posición, saltando los `ocupados` (un bloque que el asesor movió aquí desde otro
+    nivel conserva su id, y un id nunca se repite)."""
     salida = []
-    for j, b in enumerate(bloques, 1):
+    j = 0
+    for b in bloques:
+        j += 1
+        while f"{prefijo}-b{j}" in ocupados:
+            j += 1
         bid = f"{prefijo}-b{j}"
         salida.append({
             "id": bid, "titulo": b.titulo, "priming": b.priming,
@@ -177,12 +190,18 @@ def _bloques(prefijo: str, bloques: list[BloqueGen]) -> list[dict]:
     return salida
 
 
+def ids_de(niveles: list[dict]) -> set[str]:
+    """Todos los ids de bloques y pasos de esos niveles."""
+    return {x for n in niveles for b in n["bloques"] for x in [b["id"], *(p["id"] for p in b["pasos"])]}
+
+
 def con_nivel_detallado(roadmap: dict, numero: int, detalle: NivelDetallado) -> dict:
     """El roadmap con los bloques nuevos de ese nivel (los demás niveles, tal cual)."""
     niveles = []
+    otros = frozenset(ids_de([n for n in roadmap["niveles"] if n["numero"] != numero]))
     for n in roadmap["niveles"]:
         if n["numero"] == numero:
-            n = {**n, "detallado": True, "bloques": _bloques(n["id"], detalle.bloques)}
+            n = {**n, "detallado": True, "bloques": _bloques(n["id"], detalle.bloques, otros)}
         niveles.append(n)
     return {**roadmap, "niveles": niveles}
 

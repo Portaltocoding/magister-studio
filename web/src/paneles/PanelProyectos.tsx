@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { crearConversacion, enviarJson, pedir } from '../api.ts'
+import { EVENTO_CAMBIO_APLICADO, crearConversacion, enviarJson, pedir, type CambioAplicado } from '../api.ts'
 import Diagrama from '../componentes/Diagrama.tsx'
 import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
@@ -394,9 +394,29 @@ function VistaProyecto({ id, alVolver }: { id: number; alVolver: () => void }) {
   }, [cargar])
   // La última decisión del diario, para «por dónde íbamos».
   const [ultimaDecision, setUltimaDecision] = useState<Decision | null>(null)
+  const [vuelta, setVuelta] = useState(0)
   useEffect(() => {
     pedir<Decision[]>(`/api/proyectos/${id}/decisiones`).then((l) => setUltimaDecision(l[0] ?? null)).catch(() => undefined)
-  }, [id])
+  }, [id, vuelta])
+  // El asesor ha aplicado (o deshecho) un cambio en este proyecto: se vuelve a leer.
+  useEffect(() => {
+    const al = (e: Event) => {
+      const { proyecto_id, nuevos } = (e as CustomEvent<CambioAplicado>).detail
+      if (proyecto_id !== id) return
+      setVuelta((v) => v + 1)
+      // Ya releído, te lleva a lo nuevo y lo resalta un momento.
+      void cargar().then(() =>
+        window.setTimeout(() => {
+          const pasos = nuevos.map((x) => document.getElementById(`paso-${x}`)).filter((el): el is HTMLElement => !!el)
+          pasos[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          pasos.forEach((el) => el.classList.add('destacado'))
+          window.setTimeout(() => pasos.forEach((el) => el.classList.remove('destacado')), 2600)
+        }, 80),
+      )
+    }
+    window.addEventListener(EVENTO_CAMBIO_APLICADO, al)
+    return () => window.removeEventListener(EVENTO_CAMBIO_APLICADO, al)
+  }, [id, cargar])
   // Mientras se genera, se mira cada pocos segundos en qué va.
   useEffect(() => {
     if (p?.estado !== 'generando') return
@@ -756,6 +776,11 @@ function Diario({ id, pasos, alCambiar }: { id: number; pasos: Paso[]; alCambiar
       .catch((e) => setAviso(`No he podido cargar el diario: ${mensajeDe(e)}`))
   }, [id])
   useEffect(cargar, [cargar])
+  useEffect(() => {
+    const al = (e: Event) => (e as CustomEvent<CambioAplicado>).detail.proyecto_id === id && cargar()
+    window.addEventListener(EVENTO_CAMBIO_APLICADO, al)
+    return () => window.removeEventListener(EVENTO_CAMBIO_APLICADO, al)
+  }, [id, cargar])
   const titulo = (pid: string | null) => pasos.find((x) => x.id === pid)?.titulo
   return (
     <section className="proyecto-diario">

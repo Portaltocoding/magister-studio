@@ -14,6 +14,7 @@ from magister.api.rutas_agenda import rutas as rutas_agenda
 from magister.api.rutas_examen import rutas as rutas_examen
 from magister.api.rutas_borrar import rutas as rutas_borrar
 from magister.api.rutas_conversaciones import rutas as rutas_conversaciones
+from magister.api.rutas_asesor import rutas as rutas_asesor
 from magister.api.rutas_fuentes import rutas as rutas_fuentes
 from magister.api.rutas_material import rutas as rutas_material
 from magister.api.rutas_practica import rutas as rutas_practica
@@ -154,6 +155,7 @@ async def pulso(n: int = 5, juntos: int = 0) -> AsyncIterator[ServerSentEvent]:
 
 
 app.include_router(rutas_conversaciones)
+app.include_router(rutas_asesor)
 app.include_router(rutas_plan)
 app.include_router(rutas_fuentes)
 app.include_router(rutas_research)

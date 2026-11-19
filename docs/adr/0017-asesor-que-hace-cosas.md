@@ -1,0 +1,22 @@
+# ADR-0017. El asesor hace cosas: lee, propone, tú apruebas y el arnés aplica
+
+**Estado:** aceptada. **Fecha:** 2026-11-19.
+
+**Contexto.** El asesor (la mascota flotante) solo sabía contestar y llevarte a otra pantalla. Si le pegabas un plan y le pedías «añádelo al proyecto», contestaba que no podía. El modelo corre con `claude -p --tools ""`: no tiene herramientas, y no queremos que escriba en la base.
+
+**Decisión.** Leer, proponer, aprobar y aplicar, como en un agente de operaciones:
+
+1. **Ofrece.** Si el asesor ofrece un cambio, acaba su respuesta con un bloque ```` ```cambio ```` con el encargo en sus palabras. Si un cambio le parece mala idea, dice la pega y pregunta; no se niega.
+2. **Decide: leer o proponer.** Al terminar la respuesta, `asesor.agente.preparar` (plantilla `asesor_cambio`, por `estructurar`) corre un bucle corto. En cada vuelta el modelo devuelve una sola cosa: lecturas, los cambios o `no_se_puede`. El roadmap y el diario del proyecto van siempre en el prompt; las herramientas (`asesor.herramientas`) son dos, de solo lectura y sobre tus datos: `buscar_notas` y `ver_plan_estudio`. Las reglas de la decisión están en código (`agente.reglas_paso`): como mucho `MAGISTER_ASESOR_VUELTAS` vueltas (3) y `MAGISTER_ASESOR_LECTURAS` lecturas por vuelta (2), ninguna lectura repetida, y en la última vuelta solo vale proponer.
+3. **Propone acciones cerradas** (`asesor.cambios.Accion`). Añadir partes: `anadir_pasos`, `nuevo_bloque`, `nuevo_nivel`. Reestructurar: `mover_paso`, `mover_bloque`, `cambiar_paso`, `cambiar_bloque`, `cambiar_nivel`, `quitar_paso`, `quitar_bloque`, `quitar_nivel`. Lo demás: `marcar_paso`, `apuntar_decision`, `guardar_nota`.
+4. **Valida en código.** `cambios.simular` aplica las acciones en orden sobre una copia del proyecto y comprueba cómo queda al final: ids que existen, bloques de 1 a 6 pasos, niveles de 1 a 5 bloques, nada de pasos en un nivel sin detallar, pasos comprobables (`roadmap.errores_paso`). Lo que no vale vuelve al modelo con el porqué. Lo que ves en la tarjeta («Mover el paso «X» al principio de «Y»») lo escribe el código, no el modelo. Si parte del encargo no cabe, el modelo lo dice en `pendiente` y se enseña.
+5. **Aprueba la persona.** La propuesta se guarda en `asesor_cambios` con la huella del proyecto y lo que se consultó, y sale como una tarjeta con «Aplicar» y «Descartar». Aprobar es un botón de la pantalla (`POST /api/cambios/{id}/aplicar`), nunca algo que el modelo pueda llamar.
+6. **Aplica el arnés.** `asesor.arnes.aplicar` comprueba que sigue en «propuesta», que la huella no ha cambiado (si no, caduca) y vuelve a simular; lo escribe en una transacción y guarda cómo deshacerlo. «Deshacer» vuelve al proyecto de antes si nada ha cambiado después. Aplicar o deshacer dos veces no hace nada.
+
+**Los ids no cambian al reestructurar.** Lo hecho y el diario van por id de paso, así que mover un paso o un bloque conserva su id; los nuevos se numeran tras el mayor que haya existido, y `roadmap.con_nivel_detallado` salta los ids ocupados. Los niveles se nombran por id (n2): su número cambia al insertar o quitar niveles.
+
+**Consecuencias.**
+- Un cambio cuesta una llamada más con el modelo de siempre (escribe pasos), y una más por vuelta de lectura; solo cuando el asesor ofrece algo. Medido a mano el 19-11-2026: de 6 a 14 s sin lecturas y unos 10 s con una. La pregunta siguiente no espera a que se prepare, y se puede parar.
+- Un texto pegado (o una nota) con órdenes dentro, como mucho, produce una propuesta rara: no puede aplicarse sola, ni salir de la lista cerrada, ni tocar otro proyecto.
+- Lo que no está en la lista (crear o borrar proyectos, planes de estudio, ajustes) el asesor no lo hace y te dice dónde se hace. Ampliarla es añadir una acción a `cambios.py` con su simulación y su test; una lectura nueva, una función en `herramientas.py`.
+- Las pruebas no llaman al modelo: `tests/test_asesor.py` cubre las acciones, las reglas de decisión y el camino por la API con el motor eco. La prueba con el modelo de verdad es `uv run python -m evals.asesor agente|chat`, a mano.

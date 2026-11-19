@@ -98,6 +98,10 @@ class Ajustes(BaseSettings):
     ffmpeg: str = "ffmpeg"
     registros: str = str(RAIZ_SERVIDOR / "registros")
 
+    # El asesor que propone cambios (ADR-0017): cuántas vueltas como mucho (la última solo puede proponer) y cuántas
+    # lecturas por vuelta. Con 3 vueltas: leer, leer y proponer.
+    asesor_vueltas: int = 3
+    asesor_lecturas: int = 2
     # Research (Parte III)
     research_pasos: int = 12
     research_llamadas: int = 8

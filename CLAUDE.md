@@ -19,6 +19,7 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 - `material` importa de `cerebro`, `plan`, `tono` y `datos`; `tono` importa solo de `cerebro`; `trabajos` importa de `material`, `datos` y `voz` (exportar vídeos a MP4); `api` importa además de `trabajos`.
 - `aprender` importa de `cerebro`, `plan`, `tono`, `datos` y `config`; `api` y `flujo` importan de `aprender`.
 - `voz` (la voz local con Piper, el registro de las llamadas y el montaje de vídeos en MP4 con ffmpeg, `MAGISTER_FFMPEG`) solo importa de `magister.config`; `api` importa de `voz`. Piper y sus voces van en `herramientas/piper/` y los registros en `servidor/registros/llamadas/`, los dos fuera de git.
+- `asesor` (el agente que lee y propone cambios en un proyecto, y el arnés que los aplica, ADR-0017) importa de `cerebro`, `datos`, `proyectos` y `config`; `api` importa de `asesor`. Sus herramientas solo leen y el modelo solo propone acciones de la lista cerrada de `asesor/cambios.py`: aplicar es un botón, nunca una salida del modelo.
 - `plan` es código puro: no importa de `datos`, `cerebro` ni `config`.
 - `cerebro` y `datos` nunca importan de `api` ni el uno del otro.
 - Las evals viven en `servidor/evals/` y se lanzan con `uv run python -m evals.<modulo>`.
@@ -40,7 +41,7 @@ El paquete `magister` contiene `api`, `flujo`, `cerebro`, `plan` y `datos`.
 3. Ningún número de una eval lo calcula el modelo: la estadística está en `evals/estadistica.py`, con tests.
 4. Un juez que no devuelve JSON válido o cita algo que no está en el texto devuelve `FalloJuez`, nunca un suspenso.
 5. Todo trabajo largo va por la cola de `trabajos/`; los nodos son idempotentes (upsert, no insert).
-6. Las pruebas no llaman a `claude`; los harness de jueces (`evals.tono`, `evals.fidelidad`) sí, y solo a mano.
+6. Las pruebas no llaman a `claude`; los harness (`evals.tono`, `evals.fidelidad`, `evals.asesor`) sí, y solo a mano.
 
 ## Aprender (Parte V)
 

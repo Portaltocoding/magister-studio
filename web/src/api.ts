@@ -51,7 +51,7 @@ export type EventoTutor =
       retirado?: string[]
     }
   | { tipo: 'error'; detalle: string }
-  | { tipo: 'fase'; nodo: string }
+  | { tipo: 'fase'; nodo: string; detalle?: string }
   // Mientras el modelo razona sin escribir: el pulso (segundos) y, si tarda, el guion y frases para la espera.
   | { tipo: 'latido'; segundos: number }
   | { tipo: 'adelanto'; guion: string; frases: string[] }
@@ -59,6 +59,10 @@ export type EventoTutor =
   | { tipo: 'guardado'; plan_id: number; tema_id: number }
   // «Guárdalo» en el chat: la respuesta anterior ya está en Mis notas.
   | { tipo: 'nota'; id: number; mensaje_id: number }
+  // El asesor ha preparado el cambio que ofreció (o no ha podido): lo aplicas tú.
+  | ({ tipo: 'cambio' } & CambioAsesor)
+  // `explicado`: no es un fallo, el asesor dice por qué eso no lo puede hacer (y dónde se hace).
+  | { tipo: 'cambio_fallido'; detalle: string; explicado?: boolean }
   | { tipo: 'opciones'; campo: string; opciones: { valor: string; etiqueta: string }[] }
   | { tipo: 'acciones'; acciones: { tipo: 'ir' | 'buscar'; etiqueta: string; ruta?: string; consulta?: string }[] }
 
@@ -255,7 +259,39 @@ export interface ExtraMensaje {
   corregir?: boolean
   // El asesor (la mascota flotante): contesta corto sobre la pantalla que tienes abierta.
   asesor?: boolean
+  // El proyecto que tienes en pantalla: el asesor prepara sobre él los cambios que ofrece.
+  proyecto_id?: number | null
 }
+
+// Un cambio que propone el asesor. Las líneas las escribe el código del servidor, no el modelo; nada cambia hasta
+// que pulsas «Aplicar», y lo aplicado se puede deshacer.
+export interface CambioAsesor {
+  id: number
+  estado: 'propuesta' | 'aplicada' | 'descartada' | 'deshecha' | 'caducada'
+  resumen: string
+  lineas: { texto: string; motivo: string }[]
+  mensaje_id: number | null
+  proyecto_id: number | null
+  motivo_estado: string | null
+  creado_en: string
+  // Lo que miró antes de proponer («tus notas sobre «moto»») y, ya aplicado, los pasos nuevos.
+  consultado: string[]
+  nuevos: string[]
+  // Lo que pedías y se queda fuera de este cambio, con qué hacer.
+  pendiente: string | null
+}
+
+// Lo que viaja en EVENTO_CAMBIO_APLICADO: qué proyecto ha cambiado y qué pasos enseñar.
+export interface CambioAplicado {
+  proyecto_id: number | null
+  nuevos: string[]
+}
+
+export const cambiosDe = (cid: number) => pedir<CambioAsesor[]>(`/api/conversaciones/${cid}/cambios`)
+export const decidirCambio = (id: number, que: 'aplicar' | 'descartar' | 'deshacer') =>
+  pedir<CambioAsesor>(`/api/cambios/${id}/${que}`, { method: 'POST' })
+// Avisa a las pantallas abiertas (el proyecto, su diario) de que el asesor ha cambiado algo.
+export const EVENTO_CAMBIO_APLICADO = 'magister-cambio-aplicado'
 
 export function enviar(cid: number, contenido: string, signal: AbortSignal, cuenta = true, voz = false, extra: ExtraMensaje = {}) {
   return flujo<EventoTutor>(`/api/conversaciones/${cid}/mensajes`, { contenido, cuenta, voz, ...extra }, signal)

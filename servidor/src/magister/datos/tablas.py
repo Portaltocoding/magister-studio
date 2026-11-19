@@ -9,3 +9,4 @@ from magister.datos import produccion  # noqa: F401,E402
 from magister.datos import agenda  # noqa: F401,E402
 from magister.datos import notas  # noqa: F401,E402
 from magister.datos import proyectos  # noqa: F401,E402
+from magister.datos import asesor  # noqa: F401,E402

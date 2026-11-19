@@ -22,6 +22,7 @@ from magister.api.esquemas import (
     TemaSalida,
 )
 from magister.api.flujo import flujo_tutor
+from magister.api.rutas_asesor import tras_respuesta
 from magister.config import ajustes
 from magister.datos import conversaciones as dc
 from magister.datos.sesion import nueva_sesion, sesion_por_peticion
@@ -233,7 +234,17 @@ async def enviar_mensaje(
                                            "nota_guardada": p.nota is not None})
         if p.nota is not None:
             eventos = _con_nota(p.nota, eventos)
+        texto, mensaje_id = [], None
         async for evento in flujo_tutor(eventos, guardador(cid, p.cuenta), {"conversacion_id": cid}):
+            if evento.event == "delta":
+                texto.append(evento.data["t"])
+            elif evento.event == "fin":
+                mensaje_id = evento.data.get("mensaje_id")
+            yield evento
+    # El asesor que hace cosas: si ofreció un cambio (bloque ```cambio), lo prepara para que lo apliques tú. Fuera del
+    # turno: la respuesta ya está guardada y la siguiente pregunta no tiene que esperar a esto.
+    if cuerpo.asesor and mensaje_id is not None:
+        async for evento in tras_respuesta(cid, cuerpo.proyecto_id, "".join(texto), mensaje_id, turnos, hoy()):
             yield evento
 
 

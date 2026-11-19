@@ -61,6 +61,8 @@ prompts:
   proyecto_roadmap: generar
   proyecto_nivel: generar
   proyecto_arquitectura: generar
+  # Los cambios que propone el asesor: escribe pasos de proyecto, así que el modelo de siempre, no el del asesor.
+  asesor_cambio: planificar
   juez_tono: juez
   juez_completitud: juez
 

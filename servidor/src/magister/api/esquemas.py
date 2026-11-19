@@ -58,6 +58,8 @@ class MensajeEntrada(BaseModel):
     corregir: bool = False
     # El asesor: la mascota flotante que contesta sobre la pantalla que tienes abierta (en `contexto` va lo que ves).
     asesor: bool = False
+    # El proyecto que tiene en pantalla: sobre él prepara el asesor los cambios que ofrece (los aplicas tú).
+    proyecto_id: int | None = None
     # Cabe el banco entero del examen oral (unas 20 preguntas pasan de 3000 caracteres).
     contexto: str | None = Field(None, max_length=12_000)
 
