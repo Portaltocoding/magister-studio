@@ -118,8 +118,11 @@ async def _coste_en_ventana(ventana: str, reinicia: int) -> float:
         return float(await s.scalar(select(func.sum(LlamadaFila.coste_equivalente)).where(LlamadaFila.creada >= desde)) or 0.0)
 
 
-async def coste_de(accion: str, minutos: int | None = None) -> float:
-    """Coste equivalente medio de una acción, sacado de tus llamadas."""
+async def coste_de(accion: str, minutos: int | None = None, lecciones: int | None = None) -> float:
+    """Coste equivalente medio de una acción, sacado de tus llamadas. `lecciones`: el material o la búsqueda de
+    fuentes de varias lecciones a la vez (aceptar un plan buscando fuentes, el asesor preparando varias)."""
+    if accion in ("material", "research") and lecciones and lecciones > 1:
+        return await coste_de(accion) * lecciones
     if accion == "video":
         return coste_de_video(await _coste_medio(("guion_grafico",)) or await _coste_medio(("guion",)) or 0.07, minutos or MINUTOS_GUION)
     if accion == "diapositivas":
@@ -160,10 +163,10 @@ async def estado() -> dict:
     return {v: vigente(e.get(v), ahora) for v in VENTANAS}
 
 
-async def estimar(accion: str, minutos: int | None = None) -> dict:
+async def estimar(accion: str, minutos: int | None = None, lecciones: int | None = None) -> dict:
     """Cuánto subiría cada barra con esta acción (fracción de la ventana), y si la cifra está calibrada."""
     e = await _estado_guardado()
-    coste = await coste_de(accion, minutos)
+    coste = await coste_de(accion, minutos, lecciones)
     ahora = time.time()
     salida: dict = {"accion": accion}
     for v in VENTANAS:

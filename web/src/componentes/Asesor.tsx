@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from './Markdown.tsx'
 import { EVENTO_CAMBIO_APLICADO, cambiosDe, crearConversacion, decidirCambio, enviar, listarMensajes, listarPlanes, type CambioAplicado, type CambioAsesor, type LineaCambio } from '../api.ts'
 import { mensajeDe } from './Cargando.tsx'
+import BarraCuota from './BarraCuota.tsx'
 import Mascota from '../Mascota.tsx'
 import { MODOS } from '../modos.ts'
 import { EVENTO_SUENO } from './animo.ts'
@@ -487,6 +488,8 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
 }) {
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Las lecciones cuyos apuntes encola: sus líneas son las que «Deshacer» no deshace (NO_SE_DESHACE en asesor/cambios.py).
+  const preparar = (cambio.lineas as LineaCambio[]).filter((l) => l.deshace === false).length
   const caja = useRef<HTMLDivElement | null>(null)
   const aplicar = useRef<HTMLButtonElement | null>(null)
   const devolverFoco = useRef(false)
@@ -548,6 +551,8 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
         </div>
       )}
       {error && <p className="nota" role="alert">{error}</p>}
+      {/* Preparar apuntes es lo único que no se deshace (y lo único caro): lo que gastarían, antes de «Aplicar». */}
+      {cambio.estado === 'propuesta' && preparar > 0 && <BarraCuota accion={{ accion: 'material', lecciones: preparar }} compacta />}
       {/* Lo que solo prepara apuntes no se deshace: sin botón de «Deshacer». */}
       {(cambio.estado === 'propuesta' || (cambio.estado === 'aplicada' && cambio.deshacible !== false)) && (
         <div className="asesor-cambio-botones">

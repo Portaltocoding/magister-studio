@@ -5,7 +5,21 @@ import Companera from '../componentes/Companera.tsx'
 import MapaConceptos, { usarMapa } from '../componentes/MapaConceptos.tsx'
 import Calentamiento, { ApuestasRevisadas, guardarCalentamiento, leerCalentamiento, type Apuestas, type DatosCalentamiento } from '../componentes/Calentamiento.tsx'
 import Markdown from '../componentes/Markdown.tsx'
-import { EVENTO_CAMBIO_APLICADO, enviarJson, flujo, hoyIso, listarPlanes, marcarSesion, pedir, rutaExamen, verPlan, type HitoExamen, type ResumenPlan } from '../api.ts'
+import {
+  EVENTO_CAMBIO_APLICADO,
+  enviarJson,
+  flujo,
+  hoyIso,
+  listarConversaciones,
+  listarMensajes,
+  listarPlanes,
+  marcarSesion,
+  pedir,
+  rutaExamen,
+  verPlan,
+  type HitoExamen,
+  type ResumenPlan,
+} from '../api.ts'
 import { colorDeTema, nombreCorto } from '../componentes/colorTema.ts'
 import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
@@ -15,6 +29,18 @@ import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import type { IdModo } from '../modos.ts'
 import { aCss } from '../componentes/escala.ts'
 import { debeIgnorar, desplazarA, usarParrafoActivo, type Pantalla } from '../componentes/parrafos.ts'
+import {
+  aMedias,
+  claveListo,
+  descartar,
+  fotoAlLlegar,
+  leerAvancesFoco,
+  leerDescartados,
+  nuevosListos,
+  type AMedias,
+  type MaterialListo,
+  type UltimaConversacion,
+} from '../componentes/aMedias.ts'
 
 export interface Hoy {
   estado: 'propuesta' | 'adelantar' | 'sin_preparar' | 'sin_plan' | 'solo_repaso'
@@ -86,6 +112,9 @@ interface Avance {
   borradores?: Record<string, Borrador>
   // Las preguntas ya servidas (se avisa al servidor una sola vez por pregunta).
   servidas?: string[]
+  // Cuántas ideas tiene y cuándo se guardó: para «Lo dejaste ayer en la idea 3 de 5» en Hoy.
+  n?: number
+  en?: number
 }
 
 interface Borrador {
@@ -536,8 +565,8 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
   }, [descanso])
 
   useEffect(() => {
-    if (!cerrada) guardarAvance(mid, { i, comprobado, segundos, u, borradores, servidas })
-  }, [mid, i, comprobado, segundos, cerrada, u, borradores, servidas])
+    if (!cerrada) guardarAvance(mid, { i, comprobado, segundos, u, borradores, servidas, n: bloques.length, en: Date.now() })
+  }, [mid, i, comprobado, segundos, cerrada, u, borradores, servidas, bloques.length])
 
   // La pregunta de la idea se sirve al verla, una sola vez aunque vuelvas a ella (p_predicha se apunta al servirla).
   useEffect(() => {
@@ -1199,6 +1228,29 @@ function TarjetaExamen({ examen, despues }: { examen: HitoExamen; despues?: stri
   )
 }
 
+// Lo que dejaste a medias fuera de Proyectos: una línea por cosa, con su enlace y una × para quitarla.
+function FranjaAMedias({ avisos, alIr, alDescartar }: { avisos: AMedias[]; alIr: (a: AMedias) => void; alDescartar: (id: string) => void }) {
+  if (!avisos.length) return null
+  return (
+    <section className="a-medias" aria-label="Lo que dejaste a medias">
+      <span className="a-medias-etq">A medias</span>
+      <ul>
+        {avisos.map((a) => (
+          <li key={a.id}>
+            <span>{a.texto}</span>
+            <button className="boton-mini" onClick={() => alIr(a)}>
+              {a.boton} →
+            </button>
+            <button className="a-medias-quitar" onClick={() => alDescartar(a.id)} aria-label={`Quitar: ${a.texto}`} title="Quitar este aviso">
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export const saludo = () => {
   const h = new Date().getHours()
   return h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'
@@ -1215,6 +1267,10 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
   const [avance, setAvance] = useState<Avance | null>(null)
   const [minutosRepaso, setMinutosRepaso] = useState<number | null>(null)
   const [semana, setSemana] = useState<{ hechas: number; total: number; sesiones: number; hechasN: number } | null>(null)
+  // «Lo dejaste a medias»: el material que terminó desde tu visita anterior, las últimas conversaciones y lo descartado.
+  const [listosNuevos, setListosNuevos] = useState<MaterialListo[]>([])
+  const [ultimasConversaciones, setUltimasConversaciones] = useState<UltimaConversacion[]>([])
+  const [descartados, setDescartados] = useState<string[]>(leerDescartados)
   const [fallo, setFallo] = useState<string | null>(null)
   const [intento, setIntento] = useState(0)
   const reintentar = useCallback(() => {
@@ -1257,7 +1313,10 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
       // Cada plan con su vista y sus materiales, todos a la vez (antes iban uno tras otro y el primero dos veces).
       const vistas = await Promise.all(
         ps.map((p) =>
-          Promise.all([verPlan(p.tema_id), pedir<Record<string, { apuntes_id?: number }>>(`/api/planes/${p.plan_id}/materiales`)]),
+          Promise.all([
+            verPlan(p.tema_id),
+            pedir<Record<string, { apuntes_id?: number; tipos?: Record<string, string>; ids?: Record<string, number> }>>(`/api/planes/${p.plan_id}/materiales`),
+          ]),
         ),
       )
       // Esta semana: horas y sesiones hechas frente a las previstas (lunes a domingo).
@@ -1281,7 +1340,33 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
         }
       })
       setOtras(lista)
+      // Lo listo ahora frente a la foto de tu visita anterior: lo nuevo es lo que terminó mientras no estabas.
+      const listos: MaterialListo[] = []
+      ps.forEach((p, i) => {
+        for (const [clave, d] of Object.entries(vistas[i][1])) {
+          for (const [tipo, estado] of Object.entries(d.tipos ?? {})) {
+            const id = d.ids?.[tipo]
+            if (estado === 'listo' && id != null) listos.push({ id, tipo, clave, tema_id: p.tema_id })
+          }
+        }
+      })
+      setListosNuevos(nuevosListos(listos, fotoAlLlegar(listos.map(claveListo))))
     }).catch(() => undefined)
+    // Las dos conversaciones más recientes y su último mensaje: si se cortó o el tutor espera tu respuesta (solo en Hoy).
+    if (vista === 'hoy') {
+      listarConversaciones()
+        .then((cs) =>
+          Promise.all(
+            cs.slice(0, 2).map(async (c) => {
+              const ms = await listarMensajes(c.id)
+              const m = ms[ms.length - 1]
+              return { id: c.id, titulo: c.titulo, actualizada_en: c.actualizada_en, ultimo: m ? { id: m.id, rol: m.rol, estado: m.estado, contenido: m.contenido } : null }
+            }),
+          ),
+        )
+        .then(setUltimasConversaciones)
+        .catch(() => undefined)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abrir, intento])
   // El asesor ha movido una sesión o marcado una lección: lo que toca hoy puede haber cambiado.
@@ -1343,6 +1428,18 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     )
 
   const seguir = avance && hoy.material_id ? `Seguir por la idea ${avance.i + 1}` : null
+  const avisosAMedias = aMedias(
+    {
+      avances: leerAvancesFoco(),
+      lecciones: otras,
+      deHoy: hoy.estado !== 'sin_preparar' && hoy.estado !== 'solo_repaso' ? hoy.material_id : null,
+      conversaciones: ultimasConversaciones,
+      listosNuevos,
+      descartados,
+    },
+    Date.now(),
+  )
+  const irAMedias = (a: AMedias) => (a.destino.tipo === 'foco' ? empezar(a.destino.mid) : irARuta(a.destino.ruta))
   // Si el examen cubre lecciones que aún tienes pendientes hoy, va después de ellas.
   const examenDespues = hoy.examen
     ? (hoy.dia ?? []).filter((s) => s.estado !== 'hecha' && hoy.examen!.lecciones?.includes(s.clave)).map((s) => s.clave)
@@ -1389,6 +1486,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
           <small>{hoy.examen ? `${hoy.examen.titulo} →` : 'Hacer uno cuando quieras →'}</small>
         </button>
       </div>
+      <FranjaAMedias avisos={avisosAMedias} alIr={irAMedias} alDescartar={(id) => setDescartados(descartar(id))} />
       <TuDia hoy={hoy} minutosRepaso={minutosRepaso} irA={irA} planes={planes} />
       {hoy.examen && !examenDespues.length && <TarjetaExamen examen={hoy.examen} />}
       {hoy.titulo && hoy.estado !== 'solo_repaso' ? (

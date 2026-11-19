@@ -27,6 +27,9 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
   const [texto, setTexto] = useState('')
   const [pulsado, setPulsado] = useState(false)
   const bloqueado = ocupado || pulsado
+  // «Aceptar y buscar fuentes» busca en las lecciones que las necesitan: dos llamadas por cada una. Aceptar sin más no
+  // gasta modelo; «Rehacer» vuelve a planificar.
+  const aBuscar = propuesta.lecciones.filter((l) => l.necesita_fuentes !== 'no').length
 
   return (
     <section className="propuesta" aria-label="Plan propuesto">
@@ -125,8 +128,12 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
           </button>
         </div>
       )}
-      {/* Aceptar pone en marcha el plan (y la búsqueda de fuentes): lo que gastaría, antes de pulsar. */}
-      {!cambiando && <BarraCuota accion={{ accion: 'plan' }} />}
+      {/* Lo que gastaría, antes de pulsar: buscar las fuentes de esas lecciones o, si lo cambias, rehacer el plan. */}
+      {cambiando ? (
+        <BarraCuota accion={{ accion: 'plan' }} compacta />
+      ) : (
+        aBuscar > 0 && <BarraCuota accion={{ accion: 'research', lecciones: aBuscar }} />
+      )}
     </section>
   )
 }

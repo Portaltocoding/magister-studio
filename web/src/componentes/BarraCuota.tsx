@@ -20,14 +20,16 @@ interface Estimacion {
 
 export type Accion =
   | { accion: 'video'; minutos: number }
-  | { accion: 'material' }
+  // `lecciones`: el material de varias a la vez (el asesor preparando varias lecciones).
+  | { accion: 'material'; lecciones?: number }
   | { accion: 'diapositivas' }
   | { accion: 'mensaje' }
   | { accion: 'proyecto' }
   | { accion: 'nivel' }
   | { accion: 'plan' }
-  // Buscar fuentes para una lección: dos llamadas (las consultas y el juez que lee lo encontrado).
-  | { accion: 'research' }
+  // Buscar fuentes para una lección: dos llamadas (las consultas y el juez que lee lo encontrado); con `lecciones`, para
+  // varias (aceptar un plan y buscar fuentes).
+  | { accion: 'research'; lecciones?: number }
 
 const pct = (x: number) => Math.round(x * 100)
 const POCO = 0.05 // menos del 5 % de la sesión: una línea en vez de las barras
@@ -87,7 +89,11 @@ export default function BarraCuota({ accion, compacta = false }: { accion?: Acci
   useEffect(() => {
     if (!accion) return setEstimacion(null)
     let vigente = true
-    const q = new URLSearchParams({ accion: accion.accion, ...('minutos' in accion ? { minutos: String(accion.minutos) } : {}) })
+    const q = new URLSearchParams({
+      accion: accion.accion,
+      ...('minutos' in accion ? { minutos: String(accion.minutos) } : {}),
+      ...('lecciones' in accion && accion.lecciones && accion.lecciones > 1 ? { lecciones: String(accion.lecciones) } : {}),
+    })
     pedir<Estimacion>(`/api/cuota/estimar?${q}`)
       .then((e) => vigente && setEstimacion(e))
       .catch(() => vigente && setEstimacion(null))

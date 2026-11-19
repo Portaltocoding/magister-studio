@@ -139,3 +139,22 @@ async def test_buscar_fuentes_cuesta_sus_dos_llamadas(monkeypatch):
     assert await cuota.coste_de("research") == pytest.approx(0.04)
     medias.clear()
     assert await cuota.coste_de("research") == pytest.approx(0.07)
+
+
+@pytest.mark.anyio
+async def test_varias_lecciones_cuestan_lo_de_una_por_cada_una(monkeypatch):
+    """Aceptar un plan buscando fuentes o que el asesor prepare varias lecciones: el coste de una, tantas veces."""
+    from magister.observar import cuota
+
+    async def medio(prompts):
+        return {"research_consultas": 0.01, "research_juez": 0.03}.get(prompts[0], 0.0)
+
+    async def por_leccion():
+        return 0.5
+
+    monkeypatch.setattr(cuota, "_coste_medio", medio)
+    monkeypatch.setattr(cuota, "_coste_material_por_leccion", por_leccion)
+    assert await cuota.coste_de("research", lecciones=6) == pytest.approx(0.24)
+    assert await cuota.coste_de("material", lecciones=3) == pytest.approx(1.5)
+    assert await cuota.coste_de("material", lecciones=1) == pytest.approx(0.5)
+    assert await cuota.coste_de("research") == pytest.approx(0.04)
