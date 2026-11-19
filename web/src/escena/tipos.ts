@@ -274,6 +274,13 @@ export function tramoEn(desde: number[], frame: number): number {
   return i
 }
 
+// Adónde saltar para ver el tramo `i`: pasado el fundido de entrada. En su primer fotograma el tramo aún es
+// transparente y se ve el anterior (o negro, en el primero). La voz no empieza hasta ENTRADA (> SOLAPE): no se pierde nada.
+export function verTramo(desde: number[], i: number, total: number): number {
+  const d = desde[Math.max(0, Math.min(desde.length - 1, i))] ?? 0
+  return Math.max(0, Math.min(total - 1, d + SOLAPE))
+}
+
 // La frase que suena en el fotograma `f` del tramo: la del último trozo que ya ha empezado (antes, la primera).
 export function fraseEn(lista: TrozoEnLinea[], f: number): number {
   let frase = lista[0]?.frase ?? 0

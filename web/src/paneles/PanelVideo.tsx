@@ -12,6 +12,7 @@ import BarraCuota from '../componentes/BarraCuota.tsx'
 import { DEMO_IDEMPOTENCIA } from '../escena/demo.ts'
 import { DEMO_INDICES } from '../escena/indices.ts'
 import { DEMO_TOPOGRAFIA } from '../escena/topografia.ts'
+import { teclaDelReproductor } from '../escena/teclas.ts'
 import type { GuionGrafico } from '../escena/tipos.ts'
 
 const DEMOS: Record<string, GuionGrafico> = { indices: DEMO_INDICES, topografia: DEMO_TOPOGRAFIA, idempotencia: DEMO_IDEMPOTENCIA }
@@ -236,7 +237,8 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
 
   useEffect(() => {
     const tecla = (ev: KeyboardEvent) => {
-      if ((ev.target as HTMLElement).closest('input, select, textarea, button')) return
+      // Las flechas y la S valen también con el foco en un botón (tras pulsar «Ver»); el espacio ahí pulsa el botón.
+      if (!teclaDelReproductor(ev, ev.target as Element | null)) return
       if (ev.key === ' ') {
         ev.preventDefault()
         tocar()

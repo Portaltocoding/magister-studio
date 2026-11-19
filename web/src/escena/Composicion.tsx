@@ -41,7 +41,8 @@ export function Composicion({ guion, subtitulos, ritmo = 1, medidas = null, audi
   // La misma línea de tiempo que usa el Player para su duración y sus saltos.
   const linea = useMemo(() => lineaDeTiempo(guion, ritmo, medidas), [guion, ritmo, medidas])
   return (
-    <AbsoluteFill style={{ background: C.fondo }}>
+    // `escena-lienzo`: la imagen, para que el reproductor distinga un clic en ella de uno en sus controles.
+    <AbsoluteFill className="escena-lienzo" style={{ background: C.fondo }}>
       {guion.fondo === 'cartesiano' && <FondoCartesiano />}
       {guion.tramos.map((t, i) => {
         const l = linea.tramos[i]

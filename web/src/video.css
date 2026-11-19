@@ -95,10 +95,9 @@
 .video-descargar { grid-column: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .video-descargar .barra { flex: 0 1 220px; }
 .video-descargar-progreso { display: inline-flex; align-items: center; }
-/* El vídeo animado: mientras suena, una capa transparente sobre la imagen (no sobre la barra de controles) lo pausa. */
+/* El vídeo animado: mientras suena, un clic en la imagen (no en los controles) lo pausa. */
 .escena-reproductor { position: relative; }
-.escena-pausar { position: absolute; inset: 0 0 56px 0; background: transparent; border: 0; padding: 0; cursor: pointer; }
-.escena-pausar:focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; border-radius: 14px; }
+.escena-reproductor.tocando .escena-lienzo { cursor: pointer; }
 .video-descargar a.boton { text-decoration: none; }
 .video-version { margin: 0 0 10px auto; display: block; }
 .video-plan { margin-right: auto; margin-left: 14px; max-width: 280px; }
