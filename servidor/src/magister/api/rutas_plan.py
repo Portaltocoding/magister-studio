@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from magister.datos import plan as dp
 from magister.datos.sesion import sesion_por_peticion
 from magister.flujo import planes
+from magister.config import ajustes
 from magister.plan.apoyo import necesidad_efectiva
+from magister.plan.horizonte import motivo_automatico, texto_automatico
 from magister.plan.esquemas import Necesidad
 
 rutas = APIRouter(prefix="/api")
@@ -48,6 +50,13 @@ async def con_necesidad(s: AsyncSession, vista: dict) -> dict:
         # aparte cuando tu material la cambia, para que puedas elegir otra).
         lec.update(necesita_fuentes=valor, fuentes_por_que=por_que, material_propio=propio,
                    necesita_fuentes_guardada=guardada)
+        # Por qué se investiga sola o no (plan/horizonte.py): «no hace falta: tu material lo cubre», «te vendría bien:
+        # búscalas cuando quieras»...
+        b = lec.get("biblioteca") or {}
+        regla = {"sin_material": lec.get("sin_material"), "necesita_fuentes": guardada,
+                 "sin_fuente": b.get("sin_fuente") if b.get("cobertura_conocida") else None}
+        lec["research_auto"] = {"motivo": motivo_automatico(regla, propio),
+                                "texto": texto_automatico(regla, propio, ajustes.research_auto)}
     return vista
 
 

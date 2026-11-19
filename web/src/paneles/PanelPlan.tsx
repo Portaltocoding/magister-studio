@@ -539,6 +539,10 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                         {l.necesita_fuentes === 'no' ? 'buscar igualmente' : 'Buscar fuentes'}
                       </button>
                     )}
+                    {l.research_auto && l.biblioteca?.research !== 'buscando' && (
+                      // Por qué no se ha investigado sola (o cuándo lo hará): el botón de al lado la busca ya.
+                      <span className="nota"> {l.research_auto.texto}</span>
+                    )}
                     <ul>
                       {l.objetivos.map((o) => (
                         <li key={o}>{o}</li>

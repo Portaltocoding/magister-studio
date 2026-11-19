@@ -2,7 +2,8 @@
 
 Un juego fijo de lecciones etiquetadas a mano (`evals/banco/cuando-research-v1.yaml`): el modelo real decide, con los
 mismos criterios que al planificar (`comun/fuentes_leccion.md`, por la plantilla `cuando_research`), si cada una
-necesita fuentes. El código cuenta aciertos y, aparte, los fallos caros: «no» donde se esperaba «imprescindible»
+necesita fuentes. Es el juicio barato con el que el research automático etiqueta una lección antes de buscar
+(`research/necesidad.py`): el modelo es el de `prompts.cuando_research` en `config/modelos.yaml`. El código cuenta aciertos y, aparte, los fallos caros: «no» donde se esperaba «imprescindible»
 (no buscar cuando hacía falta). Toda la estadística sale de `evals/estadistica.py`, nunca del modelo.
 
 Llama a `claude` (gasta cuota): se lanza solo a mano y solo con --gastar. Sin él, dice cuántas llamadas haría.
@@ -22,29 +23,19 @@ import sys
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
 
 from evals import regresion, tope
 from evals.estadistica import kappa, margen_wilson, tabla_de
-from magister.plan.esquemas import NECESIDADES, Necesidad
+from magister.plan.esquemas import NECESIDADES
+# La misma entrada y el mismo esquema que el juicio barato del research automático (research/necesidad.py).
+from magister.research.necesidad import LOTE, EtiquetaLeccion, Etiquetas, entrada_de, reglas_de  # noqa: F401
 
 BANCO = Path(__file__).parent / "banco" / "cuando-research-v1.yaml"
-LOTE = 10  # lecciones por llamada: pocas llamadas y cada lección con su número
 # El nivel corto: 3 lecciones de cada etiqueta (las más claras y una dudosa por etiqueta), en una sola llamada.
 CORTO = ["dividir-decimales", "bucle-for", "tabla-multiplicar",
          "derivadas", "indices-sql", "recursividad",
          "ultima-version-react", "irpf-tramos", "usucapion"]
 TOPES = {"corto": 3, "completo": 9}  # cada lote, 1 llamada y hasta 2 reintentos
-
-
-class EtiquetaLeccion(BaseModel):
-    n: int = Field(description="El número de la lección, tal como va en la lista.")
-    necesita_fuentes: Necesidad
-    fuentes_por_que: str = Field(min_length=3, description="Una frase corta para el alumno.")
-
-
-class Etiquetas(BaseModel):
-    etiquetas: list[EtiquetaLeccion]
 
 
 def cargar_banco(ruta: Path = BANCO) -> list[dict]:
@@ -62,28 +53,6 @@ def lotes(casos: list, tamano: int = LOTE) -> list[list]:
 
 def llamadas_previstas(n_casos: int, tamano: int = LOTE) -> int:
     return math.ceil(n_casos / max(1, tamano)) if n_casos else 0
-
-
-def entrada_de(lote: list[dict]) -> str:
-    """Las lecciones numeradas desde 1, cada una con su tema, su título y sus objetivos."""
-    partes = []
-    for i, c in enumerate(lote, start=1):
-        objetivos = "\n".join(f"   - {o}" for o in c["objetivos"])
-        partes.append(f"{i}. Tema: {c['tema']}\n   Título: {c['titulo']}\n   Objetivos:\n{objetivos}")
-    return "\n\n".join(partes)
-
-
-def reglas_de(n: int):
-    """Una entrada por lección, del 1 al n, sin repetir ni saltarse ninguna."""
-
-    def reglas(salida: Etiquetas) -> list[str]:
-        numeros = [e.n for e in salida.etiquetas]
-        errores = []
-        if sorted(numeros) != list(range(1, n + 1)):
-            errores.append(f"tiene que haber una entrada por lección, de la 1 a la {n}, sin repetir: has dado {numeros}")
-        return errores
-
-    return reglas
 
 
 def recuento(casos: list[dict], predichas: dict[str, str | None]) -> dict:
@@ -118,7 +87,8 @@ async def etiquetar(casos: list[dict], tamano: int = LOTE, t: tope.Tope | None =
             break
         sistema = cargar("cuando_research").texto
         try:
-            salida = await estructurar(sistema, entrada_de(lote), Etiquetas, reglas_de(len(lote)), tarea="planificar")
+            # Sin `tarea`: el modelo lo pone config/modelos.yaml (prompts.cuando_research), el mismo que en producción.
+            salida = await estructurar(sistema, entrada_de(lote), Etiquetas, reglas_de(len(lote)))
         except tope.TopeAlcanzado:
             break
         except ErrorEstructura as e:
@@ -163,12 +133,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--banco", type=Path, default=BANCO)
     tope.argumentos(ap, **TOPES)
     args = ap.parse_args(argv)
+    from magister.cerebro.enrutador import tarea_de_prompt
+
     casos = cargar_banco(args.banco)
     casos = tope.del_nivel(casos, args.nivel, CORTO if args.banco == BANCO else LOTE)
     t = tope.de_args(args)
     n = llamadas_previstas(len(casos), args.lote)
     print(f"Nivel {args.nivel}: {len(casos)} lecciones de {args.banco.name}, de {args.lote} en {args.lote}: {n} llamadas al "
-          f"modelo (tarea planificar), más algún reintento si una salida no vale. Tope duro: {t.maximo}.")
+          f"modelo (tarea {tarea_de_prompt('cuando_research')}), más algún reintento si una salida no vale. Tope duro: {t.maximo}.")
     if not args.gastar:
         print("No lanzo nada. Para gastarlas, añade --gastar.")
         return 2

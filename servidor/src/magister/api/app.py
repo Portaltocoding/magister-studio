@@ -4,6 +4,7 @@ import uuid
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import date
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.sse import EventSourceResponse, ServerSentEvent
@@ -47,37 +48,62 @@ def _a_investigar(p: dict, hoy, maximo: int) -> list[str]:
                                   vieja_dias=ajustes.research_vieja_dias, material_propio=p.get("material_propio", False))
 
 
-async def por_investigar(hoy) -> set[tuple[int, str]]:
-    """Las (plan_id, clave) que el research automático lanzaría ahora: sus apuntes automáticos esperan
-    (trabajos/automatizar.py), para no hacerlos a ciegas justo antes de que lleguen sus fuentes."""
-    from magister.cerebro import freno
+def _a_juzgar(p: dict, hoy) -> list[str]:
+    from magister.plan.horizonte import lecciones_a_juzgar
+    from magister.research.necesidad import LOTE
+
+    return lecciones_a_juzgar(p["lecciones"], p["tareas"], hoy, ajustes.research_horizonte_dias, LOTE,
+                              vieja_dias=ajustes.research_vieja_dias)
+
+
+async def _planes_del_horizonte() -> list[dict]:
+    """`datos.plan.para_horizonte` y, en cada lección, `sin_fuente`: los objetivos que se sabe que no tienen fuente
+    (None si no se sabe), para decidir si falta información (plan/horizonte.py)."""
     from magister.datos import plan as dp
     from magister.datos.sesion import nueva_sesion
+    from magister.flujo.planes import cobertura_de_plan
+
+    async with nueva_sesion() as s:
+        planes = await dp.para_horizonte(s)
+        for p in planes:
+            cobertura = await cobertura_de_plan(s, p["plan_id"])
+            for lec in p["lecciones"]:
+                lec["sin_fuente"] = cobertura.get(lec["clave"])
+    return planes
+
+
+# Planes cuyo juicio barato falló hoy: no se vuelve a intentar cada 10 minutos (sería una llamada por vuelta).
+_juicio_fallido: dict[int, date] = {}
+
+
+async def por_investigar(hoy) -> set[tuple[int, str]]:
+    """Las (plan_id, clave) que el research automático lanzaría ahora, o que va a juzgar antes de decidirlo: sus apuntes
+    automáticos esperan (trabajos/automatizar.py), para no hacerlos a ciegas justo antes de que lleguen sus fuentes."""
+    from magister.cerebro import freno
 
     if not ajustes.research_auto or freno.estado()["parados"]:
         return set()
-    async with nueva_sesion() as s:
-        planes = await dp.para_horizonte(s)
-    return {(p["plan_id"], c) for p in planes if not p["en_curso"] for c in _a_investigar(p, hoy, len(p["lecciones"]))}
+    planes = await _planes_del_horizonte()
+    return {(p["plan_id"], c) for p in planes if not p["en_curso"]
+            for c in _a_investigar(p, hoy, len(p["lecciones"])) + _a_juzgar(p, hoy)}
 
 
 async def investigar_horizonte(buscador, hoy, hay_red=None) -> list[str]:
-    """Una vuelta del research automático (encargo 8): en cada plan aceptado, las lecciones que empiezan en los próximos
-    MAGISTER_RESEARCH_HORIZONTE_DIAS días y siguen sin fuentes, salvo las que el plan marca «no». Devuelve lo anotado.
-    No lanza nada si el freno está echado, si el plan ya tiene una búsqueda en curso o si `hay_red` (una búsqueda web
-    barata, sin modelo) dice que no hay red: sin ella, cada lección gastaría una consulta para nada."""
+    """Una vuelta del research automático (encargo 8; ADR-0021, nota del 19-11-2026): en cada plan aceptado, las
+    lecciones que empiezan en los próximos MAGISTER_RESEARCH_HORIZONTE_DIAS días, siguen sin fuentes y de verdad las
+    necesitan: «imprescindible», o «conviene» con objetivos sin fuente (solo esos). «Conviene» sin más la lanzas tú.
+    Las que aún no tienen etiqueta las etiqueta antes el modelo barato (`research/necesidad.py`), y no se buscan por si
+    acaso. Devuelve lo anotado. No lanza nada si el freno está echado, si el plan ya tiene una búsqueda en curso o si
+    `hay_red` (una búsqueda web barata, sin modelo) dice que no hay red: sin ella, cada lección gastaría una consulta."""
     from magister.cerebro import freno
-    from magister.datos import plan as dp
-    from magister.datos.sesion import nueva_sesion
     from magister.flujo.fuentes import calcular_apoyo
-    from magister.plan.horizonte import cuando_empiezas
-    from magister.research import tareas
+    from magister.plan.horizonte import cuando_empiezas, objetivos_a_buscar
+    from magister.research import necesidad, tareas
     from magister.trabajos.automatizar import anotar
 
     if freno.estado()["parados"]:
         return []
-    async with nueva_sesion() as s:
-        planes = await dp.para_horizonte(s)
+    planes = await _planes_del_horizonte()
     hechos: list[str] = []
     quedan = ajustes.research_por_vuelta
     red_comprobada = False
@@ -86,11 +112,30 @@ async def investigar_horizonte(buscador, hoy, hay_red=None) -> list[str]:
             break
         if p["en_curso"]:
             continue
+        recargar = False
         if not p["con_apoyo"] and buscador is not None:
             # Un plan aceptado sin buscar puede no tener ni el cálculo del apoyo: sin él, todo parecería sin material.
             await calcular_apoyo(buscador, p["plan_id"], p["tema_id"])
-            async with nueva_sesion() as s:
-                p = next((x for x in await dp.para_horizonte(s) if x["plan_id"] == p["plan_id"]), p)
+            recargar = True
+        a_juzgar = _a_juzgar(p, hoy)
+        if a_juzgar and _juicio_fallido.get(p["plan_id"]) != hoy:
+            try:
+                etiquetas = await necesidad.juzgar_plan(p["plan_id"], a_juzgar)
+            except Exception:  # noqa: BLE001  (sin etiqueta no se busca: se intenta otro día)
+                registro.exception("research automático: no se pudo decidir si %s necesitan fuentes", a_juzgar)
+                _juicio_fallido[p["plan_id"]] = hoy
+                etiquetas = {}
+            if etiquetas:
+                cuenta = sum(1 for v in etiquetas.values() if v == "imprescindible")
+                claves_j = list(etiquetas)
+                lista = claves_j[0] if len(claves_j) == 1 else f"{', '.join(claves_j[:-1])} y {claves_j[-1]}"
+                texto = (f"Decidido con el modelo barato si {lista} de {p['tema']} necesitan fuentes: "
+                         f"{cuenta} de {len(claves_j)} sí")
+                await anotar(texto)
+                hechos.append(texto)
+                recargar = True
+        if recargar:
+            p = next((x for x in await _planes_del_horizonte() if x["plan_id"] == p["plan_id"]), p)
         claves = _a_investigar(p, hoy, quedan)
         if not claves:
             continue
@@ -99,9 +144,15 @@ async def investigar_horizonte(buscador, hoy, hay_red=None) -> list[str]:
                 registro.warning("research automático: no hay red (la búsqueda web no responde); lo intento en la próxima vuelta")
                 return hechos
             red_comprobada = True
-        tareas.lanzar_en_fondo(await tareas.crear(p["plan_id"], claves))
+        por_clave = {x["clave"]: x for x in p["lecciones"]}
+        ids: list[int] = []
+        for clave in claves:
+            # En una «conviene» con falta de información, solo los objetivos sin fuente («Buscar esto»).
+            ids += await tareas.crear(p["plan_id"], [clave],
+                                      objetivos=objetivos_a_buscar(por_clave[clave], p.get("material_propio", False)))
+        tareas.lanzar_en_fondo(ids)
         quedan -= len(claves)
-        primera = min(x["primera_sesion"] for x in p["lecciones"] if x["clave"] in claves)
+        primera = min(por_clave[c]["primera_sesion"] for c in claves)
         texto = f"Buscando fuentes para {' y '.join(claves)} de {p['tema']} (empiezas {cuando_empiezas(primera, hoy)})"
         await anotar(texto)
         hechos.append(texto)
@@ -109,8 +160,6 @@ async def investigar_horizonte(buscador, hoy, hay_red=None) -> list[str]:
 
 
 async def bucle_horizonte(buscador) -> None:
-    from datetime import date
-
     from magister.research import tareas
 
     while True:

@@ -70,6 +70,9 @@ prompts:
   # objetivo y tus preferencias: datos personales, nunca a un motor externo gratuito.
   research_consultas: conversar
   research_juez: conversar
+  # Si una lección necesita fuentes (ADR-0021, nota del 19-11-2026): el research automático no busca una lección sin
+  # etiqueta «por si acaso», la etiqueta antes con el modelo barato. Lo mide `evals.cuando_research`, con este mismo modelo.
+  cuando_research: extraer
 
 # Presupuesto diario por tarea en segundo plano (tokens de entrada más salida); al pasarlo se aplaza.
 presupuesto_dia_tokens:

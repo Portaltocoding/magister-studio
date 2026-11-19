@@ -314,6 +314,19 @@ async def cambiar_necesidad(s: AsyncSession, plan_id: int, clave: str, valor: st
     return fila
 
 
+async def poner_necesidad_si_falta(s: AsyncSession, plan_id: int, valores: dict[str, tuple[str, str]]) -> dict[str, str]:
+    """Lo que decide el modelo barato (research/necesidad.py), solo en las lecciones que siguen sin etiqueta: si la has
+    puesto tú entretanto, manda la tuya. Devuelve {clave: etiqueta} de lo que se ha guardado."""
+    guardadas: dict[str, str] = {}
+    for clave, (valor, por_que) in valores.items():
+        fila = await s.get(LeccionFila, (plan_id, clave))
+        if fila is not None and fila.necesita_fuentes not in ("no", "conviene", "imprescindible"):
+            fila.necesita_fuentes, fila.fuentes_por_que = valor, por_que
+            guardadas[clave] = valor
+    await s.commit()
+    return guardadas
+
+
 async def material_propio_de_tema(s: AsyncSession, tema_id: int) -> int:
     """Cuántos documentos tuyos (subidos, no de la web) hay en este tema con su versión lista. Si los hay, mandan sobre
     la etiqueta: a quien tiene los apuntes del profesor no se le dice «no hace falta»."""

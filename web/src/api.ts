@@ -347,6 +347,9 @@ export interface LeccionVista extends LeccionPlan {
   material_propio?: boolean
   // La etiqueta guardada (la del plan o la tuya); `necesita_fuentes` es la que se usa. Difieren si tu material manda.
   necesita_fuentes_guardada?: NecesitaFuentes | null
+  // Por qué el research automático la investiga sola o no (servidor: plan/horizonte.py). Opcional: un servidor de
+  // antes no lo manda.
+  research_auto?: { motivo: 'no' | 'sin_juzgar' | 'imprescindible' | 'falta' | 'sugerencia'; texto: string }
 }
 
 export interface FuenteDeLeccion {

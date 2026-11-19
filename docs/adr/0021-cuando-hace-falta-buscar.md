@@ -20,3 +20,19 @@
 - El research automático gasta cuota sin un clic: unas 2 llamadas por lección, solo para lo que vas a estudiar en la semana, y se apaga con el ajuste.
 - La lección de mañana puede esperar hasta 20 minutos a sus fuentes en la automatización (pedirla a mano no espera).
 - Cambian las versiones de `planificar` y aparece la plantilla `cuando_research`; la tabla `lecciones` gana dos columnas, así que hay que lanzar `alembic upgrade head` antes de reiniciar la API.
+
+## Nota del 19-11-2026: el automático busca solo lo necesario
+
+**Contexto.** El punto 5 investigaba toda lección sin material que no fuera «no», y las lecciones sin etiqueta (los planes de antes, que en la base son todas) se leían como «conviene»: en la práctica, buscaba por si acaso. El dueño: «el research automático solo cuando sea necesario, y eso se juzga con un modelo barato, o cuando falte información».
+
+**Decisión** (sustituye al punto 5 en qué lecciones entran; el horizonte, el tope por vuelta, las repeticiones y el freno siguen igual).
+
+1. **Qué se investiga solo** (`plan/horizonte.motivo_automatico` y `lecciones_a_investigar`). Una lección sin material (`lecciones_apoyo.sin_material`: menos de `MAGISTER_MIN_APOYO` fragmentos que pasan la puerta), en el horizonte, y además:
+   - con la etiqueta efectiva (`necesidad_efectiva`) **«imprescindible»**: se buscan todos sus objetivos; o
+   - con **«conviene» y falta de información**: se sabe qué objetivos no tienen ninguna fuente (`sin_fuente` de la biblioteca de la lección, la cuenta de «cubre 3 de 4 objetivos» del Roadmap, con `cobertura_conocida`). Se buscan solo esos objetivos. No hay métrica nueva.
+   - «Conviene» sin más ya no se busca sola: es una sugerencia que lanzas tú. «No» nunca.
+2. **Sin etiqueta, primero se juzga.** Una lección sin `necesita_fuentes` no se busca: el automático la etiqueta antes con la plantilla `cuando_research` (los mismos criterios que al planificar), de 10 en 10 por llamada (`research/necesidad.py`), guarda la etiqueta y su porqué (sin pisar la tuya) y lo anota en el registro. Solo después decide con la regla de arriba. Si el juicio falla, ese plan no se vuelve a juzgar hasta el día siguiente.
+3. **El juicio es barato y se configura fuera del código.** `config/modelos.yaml` enruta `cuando_research` a la tarea `extraer` (Haiku). La etiqueta que ya escribe `planificar` al hacer el plan sigue saliendo de esa misma llamada (modelo por defecto), sin llamadas de más. `evals.cuando_research` ya no fuerza la tarea `planificar`: mide el modelo que juzga en producción.
+4. **Se ve en el Roadmap.** Cada lección trae `research_auto` (`motivo` y `texto`): «No hace falta: tu material lo cubre», «Te vendría bien: búscalas cuando quieras», «Se decide solo, con un modelo barato, cuando se acerque su sesión»... junto al botón «Buscar fuentes». Buscar a mano, aceptar un plan con «buscar fuentes» y «Buscar esto» no cambian.
+
+**Consecuencias.** En la base, al escribir esto, ninguna lección de los planes aceptados tiene etiqueta: el automático no busca nada hasta juzgarlas (una llamada de Haiku por plan y vuelta, con hasta 10 lecciones), y después solo las «imprescindible» o con objetivos sin fuente. Los apuntes automáticos esperan también a las lecciones que se van a juzgar.

@@ -36,6 +36,19 @@ def biblioteca_de_leccion(objetivos: list[str], fuentes: list[dict], tarea: dict
             "cobertura_conocida": con_ficha or anotado is not None}
 
 
+async def cobertura_de_plan(s: AsyncSession, plan_id: int) -> dict[str, list[int] | None]:
+    """Por lección, los objetivos (desde 1) que se sabe que no tienen fuente; None si no se sabe (nada buscado aún, o
+    búsquedas de antes de anotarlo). Lo usa el research automático para «falta información» (plan/horizonte.py)."""
+    lecs = await dp.lecciones(s, plan_id)
+    biblioteca = await rf.biblioteca_de_plan(s, plan_id)
+    tareas = await dp.ultimas_tareas_research(s, plan_id)
+    salida: dict[str, list[int] | None] = {}
+    for lec in lecs:
+        b = biblioteca_de_leccion(lec.objetivos, biblioteca.get(lec.clave, []), tareas.get(lec.clave))
+        salida[lec.clave] = b["sin_fuente"] if b["cobertura_conocida"] else None
+    return salida
+
+
 async def examenes_del_plan(s: AsyncSession, plan_id: int, lecs: list, ses: list) -> list[dict]:
     """Los exámenes que tocan según el calendario, marcados si ya hiciste uno que los cubre."""
     from sqlalchemy import select
