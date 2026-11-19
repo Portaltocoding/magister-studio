@@ -58,11 +58,11 @@ async def encolar(tipo: str, plan_id: int | None, leccion_clave: str | None, par
 
 
 # Los trabajos cortos (segundos o un minuto): bajar fuentes (8 s), montar un MP4 (23 s), detallar un nivel de un
-# proyecto (28 s), un juez, y las diapositivas o el guion de unos apuntes que ya están (sin apuntes ni preguntas).
+# proyecto (28 s), un juez, repintar el PDF de unos apuntes, y las diapositivas o el guion de unos apuntes que ya están (sin apuntes ni preguntas).
 # Pasan delante de los largos (preparar una lección, 5-20 min; el roadmap de un proyecto con research) y, con varios
 # trabajadores, los largos ocupan como mucho `a_la_vez - 1` huecos: siempre queda uno para un corto. Los largos no se
 # mueren de hambre: los cortos acaban en segundos y solo llegan cuando los pides.
-CORTOS = ("incorporar", "video_mp4", "proyecto_nivel", "juez_online")
+CORTOS = ("incorporar", "video_mp4", "proyecto_nivel", "juez_online", "repintar")
 SOLO_APUNTES = ["apuntes", "preguntas"]  # un trabajo de material con alguno de estos es largo
 # La llave del candado de Postgres que pone en fila las reservas (un número cualquiera, fijo).
 CANDADO_COGER = 2026111901

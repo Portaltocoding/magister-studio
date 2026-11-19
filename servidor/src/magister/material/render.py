@@ -121,8 +121,13 @@ async def pintar(markdown: str, plan_id: int, clave: str, nombre: str = "apuntes
     trabajo = carpeta / f".{nombre}"
     trabajo.mkdir(exist_ok=True)
     pdf = carpeta / f"{nombre}.pdf"
+    # El motor escribe en la carpeta de trabajo y el PDF nuevo sustituye al viejo de golpe al final: mientras se
+    # repinta, el de antes se sigue descargando entero.
+    nuevo = trabajo / f"{nombre}.pdf"
+    nuevo.unlink(missing_ok=True)
     md = svg_en_linea(re.sub(r"^salida: .*$", f"salida: {pdf.as_posix()}", markdown, count=1, flags=re.M))
-    (trabajo / "ficha.md").write_text(md, encoding="utf-8")
+    (trabajo / "ficha.md").write_text(re.sub(r"^salida: .*$", f"salida: {nuevo.as_posix()}", md, count=1, flags=re.M),
+                                      encoding="utf-8")
     (carpeta / f"{nombre}.md").write_text(md, encoding="utf-8")
     acento = await color_acento(clave)
     try:
@@ -134,8 +139,12 @@ async def pintar(markdown: str, plan_id: int, clave: str, nombre: str = "apuntes
     except (TimeoutError, OSError) as e:
         return Render(None, None, error=f"el motor de PDF no respondió: {e}")
     texto = salida.decode("utf-8", "replace")
-    if not pdf.exists():
+    if not nuevo.exists():
         return Render(None, None, error=f"no salió el PDF: {texto[-600:]}")
+    try:
+        await asyncio.to_thread(os.replace, nuevo, pdf)
+    except OSError as e:  # en Windows, si alguien lo está descargando justo ahora
+        return Render(None, None, error=f"no se pudo sustituir el PDF: {e}")
     m = re.search(r"(\d+) páginas", texto)
     contacto = trabajo / "contacto.png"
     return Render(pdf, contacto if contacto.exists() else None, int(m.group(1)) if m else 0, _avisos(texto))

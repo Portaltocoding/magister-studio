@@ -80,6 +80,10 @@ async def ejecutar_uno(quien: str) -> bool:
             from magister.trabajos.video import ejecutar as ejecutar_video
 
             await ejecutar_video(t.id, t.parametros)
+        elif t.tipo == "repintar":
+            from magister.trabajos.material import repintar
+
+            await repintar(t.id, t.parametros)
         elif t.tipo == "incorporar":
             from magister.trabajos.incorporar import ejecutar as ejecutar_incorporar
 

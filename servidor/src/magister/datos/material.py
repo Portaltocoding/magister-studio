@@ -82,6 +82,8 @@ class Material(Base):
     rutas: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     versiones: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     informes: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    # Con qué `VERSION_MONTAJE` se montó y pintó (nula: de antes de llevarla). Solo formato, nunca contenido.
+    montaje: Mapped[int | None] = mapped_column(Integer)
     trabajo_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("trabajos.id", ondelete="SET NULL"))
     creado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
     actualizado_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())

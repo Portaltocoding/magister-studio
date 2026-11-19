@@ -83,6 +83,8 @@ async def _repintar(material_id: int) -> None:
         m = await almacen.material(material_id)
         r = await pintar(m.texto or "", m.plan_id, m.leccion_clave, estilo=almacen.estilo_de(m))
         if r.pdf:
-            await almacen.actualizar(material_id, rutas={**(m.rutas or {}), "pdf": str(r.pdf)})
+            from magister.material.plantillas import VERSION_MONTAJE
+
+            await almacen.actualizar(material_id, rutas={**(m.rutas or {}), "pdf": str(r.pdf)}, montaje=VERSION_MONTAJE)
     except Exception:  # noqa: BLE001
         registro.exception("repintar el PDF tras rehacer un bloque")

@@ -13,6 +13,7 @@ from magister.material.entrada import con_que_se_hacen, entrada_de_leccion
 from magister.material.generador import Cancelado, generar_apuntes
 from magister.material.guion import ESTILOS_VIDEO, auditar_guion, generar_guion
 from magister.material.guion_grafico import generar_guion_grafico, por_escenas
+from magister.material.plantillas import VERSION_MONTAJE
 from magister.material.preguntas import auditar, generar_preguntas, guardar_preguntas
 from magister.material.render import pintar
 from magister.tono import lint
@@ -101,7 +102,7 @@ async def ejecutar(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], 
         rutas["contacto"] = str(r.contacto)
     for a in r.avisos:
         await cola.aviso(trabajo_id, a["regla"], a["detalle"])
-    cambios: dict = {"rutas": rutas, "informes": [*(m.informes or []), {"nodo": "pintar", "paginas": r.paginas, "avisos": r.avisos,
+    cambios: dict = {"rutas": rutas, "montaje": VERSION_MONTAJE, "informes":[*(m.informes or []), {"nodo": "pintar", "paginas": r.paginas, "avisos": r.avisos,
                                                                           "error": r.error}]}
     if any(a["gravedad"] == "veto" for a in r.avisos):
         cambios.update(estado="bloqueado", motivo="el PDF tiene la raya larga")
@@ -161,3 +162,38 @@ async def _extras(trabajo_id: int, plan_id: int, clave: str, tipos: list[str], e
                                            {"nodo": "video", "estilo": estilo, "animado": "grafico" in rutas,
                                             "concepto": video.get("concepto"), "minutos": minutos}])
     return materiales
+
+
+def clave_repintar(material_id: int) -> str:
+    """Un repintado por material y versión del montaje: dos peticiones a la vez dan el mismo trabajo."""
+    return cola.clave_idempotencia(tipo="repintar", material=material_id, montaje=VERSION_MONTAJE)
+
+
+async def al_dia(material_id: int):
+    """Unos apuntes montados con una versión anterior de las plantillas (o sin marca) se ponen al día al servirlos:
+    el markdown se vuelve a montar ahora (sin modelo, en milisegundos) y el PDF se repinta en la cola; mientras, el
+    viejo se sigue descargando. No toca contenidos, preguntas ni versiones de prompts. Devuelve el material."""
+    m = await almacen.material(material_id)
+    if m is None or m.tipo != "apuntes" or m.estado == "generando" or (m.montaje or 0) >= VERSION_MONTAJE:
+        return m
+    await cola.encolar("repintar", m.plan_id, m.leccion_clave, {"material_id": m.id}, clave_repintar(m.id))
+    await almacen.montar_markdown(m.id)
+    return await almacen.material(m.id)
+
+
+async def repintar(trabajo_id: int, parametros: dict) -> None:
+    """El trabajo «repintar»: vuelve a montar el markdown y a pintar el PDF con las plantillas de ahora, en el estilo
+    que tenía. Sin modelo e idempotente: repetirlo deja lo mismo."""
+    mid = parametros["material_id"]
+    m = await almacen.material(mid)
+    if m is None or m.tipo != "apuntes":
+        return  # borrado mientras esperaba
+    md = await almacen.montar_markdown(mid)
+    r = await pintar(md, m.plan_id, m.leccion_clave, estilo=almacen.estilo_de(m))
+    rutas = {**(m.rutas or {}), **({"pdf": str(r.pdf)} if r.pdf else {}), **({"contacto": str(r.contacto)} if r.contacto else {})}
+    # La marca se pone aunque el PDF falle: el markdown ya está al día y no se reintenta en cada visita.
+    await almacen.actualizar(mid, rutas=rutas, montaje=VERSION_MONTAJE)
+    for a in r.avisos:
+        await cola.aviso(trabajo_id, a["regla"], a["detalle"])
+    if r.error:
+        await cola.aviso(trabajo_id, "pintar", r.error)

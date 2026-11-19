@@ -335,6 +335,10 @@ async def cambiar_estilo(mid: int, cuerpo: CambiarEstilo, s: AsyncSession = Depe
     await s.close()
     md = await almacen.montar_markdown(mid, cuerpo.estilo)
     r = await pintar(md, m.plan_id, m.leccion_clave, estilo=cuerpo.estilo)
+    if r.pdf:
+        from magister.material.plantillas import VERSION_MONTAJE
+
+        await almacen.actualizar(mid, montaje=VERSION_MONTAJE)
     return {"estilo": cuerpo.estilo, "paginas": r.paginas, "error": r.error}
 
 
@@ -398,6 +402,11 @@ async def material_de_leccion(plan_id: int, clave: str, s: AsyncSession = Depend
     trabajo = await s.scalar(text("select id from trabajos where plan_id = :p and leccion_clave = :c and tipo = 'material' "
                                   "order by id desc limit 1"),
                              {"p": plan_id, "c": clave})
+    if "apuntes" in ultimo and _por_montar(ultimo["apuntes"]):
+        from magister.trabajos.material import al_dia
+
+        await s.close()
+        ultimo["apuntes"] = await al_dia(ultimo["apuntes"].id) or ultimo["apuntes"]
     return {
         "materiales": {t: _material(m) for t, m in ultimo.items()},
         "preguntas": [{"id": p.id, "tipo": p.tipo, "enunciado": p.enunciado, "fantasma": p.fantasma, "donde": p.donde,
@@ -411,7 +420,19 @@ async def ver_material(mid: int, s: AsyncSession = Depends(sesion_por_peticion))
     m = await s.get(Material, mid)
     if m is None:
         raise HTTPException(404, "material no encontrado")
+    if _por_montar(m):
+        from magister.trabajos.material import al_dia
+
+        await s.close()
+        m = await al_dia(mid) or m
     return _material(m, con_texto=True)
+
+
+def _por_montar(m: Material) -> bool:
+    """Apuntes montados con plantillas de antes (ver `trabajos.material.al_dia`)."""
+    from magister.material.plantillas import VERSION_MONTAJE
+
+    return m.tipo == "apuntes" and m.estado != "generando" and (m.montaje or 0) < VERSION_MONTAJE
 
 
 @rutas.get("/materiales/{mid}/guion_grafico")

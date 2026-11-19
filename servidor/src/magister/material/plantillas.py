@@ -24,6 +24,10 @@ def montar(plantilla: str, valores: dict[str, str]) -> str:
 
 
 ESTILOS = {"libro": "practica.css", "ficha": "ficha.css"}
+# Súbela cuando cambien las plantillas o el montaje de los apuntes: los materiales con una anterior (o sin ella) se
+# vuelven a montar al servirlos y su PDF se repinta en la cola, sin llamar al modelo. 2: opciones de las de test,
+# la pregunta 10 sin romper la lista, `.nb` en todos los bloques y marcadores en el PDF.
+VERSION_MONTAJE = 2
 
 
 def barajar(lista: list, semilla: str) -> list:
