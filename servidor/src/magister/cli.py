@@ -93,6 +93,12 @@ async def principal(args: argparse.Namespace) -> None:
         print(f"Indexadas: {len(listas)} versiones")
         await recalcular_apoyo(listas)
     elif args.orden == "indexar":
+        if args.al_arrancar:
+            # Lo lanza el arranque tras las migraciones: si una ha activado otra configuración (v4), lo ya listo se
+            # reindexa con ella antes de abrir la API, para que el tutor no se quede «sin fuentes». Si no falta nada,
+            # ni carga e5 ni dice nada.
+            await recalcular_apoyo(await activar_config(None))
+            return
         if args.en_seco:
             if args.indice:
                 raise SystemExit("--en-seco no vale con --indice")
@@ -103,7 +109,7 @@ async def principal(args: argparse.Namespace) -> None:
             await _indice_nuevo(args.indice)
         else:
             # Sin --activar, la activa: lo ya listo que no tenga sus fragmentos (por ejemplo, tras la migración que
-            # activa v3) se reindexa con ella.
+            # activa v3 o la que activa v4) se reindexa con ella.
             reindexadas = await activar_config(args.activar)
             if args.reintentar:
                 print(f"Vuelven a pendiente: {await reintentar_cuarentena()} versiones que no se pudieron indexar")
@@ -433,6 +439,7 @@ def main() -> None:
     x.add_argument("--activar", metavar="NOMBRE", help="crea la configuración sin bibliografía (ADR-0018) y la activa")
     x.add_argument("--reintentar", action="store_true", help="vuelve a indexar lo que quedó en cuarentena al indexar")
     x.add_argument("--en-seco", action="store_true", help="dice qué haría y por qué, sin escribir nada")
+    x.add_argument("--al-arrancar", action="store_true", help="solo reindexa lo ya listo que le falte a la activa")
     v = sub.add_parser("versiones")
     v.add_argument("--duplicadas", action="store_true")
     t = sub.add_parser("trocear")

@@ -281,7 +281,7 @@ async def test_activar_config_nueva_reindexa_sin_editar_la_anterior(base) -> Non
             await s.execute(update(Configuracion).where(Configuracion.id == v1.id).values(activa=True))
 
 
-# Idempotencia, v3 por defecto, apoyo con puerta, escalón y modo en seco
+# Idempotencia, v4 por defecto, apoyo con puerta, escalón y modo en seco
 
 
 async def _cuantos_fragmentos(version_id: int | None = None, config_id: int | None = None) -> int:
@@ -319,22 +319,26 @@ async def test_indexar_dos_veces_no_duplica_fragmentos(base) -> None:
     assert await _cuantos_fragmentos(r.version_id, activa.id) == n
 
 
-async def test_la_migracion_deja_v3_activa_sin_tocar_v1(base) -> None:
+async def test_las_migraciones_dejan_v4_activa_sin_tocar_v1_ni_v3(base) -> None:
     from magister import cli
 
     async with nueva_sesion() as s:
         activa = await rf.configuracion(s)
         v1 = await rf.configuracion(s, "v1")
-    assert activa.nombre == "v3" and "references" in activa.params["secciones_fuera"]
+        v3 = await rf.configuracion(s, "v3")
+    assert "references" in v3.params["secciones_fuera"] and not v3.activa
     assert "secciones_fuera" not in v1.params and not v1.activa
-    assert {k: v for k, v in activa.params.items() if k != "secciones_fuera"} == v1.params
-    # Lo que entra sin pasar por la orden ya se indexa con v3.
+    assert {k: v for k, v in v3.params.items() if k != "secciones_fuera"} == v1.params
+    # v4 = v3 + tus notas por secciones (ADR-0018, nota del 20-11-2026).
+    assert activa.nombre == "v4"
+    assert activa.params == {**v3.params, "vault_por_secciones": True, "seccion_minima": 50}
+    # Lo que entra sin pasar por la orden ya se indexa con v4.
     fid = await crear_fuente("web", "web", 1)
     [r] = await ingesta.ingerir_ruta(fid, str(DATOS / "indices.md"))
     await ingesta.procesar_pendientes()
     assert await _cuantos_fragmentos(r.version_id, activa.id) > 0
-    # `--activar v3` sigue valiendo con v3 ya creada: no la duplica ni reindexa lo que ya tiene.
-    assert await cli.activar_config("v3") == []
+    # `--activar v4` sigue valiendo con v4 ya creada: no la duplica ni reindexa lo que ya tiene.
+    assert await cli.activar_config("v4") == []
     async with nueva_sesion() as s:
         assert (await rf.configuracion(s)).id == activa.id
 
@@ -478,7 +482,7 @@ async def test_indexar_en_seco_no_escribe_y_explica(base) -> None:
     assert "Indexaría 1 versiones" in con and f"  {vid}  «" in con and "fallo nuestro" in con
     nueva = "\n".join(await cli.en_seco("v_seco", True))
     assert "Crearía la configuración v_seco" in nueva and "Indexaría 2 versiones" in nueva
-    assert f"  {otra}  «" in nueva and "otra configuración (v3)" in nueva
+    assert f"  {otra}  «" in nueva and "otra configuración (v4)" in nueva
     total = int(nueva.split("unos ")[1].split(" ")[0])
     assert total > 0
     assert await foto() == antes  # nada escrito

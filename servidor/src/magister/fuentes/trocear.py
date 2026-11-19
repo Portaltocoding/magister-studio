@@ -1,6 +1,7 @@
 """El chunker. Invariante: `version.texto[inicio:fin] == fragmento.texto`.
 
-Vault: por párrafos (la nota entera si cabe). Resto: por encabezados y después
+Vault: por párrafos (la nota entera si cabe; con `vault_por_secciones`, v4, por encabezados aunque quepa). Con
+`seccion_minima`, las secciones más cortas se juntan con la vecina (ADR-0018). Resto: por encabezados y después
 recursivo por separadores hasta `tokens`, con `solape`. Todo parámetro sale de la
 configuración del índice.
 """
@@ -126,10 +127,40 @@ def _recortar(texto: str, a: int, b: int) -> tuple[int, int]:
     return a, b
 
 
+def _juntar_cortas(
+    texto: str, rangos: list[tuple[int, int, list[str]]], minimo: int, maximo: int, modelo: str | None
+) -> list[tuple[int, int, list[str]]]:
+    """Una sección de menos de `minimo` tokens (un encabezado solo, dos líneas) se junta con la siguiente y, si no
+    hay siguiente o no cabe, con la anterior; nunca por encima de `maximo` ni a través de un hueco (una sección
+    quitada). El rango sigue siendo un tramo del texto; la ruta es la de la sección más larga del grupo."""
+
+    def tokens(a: int, b: int) -> int:
+        return contar_tokens(texto[a:b], modelo)
+
+    grupos: list[list[tuple[int, int, list[str]]]] = []
+    for r in rangos:
+        if grupos:
+            a, b = grupos[-1][0][0], grupos[-1][-1][1]
+            if b == r[0] and tokens(a, b) < minimo and tokens(a, r[1]) <= maximo:
+                grupos[-1].append(r)
+                continue
+        grupos.append([r])
+    salida: list[list[tuple[int, int, list[str]]]] = []
+    for g in grupos:
+        if salida and salida[-1][-1][1] == g[0][0] and tokens(g[0][0], g[-1][1]) < minimo \
+                and tokens(salida[-1][0][0], g[-1][1]) <= maximo:
+            salida[-1] += g
+        else:
+            salida.append(g)
+    return [(g[0][0], g[-1][1], max(g, key=lambda r: r[1] - r[0])[2]) for g in salida]
+
+
 def trocear(texto: str, titulo: str, fuente_tipo: str, params: dict) -> list[Trozo]:
     maximo = int(params.get("tokens", 400))
     modelo = params.get("modelo")
-    if fuente_tipo == "vault" and params.get("vault_por_parrafos", True) and contar_tokens(texto, modelo) <= maximo:
+    # `vault_por_secciones` (v4): una nota que cabe también se trocea por encabezados; sin él (v1, v3), entera.
+    if (fuente_tipo == "vault" and params.get("vault_por_parrafos", True) and not params.get("vault_por_secciones")
+            and contar_tokens(texto, modelo) <= maximo):
         rangos = [(0, len(texto), [])]
     else:
         rangos = _secciones(texto)
@@ -137,10 +168,15 @@ def trocear(texto: str, titulo: str, fuente_tipo: str, params: dict) -> list[Tro
     fuera = {normalizar_encabezado(x) for x in params.get("secciones_fuera") or []} if fuente_tipo != "vault" else set()
     # Fuera si cualquier encabezado de la ruta lo está: «References > Citations» también es bibliografía.
     utiles = [r for r in rangos if not any(normalizar_encabezado(h) in fuera for h in r[2])]
+    filtrado = len(utiles) < len(rangos)
+    minimo = int(params.get("seccion_minima", 0))
+    if minimo:
+        utiles = _juntar_cortas(texto, utiles, minimo, maximo, modelo)
     trozos = _trocear_rangos(texto, titulo, fuente_tipo, params, utiles)
-    if not trozos and len(utiles) < len(rangos):
+    if not trozos and filtrado:
         # Un documento que solo tiene secciones de esas no se queda sin fragmentos.
-        trozos = _trocear_rangos(texto, titulo, fuente_tipo, params, rangos)
+        todos = _juntar_cortas(texto, rangos, minimo, maximo, modelo) if minimo else rangos
+        trozos = _trocear_rangos(texto, titulo, fuente_tipo, params, todos)
     return trozos
 
 

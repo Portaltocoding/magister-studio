@@ -13,4 +13,6 @@ if [ -f /run/secrets/postgres_password ]; then
 fi
 mkdir -p /datos/crudo /datos/salidas /datos/registros /datos/hf
 alembic upgrade head
+# Si una migración ha cambiado cómo se trocean las fuentes, lo ya guardado se reindexa antes de abrir la API.
+magister indexar --al-arrancar
 exec uvicorn magister.api.app:app --host 0.0.0.0 --port 8000

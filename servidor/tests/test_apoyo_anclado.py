@@ -86,13 +86,26 @@ async def _plan(objetivos_l1: list[str] | None = None) -> int:
     return plan_id
 
 
+def _documentos(carpeta: Path) -> None:
+    """Dos documentos de tres secciones largas: dan varios fragmentos cada uno también con v4, que junta las
+    secciones cortas (los de tests/datos son tan cortos que ahora salen en uno)."""
+    for nombre, tema in (("indices.md", "los índices de Postgres"), ("transacciones.md", "las transacciones")):
+        secciones = [f"## Apartado {i}\n" + f"Este apartado {i} explica con calma {tema} y sus detalles. " * 8
+                     for i in range(1, 4)]
+        (carpeta / nombre).write_text(f"# Sobre {tema}\n\n" + "\n\n".join(secciones), encoding="utf-8")
+
+
 async def _versiones_indexadas() -> dict[int, list[int]]:
+    import tempfile
+
     from magister.datos.fuentes import Fragmento
 
     async with nueva_sesion() as s:
         fid = (await rf.crear_fuente(s, "web", "web", 1)).id
-    await ingesta.ingerir_ruta(fid, str(DATOS))
-    await ingesta.procesar_pendientes()
+    with tempfile.TemporaryDirectory() as carpeta:
+        _documentos(Path(carpeta))
+        await ingesta.ingerir_ruta(fid, carpeta)
+        await ingesta.procesar_pendientes()
     async with nueva_sesion() as s:
         filas = (await s.execute(select(Fragmento.version_id, Fragmento.id).order_by(Fragmento.id))).all()
     salida: dict[int, list[int]] = {}

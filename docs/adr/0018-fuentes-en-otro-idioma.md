@@ -48,3 +48,42 @@ Citas (afirmación en español, fragmento en inglés, coseno con la frase más p
 **Medido** (base de ensayo, e5-small y mMARCO, sin red). La pregunta del probador contra la nota de meiosis entera (un solo fragmento, 1.106 caracteres, del vault): coseno 0,834 y reranker −2,23; contra fragmentos de otras lecciones, 0,827-0,836 y de −4,6 a −7,0. Contra solo su sección «Meiosis I», 0,856 y −0,87. Con estos datos el coseno no separa lo que contesta de lo ajeno en esta nota, y bajar umbrales no está justificado. Trocear el vault por encabezados daría 0,856, pero es otra configuración del índice (las del vault no se trocean si caben) y hay que medirla con el banco antes.
 
 **Consecuencias.** Esa pregunta sigue en «nada»: la nota no habla del complejo sinaptonémico, así que no tiene todas sus palabras. «¿Los quiasmas se ven en el diploteno?» sí resuelve por la vía léxica.
+
+## Nota del 20-11-2026: índice v4, tus notas por secciones
+
+**Contexto.** La nota anterior dejó pendiente trocear el vault por encabezados y medirlo con el banco.
+
+**Decisión.** Configuración nueva `v4` = `v3` + `vault_por_secciones: true` + `seccion_minima: 50` (migración `b5e2d8f4a6c1`, que la crea y la activa; `v3` no se edita). Con `vault_por_secciones`, una nota del vault se trocea por encabezados aunque quepa entera (las que no tienen encabezados siguen saliendo enteras, y una sección de más de `tokens` se parte por párrafos, como antes). Con `seccion_minima`, una sección de menos de 50 tokens (un encabezado suelto, dos líneas) se junta con la siguiente o, si no la hay o no cabe, con la anterior; nunca por encima de `tokens` ni a través de una sección quitada por `secciones_fuera`. Vale para todas las fuentes. Cada fragmento sigue siendo un tramo de la versión (`version.texto[inicio:fin] == fragmento.texto`). La cabecera «título > ruta de encabezados» se queda como en v3, solo en `texto_indexado` (lo que se embebe; el reranker y las citas usan `texto`): sin ella, la sección «Meiosis I» sube de 0,866 a 0,877, pero los ajenos también (0,841 → 0,847) y el banco se midió con ella.
+
+**Medido** (en memoria, sin escribir en ninguna base: textos de las versiones «lista» con SELECT, e5-small y mMARCO en CPU, vía densa con k = 5 y las dos puertas de siempre, 0,85 y 1,5; la vía léxica y el RRF de la híbrida no entran en esta medición).
+
+Banco `evals/banco/recuperacion-v1.yaml` (15 con respuesta, 5 de otros temas) contra las 28 versiones de la base `magister`:
+
+| | v3 | v4 |
+|---|---|---|
+| Fragmentos | 723 | 659 |
+| Con fuentes | 86,7 % | 86,7 % |
+| Documento entre los 3 primeros | 80,0 % | 80,0 % |
+| Sección entre los 5 primeros | 84,6 % | 84,6 % |
+| De otros temas con «hay fuentes» | 40 % | 40 % |
+| MRR del documento | 0,702 | 0,702 |
+| MRR de la sección | 0,567 | 0,571 |
+
+Ninguna pregunta cambia de bien a mal ni al revés (0 y 0 discordantes); bootstrap pareado de la diferencia de MRR de sección +0,005 [0,000; 0,014]. Empate. (El 40 % de falsas es igual en las dos: la base ya tiene páginas de CORS y de conversión de ángulos, que el banco da por ajenas.)
+
+Caso de la meiosis (base de ensayo, 30 versiones; la nota pasa de 1 fragmento a 3: «Meiosis (apuntes e6) + Idea general», «Meiosis I» y «Meiosis II + Marca para citas»):
+
+| Pregunta | v3: coseno / reranker | v4: coseno / reranker | Ajenos, top 5 |
+|---|---|---|---|
+| ¿Qué es el complejo sinaptonémico y en qué subfase aparecen los quiasmas? | 0,834 / −2,23 · nada | 0,851 / −0,96 · densa | 0,818-0,836 |
+| … en qué subfase de la profase I aparecen los quiasmas? | 0,843 / −1,64 · nada | 0,866 / +0,58 · densa | 0,824-0,841 |
+| … de la profase I … ? Cita las fuentes. | 0,844 / −2,60 · nada | 0,868 / −1,16 · densa | 0,827-0,843 |
+| ¿En qué subfase aparecen los quiasmas? | 0,816 / −0,27 · nada | 0,831 / +1,10 · nada | 0,803-0,823 |
+| ¿Cuántas combinaciones da la segregación independiente en humanos? | 0,841 / −0,61 · nada | 0,870 / +5,84 · densa | 0,799-0,811 |
+
+Contra solo tus notas, el documento correcto sale el primero en 7 de 7 preguntas con v4 y en 6 de 7 con v3. La mejor sección de la nota pasa el umbral denso y los ajenos siguen por debajo: ahora el coseno sí separa. Los umbrales no cambian.
+
+**Consecuencias.**
+- `alembic upgrade head` deja v4 activa sin fragmentos. Para que las búsquedas no se queden sin nada de lo ya indexado, el arranque (`arrancar.ps1` y `entrada.sh` en Docker) lanza justo después `magister indexar --al-arrancar`: reindexa con v4 lo «lista» que le falte y recalcula el apoyo de las lecciones (la primera vez, 2–4 minutos; después no hace nada). `uv run magister indexar --en-seco` dice antes cuántas versiones y fragmentos.
+- Los fragmentos de v3 se quedan a un lado (no se borran); `alembic downgrade` vuelve a activar v3 y borra v4 solo si no tiene fragmentos.
+- Medido solo con la vía densa: tras reindexar, `uv run python -m evals.recuperacion --estricto` lo comprueba con la híbrida de verdad.

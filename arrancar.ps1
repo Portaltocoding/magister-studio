@@ -43,6 +43,9 @@ Set-Location "$raiz\servidor"
 if (-not (Test-Path ".env")) { Copy-Item ".env.example" ".env" }
 uv run alembic upgrade head
 uv run alembic -x db=pruebas upgrade head | Out-Null
+# Si una migración ha cambiado cómo se trocean las fuentes, lo ya guardado se reindexa aquí (la primera vez, unos
+# minutos); si no falta nada, no tarda.
+uv run magister indexar --al-arrancar
 
 if (-not (Test-Path "$raiz\web\dist\index.html")) {
     Write-Host "Construyendo la página..."
