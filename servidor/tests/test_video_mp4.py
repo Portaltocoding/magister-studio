@@ -97,6 +97,37 @@ async def test_pedir_hacer_y_bajar_el_mp4(cliente, monkeypatch, tmp_path) -> Non
 
 
 @pytest.mark.anyio
+async def test_borrar_el_video_mientras_se_monta_lo_para(cliente, monkeypatch, tmp_path) -> None:
+    from magister.config import ajustes
+    from magister.material import almacen
+    from magister.trabajos import cola
+    from magister.trabajos.trabajador import ejecutar_uno
+    from magister.voz import piper
+
+    from tests.test_material import plan_aceptado
+
+    monkeypatch.setattr(ajustes, "salidas", str(tmp_path))
+    monkeypatch.setattr(piper, "disponibles", lambda: [piper.Voz("sharvard-f", "Sharvard", "x.onnx", 1)])
+    plan_id = await plan_aceptado()
+    mid = await almacen.nuevo_material(plan_id, "L1", "guion", None)
+
+    async def exportar_mientras_borras(escenas, voz_id, destino: Path, *, pdf=None, titulo="", avance=None):
+        # Borras el vídeo mientras ffmpeg monta, y ffmpeg acaba sin pasar por otro avance.
+        assert (await cliente.delete(f"/api/materiales/{mid}")).status_code == 204
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_bytes(b"mp4")
+        return 5.0
+
+    monkeypatch.setattr(video, "exportar", exportar_mientras_borras)
+    cuerpo = {"voz": "sharvard-f", "titulo": "L1", "escenas": [{"marca": "teoria", "frases": [{"texto": "Fin."}]}]}
+    tid = (await cliente.post(f"/api/materiales/{mid}/mp4", json=cuerpo)).json()["trabajo_id"]
+    assert await ejecutar_uno("t1")
+    assert (await cola.leer(tid))["estado"] == "cancelado"
+    assert not (tmp_path / f"{plan_id}-L1" / f"video-{mid}.mp4").exists()
+    assert not (tmp_path / f"{plan_id}-L1" / f"video-{mid}.json").exists()
+
+
+@pytest.mark.anyio
 async def test_sin_piper_no_se_pide_y_sin_guion_404(cliente, monkeypatch) -> None:
     from magister.material import almacen
     from magister.voz import piper

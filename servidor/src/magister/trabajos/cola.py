@@ -104,15 +104,17 @@ async def cancelado(trabajo_id: int) -> bool:
 
 
 async def terminar(trabajo_id: int, estado: str, error: str | None = None) -> None:
+    # Un trabajo cancelado se queda cancelado, aunque la llamada en curso acabe después con un error.
     async with nueva_sesion() as s, s.begin():
-        await s.execute(update(Trabajo).where(Trabajo.id == trabajo_id).values(
+        await s.execute(update(Trabajo).where(Trabajo.id == trabajo_id, Trabajo.estado != "cancelado").values(
             estado=estado, error=error, acabado_en=ahora(), lease_hasta=None))
         await avisar(trabajo_id, s)
 
 
 async def reintentar_luego(trabajo_id: int, espera_s: float, error: str) -> None:
     async with nueva_sesion() as s, s.begin():
-        await s.execute(update(Trabajo).where(Trabajo.id == trabajo_id).values(
+        # Solo lo que sigue en curso: un cancelado no vuelve a la cola.
+        await s.execute(update(Trabajo).where(Trabajo.id == trabajo_id, Trabajo.estado == "en_curso").values(
             estado="pendiente", error=error, lease_hasta=ahora() + timedelta(seconds=espera_s)))
         await avisar(trabajo_id, s)
 

@@ -39,9 +39,14 @@ class ResultadoBusqueda:
     busqueda_id: int | None = None
     # Similitud coseno de la vía densa por fragmento: dice si «hay fuentes» de verdad.
     similitud_densa: dict[int, float] = field(default_factory=dict)
+    # La vía que se usó de verdad: la híbrida pasa a «lexica» si e5 aún no está cargado.
+    via: str = "hibrida"
 
     @property
     def mejor_similitud(self) -> float:
+        if self.via == "lexica":
+            # Sin vía densa no hay coseno; un acierto léxico (todas las palabras, con AND) ya es relevante.
+            return 1.0 if self.recuperados else 0.0
         if self.similitud_densa:
             return max(self.similitud_densa.get(r.fragmento_id, 0.0) for r in self.recuperados) if self.recuperados else 0.0
         return max((r.puntuacion for r in self.recuperados), default=0.0)

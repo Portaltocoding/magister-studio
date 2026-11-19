@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 from magister.cerebro.estructura import ErrorEstructura, estructurar
 from magister.config import ajustes
 from magister.research.fijo import describir
-from magister.research.herramientas import Herramientas
+from magister.research.herramientas import Herramientas, neutro
 
 SISTEMA = """Eres un agente que busca fuentes de estudio en la web para una lección.
 Decides la siguiente acción con el esquema dado:
@@ -62,7 +62,7 @@ class EstadoAgente(TypedDict, total=False):
 def _prompt(e: EstadoAgente) -> str:
     resultados = "\n".join(f"- {r['url']} · {r['titulo']}" for r in e.get("resultados", [])[-24:]) or "(ninguno)"
     lecturas = "\n".join(
-        f'<pagina_no_confiable url="{x["url"]}">{x["titulo"]}: {x["resumen"]}</pagina_no_confiable>'
+        f'<pagina_no_confiable url="{x["url"]}">{neutro(x["titulo"])}: {neutro(x["resumen"])}</pagina_no_confiable>'
         for x in e.get("lecturas", [])
     ) or "(ninguna)"
     return (

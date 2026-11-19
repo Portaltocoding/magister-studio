@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from '../componentes/Markdown.tsx'
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
@@ -89,23 +89,37 @@ const fecha = (iso: string) =>
   new Date(iso).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // Corrige una respuesta con el mismo corrector del repaso. Devuelve la nota y la explicación.
+// Las tipo test se comparan con la opción buena, sin modelo. Si el corrector falla, lanza: quien llama
+// lo enseña como «No se pudo corregir» en vez de inventarse un fallo.
 async function corregir(p: PreguntaExamen, r: Respuesta, alTrozo?: (t: string) => void) {
-  let nota: Nota = 'fallo'
+  if (p.opciones?.length) {
+    const t = await pedir<{ acierto: boolean; porque: string }>(
+      '/api/practica/test',
+      enviarJson({ pregunta_id: p.pregunta_id, opcion: r.texto, confianza: r.confianza, clave: nueva() }),
+    )
+    return { nota: (t.acierto ? 'bien' : 'fallo') as Nota, explicacion: t.porque, intento_id: undefined }
+  }
+  let nota: Nota | null = null
   let explicacion = ''
   let intento_id: string | undefined
-  for await (const ev of flujo<{ tipo: string; nota?: Nota; t?: string; intento_id?: string }>('/api/practica/intentos', {
-    pregunta_id: p.pregunta_id,
-    concepto_id: p.concepto_id,
-    respuesta: r.texto,
-    confianza: r.confianza ?? 0.5,
-    clave: nueva(),
-  })) {
+  for await (const ev of flujo<{ tipo: string; nota?: Nota; t?: string; intento_id?: string; detalle?: string }>(
+    '/api/practica/intentos',
+    {
+      pregunta_id: p.pregunta_id,
+      concepto_id: p.concepto_id,
+      respuesta: r.texto,
+      confianza: r.confianza,
+      clave: nueva(),
+    },
+  )) {
     if (ev.tipo === 'nota' && ev.nota) nota = ev.nota
     else if (ev.tipo === 'delta' && ev.t) {
       explicacion += ev.t
       alTrozo?.(ev.t)
     } else if (ev.tipo === 'fin') intento_id = ev.intento_id
+    else if (ev.tipo === 'error') throw new Error(ev.detalle || 'No se pudo corregir')
   }
+  if (nota === null) throw new Error('No se pudo corregir')
   return { nota, explicacion, intento_id }
 }
 
@@ -353,11 +367,25 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
     pedir(`/api/tutor/servir/${p.pregunta_id}`, { method: 'POST' }).catch(() => undefined)
   }, [p.pregunta_id, servidas])
 
+  // El tiempo sale del reloj, no de sumar ticks: con la pestaña oculta o el portátil suspendido, setInterval se para.
+  const inicio = useRef(Date.now())
   useEffect(() => {
     if (corrigiendo) return
-    const t = setInterval(() => setSegundos((s) => s + 1), 1000)
+    const t = setInterval(() => setSegundos(Math.floor((Date.now() - inicio.current) / 1000)), 1000)
     return () => clearInterval(t)
   }, [corrigiendo])
+
+  // Recargar o cerrar la pestaña con respuestas sin entregar las pierde: el navegador avisa antes.
+  const sinEntregar = contestadas > 0 && !corrigiendo
+  useEffect(() => {
+    if (!sinEntregar) return
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [sinEntregar])
 
   const entregar = useCallback(async () => {
     setConfirmar(false)

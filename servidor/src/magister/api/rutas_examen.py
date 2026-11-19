@@ -171,10 +171,13 @@ async def corregir_entero(examen_id: int, cuerpo: Corregir, s: AsyncSession = De
             hechas, version = await corregir_examen(abiertas)
         except Exception as ex:  # noqa: BLE001
             raise HTTPException(502, f"no se pudo corregir de una vez: {ex}") from ex
+        # Si aun así falta alguna, no se registra nada: la web corrige entonces de una en una.
+        faltan = [a["id"] for a in abiertas if a["id"] not in hechas]
+        if faltan:
+            raise HTTPException(502, f"no se pudo corregir de una vez: faltan {', '.join(faltan)}")
         for a in abiertas:
-            c = hechas.get(a["id"])
-            if c is not None:
-                notas[a["pregunta_id"]] = (c.nota, c.explicacion, c.model_dump(exclude={"id", "explicacion"}), version)
+            c = hechas[a["id"]]
+            notas[a["pregunta_id"]] = (c.nota, c.explicacion, c.model_dump(exclude={"id", "explicacion"}), version)
     momento = datetime.now(timezone.utc)
     resultados = []
     for q in e.preguntas:

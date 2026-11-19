@@ -59,12 +59,17 @@ def leer_crudo(h: str) -> bytes:
 
 async def descargar(url: str) -> tuple[bytes, str]:
     async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": "Magister/0.3"}) as c:
-        r = await c.get(url)
-        r.raise_for_status()
-        if len(r.content) > MAX_DESCARGA:
-            raise ValueError("la página pasa de 20 MB")
-        tipo = "pdf" if "pdf" in r.headers.get("content-type", "") or url.lower().endswith(".pdf") else "html"
-        return r.content, tipo
+        async with c.stream("GET", url) as r:
+            r.raise_for_status()
+            trozos: list[bytes] = []
+            total = 0
+            async for t in r.aiter_bytes():
+                total += len(t)
+                if total > MAX_DESCARGA:
+                    raise ValueError("la página pasa de 20 MB")
+                trozos.append(t)
+            tipo = "pdf" if "pdf" in r.headers.get("content-type", "") or url.lower().endswith(".pdf") else "html"
+            return b"".join(trozos), tipo
 
 
 def _preparar(crudo: bytes, nombre: str, tipo: str | None):

@@ -45,7 +45,8 @@ def _partir(texto: str, ini: int, fin: int, maximo: int, solape: int, modelo: st
     if contar_tokens(texto[ini:fin], modelo) <= maximo:
         return [(ini, fin)]
     for sep in SEPARADORES:
-        cortes = [m.end() for m in re.finditer(re.escape(sep), texto[ini:fin])]
+        # Un corte al final del tramo no parte nada: dejaría el mismo tramo y la recursión no acabaría.
+        cortes = [m.end() for m in re.finditer(re.escape(sep), texto[ini:fin]) if m.end() < fin - ini]
         if not cortes:
             continue
         piezas: list[tuple[int, int]] = []

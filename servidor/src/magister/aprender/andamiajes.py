@@ -46,9 +46,9 @@ Tono: español de España, tuteo, sin condescendencia ni adulación, sin el car�
 """
 
 
-def extension(confianza: float, nota: str) -> str:
-    """Corta si dudabas; normal si estabas seguro y fallaste (es donde más se aprende)."""
-    if confianza >= 0.75 and nota == "fallo":
+def extension(confianza: float | None, nota: str) -> str:
+    """Corta si dudabas (o no apostaste); normal si estabas seguro y fallaste (es donde más se aprende)."""
+    if confianza is not None and confianza >= 0.75 and nota == "fallo":
         return "Estabas seguro y has fallado: explícalo con calma, en unas 200 palabras."
     return "Sé breve: unas 100 palabras."
 

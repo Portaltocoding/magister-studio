@@ -1,5 +1,6 @@
 """El research por lección y tu aprobación de sus propuestas (Parte III)."""
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
@@ -12,6 +13,7 @@ from magister.datos.fuentes import Propuesta
 from magister.datos.sesion import nueva_sesion
 from magister.fuentes import ingesta
 from magister.research import tareas
+from magister.seguridad.politica import UrlProhibida, comprobar_url
 
 rutas = APIRouter(prefix="/api")
 
@@ -62,6 +64,10 @@ async def decidir(pid: int, cuerpo: Decision) -> dict:
         url, tema_id = p.url, plan.tema_id if plan else None
     version_id = None
     if cuerpo.accion == "aprobar":
+        try:
+            await asyncio.to_thread(comprobar_url, url)
+        except UrlProhibida as e:
+            raise HTTPException(422, f"la dirección ya no es válida: {e}") from None
         fuente = await rf.fuente_o_nueva("web", "web", 1)
         try:
             crudo, tipo = await ingesta.descargar(url)

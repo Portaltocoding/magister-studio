@@ -310,7 +310,11 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     if (!p) {
       p = pedir<{ svg: string | null }>(`/api/estudio/${l.mid}/diagrama/${claveBloque}`)
         .then((r) => r.svg)
-        .catch(() => null)
+        .catch(() => {
+          // No se guarda el fallo: la próxima vez que entres en el apartado se vuelve a pedir.
+          diagramas.current.delete(claveBloque)
+          return null
+        })
       diagramas.current.set(claveBloque, p)
     }
     return p

@@ -12,6 +12,7 @@ import {
   pedir,
   subirUrl,
   verPlan,
+  verResearch,
   type DocumentoInfo,
   type Fuente,
   type PropuestaInfo,
@@ -39,6 +40,17 @@ async function fuenteWeb(fuentes: Fuente[], elegida: number | null): Promise<num
   const web = fuentes.find((f) => f.tipo === 'web')
   if (web) return web.id
   return (await crearFuente(NOMBRE_WEB, 'web', 1)).id
+}
+
+const QUE_HACER = 'Vuelve a lanzarla o sube tú un PDF o una URL.'
+
+// Cómo terminó la búsqueda de una lección, con qué hacer si no salió nada.
+function comoAcabo(clave: string, estado: string, motivo: string | null): string {
+  if (estado === 'cortada') return `La búsqueda para ${clave} se cortó (${motivo ?? 'sin motivo'}). ${QUE_HACER}`
+  const n = /^(\d+) propuestas/.exec(motivo ?? '')
+  if (n && Number(n[1]) > 0) return `Búsqueda para ${clave} acabada: ${n[1]} ${n[1] === '1' ? 'propuesta' : 'propuestas'}, abajo.`
+  if (n) return `La búsqueda para ${clave} acabó sin propuestas. ${QUE_HACER}`
+  return `La búsqueda para ${clave} no salió bien (${motivo ?? 'sin motivo'}). ${QUE_HACER}`
 }
 
 interface Encontrada {
@@ -71,17 +83,40 @@ function Buscar() {
       .catch((e) => setAviso(`No he podido cargar tus lecciones: ${mensajeDe(e)}`))
   }, [cargarPropuestas])
 
-  // Mientras busca para una lección, las propuestas van llegando.
-  const [esperando, setEsperando] = useState(0)
+  // Mientras busca para una lección, las propuestas van llegando y se mira cada tarea hasta que acaba.
+  const [enMarcha, setEnMarcha] = useState<{ id: number; clave: string }[]>([])
   useEffect(() => {
-    if (!esperando) return
-    const t = window.setInterval(cargarPropuestas, 5000)
-    const fin = window.setTimeout(() => setEsperando(0), 4 * 60 * 1000)
-    return () => {
-      window.clearInterval(t)
-      window.clearTimeout(fin)
+    if (!enMarcha.length) return
+    let vivo = true
+    const mirar = async () => {
+      cargarPropuestas()
+      const estados = await Promise.all(
+        enMarcha.map((t) =>
+          verResearch(t.id).then(
+            (r) => ({ t, r }),
+            () => ({ t, r: null }),
+          ),
+        ),
+      )
+      if (!vivo) return
+      const acabadas = estados.flatMap(({ t, r }) => (r && r.estado !== 'en_curso' ? [{ t, r }] : []))
+      if (!acabadas.length) return
+      setAviso(acabadas.map(({ t, r }) => comoAcabo(t.clave, r.estado, r.motivo_fin)).join(' '))
+      const ids = new Set(acabadas.map(({ t }) => t.id))
+      setEnMarcha((ts) => ts.filter((x) => !ids.has(x.id)))
     }
-  }, [esperando, cargarPropuestas])
+    const intervalo = window.setInterval(mirar, 5000)
+    // Tope de seguridad: si en 15 minutos no ha acabado, deja de mirar.
+    const tope = window.setTimeout(() => {
+      setEnMarcha([])
+      setAviso('La búsqueda sigue sin acabar. Vuelve en un rato: las propuestas aparecerán abajo.')
+    }, 15 * 60 * 1000)
+    return () => {
+      vivo = false
+      window.clearInterval(intervalo)
+      window.clearTimeout(tope)
+    }
+  }, [enMarcha, cargarPropuestas])
 
   const buscar = async () => {
     if (consulta.trim().length < 3) return
@@ -176,9 +211,9 @@ function Buscar() {
             const l = lecciones.find((x) => `${x.plan_id}:${x.clave}` === leccion)
             if (!l) return
             try {
-              await lanzarResearch(l.plan_id, [l.clave])
+              const r = await lanzarResearch(l.plan_id, [l.clave])
               setAviso(`Buscando fuentes para ${l.clave}. Tarda unos minutos; las propuestas aparecerán abajo.`)
-              setEsperando(Date.now())
+              setEnMarcha((ts) => [...ts, ...r.tareas.map((id) => ({ id, clave: l.clave }))])
             } catch (err) {
               setAviso(String((err as Error).message))
             }
@@ -196,7 +231,7 @@ function Buscar() {
             Buscar para esta lección
           </button>
         </form>
-        {esperando > 0 && <Pensando texto="Buscando… las propuestas irán apareciendo" />}
+        {enMarcha.length > 0 && <Pensando texto="Buscando… las propuestas irán apareciendo" />}
       </section>
 
       <section>

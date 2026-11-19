@@ -25,7 +25,7 @@ def html_a_texto(html: str) -> str:
     h = re.sub(r"<!--.*?-->", " ", html, flags=re.S)
     h = re.sub(r"<(script|style|noscript|template)\b.*?</\1>", " ", h, flags=re.S | re.I)
     oculto = (r"<(\w+)\b[^>]*(?:style\s*=\s*\"[^\"]*(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|"
-              r"color\s*:\s*(?:#fff(?:fff)?|white)\b[^\"]*background(?:-color)?\s*:\s*(?:#fff(?:fff)?|white))[^\"]*\"|\bhidden\b|"
+              r"color\s*:\s*(?:#fff(?:fff)?|white)\b[^\"]*background(?:-color)?\s*:\s*(?:#fff(?:fff)?|white))[^\"]*\"|[\s\"']hidden(?=[\s>=/\"'])|"
               r"aria-hidden\s*=\s*\"true\")[^>]*>.*?</\1>")
     anterior = None
     while anterior != h:

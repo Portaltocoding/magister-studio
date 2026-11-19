@@ -104,6 +104,44 @@ async def test_el_examen_se_corrige_en_una_llamada():
     assert hechas["p2"].nota == "parcial"
 
 
+@pytest.mark.anyio
+async def test_si_el_corrector_se_salta_una_respuesta_se_le_vuelve_a_pedir():
+    from magister.aprender.corrector import CorreccionExamen, corregir_examen
+    from magister.cerebro.estructura import eco
+
+    eco.vaciar()
+    eco.encolar(CorreccionExamen, [
+        {"correcciones": [{"id": "p1", "nota": "bien"}]},
+        {"correcciones": [{"id": "p1", "nota": "bien"}, {"id": "p2", "nota": "perfecta"}]},
+    ])
+    items = [{"id": "p1", "pregunta": "a", "referencia": "b", "respuesta": "c"}, {"id": "p2", "pregunta": "d", "referencia": "e", "respuesta": "f"}]
+    hechas, _ = await corregir_examen(items)
+    assert set(hechas) == {"p1", "p2"} and hechas["p2"].nota == "perfecta"
+
+
+@pytest.mark.anyio
+async def test_si_falta_una_correccion_el_examen_no_registra_nada(cliente, monkeypatch):
+    from sqlalchemy import func, select
+
+    from magister.api import rutas_examen
+    from magister.datos.aprender import Intento
+    from magister.datos.sesion import nueva_sesion
+    from test_aprender import preparar_preguntas
+
+    plan_id = await preparar_preguntas()
+    e = (await cliente.post("/api/examenes", json={"plan_id": plan_id, "lecciones": ["L1"], "cantidad": 1})).json()
+
+    async def sin_nada(items):
+        return {}, "corrector_examen@x"
+
+    monkeypatch.setattr(rutas_examen, "corregir_examen", sin_nada)
+    r = await cliente.post(f"/api/examenes/{e['id']}/corregir",
+                           json={"resultados": [{"pregunta_id": "p1", "respuesta": "Identifica cada fila"}], "segundos": 30})
+    assert r.status_code == 502
+    async with nueva_sesion() as s:
+        assert await s.scalar(select(func.count()).select_from(Intento)) == 0
+
+
 def test_los_diagramas_de_los_apuntes_pasan_limpios_al_pdf():
     from magister.material.render import limpiar_svg, svg_en_linea
 

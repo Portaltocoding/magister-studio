@@ -1,11 +1,13 @@
 """El progreso: estado de cada concepto, calibración, racha y tiempo. Todo se calcula al pedirlo."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, text
 
 from magister.aprender.estado import es_acierto, estados_en
 from magister.aprender.programador import programador
+from magister.config import ajustes
 from magister.datos.aprender import Intento
 from magister.datos.material import Pregunta
 from magister.datos.plan import ConceptoFila, DependenciaFila, PlanFila
@@ -71,25 +73,31 @@ async def calibracion(fuente: str, desde: datetime) -> list[dict]:
             for _, v in sorted(tramos.items())]
 
 
+def racha(dias: list[date], ahora: datetime) -> int:
+    """Días seguidos estudiando, de `dias` (fechas locales, de más reciente a más antigua). Hoy es el día en
+    `MAGISTER_ZONA`, no en UTC; si hoy aún no has estudiado, la racha sigue viva desde ayer."""
+    hoy = ahora.astimezone(ZoneInfo(ajustes.zona)).date()
+    base = hoy if dias and dias[0] == hoy else hoy - timedelta(days=1)
+    n = 0
+    for i, d in enumerate(dias):
+        if d != base - timedelta(days=i):
+            break
+        n += 1
+    return n
+
+
 async def resumen(ahora: datetime) -> dict:
     """Porcentaje del camino (sesiones hechas), dominio, días estudiados, racha y tiempo."""
     async with nueva_sesion() as s:
         dias = [d for (d,) in (await s.execute(text(
-            "select distinct (momento at time zone 'Europe/Madrid')::date from intentos order by 1 desc"))).all()]
+            "select distinct (momento at time zone :zona)::date from intentos order by 1 desc"), {"zona": ajustes.zona})).all()]
         minutos = (await s.scalar(text("select coalesce(sum(latencia_ms), 0) / 60000.0 from intentos"))) or 0
         sesiones = (await s.execute(text(
             "select coalesce(sum(s.horas) filter (where s.estado = 'hecha'), 0), coalesce(sum(s.horas), 0) "
             "from sesiones s join planes p on p.id = s.plan_id where p.estado = 'aceptado'"))).one()
         intentos = await s.scalar(select(text("count(*)")).select_from(Intento))
-    racha = 0
-    hoy = ahora.date()
-    for i, d in enumerate(dias):
-        if d == hoy - timedelta(days=i) or (i == 0 and d == hoy - timedelta(days=1)):
-            racha += 1
-        else:
-            break
     lista = await conceptos(ahora)
     dominados = sum(1 for c in lista if c["estado"] == "dominado")
     return {"camino": round(sesiones[0] / sesiones[1], 3) if sesiones[1] else 0.0, "horas_hechas": float(sesiones[0]),
             "horas_plan": float(sesiones[1]), "conceptos": len(lista), "dominados": dominados,
-            "dias_estudiados": len(dias), "racha": racha, "minutos_practica": round(float(minutos)), "intentos": intentos}
+            "dias_estudiados": len(dias), "racha": racha(dias, ahora), "minutos_practica": round(float(minutos)), "intentos": intentos}

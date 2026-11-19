@@ -82,7 +82,8 @@ async def crear_tests(plan_id: int, clave: str, n: int = 5, s: AsyncSession = De
     from magister.material.preguntas import anadir_tests
 
     apuntes = await s.scalar(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave,
-                                                    Material.tipo == "apuntes").order_by(Material.id.desc()).limit(1))
+                                                    Material.tipo == "apuntes", Material.estado != "generando")
+                              .order_by(Material.id.desc()).limit(1))
     if apuntes is None:
         raise HTTPException(404, "esta lección aún no tiene apuntes")
     textos = (await s.scalars(select(BloqueMaterial.texto).where(BloqueMaterial.material_id == apuntes.id))).all()
@@ -150,6 +151,12 @@ async def borrar_un_material(mid: int, s: AsyncSession = Depends(sesion_por_peti
     if m is None:
         raise HTTPException(404, "material no encontrado")
     plan_id, clave = m.plan_id, m.leccion_clave
+    # Si su MP4 se está montando, se para: no tiene sentido acabar el vídeo de algo borrado.
+    parados = (await s.scalars(text(
+        "update trabajos set estado = 'cancelado', acabado_en = now() where tipo = 'video_mp4' "
+        "and (parametros->>'material_id')::bigint = :m and estado in ('pendiente', 'en_curso') returning id"), {"m": mid})).all()
+    for tid in parados:
+        await cola.avisar(tid, s)
     await s.delete(m)
     await s.commit()
     # Si era un vídeo descargado en MP4, su fichero y su ficha (.json) se van con él.
@@ -254,7 +261,7 @@ async def materiales_del_plan(plan_id: int, s: AsyncSession = Depends(sesion_por
     """Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha."""
     filas = (await s.execute(text(
         "select distinct on (leccion_clave, tipo) leccion_clave, tipo, estado, id from materiales "
-        "where plan_id = :p order by leccion_clave, tipo, id desc"), {"p": plan_id})).all()
+        "where plan_id = :p order by leccion_clave, tipo, (estado = 'generando'), id desc"), {"p": plan_id})).all()
     fichas = dict((await s.execute(text(
         "select leccion_clave, count(*) from preguntas where plan_id = :p and estado = 'activa' and not sonda "
         "group by leccion_clave"), {"p": plan_id})).all())
@@ -334,13 +341,14 @@ def _material(m: Material, con_texto: bool = False) -> dict:
 @rutas.get("/planes/{plan_id}/lecciones/{clave}/material")
 async def material_de_leccion(plan_id: int, clave: str, s: AsyncSession = Depends(sesion_por_peticion)) -> dict:
     mats = (await s.scalars(select(Material).where(Material.plan_id == plan_id, Material.leccion_clave == clave)
-                            .order_by(Material.id.desc()))).all()
+                            .order_by(Material.estado == "generando", Material.id.desc()))).all()
     ultimo: dict[str, Material] = {}
     for m in mats:
         ultimo.setdefault(m.tipo, m)
     preguntas = (await s.scalars(select(Pregunta).where(Pregunta.plan_id == plan_id, Pregunta.leccion_clave == clave,
                                                         Pregunta.estado == "activa").order_by(Pregunta.id))).all()
-    trabajo = await s.scalar(text("select id from trabajos where plan_id = :p and leccion_clave = :c order by id desc limit 1"),
+    trabajo = await s.scalar(text("select id from trabajos where plan_id = :p and leccion_clave = :c and tipo = 'material' "
+                                  "order by id desc limit 1"),
                              {"p": plan_id, "c": clave})
     return {
         "materiales": {t: _material(m) for t, m in ultimo.items()},

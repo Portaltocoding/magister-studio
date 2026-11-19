@@ -102,24 +102,31 @@ async def _marcar_videos(lecciones: list[dict]) -> None:
         x.update(video=(x["plan_id"], x["clave"]) in elegidas, minutos=pref["minutos"])
 
 
-def elegir_tarea(config: dict, lecciones: list[dict], hoy: date) -> tuple[dict, list[str], dict] | None:
-    """La primera cosa que toca hacer según las reglas encendidas, o None. Sin efectos: se puede probar."""
+def elegir_tarea(config: dict, lecciones: list[dict], hoy: date,
+                 descartadas: frozenset[tuple[int, str, str]] = frozenset()) -> tuple[dict, list[str], dict] | None:
+    """La primera cosa que toca hacer según las reglas encendidas, o None. Sin efectos: se puede probar.
+
+    `descartadas` son las (plan_id, clave, tipo principal) que ya se intentaron hoy y no salieron: se saltan."""
+
+    def fuera(lec: dict, tipo: str) -> bool:
+        return (lec["plan_id"], lec["clave"], tipo) in descartadas
+
     regla = config["preparar_siguiente"]
     if regla.get("activa"):
         limite = hoy + timedelta(days=int(regla.get("dias_antes", 1)))
         for lec in lecciones:
-            if lec["fecha"] and lec["fecha"] <= limite and "apuntes" not in lec["tipos"]:
+            if lec["fecha"] and lec["fecha"] <= limite and "apuntes" not in lec["tipos"] and not fuera(lec, "apuntes"):
                 return lec, ["apuntes", "preguntas"], {}
     if config["diapositivas_al_preparar"].get("activa"):
         for lec in lecciones:
-            if "apuntes" in lec["tipos"] and "diapositivas" not in lec["tipos"]:
+            if "apuntes" in lec["tipos"] and "diapositivas" not in lec["tipos"] and not fuera(lec, "diapositivas"):
                 return lec, ["diapositivas"], {}
     video = config["video_al_preparar"]
     if video.get("activa"):
         # Solo las lecciones que tu plan elige para vídeo (las más duras, tantas como pidas en el roadmap); sin esa
         # marca (configuraciones antiguas), todas.
         for lec in lecciones:
-            if "apuntes" in lec["tipos"] and "guion" not in lec["tipos"] and lec.get("video", True):
+            if "apuntes" in lec["tipos"] and "guion" not in lec["tipos"] and lec.get("video", True) and not fuera(lec, "guion"):
                 return lec, ["guion"], {"video": {"estilo": lec.get("estilo") or video.get("estilo", "clase"),
                                                   "minutos": int(lec.get("minutos") or video.get("minutos", 6))}}
     return None
@@ -136,19 +143,34 @@ async def una_vuelta(ahora: datetime | None = None) -> str | None:
     lecciones = await _lecciones(ahora.date(), 7)
     if config["video_al_preparar"].get("activa"):
         await _marcar_videos(lecciones)
-    tarea = elegir_tarea(config, lecciones, ahora.date())
-    if tarea is None:
-        return None
-    lec, tipos, preferencias = tarea
-    clave = cola.clave_idempotencia(automatizacion=True, plan_id=lec["plan_id"], leccion=lec["clave"], tipos=sorted(tipos),
-                                    dia=ahora.date().isoformat())
-    _, nuevo = await cola.encolar("material", lec["plan_id"], lec["clave"], {"tipos": tipos, "preferencias": preferencias}, clave)
-    if not nuevo:
-        return None
-    que = {"apuntes": "preparar", "diapositivas": "hacer las diapositivas de", "guion": "hacer el vídeo de"}[tipos[0]]
-    texto = f"Puesto en cola: {que} {lec['clave']} · {lec['titulo']}"
-    await anotar(texto)
-    return texto
+    # Lo que ya se intentó hoy (hecho, fallido o cancelado) no se reabre: se pasa a lo siguiente. Mañana se reintenta.
+    descartadas: set[tuple[int, str, str]] = set()
+    for _ in range(3 * len(lecciones) + 1):
+        tarea = elegir_tarea(config, lecciones, ahora.date(), frozenset(descartadas))
+        if tarea is None:
+            return None
+        lec, tipos, preferencias = tarea
+        que = {"apuntes": "preparar", "diapositivas": "hacer las diapositivas de", "guion": "hacer el vídeo de"}[tipos[0]]
+        clave = cola.clave_idempotencia(automatizacion=True, plan_id=lec["plan_id"], leccion=lec["clave"], tipos=sorted(tipos),
+                                        dia=ahora.date().isoformat())
+        async with nueva_sesion() as s:
+            estado = await s.scalar(text("select estado from trabajos where clave = :c"), {"c": clave})
+        if estado in ("hecho", "fallido", "cancelado"):
+            descartadas.add((lec["plan_id"], lec["clave"], tipos[0]))
+            if estado != "cancelado":
+                aviso = f"No he podido {que} {lec['clave']} · {lec['titulo']}: lo dejo por hoy."
+                if not any(x.get("texto") == aviso for x in await ver_registro()):
+                    await anotar(aviso)
+            continue
+        if estado is not None:
+            return None
+        _, nuevo = await cola.encolar("material", lec["plan_id"], lec["clave"], {"tipos": tipos, "preferencias": preferencias}, clave)
+        if not nuevo:
+            return None
+        texto = f"Puesto en cola: {que} {lec['clave']} · {lec['titulo']}"
+        await anotar(texto)
+        return texto
+    return None
 
 
 async def bucle() -> None:

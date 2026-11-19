@@ -38,7 +38,7 @@ from magister.fuentes.embeber import embeber
 from magister.fuentes.reranker import reordenar
 from magister.research.agente import Accion, presupuesto_agotado
 from magister.research.fijo import describir
-from magister.research.herramientas import Herramientas, delimitar, Lectura
+from magister.research.herramientas import Herramientas, delimitar, Lectura, neutro
 
 
 class EstadoResearcher(TypedDict, total=False):
@@ -177,7 +177,7 @@ def _prompt(e: EstadoResearcher) -> str:
     candidatos = _candidatos_ordenados(e, objetivo)
     resultados = "\n".join(f"- {r['url']} · {r.get('titulo', '')}: {r.get('extracto', '')[:160]}" for r in candidatos[:16]) or "(ninguno)"
     lecturas = "\n".join(
-        f'<pagina_no_confiable url="{x["url"]}">{x["titulo"]}: {x["resumen"]}</pagina_no_confiable>'
+        f'<pagina_no_confiable url="{x["url"]}">{neutro(x["titulo"])}: {neutro(x["resumen"])}</pagina_no_confiable>'
         for x in e.get("lecturas", [])
     ) or "(ninguna)"
     return (

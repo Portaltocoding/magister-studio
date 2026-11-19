@@ -31,7 +31,8 @@ class IntentoEntrada(BaseModel):
     pregunta_id: str
     concepto_id: str
     respuesta: str = Field(min_length=1, max_length=8000)
-    confianza: Literal[0.25, 0.5, 0.75, 0.95]
+    # Sin apuesta (un examen en el que no la marcaste): no entra en la calibración, en vez de inventarse un 0,5.
+    confianza: Literal[0.25, 0.5, 0.75, 0.95] | None = None
     clave: str = Field(min_length=8, max_length=80)
     tipo: Literal["espaciado", "reintento"] = "espaciado"
     latencia_ms: int | None = None

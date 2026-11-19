@@ -69,6 +69,8 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
   const [error, setError] = useState<string | null>(null)
   const [avisoConfianza, setAvisoConfianza] = useState<string | null>(null)
   const servidaEn = useRef(Date.now())
+  // Tras «Reintentar (no cuenta)», lo que envíes de esa misma pregunta va como reintento: no mueve el repaso.
+  const reintentando = useRef(false)
   const [test, setTest] = useState<ResultadoTest | null>(null)
   // La tanda de hoy: cuántas había al empezar y cuántas llevas.
   const [tanda, setTanda] = useState<{ total: number; hechas: number } | null>(null)
@@ -123,6 +125,7 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
     setConfianza(null)
     setError(null)
     setAvisoConfianza(null)
+    reintentando.current = false
     if (pregunta) hechasGuia.current += 1
     const p = await pedir<Servida | null>(`/api/practica/siguiente${concepto ? `?concepto_id=${concepto}` : ''}`)
     // Se acabó la tanda: se celebra.
@@ -137,7 +140,7 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
     const respuesta_ = forzado?.respuesta ?? respuesta
     const confianza_ = forzado?.confianza ?? confianza
     if (!pregunta || confianza_ == null || !respuesta_.trim()) return
-    if (pregunta.otra_vez) tipo = 'reintento'
+    if (pregunta.otra_vez || reintentando.current) tipo = 'reintento'
     if (forzado) {
       setRespuesta(forzado.respuesta)
       setConfianza(forzado.confianza)
@@ -356,6 +359,7 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
                     <button
                       className="boton-mini"
                       onClick={() => {
+                        reintentando.current = true
                         setNota(null)
                         setExplicacion('')
                         setFin(null)

@@ -16,7 +16,10 @@ from typing import Protocol
 from magister.aprender.estado import EstadoConcepto, es_acierto
 from magister.config import ajustes
 
-NOTAS_FSRS = {"fallo": 1, "parcial": 2, "bien": 3, "perfecta": 4}  # Again, Hard, Good, Easy
+# Again, Again, Good, Easy. «parcial» es un fallo en todo lo demás (estado, calibración, reaprendizaje): para FSRS
+# también, no un Hard (que FSRS trata como recuerdo y puede mandar a dos meses). Igual en `personal.NOTAS`.
+NOTAS_FSRS = {"fallo": 1, "parcial": 1, "bien": 3, "perfecta": 4}
+MARCA_NOTAS = "-p1"  # en la versión: distingue este mapeo del anterior (parcial = Hard)
 
 
 class Programador(Protocol):
@@ -74,7 +77,7 @@ class FSRS:
         self.programador = Scheduler(desired_retention=self.retencion, learning_steps=(), relearning_steps=(),
                                      enable_fuzzing=False, **extra)
         self.tope = ajustes.tope_inicial
-        self.version = f"fsrs-6-{etiqueta}-r{self.retencion}" + ("-tope" if self.tope else "")
+        self.version = f"fsrs-6-{etiqueta}-r{self.retencion}" + ("-tope" if self.tope else "") + MARCA_NOTAS
 
     def tarjeta(self, estado: EstadoConcepto):
         from fsrs import Card, Rating

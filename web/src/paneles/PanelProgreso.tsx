@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
 import { usarAviso } from '../componentes/Aviso.tsx'
+import { mensajeDe } from '../componentes/Cargando.tsx'
 import Pensando from '../componentes/Pensando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
@@ -204,6 +205,8 @@ function TuModelo() {
           ? `Hecho: ahora predice tus aciertos mejor (pérdida ${String(r.perdida_antes).replace('.', ',')} → ${String(r.perdida_despues).replace('.', ',')}).`
           : (r.motivo ?? 'Sin cambios.'),
       )
+    } catch (err) {
+      setAviso(`No he podido ajustarlo: ${mensajeDe(err)}`)
     } finally {
       setHaciendo(false)
     }

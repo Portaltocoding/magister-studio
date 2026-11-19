@@ -17,7 +17,7 @@ from magister.datos.modelos import Tema
 from magister.datos.sesion import nueva_sesion
 from magister.research.agente import research_agente
 from magister.research.fijo import research_fijo
-from magister.research.herramientas import Herramientas, Web
+from magister.research.herramientas import Herramientas, Lectura, Web
 
 registro = logging.getLogger("magister.research")
 _semaforo = asyncio.Semaphore(2)
@@ -53,6 +53,14 @@ async def _actualizar(tarea_id: int, **valores) -> None:
         await s.execute(update(TareaResearch).where(TareaResearch.id == tarea_id).values(**valores))
 
 
+def rellenar_desde_previo(h: Herramientas, previo: dict) -> None:
+    """Al reanudar, las herramientas recuerdan qué URLs salieron en las búsquedas y cuáles se leyeron."""
+    for r in previo.get("resultados", []):
+        h.permitidas.setdefault(r["url"], r.get("titulo", ""))
+    for x in previo.get("lecturas", []):
+        h.leidas.setdefault(x["url"], Lectura(x["url"], titulo=x.get("titulo", ""), extracto=x.get("resumen", "")))
+
+
 async def correr(tarea_id: int, web: Web | None = None, previo: dict | None = None) -> dict:
     async with nueva_sesion() as s:
         t = await s.get(TareaResearch, tarea_id)
@@ -66,6 +74,8 @@ async def correr(tarea_id: int, web: Web | None = None, previo: dict | None = No
         return await _guardar_propuesta(tarea_id, plan_id, clave, url, titulo, motivo)
 
     h = Herramientas(web or web_por_defecto, plan_id, clave, tarea_id, guardar_propuesta=guardar)
+    if previo:
+        rellenar_desde_previo(h, previo)
 
     async def guardar_estado(e: dict) -> None:
         limpio = {k: v for k, v in e.items() if k not in ("inicio", "leccion")}

@@ -138,19 +138,32 @@ async def _cuantos_bloquea() -> dict[tuple[int, str], int]:
 
 
 async def _a_repetir_hoy(ahora: datetime) -> list[tuple[int, str]]:
-    """Conceptos cuyo primer intento de hoy fue un fallo, sin acierto después y con menos de 3 intentos hoy."""
+    """Conceptos cuyo primer intento de hoy fue un fallo, sin acierto después con otra pregunta y con menos de 3
+    intentos hoy."""
     inicio = fin_del_dia(ahora) - timedelta(days=1)
     async with nueva_sesion() as s:
         filas = (await s.execute(text(
-            "select plan_id, concepto_id, coalesce(nota_usuario, nota_corrector) from intentos "
+            "select plan_id, concepto_id, pregunta_id, coalesce(nota_usuario, nota_corrector) from intentos "
             "where momento >= :d order by plan_id, concepto_id, momento"), {"d": inicio})).all()
-    por: dict[tuple[int, str], list[str]] = {}
-    for plan_id, cid, nota in filas:
-        por.setdefault((plan_id, cid), []).append(nota)
+    return por_repetir([tuple(f) for f in filas])
+
+
+def por_repetir(filas: list[tuple[int, str, str, str]]) -> list[tuple[int, str]]:
+    """`filas`: (plan, concepto, pregunta, nota) de hoy, en orden. Acertar una pregunta que ya fallaste hoy (por
+    ejemplo, copiando la explicación) no saca al concepto del reaprendizaje: hace falta acertar otra."""
     from magister.aprender.estado import es_acierto
 
-    return [k for k, notas in por.items()
-            if not es_acierto(notas[0]) and not any(es_acierto(n) for n in notas) and len(notas) < INTENTOS_AL_DIA]
+    por: dict[tuple[int, str], list[tuple[str, str]]] = {}
+    for plan_id, cid, pid, nota in filas:
+        por.setdefault((plan_id, cid), []).append((pid, nota))
+    salida = []
+    for k, lista in por.items():
+        falladas = {pid for pid, nota in lista if not es_acierto(nota)}
+        if es_acierto(lista[0][1]) or len(lista) >= INTENTOS_AL_DIA:
+            continue
+        if not any(es_acierto(nota) and pid not in falladas for pid, nota in lista):
+            salida.append(k)
+    return salida
 
 
 async def siguiente(ahora: datetime, concepto_id: str | None = None) -> dict | None:

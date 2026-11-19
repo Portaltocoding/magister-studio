@@ -229,7 +229,9 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
           setTrabajo((t) => t && { ...t, avisos: [...t.avisos, { regla: ev.regla, detalle: ev.detalle }] })
         else if (ev.tipo === 'error') {
           acabado = true
-          setTrabajo((t) => t && { ...t, estado: 'fallido', error: ev.detalle })
+          // Si lo has parado tú, no es un fallo: se queda cancelado y no se pinta como error.
+          if (ev.detalle === 'cancelado') setTrabajo((t) => t && { ...t, estado: 'cancelado', error: null })
+          else setTrabajo((t) => t && { ...t, estado: 'fallido', error: ev.detalle })
         } else if (ev.tipo === 'fin') {
           acabado = true
           setTrabajo((t) => t && { ...t, estado: 'hecho' })

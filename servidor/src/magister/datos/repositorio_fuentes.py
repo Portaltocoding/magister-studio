@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import and_, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from magister.datos.fuentes import Configuracion, Documento, Fragmento, Fuente, Version
@@ -72,8 +72,15 @@ async def documentos_de_fuente(s: AsyncSession, fuente_id: int) -> list[tuple[Do
     """Cada documento con su última versión y cuántos fragmentos tiene esa versión."""
     docs = list((await s.scalars(select(Documento).where(Documento.fuente_id == fuente_id).order_by(Documento.titulo))).all())
     salida = []
+    # Volver a subir el mismo fichero deja una versión «retirada · sin cambios»: no es la que se muestra.
+    repetida = and_(Version.estado == "retirada", Version.motivo == "sin cambios")
     for d in docs:
-        v = await s.scalar(select(Version).where(Version.documento_id == d.id).order_by(Version.id.desc()).limit(1))
+        v = await s.scalar(
+            select(Version)
+            .where(Version.documento_id == d.id, ~func.coalesce(repetida, False))
+            .order_by(Version.id.desc())
+            .limit(1)
+        )
         n = 0
         if v is not None:
             n = await s.scalar(select(func.count()).select_from(Fragmento).where(Fragmento.version_id == v.id)) or 0

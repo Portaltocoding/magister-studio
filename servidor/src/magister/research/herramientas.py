@@ -11,6 +11,8 @@ venga de la web es no confiable: se delimita y nunca da órdenes.
 
 import asyncio
 import hashlib
+import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -19,9 +21,26 @@ import httpx
 
 from magister.config import ajustes
 
+registro = logging.getLogger("magister.research")
+
 MAX_PAGINA = 2 * 1024 * 1024
 PLAZO = 15
 EXTRACTO = 1500
+
+# ddgs no tiene un valor de «sin región» (su documentación solo da ejemplos país-idioma como us-en y usa
+# us-en por defecto): las consultas en español van con es-es y las demás con us-en.
+REGION_ES = "es-es"
+REGION_OTRA = "us-en"
+_SENALES_ES = re.compile(r"[áéíóúñü¿¡]", re.I)
+_PALABRAS_ES = {"qué", "que", "cómo", "como", "para", "con", "los", "las", "del", "una", "por", "entre", "sobre", "cuando", "donde", "de", "el"}
+
+
+def region_de(consulta: str) -> str:
+    """La región de búsqueda según el idioma que parece tener la consulta."""
+    if _SENALES_ES.search(consulta):
+        return REGION_ES
+    palabras = re.findall(r"\w+", consulta.lower())
+    return REGION_ES if any(p in _PALABRAS_ES for p in palabras) else REGION_OTRA
 
 
 @dataclass
@@ -53,13 +72,14 @@ class Web:
         def _buscar() -> list[dict]:
             from ddgs import DDGS
 
-            return list(DDGS().text(consulta, region="es-es", max_results=n))
+            return list(DDGS().text(consulta, region=region_de(consulta), max_results=n))
 
         for intento in range(2):
             try:
                 filas = await asyncio.to_thread(_buscar)
                 return [Resultado(f.get("title", ""), f.get("href", ""), f.get("body", "")) for f in filas if f.get("href")]
-            except Exception:  # noqa: BLE001 solo se reintenta una vez, por si es la red
+            except Exception as e:  # noqa: BLE001 solo se reintenta una vez, por si es la red
+                registro.warning("la búsqueda %r falló (intento %d): %r", consulta, intento + 1, e)
                 if intento == 0:
                     await asyncio.sleep(2)
         raise RuntimeError("la búsqueda web no respondió")
@@ -72,6 +92,9 @@ class Web:
             async with c.stream("GET", url) as r:
                 r.raise_for_status()
                 comprobar_url(str(r.url))
+                tipo = r.headers.get("content-type", "").lower()
+                if (tipo and "html" not in tipo) or (not tipo and str(r.url).lower().endswith(".pdf")):
+                    raise ValueError("no es una página HTML")
                 trozos: list[bytes] = []
                 total = 0
                 async for t in r.aiter_bytes():
@@ -144,7 +167,9 @@ class Herramientas:
 def _extraer(url: str, crudo: bytes) -> Lectura:
     import trafilatura
 
-    html = crudo.decode("utf-8", "replace")
+    from magister.seguridad.entrada import html_a_texto
+
+    html = html_a_texto(crudo.decode("utf-8", "replace"))
     texto = trafilatura.extract(html) or ""
     meta = trafilatura.extract_metadata(html)
     return Lectura(
@@ -158,10 +183,17 @@ def _extraer(url: str, crudo: bytes) -> Lectura:
     )
 
 
+def neutro(texto: str) -> str:
+    """Quita a un texto de la web la forma de etiqueta, para que no pueda cerrar el delimitador."""
+    return (texto or "").replace("<", "‹").replace(">", "›")
+
+
 def delimitar(lectura: Lectura) -> str:
     """Una lectura como dato no confiable para el prompt."""
+    total = max(lectura.longitud, len(lectura.extracto))
     return (
         f'<pagina_no_confiable url="{lectura.url}">\n'
-        f"Título: {lectura.titulo}\nFecha: {lectura.fecha or 'desconocida'}\n{lectura.extracto}\n"
+        f"Título: {neutro(lectura.titulo)}\nFecha: {neutro(lectura.fecha or 'desconocida')}\n"
+        f"Extracto: los primeros {len(lectura.extracto)} de {total} caracteres\n{neutro(lectura.extracto)}\n"
         "</pagina_no_confiable>"
     )

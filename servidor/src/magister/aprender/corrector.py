@@ -64,5 +64,11 @@ async def corregir_examen(items: list[dict]) -> tuple[dict[str, CorreccionItem],
     bloque = "\n\n".join(
         f'<item id="{x["id"]}">\n<pregunta>{x["pregunta"]}</pregunta>\n<referencia>{x["referencia"]}</referencia>\n'
         f'<respuesta_del_alumno>{x["respuesta"]}</respuesta_del_alumno>\n</item>' for x in items)
-    r = await estructurar(p.rellenar(items=bloque), "Devuelve la corrección de cada respuesta.", CorreccionExamen)
+    pedidos = {x["id"] for x in items}
+
+    def reglas(r: CorreccionExamen) -> list[str]:
+        return [f"falta la corrección de {i}" for i in sorted(pedidos - {c.id for c in r.correcciones})]
+
+    r = await estructurar(p.rellenar(items=bloque), "Devuelve la corrección de cada respuesta.", CorreccionExamen,
+                          reglas=reglas)
     return {c.id: comprobar(c, []) for c in r.correcciones}, p.etiqueta

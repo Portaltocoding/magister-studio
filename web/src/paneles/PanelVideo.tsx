@@ -401,8 +401,14 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
   }
   const cancelar = async () => {
     if (!estado?.trabajo) return
+    try {
+      await pedir(`/api/trabajos/${estado.trabajo.id}/cancelar`, { method: 'POST' })
+    } catch (e) {
+      // Sin mirar() justo después, que borraría el aviso: el MP4 sigue y se sigue esperando.
+      setFallo(`No he podido cancelar: ${mensajeDe(e)}`)
+      return
+    }
     esperando.current = false
-    await pedir(`/api/trabajos/${estado.trabajo.id}/cancelar`, { method: 'POST' }).catch(() => undefined)
     await mirar()
   }
 

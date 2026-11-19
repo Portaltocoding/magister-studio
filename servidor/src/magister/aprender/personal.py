@@ -23,7 +23,7 @@ from magister.datos.sesion import nueva_sesion
 UMBRAL_INICIAL = 8
 UMBRAL_COMPLETO = 64
 CLAVE = "fsrs_personal"
-NOTAS = {"fallo": 1, "parcial": 2, "bien": 3, "perfecta": 4}
+NOTAS = {"fallo": 1, "parcial": 1, "bien": 3, "perfecta": 4}  # el mismo mapeo que `programador.NOTAS_FSRS`
 
 _personal: dict | None = None
 

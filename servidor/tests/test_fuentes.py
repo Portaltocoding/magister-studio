@@ -66,6 +66,16 @@ def test_trocear_invariante() -> None:
             assert t.texto_indexado.endswith(t.texto)
 
 
+def test_trocear_seccion_larga_que_acaba_en_salto() -> None:
+    # Antes, el único «\n\n» caía al final del tramo, el tramo no se partía y la recursión no acababa.
+    texto = "## A\n" + "palabra " * 60 + "\n\n## B\nhola"
+    trozos = trocear(texto, "Doc", "pdf", {"tokens": 40, "solape": 8})
+    assert len(trozos) > 2
+    for t in trozos:
+        assert texto[t.inicio : t.fin] == t.texto
+    assert trozos[-1].texto.endswith("hola")
+
+
 def test_rrf_ejemplo() -> None:
     from magister.cerebro.contratos import Recuperado
 
@@ -126,6 +136,8 @@ async def test_indexar_y_buscar_por_las_tres_vias(base) -> None:
     b = BuscadorHibrido()
     lex = await b.buscar("ACID", 5, Filtros(), Consulta(via="lexica"))
     assert lex.recuperados and "ACID" in lex.recuperados[0].texto
+    # Sin vía densa no hay coseno: el acierto léxico cuenta como «hay fuentes».
+    assert lex.via == "lexica" and lex.mejor_similitud == 1.0
     assert (await b.buscar("zxqwv", 5, Filtros(), Consulta(via="lexica"))).recuperados == []
     densa = await b.buscar("índice parcial", 5, Filtros(), Consulta(via="densa"))
     assert len(densa.recuperados) > 0
@@ -133,3 +145,29 @@ async def test_indexar_y_buscar_por_las_tres_vias(base) -> None:
     hib = await b.buscar("índices parciales", 3, Filtros(), Consulta(reranker=True))
     assert hib.busqueda_id and len(hib.recuperados) <= 3
     assert "Índices" in (await b.indice_fuentes(None))
+
+
+def test_via_lexica_da_fuentes_si_hay_aciertos() -> None:
+    from magister.cerebro.contratos import Recuperado, ResultadoBusqueda
+
+    r = Recuperado(1, 1, 0.003, "ACID", "Doc", "doc.md", "pdf", 1)
+    assert ResultadoBusqueda([r], None, {}, "lexica").mejor_similitud == 1.0
+    assert ResultadoBusqueda([], None, {}, "lexica").mejor_similitud == 0.0
+    # La híbrida sigue mirando el coseno de la vía densa.
+    assert ResultadoBusqueda([r], None, {1: 0.4}).mejor_similitud == 0.4
+
+
+async def test_volver_a_subir_el_mismo_fichero_muestra_la_lista(base) -> None:
+    fid = await crear_fuente("Adjuntos del chat", "pdf", 3)
+    crudo = (DATOS / "indices.md").read_bytes()
+    v1 = await ingesta.recibir(fid, crudo, "indices.md", "subida/indices.md", None, "md")
+    await ingesta.procesar_pendientes()
+    v2 = await ingesta.recibir(fid, crudo, "indices.md", "subida/indices.md", None, "md")
+    await ingesta.procesar_pendientes()
+    async with nueva_sesion() as s:
+        from magister.datos.fuentes import Version
+
+        repetida = await s.get(Version, v2)
+        assert (repetida.estado, repetida.motivo) == ("retirada", "sin cambios")
+        [(_, v, n)] = await rf.documentos_de_fuente(s, fid)
+    assert v.id == v1 and v.estado == "lista" and n > 0

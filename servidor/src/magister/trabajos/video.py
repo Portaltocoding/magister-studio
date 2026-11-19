@@ -69,5 +69,9 @@ async def ejecutar(trabajo_id: int, parametros: dict) -> None:
     except video.ErrorVideo as e:
         # No es transitorio (falta Piper o ffmpeg, o el guion no tiene escenas): sin reintentos.
         raise LookupError(str(e)) from None
+    # ffmpeg puede acabar entre dos avances: si te lo cancelaron (o borraste el vídeo) mientras, el MP4 no se queda.
+    if await cola.cancelado(trabajo_id):
+        await asyncio.to_thread(destino.unlink, missing_ok=True)
+        raise Cancelado()
     meta = {"huella": huella(parametros["escenas"], parametros["voz"]), "voz": parametros["voz"], "segundos": round(segundos, 1)}
     await asyncio.to_thread(destino.with_suffix(".json").write_text, json.dumps(meta), encoding="utf-8")

@@ -217,6 +217,70 @@ def test_la_red_recien_creada_es_fsrs():
     assert pr.proxima(e) <= f.proxima(e)
 
 
+def test_acertar_la_misma_pregunta_fallada_no_saca_del_reaprendizaje():
+    from magister.aprender.practica import por_repetir
+
+    # Fallas p1 y la aciertas al reintentarla (con la explicación delante): el concepto sigue a repetir.
+    assert por_repetir([(1, "c", "p1", "fallo"), (1, "c", "p1", "bien")]) == [(1, "c")]
+    # Aciertas otra pregunta del mismo concepto: sale.
+    assert por_repetir([(1, "c", "p1", "fallo"), (1, "c", "p2", "bien")]) == []
+    # Un «parcial» también cuenta como fallada; el tope de 3 intentos al día sigue mandando.
+    assert por_repetir([(1, "c", "p1", "parcial"), (1, "c", "p2", "parcial"), (1, "c", "p2", "bien")]) == []
+    assert por_repetir([(1, "c", "p1", "parcial"), (1, "c", "p2", "bien")]) == []
+    assert por_repetir([(1, "c", "p1", "bien")]) == []
+
+
+def test_parcial_es_un_fallo_para_fsrs():
+    from magister.aprender import personal
+    from magister.aprender.programador import NOTAS_FSRS
+
+    t0 = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
+    f = FSRS()
+    historia = [(t0, "bien"), (t0 + timedelta(days=3), "bien"), (t0 + timedelta(days=12), "bien")]
+    ahora = t0 + timedelta(days=40)
+    con = lambda nota: f.siguiente(EstadoConcepto("x", ahora, historia), nota, ahora)[1]  # noqa: E731
+    assert con("parcial") == con("fallo") < con("bien")
+    assert f.version.endswith("-p1")
+    assert personal.NOTAS == NOTAS_FSRS
+
+
+def test_la_racha_cuenta_en_tu_zona_y_desde_ayer(monkeypatch):
+    from datetime import date
+
+    from magister.aprender.progreso import racha
+    from magister.config import ajustes
+
+    monkeypatch.setattr(ajustes, "zona", "Europe/Madrid")
+    # Las 00:30 del 20 en Madrid (23:30 del 19 en UTC), con intentos ayer y anteayer: la racha sigue viva.
+    medianoche = datetime(2026, 11, 19, 23, 30, tzinfo=timezone.utc)
+    assert racha([date(2026, 11, 19), date(2026, 11, 18)], medianoche) == 2
+    # Por la mañana, antes de estudiar: cuenta desde ayer, no se queda en 1.
+    manana = datetime(2026, 11, 20, 8, tzinfo=timezone.utc)
+    assert racha([date(2026, 11, 19), date(2026, 11, 18), date(2026, 11, 17)], manana) == 3
+    assert racha([date(2026, 11, 20), date(2026, 11, 19), date(2026, 11, 17)], manana) == 2
+    assert racha([date(2026, 11, 18)], manana) == 0
+    assert racha([], manana) == 0
+
+
+async def test_un_intento_sin_seguridad_no_se_inventa_un_cinco(cliente) -> None:
+    from sqlalchemy import select
+
+    from magister.aprender.andamiajes import extension
+    from magister.cerebro.estructura import eco
+    from magister.datos.aprender import Intento
+    from magister.datos.sesion import nueva_sesion
+    from sse import eventos_sse
+
+    assert extension(None, "fallo") == extension(0.25, "fallo")
+    await preparar_preguntas()
+    eco.encolar(Correccion, [{"nota": "fallo", "ideas_ausentes": ["que no puede ser nula"], "errores": []}])
+    cuerpo = {"pregunta_id": "p1", "concepto_id": "clave-primaria", "respuesta": "Ni idea", "clave": "intento-sin-seguridad"}
+    ev = eventos_sse((await cliente.post("/api/practica/intentos", json=cuerpo)).text)
+    assert ev[-1][0] == "fin"
+    async with nueva_sesion() as s:
+        assert (await s.scalar(select(Intento.confianza).where(Intento.clave_idempotencia == "intento-sin-seguridad"))) is None
+
+
 async def test_una_pregunta_que_ya_no_existe_da_un_error_controlado(base) -> None:
     from magister.aprender import practica, progreso
 

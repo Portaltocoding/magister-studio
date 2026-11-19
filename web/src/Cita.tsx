@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { verFragmento, type CitaInfo, type FragmentoInfo } from './api.ts'
 
-// Las marcas [123] del tutor pasan a enlaces internos que el hilo pinta como botones.
-// Se recomponen aunque lleguen partidas entre dos deltas, porque se aplican al texto entero.
-export const conMarcas = (texto: string) => texto.replace(/\[(\d{1,9})\]/g, '[\\[$1\\]](#cita-$1)')
+// Las marcas [n] del texto pasan a enlaces en componentes/marcas.ts.
 
 interface Props {
   id: number

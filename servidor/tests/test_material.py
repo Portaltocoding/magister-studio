@@ -172,6 +172,44 @@ async def test_trabajo_de_leccion_borrada_falla_sin_reintentos(base) -> None:
     assert t["estado"] == "fallido" and t["intentos"] == 1 and "no existe" in t["error"]
 
 
+async def test_un_cancelado_no_resucita_si_la_llamada_acaba_en_error(base) -> None:
+    from magister.trabajos import cola
+
+    tid, _ = await cola.encolar("material", None, None, {}, "clave-cancelada")
+    assert (await cola.coger("t1")).id == tid
+    assert await cola.cancelar(tid)
+    # La llamada que estaba en curso acaba después con un plazo agotado o con otro error.
+    await cola.reintentar_luego(tid, 0, "plazo agotado")
+    await cola.terminar(tid, "fallido", "otro error")
+    t = await cola.leer(tid)
+    assert t["estado"] == "cancelado" and t["error"] is None
+    assert await cola.coger("t1") is None
+
+
+async def test_un_rehacer_a_medias_no_tapa_los_apuntes_buenos(cliente) -> None:
+    from sqlalchemy import update
+
+    from magister.datos.material import Material
+    from magister.datos.sesion import nueva_sesion
+    from magister.material import almacen
+    from magister.trabajos import cola
+
+    plan_id = await plan_aceptado()
+    bueno = await almacen.nuevo_material(plan_id, "L1", "apuntes", None)
+    async with nueva_sesion() as s, s.begin():
+        await s.execute(update(Material).where(Material.id == bueno).values(estado="listo"))
+    tid, _ = await cola.encolar("material", plan_id, "L1", {"tipos": ["apuntes"]}, "clave-rehacer")
+    a_medias = await almacen.nuevo_material(plan_id, "L1", "apuntes", tid)
+    assert a_medias > bueno
+    # El MP4 de un vídeo de la lección no cuenta como el trabajo de preparar su material.
+    await cola.encolar("video_mp4", plan_id, "L1", {"material_id": 0}, "clave-mp4")
+    r = (await cliente.get(f"/api/planes/{plan_id}/lecciones/L1/material")).json()
+    assert r["materiales"]["apuntes"]["id"] == bueno and r["materiales"]["apuntes"]["estado"] == "listo"
+    assert r["ultimo_trabajo"]["id"] == tid and r["ultimo_trabajo"]["tipo"] == "material"
+    plan = (await cliente.get(f"/api/planes/{plan_id}/materiales")).json()
+    assert plan["L1"]["apuntes_id"] == bueno and plan["L1"]["tipos"]["apuntes"] == "listo"
+
+
 async def test_generador_con_eco_y_reanudar(base, monkeypatch, tmp_path) -> None:
     from magister.cerebro.estructura import eco
     from magister.config import ajustes

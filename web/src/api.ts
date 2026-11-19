@@ -457,7 +457,13 @@ export const subirUrl = (fid: number, url: string, tema_id: number | null) =>
 export const lanzarResearch = (plan_id: number, leccion_claves: string[]) =>
   pedir<{ tareas: number[] }>('/api/research', enviarJson({ plan_id, leccion_claves }))
 export const verResearch = (id: number) =>
-  pedir<{ estado: string; motivo_fin: string | null; pasos: number }>(`/api/research/${id}`)
+  pedir<{
+    estado: string
+    leccion_clave: string
+    motivo_fin: string | null
+    pasos: number
+    paso_actual: Record<string, unknown> | null
+  }>(`/api/research/${id}`)
 export const listarPropuestas = () => pedir<PropuestaInfo[]>('/api/propuestas?estado=pendiente')
 export const decidirPropuesta = (id: number, accion: 'aprobar' | 'rechazar') =>
   pedir<{ estado: string }>(`/api/propuestas/${id}`, enviarJson({ accion }))

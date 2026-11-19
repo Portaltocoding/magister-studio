@@ -169,7 +169,7 @@ class BuscadorHibrido:
             s.add(b)
             await s.flush()
             busqueda_id = b.id
-        return ResultadoBusqueda(recuperados, busqueda_id, dict(densa))
+        return ResultadoBusqueda(recuperados, busqueda_id, dict(densa), via)
 
     async def indice_fuentes(self, tema_id: int | None, max_caracteres: int = 6000) -> str:
         """Títulos de documento y encabezados del tema, para orientar al planificador."""

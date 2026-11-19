@@ -92,7 +92,7 @@ def hacer_recuperar(buscador: Buscador):
         hay = bool(r.recuperados) and r.mejor_similitud >= ajustes.umbral_fuentes
         return {
             "recuperados": [
-                {"id": x.fragmento_id, "texto": x.texto, "titulo": x.documento_titulo, "tipo": x.fuente_tipo}
+                {"id": x.fragmento_id, "texto": x.texto, "titulo": x.documento_titulo, "tipo": x.fuente_tipo, "uri": x.uri}
                 for x in r.recuperados
             ]
             if hay
@@ -103,14 +103,19 @@ def hacer_recuperar(buscador: Buscador):
     return recuperar
 
 
+def _es_externo(x: dict) -> bool:
+    # Una URL guardada en una fuente que no es «web» sigue siendo contenido de la web.
+    return x["tipo"] == "web" or (x.get("uri") or "").startswith(("http://", "https://"))
+
+
 def _bloque(recuperados: list[dict]) -> str:
     from magister.seguridad.entrada import AVISO, marcar_externo
 
     partes = []
     for x in recuperados:
-        texto = marcar_externo(x["texto"], x["id"], "web") if x["tipo"] == "web" else x["texto"]
+        texto = marcar_externo(x["texto"], x["id"], "web") if _es_externo(x) else x["texto"]
         partes.append(f'<fragmento id="{x["id"]}" fuente="{x["titulo"]} ({x["tipo"]})">\n{texto}\n</fragmento>')
-    aviso = AVISO + "\n\n" if any(x["tipo"] == "web" for x in recuperados) else ""
+    aviso = AVISO + "\n\n" if any(_es_externo(x) for x in recuperados) else ""
     return aviso + "\n\n".join(partes)
 
 

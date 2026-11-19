@@ -33,9 +33,15 @@ def _frases(t: str) -> list[str]:
 def _afirmaciones(respuesta: str) -> dict[int, list[str]]:
     """Para cada id citado, las frases de la respuesta que lo llevan."""
     salida: dict[int, list[str]] = {}
+    anterior = ""
     for frase in _frases(respuesta):
+        limpia = MARCA.sub("", frase)
+        # «… evidence. [7]»: la marca detrás del punto queda sola; es de la frase anterior.
+        afirmacion = limpia if limpia.strip() else anterior
         for m in MARCA.finditer(frase):
-            salida.setdefault(int(m.group(1)), []).append(MARCA.sub("", frase))
+            salida.setdefault(int(m.group(1)), []).append(afirmacion)
+        if limpia.strip():
+            anterior = limpia
     return salida
 
 

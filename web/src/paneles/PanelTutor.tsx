@@ -10,7 +10,7 @@ import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Mascota from '../Mascota.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import type { IdModo } from '../modos.ts'
 import { aCss } from '../componentes/escala.ts'
 
@@ -206,30 +206,39 @@ function Comprobar({ pregunta, alAcabar }: { pregunta: NonNullable<Bloque['pregu
   const [nota, setNota] = useState<string | null>(null)
   const [explicacion, setExplicacion] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [inicio] = useState(() => Date.now())
 
   useEffect(() => {
     pedir(`/api/tutor/servir/${pregunta.pregunta_id}`, { method: 'POST' })
   }, [pregunta.pregunta_id])
 
+  // Si el corrector falla, no se inventa un «Fallada»: se dice y puedes volver a comprobar.
   const enviar = async () => {
     setEnviando(true)
-    let final = 'fallo'
-    for await (const ev of flujo<{ tipo: string; nota?: string; t?: string }>('/api/practica/intentos', {
-      pregunta_id: pregunta.pregunta_id,
-      concepto_id: pregunta.concepto_id,
-      respuesta,
-      confianza,
-      clave: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-      latencia_ms: Date.now() - inicio,
-    })) {
-      if (ev.tipo === 'nota' && ev.nota) {
-        setNota(ev.nota)
-        final = ev.nota
-      } else if (ev.tipo === 'delta' && ev.t) setExplicacion((x) => x + ev.t)
+    setError(null)
+    let final: string | null = null
+    try {
+      for await (const ev of flujo<{ tipo: string; nota?: string; t?: string; detalle?: string }>('/api/practica/intentos', {
+        pregunta_id: pregunta.pregunta_id,
+        concepto_id: pregunta.concepto_id,
+        respuesta,
+        confianza,
+        clave: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        latencia_ms: Date.now() - inicio,
+      })) {
+        if (ev.tipo === 'nota' && ev.nota) {
+          setNota(ev.nota)
+          final = ev.nota
+        } else if (ev.tipo === 'delta' && ev.t) setExplicacion((x) => x + ev.t)
+        else if (ev.tipo === 'error') setError(ev.detalle || 'No se pudo corregir.')
+      }
+    } catch (e) {
+      setError(mensajeDe(e))
+    } finally {
+      setEnviando(false)
     }
-    setEnviando(false)
-    alAcabar(final)
+    if (final) alAcabar(final)
   }
 
   return (
@@ -258,6 +267,7 @@ function Comprobar({ pregunta, alAcabar }: { pregunta: NonNullable<Bloque['pregu
           </button>
         </div>
       )}
+      {error && <TextoError texto={error} antes="No he podido corregirla: " />}
       {(nota || explicacion) && (
         <div className={`correccion nota-${nota ?? ''}`}>
           {nota && <strong>{NOTA[nota] ?? nota}</strong>}
