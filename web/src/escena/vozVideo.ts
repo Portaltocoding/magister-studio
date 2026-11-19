@@ -1,15 +1,12 @@
-// La voz de Magister para un vídeo animado. Antes de reproducir, cada trozo de la narración (los mismos que decía el
-// Locutor, con la misma petición a /api/voz) se sintetiza una vez y se mide. Con eso cada tramo dura lo que dura su
-// voz y el audio va dentro de la línea de tiempo de Remotion. Si no se puede, se dice por qué y el vídeo sigue con
-// la estimación y la voz del navegador, como antes.
+// La voz de Magister para un vídeo animado. Cada trozo de la narración (los mismos que decía el Locutor, con la misma
+// petición a /api/voz) se sintetiza una vez y se mide, en el orden del vídeo. Con eso cada tramo dura lo que dura su
+// voz y el audio va dentro de la línea de tiempo de Remotion. El vídeo empieza en cuanto el primer tramo tiene su voz;
+// el resto se prepara mientras suena (el estado y sus reglas, en vozPorTramos.ts). Si no se puede, se dice por qué y
+// lo que falte va con la estimación y la voz del navegador, como antes.
 import { pedirVozMagister, pronunciar, vocesMagister, vocesMagisterListas, vozMagister } from '../componentes/voz.ts'
 import { duracionWav, enParalelo } from './medir.ts'
-import { trozos, type GuionGrafico, type Medidas } from './tipos.ts'
-
-export type MotivoSinMagister = 'elegida' | 'sin_piper' | 'fallo' | 'cancelado'
-export type VozPreparada =
-  | { modo: 'magister'; medidas: Medidas; audios: (string | null)[][]; liberar: () => void }
-  | { modo: 'navegador'; motivo: MotivoSinMagister; liberar: () => void }
+import { trozos, type GuionGrafico } from './tipos.ts'
+import { conAudio, conFuentes, estadoInicial, sinMagister, type AudioMedido, type EstadoVoz } from './vozPorTramos.ts'
 
 // Piper dice una frase cada vez (el servidor las pone en fila): con tres pedidas a la vez siempre tiene la siguiente.
 const A_LA_VEZ = 3
@@ -54,45 +51,58 @@ function esperarFuentes(g: GuionGrafico): Promise<unknown> {
   return Promise.race([Promise.all(fuentes.map((f) => document.fonts.load(f))).catch(nada), espera(3000)])
 }
 
-export async function prepararVoz(
+// Prepara la voz tramo a tramo y va contando cómo va con `alCambio` (estado nuevo cada vez, ver vozPorTramos.ts): el
+// vídeo puede empezar en cuanto el primer tramo tiene su voz. Cancelar (`signal`) deja con la de Magister los tramos
+// ya listos y el resto con la del navegador. `liberar` suelta los audios (al salir o con otro guion).
+export function prepararVoz(
   g: GuionGrafico,
-  { signal, alAvance }: { signal: AbortSignal; alAvance: (hechos: number, total: number) => void },
-): Promise<VozPreparada> {
-  const fuentes = esperarFuentes(g)
-  await Promise.race([vocesMagisterListas, espera(5000)])
-  const voz = vozMagister()
-  if (!voz) {
-    await fuentes
-    return { modo: 'navegador', motivo: vocesMagister.length ? 'elegida' : 'sin_piper', liberar: nada }
-  }
-  // Cancelado mientras se esperaba a las voces (en desarrollo, React monta dos veces): no se sintetiza nada.
-  if (signal.aborted) {
-    await fuentes
-    return { modo: 'navegador', motivo: 'cancelado', liberar: nada }
-  }
-
+  { signal, alCambio }: { signal: AbortSignal; alCambio: (e: EstadoVoz) => void },
+): { liberar: () => void } {
   // Cada texto distinto se pide una sola vez; lo que no tiene nada que decir (un trozo que se queda vacío) no se pide.
   const textos = g.tramos.map((t) => trozos(t.narracion).map((z) => z.texto))
-  const unicos = [...new Set(textos.flat().filter((t) => pronunciar(t)))]
+  let estado = estadoInicial(textos, (t) => !!pronunciar(t))
   const urls: string[] = []
   let soltado = false
   const liberar = () => {
     soltado = true
     urls.splice(0).forEach((u) => URL.revokeObjectURL(u))
   }
+  const cambiar = (f: (e: EstadoVoz) => EstadoVoz) => {
+    const nuevo = f(estado)
+    if (nuevo === estado || soltado) return
+    estado = nuevo
+    alCambio(estado)
+  }
+  void esperarFuentes(g).then(() => cambiar(conFuentes))
+  void preparar(estado.unicos, signal, cambiar, urls, () => soltado)
+  return { liberar }
+}
+
+async function preparar(
+  unicos: string[],
+  signal: AbortSignal,
+  cambiar: (f: (e: EstadoVoz) => EstadoVoz) => void,
+  urls: string[],
+  soltado: () => boolean,
+): Promise<void> {
+  await Promise.race([vocesMagisterListas, espera(5000)])
+  const voz = vozMagister()
+  if (!voz) return cambiar((e) => sinMagister(e, vocesMagister.length ? 'elegida' : 'sin_piper'))
+  // Cancelado mientras se esperaba a las voces (en desarrollo, React monta dos veces): no se sintetiza nada.
+  if (signal.aborted) return cambiar((e) => sinMagister(e, 'cancelado'))
+
   // Corta también las peticiones en vuelo cuando un trozo falla del todo (no solo cuando cancelas tú).
   const interno = new AbortController()
   const cortarInterno = () => interno.abort()
-  if (signal.aborted) cortarInterno()
   signal.addEventListener('abort', cortarInterno, { once: true })
 
-  const medirUno = async (texto: string): Promise<{ url: string; segundos: number }> => {
+  const medirUno = async (texto: string): Promise<AudioMedido> => {
     for (let intento = 0; ; intento++) {
       if (interno.signal.aborted) throw new Error('cancelado')
       try {
         const b = await conPlazo((s) => pedirVozMagister(texto, voz, s), interno.signal)
         if (!b) throw new Error('sin audio')
-        if (soltado) throw new Error('cancelado') // ya se ha rendido: este audio no se guarda
+        if (soltado()) throw new Error('cancelado') // ya se ha soltado todo: este audio no se guarda
         const url = URL.createObjectURL(b)
         urls.push(url)
         const segundos = duracionWav(await b.arrayBuffer()) ?? (await duracionDelNavegador(url))
@@ -105,36 +115,21 @@ export async function prepararVoz(
     }
   }
 
-  alAvance(0, unicos.length)
+  // En el orden del vídeo y de tres en tres: cada trozo medido se anota en cuanto llega.
   try {
-    const medidos = await enParalelo(
-      unicos.map((t) => () => medirUno(t)),
+    await enParalelo(
+      unicos.map((t) => async () => {
+        const a = await medirUno(t)
+        cambiar((e) => conAudio(e, t, a))
+      }),
       A_LA_VEZ,
-      (hechos) => alAvance(hechos, unicos.length),
     )
-    await fuentes
-    if (signal.aborted) throw new Error('cancelado')
-    const porTexto = new Map(unicos.map((t, i) => [t, medidos[i]]))
-    return {
-      modo: 'magister',
-      medidas: textos.map((lista) => lista.map((t) => porTexto.get(t)?.segundos ?? null)),
-      audios: textos.map((lista) => lista.map((t) => porTexto.get(t)?.url ?? null)),
-      liberar,
-    }
   } catch {
+    // Falla un trozo (tras su reintento) o lo cortas: los tramos ya listos siguen con la voz de Magister y el resto
+    // pasa a la del navegador. Los audios ya pedidos se quedan hasta `liberar`.
     cortarInterno()
-    liberar()
-    await fuentes
-    return { modo: 'navegador', motivo: signal.aborted ? 'cancelado' : 'fallo', liberar: nada }
+    cambiar((e) => sinMagister(e, signal.aborted ? 'cancelado' : 'fallo'))
   } finally {
     signal.removeEventListener('abort', cortarInterno)
   }
-}
-
-// Qué decir en pantalla cuando el vídeo va sin la voz de Magister.
-export function avisoSinMagister(m: MotivoSinMagister): string {
-  if (m === 'elegida') return 'Con la voz del navegador, los tiempos son aproximados.'
-  if (m === 'sin_piper') return 'La voz de Magister no está instalada: suena la del navegador y los tiempos son aproximados.'
-  if (m === 'cancelado') return 'Sin esperar a la voz: va aparte de la imagen y los tiempos son aproximados.'
-  return 'No se ha podido preparar la voz de Magister: va aparte de la imagen y los tiempos son aproximados.'
 }

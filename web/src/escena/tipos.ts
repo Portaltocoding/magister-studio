@@ -208,8 +208,9 @@ export interface Linea {
   tramos: TramoEnLinea[]
   total: number
 }
-// Lo que dura de verdad cada trozo de cada tramo, en segundos y a velocidad 1 (null: no hay nada que decir).
-export type Medidas = (number | null)[][]
+// Lo que dura de verdad cada trozo de cada tramo, en segundos y a velocidad 1 (null: no hay nada que decir). Un tramo
+// entero a null aún no tiene su voz medida (o va con la del navegador): dura la estimación.
+export type Medidas = ((number | null)[] | null)[]
 
 // Los trozos de una narración, en orden: los mismos que decía el Locutor (frase a frase, cortadas en sus comas).
 export function trozos(narracion: string): Trozo[] {

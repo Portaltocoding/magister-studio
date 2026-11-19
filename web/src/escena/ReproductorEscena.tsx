@@ -1,6 +1,6 @@
 // El reproductor del vídeo animado: el Player de Remotion y el esqueleto de tesis a un lado (pulsas una y saltas).
-// Antes de reproducir se prepara la voz de Magister: cada trozo de la narración se sintetiza y se mide, y va como audio
-// dentro de la composición. Así cada tramo dura lo que dura su voz, y pausar, saltar o cambiar la velocidad lleva voz,
+// La voz de Magister se prepara tramo a tramo: cada trozo de la narración se sintetiza y se mide, y va como audio
+// dentro de la composición. El vídeo sale en cuanto el primer tramo tiene su voz y el resto se prepara mientras suena. Así cada tramo dura lo que dura su voz, y pausar, saltar o cambiar la velocidad lleva voz,
 // imagen y subtítulos a la vez, sin nada aparte. Sin la voz de Magister, los tiempos se estiman y el Locutor habla
 // por fuera, como antes. Con el vídeo parado, la escena se puede tocar.
 import { useEffect, useMemo, useRef, useState, type MouseEvent as Pulsacion, type SyntheticEvent } from 'react'
@@ -10,35 +10,30 @@ import { guardarAjustesVoz, leerAjustesVoz, Locutor, VELOCIDADES } from '../comp
 import { Composicion, type PropsComposicion } from './Composicion.tsx'
 import { accionDeTecla, AYUDA_TECLAS, fotogramaTrasTecla } from './teclas.ts'
 import { ALTO, ANCHO, FPS, lineaDeTiempo, tramoEn, trozoEn, verTramo, type GuionGrafico } from './tipos.ts'
-import { avisoSinMagister, prepararVoz, type VozPreparada } from './vozVideo.ts'
+import { prepararVoz } from './vozVideo.ts'
+import { avance, avisoVoz, conMagister as hayMagister, esperaEn, puedeEmpezar, reubicar, type EstadoVoz } from './vozPorTramos.ts'
 
 export default function ReproductorEscena({ guion, segundo = 0 }: { guion: GuionGrafico; segundo?: number }) {
-  // Lo preparado y el avance van con su guion: si llega otro, lo de antes no vale (sin reiniciar estado en el efecto).
-  const [preparada, setPreparada] = useState<{ guion: GuionGrafico; voz: VozPreparada } | null>(null)
-  const [progreso, setProgreso] = useState<{ guion: GuionGrafico; hechos: number; total: number } | null>(null)
-  const voz = preparada?.guion === guion ? preparada.voz : null
-  const avance = progreso?.guion === guion ? progreso : { hechos: 0, total: 0 }
+  // El estado de la voz va con su guion: si llega otro, lo de antes no vale (sin reiniciar estado en el efecto).
+  const [preparando, setPreparando] = useState<{ guion: GuionGrafico; voz: EstadoVoz } | null>(null)
+  const voz = preparando?.guion === guion ? preparando.voz : null
+  const { hechos, total } = voz ? avance(voz) : { hechos: 0, total: 0 }
   const cancelar = useRef<() => void>(() => undefined)
 
-  // La voz se prepara una vez por guion; al salir (o con otro guion) se sueltan sus audios.
+  // La voz se prepara una vez por guion, tramo a tramo; al salir (o con otro guion) se sueltan sus audios.
   useEffect(() => {
     let vigente = true
-    let hecha: VozPreparada | null = null
     const ac = new AbortController()
     cancelar.current = () => ac.abort()
-    void prepararVoz(guion, { signal: ac.signal, alAvance: (hechos, total) => vigente && setProgreso({ guion, hechos, total }) }).then((v) => {
-      if (!vigente) return v.liberar()
-      hecha = v
-      setPreparada({ guion, voz: v })
-    })
+    const p = prepararVoz(guion, { signal: ac.signal, alCambio: (v) => vigente && setPreparando({ guion, voz: v }) })
     return () => {
       vigente = false
       ac.abort()
-      hecha?.liberar()
+      p.liberar()
     }
   }, [guion])
 
-  if (!voz)
+  if (!voz || !puedeEmpezar(voz))
     return (
       <div className="escena">
         <div className="escena-pantalla">
@@ -49,32 +44,89 @@ export default function ReproductorEscena({ guion, segundo = 0 }: { guion: Guion
               alignContent: 'center', gap: 12, padding: 16, textAlign: 'center',
             }}
           >
-            <Pensando texto={avance.total ? `Preparando la voz… ${avance.hechos} de ${avance.total}` : 'Preparando la voz…'} />
-            {avance.total > 0 && <progress max={avance.total} value={avance.hechos} style={{ width: 'min(320px, 80%)' }} aria-label="Voz preparada" />}
+            <Pensando texto={total ? `Preparando la voz… ${hechos} de ${total}` : 'Preparando la voz…'} />
+            {total > 0 && <progress max={total} value={hechos} style={{ width: 'min(320px, 80%)' }} aria-label="Voz preparada" />}
             <button type="button" className="boton boton-suave" onClick={() => cancelar.current()}>
               Ver sin esperar
             </button>
-            <span className="nota">Cada frase se dice una vez y se mide: así la voz va clavada a la imagen.</span>
+            <span className="nota">Cada frase se dice una vez y se mide: así la voz va clavada a la imagen. Empieza en cuanto está la primera escena.</span>
           </div>
         </div>
       </div>
     )
-  return <Reproductor guion={guion} segundo={segundo} voz={voz} />
+  return <Reproductor guion={guion} segundo={segundo} voz={voz} sinEsperar={() => cancelar.current()} />
 }
 
-function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: number; voz: VozPreparada }) {
+function Reproductor({ guion, segundo, voz, sinEsperar }: { guion: GuionGrafico; segundo: number; voz: EstadoVoz; sinEsperar: () => void }) {
   const player = useRef<PlayerRef>(null)
-  const conMagister = voz.modo === 'magister'
+  const conMagister = hayMagister(voz)
+  const vozRef = useRef(voz)
+  useEffect(() => {
+    vozRef.current = voz
+  }, [voz])
+  const hayNavegador = voz.tramos.includes('navegador')
   // La velocidad de voz elegida. Con la voz de Magister la línea de tiempo va a velocidad 1 y el Player acelera imagen
   // y voz a la vez (y se puede cambiar a mitad sin descuadrar nada). Sin ella, estira los tramos estimados, como antes.
   const [ritmo] = useState(() => leerAjustesVoz().velocidad)
   const [velocidad, setVelocidad] = useState(ritmo)
-  const medidas = conMagister ? voz.medidas : null
-  const audios = conMagister ? voz.audios : null
+  // Los tramos aún sin voz (o con la del navegador) van a null: duran la estimación por su texto.
+  const { medidas, audios } = voz
   const ritmoLinea = conMagister ? 1 : ritmo
   const linea = useMemo(() => lineaDeTiempo(guion, ritmoLinea, medidas), [guion, ritmoLinea, medidas])
   const desde = useMemo(() => linea.tramos.map((t) => t.desde), [linea])
   const total = Math.max(1, linea.total)
+
+  // Si el vídeo llega a un tramo cuya voz aún se prepara, se para ahí («preparando la voz…») y sigue solo cuando está.
+  const [esperando, setEsperando] = useState<number | null>(null)
+  const esperandoRef = useRef<number | null>(null)
+  useEffect(() => {
+    const p = player.current
+    if (!p) return
+    const mirar = (frame: number) => {
+      if (!p.isPlaying()) return
+      const i = esperaEn(vozRef.current, desde, frame)
+      if (i === null) return
+      p.pause()
+      esperandoRef.current = i
+      setEsperando(i)
+    }
+    const alFotograma = (e: { detail: { frame: number } }) => mirar(e.detail.frame)
+    const alTocar = () => mirar(p.getCurrentFrame())
+    // Si saltas a otro tramo mientras espera, ya no sigue solo.
+    const alSaltar = (e: { detail: { frame: number } }) => {
+      if (esperandoRef.current === null || tramoEn(desde, e.detail.frame) === esperandoRef.current) return
+      esperandoRef.current = null
+      setEsperando(null)
+    }
+    p.addEventListener('frameupdate', alFotograma)
+    p.addEventListener('play', alTocar)
+    p.addEventListener('seeked', alSaltar)
+    return () => {
+      p.removeEventListener('frameupdate', alFotograma)
+      p.removeEventListener('play', alTocar)
+      p.removeEventListener('seeked', alSaltar)
+    }
+  }, [desde])
+  // La línea crece según llega la voz: el cabezal se queda en su tramo y a la misma distancia de su inicio (nunca
+  // salta atrás). Y si se esperaba un tramo que ya tiene su voz (o ya va con la del navegador), sigue.
+  const lineaAntes = useRef(linea)
+  useEffect(() => {
+    const p = player.current
+    const antes = lineaAntes.current
+    lineaAntes.current = linea
+    if (!p) return
+    const i = esperandoRef.current
+    if (antes !== linea) {
+      const f = p.getCurrentFrame()
+      const nuevo = reubicar(antes, linea, f)
+      if (nuevo !== f) p.seekTo(nuevo)
+    }
+    if (i !== null && voz.tramos[i] !== 'pendiente') {
+      esperandoRef.current = null
+      p.play()
+    }
+  }, [linea, voz])
+  const preparandoVoz = esperando !== null && voz.tramos[esperando] === 'pendiente'
   // Sin segundo pedido, se abre en la primera escena ya entrada (en el fotograma 0 todo es negro: el fundido de entrada).
   const primero = verTramo(desde, 0, total)
   const inicial = segundo > 0 ? Math.min(total - 1, Math.round(segundo * FPS)) : primero
@@ -123,7 +175,6 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
     if (conVozRef.current === si) return
     conVozRef.current = si
     setConVoz(si)
-    if (conMagister) return
     if (si) reanudar.current()
     else locutor.current?.parar()
   }
@@ -139,18 +190,19 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
     return () => p.removeEventListener('mutechange', alSilencio)
   }, [])
 
-  // Sin la voz de Magister, el Locutor dice cada tramo al empezar (o al darle a reproducir), desde el trozo que toca
-  // según el fotograma: pausar y seguir no repite el tramo desde el principio.
+  // En los tramos con la voz del navegador (todos, o los que quedaron sin la de Magister al fallar), el Locutor dice
+  // cada tramo al empezar (o al darle a reproducir), desde el trozo que toca según el fotograma: pausar y seguir no
+  // repite el tramo desde el principio.
   const locutor = useRef<Locutor | null>(null)
   useEffect(() => {
     const p = player.current
-    if (!p || conMagister) return
+    if (!p || !hayNavegador) return
     const l = (locutor.current ??= new Locutor())
     let dicho = -1
     const decir = (i: number, frame: number) => {
       dicho = i
       l.nueva()
-      if (!conVozRef.current) return
+      if (!conVozRef.current || vozRef.current.tramos[i] !== 'navegador') return
       const t = linea.tramos[i]
       // El locutor ya pasa cada trozo por `pronunciar`.
       l.decirTodo(t.trozos.slice(trozoEn(t.trozos, frame - t.desde)).map((z) => z.texto))
@@ -189,7 +241,7 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
       reanudar.current = () => undefined
       l.parar()
     }
-  }, [conMagister, desde, linea])
+  }, [hayNavegador, desde, linea])
 
   // Mientras suena, pulsar en la imagen lo pausa; parado, los botones de la escena se pueden tocar. Se mira el clic
   // antes de que llegue a la escena (fase de captura) y solo si cae en la imagen: la barra de controles y el menú de
@@ -295,6 +347,20 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
           showPlaybackRateControl={conMagister ? VELOCIDADES : false}
           style={{ width: '100%', aspectRatio: `${ANCHO} / ${ALTO}`, borderRadius: 14, overflow: 'hidden' }}
         />
+        {preparandoVoz && (
+          <div
+            role="status"
+            style={{
+              position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 10,
+              padding: '6px 12px', borderRadius: 999, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 14,
+            }}
+          >
+            <Pensando texto="Preparando la voz…" />
+            <button type="button" className="boton-mini" onClick={sinEsperar}>
+              Seguir con la del navegador
+            </button>
+          </div>
+        )}
         </div>
         <div className="escena-ajustes">
           <label>
@@ -305,7 +371,7 @@ function Reproductor({ guion, segundo, voz }: { guion: GuionGrafico; segundo: nu
           </label>
           <span className="nota escena-teclas">{AYUDA_TECLAS}.</span>
           <span className="nota">Parado, la escena se puede tocar.</span>
-          {voz.modo === 'navegador' && <span className="nota">{avisoSinMagister(voz.motivo)}</span>}
+          {avisoVoz(voz) && <span className="nota">{avisoVoz(voz)}</span>}
         </div>
       </div>
       <aside className="escena-esqueleto">

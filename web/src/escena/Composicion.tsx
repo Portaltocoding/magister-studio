@@ -16,7 +16,8 @@ export interface PropsComposicion {
   ritmo?: number
   // Con la voz de Magister: cuánto dura cada trozo de cada tramo (s) y su audio. Sin ellas, los tiempos se estiman.
   medidas?: Medidas | null
-  audios?: (string | null)[][] | null
+  // Un tramo a null: aún sin su voz (dura la estimación) o con la del navegador, que va por fuera.
+  audios?: ((string | null)[] | null)[] | null
   // Remotion pide que las props de una composición sean un objeto indexable.
   [clave: string]: unknown
 }
