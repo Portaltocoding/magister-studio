@@ -9,6 +9,7 @@ decidido en el diario delante.
 import json
 import re
 import unicodedata
+from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 
@@ -219,6 +220,42 @@ def con_nivel_detallado(roadmap: dict, numero: int, detalle: NivelDetallado) -> 
     return {**roadmap, "niveles": niveles}
 
 
+def bloques_vacios(nivel: dict) -> list[dict]:
+    """Los bloques del nivel que aún no tienen pasos."""
+    return [b for b in nivel["bloques"] if not b["pasos"]]
+
+
+def por_detallar(nivel: dict) -> bool:
+    """Se puede detallar: el nivel aún no lo está, o le quedan bloques sin pasos (un roadmap rehecho que conservó los
+    pasos de unos bloques y trajo otros nuevos)."""
+    return not nivel.get("detallado") or bool(bloques_vacios(nivel))
+
+
+def con_bloques_rellenos(roadmap: dict, numero: int, detalle: NivelDetallado, ocupados: frozenset[str] = frozenset()) -> dict:
+    """El roadmap con los pasos de `detalle` puestos, en orden, en los bloques vacíos de ese nivel. Los bloques que ya
+    tenían pasos no se tocan (ni sus ids ni sus pasos), y los pasos nuevos llevan ids que no están en uso en el roadmap,
+    ni en lo apuntado, ni en `ocupados` (lo hecho y el diario)."""
+    usados = {*ids_de(roadmap["niveles"]), *(x["id"] for x in roadmap.get("ya_no_estan", [])), *ocupados}
+    niveles = []
+    for n in roadmap["niveles"]:
+        if n["numero"] == numero:
+            nuevos = iter(detalle.bloques)
+            bloques = []
+            for b in n["bloques"]:
+                if not b["pasos"]:
+                    ps, k = [], 0
+                    for p in next(nuevos).pasos:
+                        k += 1
+                        while f"{b['id']}-p{k}" in usados:
+                            k += 1
+                        ps.append({"id": f"{b['id']}-p{k}", **p.model_dump()})
+                    b = {**b, "pasos": ps}
+                bloques.append(b)
+            n = {**n, "detallado": True, "bloques": bloques}
+        niveles.append(n)
+    return {**roadmap, "niveles": niveles}
+
+
 def pasos(roadmap: dict) -> list[dict]:
     return [p for n in roadmap.get("niveles", []) for b in n["bloques"] for p in b["pasos"]]
 
@@ -320,15 +357,25 @@ def conservar(viejo: dict, nuevo: dict, hechos: list[str], hechos_en: dict, usad
         ocupados.add(x)
         return x
 
+    # El roadmap nuevo solo trae detallado el nivel 1. Un bloque que sale sin pasos y es el mismo que uno de antes que
+    # ya detallaste conserva esos pasos con sus ids (y lo hecho en ellos), salvo los que ya heredó un paso nuevo.
+    pasos_de_antes = {b["id"]: b["pasos"] for n in viejo.get("niveles", []) for b in n["bloques"]}
+    heredados = set(heredado.values())
+
     niveles = []
     for n in nuevo.get("niveles", []):
         nid = heredado.get(n["id"]) or nuevo_id("n")
         bloques = []
         for b in n["bloques"]:
             bid = heredado.get(b["id"]) or nuevo_id(f"{nid}-b")
-            bloques.append({**b, "id": bid, "pasos": [{**p, "id": heredado.get(p["id"]) or nuevo_id(f"{bid}-p")}
-                                                      for p in b["pasos"]]})
-        niveles.append({**n, "id": nid, "bloques": bloques})
+            if b["pasos"]:
+                ps = [{**p, "id": heredado.get(p["id"]) or nuevo_id(f"{bid}-p")} for p in b["pasos"]]
+            else:
+                ps = [p for p in pasos_de_antes.get(bid, []) if p["id"] not in heredados]
+            bloques.append({**b, "id": bid, "pasos": ps})
+        # Con pasos conservados el nivel ya está detallado; si además trae bloques nuevos sin pasos, detallarlo
+        # rellena solo esos (`por_detallar`, `con_bloques_rellenos`).
+        niveles.append({**n, "id": nid, "bloques": bloques, "detallado": bool(n.get("detallado")) or any(b["pasos"] for b in bloques)})
     salida = {**nuevo, "niveles": niveles}
     presentes = {p["id"] for p in pasos(salida)}
     salida["conservados"] = sum(1 for x in dict.fromkeys(hechos) if x in presentes)
@@ -375,30 +422,78 @@ def _texto_diario(decisiones: list[dict]) -> str:
     return "\n".join(lineas) or "(sin decisiones apuntadas)"
 
 
+_ENCARGO_TODO = ("Devuelve los bloques del nivel (puedes ajustar sus títulos y su priming si lo hecho o lo decidido lo "
+                 "pide, sin cambiar el objetivo del nivel).")
+
+
+def _encargo(nivel: dict) -> str:
+    """Qué bloques hay que devolver: todos, o solo los que aún no tienen pasos (los demás no se tocan)."""
+    vacios = bloques_vacios(nivel)
+    if len(vacios) == len(nivel["bloques"]):
+        return _ENCARGO_TODO
+    lista = "; ".join(f"«{b['titulo']}»" for b in vacios)
+    return ("Algunos bloques de este nivel ya tienen sus pasos (van en «pasos_que_ya_tiene») y no se tocan. Devuelve "
+            f"solo los bloques que aún no tienen pasos ({len(vacios)}), en este orden y con el mismo título: {lista}. "
+            "Sus pasos parten de lo que ya hay y no repiten ninguno de los que ya están.")
+
+
 def sistema_nivel(roadmap: dict, numero: int, hechos: list[str], decisiones: list[dict], datos: dict) -> str:
-    """El prompt para detallar un nivel (sin llamar al modelo, para poder probarlo)."""
+    """El prompt para detallar un nivel (sin llamar al modelo, para poder probarlo). Si el nivel ya tiene pasos en
+    unos bloques, pide solo los de los bloques vacíos y enseña los que ya hay."""
     nivel = next(n for n in roadmap["niveles"] if n["numero"] == numero)
     hecho = [f"- {p['titulo']}" for p in pasos(roadmap) if p["id"] in hechos] or ["(todavía nada)"]
+    bloques = [{"titulo": b["titulo"], "priming": b["priming"]}
+               | ({"pasos_que_ya_tiene": [p["titulo"] for p in b["pasos"]]} if b["pasos"] else {})
+               for b in nivel["bloques"]]
     resumen_proyecto = {
         "nombre": datos["nombre"], "idea": datos["idea"], "lo_que_sabe": datos.get("sabes"), "ritmo": datos.get("ritmo"),
         "resumen": roadmap["resumen"], "arquitectura": roadmap["arquitectura"],
         "niveles": [{"numero": n["numero"], "titulo": n["titulo"], "objetivo": n["objetivo"]} for n in roadmap["niveles"]],
     }
     return cargar("proyecto_nivel").rellenar(
+        encargo=_encargo(nivel),
         proyecto=json.dumps(resumen_proyecto, ensure_ascii=False, indent=1),
         niveles_anteriores=texto_niveles_anteriores(roadmap, numero, hechos),
         hecho="\n".join(hecho),
         diario=_texto_diario(decisiones),
-        nivel=json.dumps({k: nivel[k] for k in ("numero", "titulo", "objetivo", "priming")}
-                         | {"bloques": [{"titulo": b["titulo"], "priming": b["priming"]} for b in nivel["bloques"]]},
+        nivel=json.dumps({k: nivel[k] for k in ("numero", "titulo", "objetivo", "priming")} | {"bloques": bloques},
                          ensure_ascii=False, indent=1))
 
 
-async def detallar_nivel(roadmap: dict, numero: int, hechos: list[str], decisiones: list[dict], datos: dict) -> dict:
+def reglas_relleno(nivel: dict, numero: int) -> Callable[[NivelDetallado], list[str]]:
+    """Las reglas del detalle de solo los bloques vacíos: uno por bloque vacío, y sin repetir los pasos que ya hay."""
+    vacios = bloques_vacios(nivel)
+    ya = {p["titulo"].strip().lower() for b in nivel["bloques"] for p in b["pasos"]}
+
+    def reglas(x: NivelDetallado) -> list[str]:
+        errores = _con_pasos(x.bloques, f"el nivel {numero}")
+        if len(x.bloques) != len(vacios):
+            errores.append(f"Devuelve exactamente {len(vacios)} bloques, los que aún no tienen pasos y en su orden "
+                           f"(has devuelto {len(x.bloques)}).")
+        repetidos = sorted({p.titulo for b in x.bloques for p in b.pasos if p.titulo.strip().lower() in ya})
+        if repetidos:
+            errores.append(f"Estos pasos ya están en otro bloque del nivel: {', '.join(repetidos)}.")
+        return errores
+
+    return reglas
+
+
+async def detallar_nivel(roadmap: dict, numero: int, hechos: list[str], decisiones: list[dict], datos: dict,
+                         usados: frozenset[str] = frozenset()) -> dict:
+    """Pone los pasos al nivel. Si ya tiene pasos en unos bloques, rellena solo los vacíos (los demás, con sus ids, lo
+    hecho y el diario, no se tocan); si no le queda ninguno vacío, no llama al modelo (un reintento no rehace nada)."""
+    nivel = next(n for n in roadmap["niveles"] if n["numero"] == numero)
+    vacios = bloques_vacios(nivel)
+    if nivel["bloques"] and not vacios:
+        return {**roadmap, "niveles": [{**n, "detallado": True} if n["numero"] == numero else n for n in roadmap["niveles"]]}
     sistema = sistema_nivel(roadmap, numero, hechos, decisiones, datos)
-    d = await estructurar(sistema, "Devuelve los bloques del nivel con sus pasos.", NivelDetallado,
-                          reglas=lambda x: _con_pasos(x.bloques, f"el nivel {numero}"))
-    return con_nivel_detallado(roadmap, numero, d)
+    if len(vacios) == len(nivel["bloques"]):
+        d = await estructurar(sistema, "Devuelve los bloques del nivel con sus pasos.", NivelDetallado,
+                              reglas=lambda x: _con_pasos(x.bloques, f"el nivel {numero}"))
+        return con_nivel_detallado(roadmap, numero, d)
+    d = await estructurar(sistema, "Devuelve solo los bloques sin pasos, con sus pasos.", NivelDetallado,
+                          reglas=reglas_relleno(nivel, numero))
+    return con_bloques_rellenos(roadmap, numero, d, frozenset({*hechos, *usados}))
 
 
 def extraer_svg(texto: str) -> str | None:

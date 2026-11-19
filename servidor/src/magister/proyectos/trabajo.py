@@ -145,8 +145,12 @@ async def detallar(trabajo_id: int, pid: int, numero: int) -> None:
         filas = (await s.scalars(select(Decision).where(Decision.proyecto_id == pid)
                                  .order_by(Decision.id.desc()).limit(15))).all()
         decisiones = [{"titulo": d.titulo, "decision": d.decision, "contexto": d.contexto} for d in reversed(filas)]
+        # Los pasos del diario (también de pasos que ya no están): un paso nuevo nunca hereda uno de esos ids.
+        diario = frozenset((await s.scalars(select(Decision.paso_id).where(
+            Decision.proyecto_id == pid, Decision.paso_id.is_not(None)))).all())
     await cola.fase(trabajo_id, f"nivel {numero}", 1, 1)
-    nuevo = await rm.detallar_nivel(p.roadmap, numero, list(p.hechos or []), decisiones, _datos(p))
+    nuevo = await rm.detallar_nivel(p.roadmap, numero, list(p.hechos or []), decisiones, _datos(p),
+                                    usados=diario | frozenset(p.hechos_en or {}))
     await _guardar(pid, roadmap=nuevo, estado="listo", error=None, trabajo_id=None)
 
 

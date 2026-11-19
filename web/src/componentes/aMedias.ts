@@ -1,6 +1,7 @@
 // «Lo dejaste a medias»: lo que quedó sin acabar fuera de Proyectos (una lección en foco, una respuesta del tutor que se
-// cortó o que espera la tuya, material que terminó mientras no estabas) y dónde retomarlo. Solo con lo que ya hay: el
-// avance del foco en localStorage, las conversaciones y los materiales de la API. Los exámenes no entran.
+// cortó o que espera la tuya, un repaso que dejaste a mitad, material que terminó mientras no estabas) y dónde retomarlo.
+// Solo con lo que ya hay: el avance del foco y la tanda de repaso en localStorage, las conversaciones y los materiales
+// de la API. Los exámenes no entran.
 
 export const MAX_A_MEDIAS = 3
 const DIA = 86_400_000
@@ -40,8 +41,18 @@ export interface MaterialListo {
   tema_id: number
 }
 
+// La tanda de repaso (Practicar → Repaso) que empezaste: cuántas había al empezar y cuántas llevabas al salir.
+export interface PracticaLeida {
+  total: number
+  hechas: number
+  en: number // cuándo se guardó (ms)
+}
+
 export interface Lectura {
   avances: AvanceLeido[]
+  // La tanda de repaso sin acabar y cuántos repasos quedan hoy (sin ninguno pendiente ya no está a medias).
+  practica?: PracticaLeida | null
+  repasosPendientes?: number
   lecciones: LeccionConocida[]
   // Los apuntes de hoy: su «Seguir por la idea N» ya está en la tarjeta de hoy.
   deHoy?: number | null
@@ -109,6 +120,13 @@ export function aMedias(l: Lectura, ahora: number): AMedias[] {
     todos.push({ id: `foco:${a.mid}:${a.i}`, texto, boton: `Seguir por la idea ${a.i + 1}`, destino: { tipo: 'foco', mid: a.mid }, en: a.en ?? 0 })
   }
 
+  // Un repaso a mitad: al menos una respondida (abrir la primera y salir no cuenta) y aún te queda alguno.
+  const p = l.practica
+  if (p && p.hechas > 0 && (l.repasosPendientes ?? 0) > 0 && ahora - p.en <= CADUCA_DIAS * DIA) {
+    const llevabas = p.hechas < p.total ? `: llevabas ${p.hechas} de ${p.total}` : ''
+    todos.push({ id: `practica:${p.en}`, texto: `Dejaste el repaso a medias ${cuando(p.en, ahora)}${llevabas}.`, boton: 'Seguir repasando', destino: { tipo: 'ruta', ruta: '#/repaso' }, en: p.en })
+  }
+
   for (const c of l.conversaciones) {
     const m = c.ultimo
     if (!m) continue
@@ -154,6 +172,27 @@ export function leerAvancesFoco(): AvanceLeido[] {
     /* sin almacenamiento o un avance roto: se enseña lo que se pudo leer */
   }
   return salida
+}
+
+const CLAVE_PRACTICA = 'magister-practica-tanda'
+
+export function leerPractica(): PracticaLeida | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(CLAVE_PRACTICA) ?? 'null')
+    return p && typeof p.hechas === 'number' && typeof p.total === 'number' && typeof p.en === 'number' ? p : null
+  } catch {
+    return null
+  }
+}
+
+// La tanda en curso (con null, acabada: ya no está a medias).
+export function guardarPractica(p: PracticaLeida | null) {
+  try {
+    if (p) localStorage.setItem(CLAVE_PRACTICA, JSON.stringify(p))
+    else localStorage.removeItem(CLAVE_PRACTICA)
+  } catch {
+    /* sin almacenamiento: no se avisa */
+  }
 }
 
 export function leerDescartados(): string[] {

@@ -5,7 +5,7 @@ import Pensando from '../componentes/Pensando.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
 import { celebrar } from '../componentes/animo.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
-import { avisoRehacer, resumenRehecho, type HechoQueYaNoEsta } from './rehacerProyecto.ts'
+import { avisoRehacer, porDetallar, resumenRehecho, type HechoQueYaNoEsta } from './rehacerProyecto.ts'
 import { agruparReferencias, leerIdea, olvidarIdea, tituloDePaso, type Referencia } from './referenciasProyecto.ts'
 
 // Proyectos: le cuentas lo que quieres construir y saca el roadmap de construcción. Arriba, la explicación del
@@ -139,7 +139,7 @@ export function hojaDeRuta(r: Roadmap, hechos: string[], hechosEn: Record<string
   const restoBloque = siguiente ? siguiente.bloque.pasos.filter((x) => !hechosSet.has(x.id) && x.id !== siguiente.paso.id) : []
   const nivelActual = siguiente?.nivel ?? null
   const siguienteNivel = nivelActual ? (r.niveles.find((n) => n.numero === nivelActual.numero + 1) ?? null) : null
-  const sinDetallar = siguiente ? null : (r.niveles.find((n) => !n.detallado) ?? null)
+  const sinDetallar = siguiente ? null : (r.niveles.find(porDetallar) ?? null)
   return { ultimoEn: fechas[0]?.[1] ?? null, ultimos, siguiente, frescos, restoBloque, siguienteNivel, sinDetallar }
 }
 
@@ -181,10 +181,12 @@ function Retomar({ p, ultimaDecision, alDetallar, ocupado }: { p: Proyecto; ulti
         <div className="retomar-ahora">
           <span className="retomar-etq">Ahora toca</span>
           <p>
-            Lo detallado está hecho. El siguiente nivel, «{tituloNivel(h.sinDetallar)}», aún está esbozado.
+            {h.sinDetallar.detallado
+              ? `Lo detallado está hecho. El nivel «${tituloNivel(h.sinDetallar)}» tiene bloques nuevos aún sin pasos.`
+              : `Lo detallado está hecho. El siguiente nivel, «${tituloNivel(h.sinDetallar)}», aún está esbozado.`}
           </p>
           <button className="boton boton-principal" disabled={ocupado} onClick={() => alDetallar(h.sinDetallar!.numero)}>
-            Detallar el nivel {h.sinDetallar.numero}
+            {h.sinDetallar.detallado ? `Detallar los bloques nuevos del nivel ${h.sinDetallar.numero}` : `Detallar el nivel ${h.sinDetallar.numero}`}
           </button>
         </div>
       ) : (
@@ -743,12 +745,16 @@ function NivelVista({ n, hechos, proyecto, alMarcar, alDetallar, ocupado }: {
           )}
         </div>
       ))}
-      {!n.detallado && (
+      {porDetallar(n) && (
         <div className="proyecto-detallar">
-          <p className="nota">Este nivel está esbozado. Sus pasos se preparan cuando llegues, con lo que hayas hecho y decidido hasta entonces.</p>
+          <p className="nota">
+            {n.detallado
+              ? 'Hay bloques nuevos sin pasos. Detallarlos prepara solo esos; los pasos que ya tienes, y lo hecho en ellos, no se tocan.'
+              : 'Este nivel está esbozado. Sus pasos se preparan cuando llegues, con lo que hayas hecho y decidido hasta entonces.'}
+          </p>
           <BarraCuota accion={{ accion: 'nivel' }} />
           <button className="boton" onClick={alDetallar} disabled={ocupado}>
-            Detallar este nivel
+            {n.detallado ? 'Detallar los bloques nuevos' : 'Detallar este nivel'}
           </button>
         </div>
       )}

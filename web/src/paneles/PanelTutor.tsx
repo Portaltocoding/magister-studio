@@ -36,6 +36,7 @@ import {
   fotoAlLlegar,
   leerAvancesFoco,
   leerDescartados,
+  leerPractica,
   nuevosListos,
   type AMedias,
   type MaterialListo,
@@ -1431,6 +1432,8 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
   const avisosAMedias = aMedias(
     {
       avances: leerAvancesFoco(),
+      practica: leerPractica(),
+      repasosPendientes: hoy.repasos,
       lecciones: otras,
       deHoy: hoy.estado !== 'sin_preparar' && hoy.estado !== 'solo_repaso' ? hoy.material_id : null,
       conversaciones: ultimasConversaciones,

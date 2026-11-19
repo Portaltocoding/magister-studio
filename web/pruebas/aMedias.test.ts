@@ -1,7 +1,7 @@
 // «Lo dejaste a medias» en Hoy: qué sale, en qué orden y qué no.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { aMedias, cuando, fotoAlLlegar, leerAvancesFoco, nuevosListos, type Lectura } from '../src/componentes/aMedias.ts'
+import { aMedias, cuando, fotoAlLlegar, guardarPractica, leerAvancesFoco, leerPractica, nuevosListos, type Lectura } from '../src/componentes/aMedias.ts'
 
 const AHORA = new Date(2026, 10, 19, 10, 0).getTime()
 const AYER = new Date(2026, 10, 18, 21, 30).getTime()
@@ -74,6 +74,29 @@ test('el material que terminó va delante, luego lo más reciente, y como mucho 
   assert.deepEqual(r[0].destino, { tipo: 'ruta', ruta: '#/fichas/1/L6' })
 })
 
+test('un repaso que dejaste a mitad lleva a seguir repasando', () => {
+  const [a] = aMedias({ ...vacia, practica: { total: 8, hechas: 3, en: AYER }, repasosPendientes: 5 }, AHORA)
+  assert.equal(a.texto, 'Dejaste el repaso a medias ayer: llevabas 3 de 8.')
+  assert.equal(a.boton, 'Seguir repasando')
+  assert.deepEqual(a.destino, { tipo: 'ruta', ruta: '#/repaso' })
+  // Si te salieron más de las que había al empezar (las que fallas vuelven), no se dice la cuenta.
+  const [b] = aMedias({ ...vacia, practica: { total: 2, hechas: 3, en: AYER }, repasosPendientes: 1 }, AHORA)
+  assert.equal(b.texto, 'Dejaste el repaso a medias ayer.')
+})
+
+test('el repaso no sale si no respondiste ninguna, si ya no queda nada, si es viejo o si lo descartaste', () => {
+  const practica = { total: 8, hechas: 3, en: AYER }
+  assert.deepEqual(aMedias({ ...vacia, practica: { ...practica, hechas: 0 }, repasosPendientes: 8 }, AHORA), [])
+  assert.deepEqual(aMedias({ ...vacia, practica, repasosPendientes: 0 }, AHORA), [])
+  assert.deepEqual(aMedias({ ...vacia, practica }, AHORA), [])
+  assert.deepEqual(aMedias({ ...vacia, practica: { ...practica, en: AHORA - 30 * 24 * HORA }, repasosPendientes: 5 }, AHORA), [])
+  assert.deepEqual(aMedias({ ...vacia, practica, repasosPendientes: 5, descartados: [`practica:${AYER}`] }, AHORA), [])
+})
+
+test('nunca sale un examen, aunque el material de un examen esté listo', () => {
+  assert.deepEqual(aMedias({ ...vacia, listosNuevos: [{ id: 70, tipo: 'examen', clave: 'L4', tema_id: 1 }] }, AHORA), [])
+})
+
 test('lo descartado no vuelve; si avanzas y lo dejas en otra idea, sí', () => {
   const l = { ...vacia, avances: [{ mid: 12, i: 2, en: AYER }], descartados: ['foco:12:2'] }
   assert.deepEqual(aMedias(l, AHORA), [])
@@ -95,4 +118,6 @@ test('cuándo: hoy, ayer o hace unos días', () => {
 test('sin almacenamiento no revienta', () => {
   assert.deepEqual(leerAvancesFoco(), [])
   assert.equal(fotoAlLlegar(['apuntes:5']), null)
+  guardarPractica({ total: 1, hechas: 1, en: AHORA })
+  assert.equal(leerPractica(), null)
 })

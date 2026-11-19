@@ -120,7 +120,7 @@ async def test_un_proyecto_de_punta_a_punta_por_la_api(cliente, monkeypatch) -> 
         assert datos["nombre"] == "Copiloto" and referencias == []
         return rm.montar(_roadmap(2))
 
-    async def nivel_falso(mapa, numero, hechos, decisiones, datos):
+    async def nivel_falso(mapa, numero, hechos, decisiones, datos, usados=frozenset()):
         assert hechos == ["n1-b1-p1"] and decisiones[0]["titulo"] == "Usar boto3"
         return rm.con_nivel_detallado(mapa, numero, rm.NivelDetallado(bloques=[rm.BloqueGen(titulo="Plan", priming="…", pasos=[_paso("a"), _paso("b")])]))
 
@@ -247,6 +247,37 @@ def test_conservar_hereda_ids_y_apunta_lo_hecho_que_ya_no_esta() -> None:
     assert m2["niveles"][1]["numero"] == 2  # la pantalla va por número: el id solo es para lo hecho
 
 
+def _detallar_n2(m: dict, *titulos: str) -> dict:
+    return rm.con_nivel_detallado(m, 2, rm.NivelDetallado(bloques=[rm.BloqueGen(titulo="Plan", priming="…", pasos=[_paso(t) for t in titulos])]))
+
+
+def test_rehacer_conserva_lo_hecho_de_un_nivel_que_detallaste() -> None:
+    """El roadmap nuevo trae el nivel 2 sin pasos: el bloque que sigue siendo el mismo se queda con los suyos."""
+    viejo = _detallar_n2(_con_pasos(_IAM, _CLI), "Escribir el plan", "Aprobar el plan")
+    hechos = ["n1-b1-p1", "n2-b1-p1"]
+    m = rm.conservar(viejo, _con_pasos(_IAM, _CLI), hechos, {"n2-b1-p1": "2026-11-03T10:00:00+00:00"})
+    n2 = m["niveles"][1]
+    assert n2["detallado"] and [p["id"] for p in n2["bloques"][0]["pasos"]] == ["n2-b1-p1", "n2-b1-p2"]
+    assert m["conservados"] == 2 and m["ya_no_estan"] == []
+    # Si el nuevo sí lo trae detallado, se empareja paso a paso, como en el nivel 1.
+    m = rm.conservar(viejo, _detallar_n2(_con_pasos(_IAM, _CLI), "Revisar el plan", "escribir el plan."), hechos, {})
+    assert _titulos(m)["n2-b1-p1"] == "escribir el plan." and m["conservados"] == 2
+    # Si el bloque ya no es el mismo, lo hecho en él se apunta aparte y el nivel queda por detallar.
+    otro = _con_pasos(_IAM, _CLI)
+    otro["niveles"][1]["bloques"][0]["titulo"] = "Nada que ver"
+    m = rm.conservar(viejo, otro, hechos, {})
+    assert not m["niveles"][1]["detallado"] and m["niveles"][1]["bloques"][0]["pasos"] == []
+    assert [x["id"] for x in m["ya_no_estan"]] == ["n2-b1-p1"] and m["conservados"] == 1
+
+
+def test_un_paso_que_el_roadmap_nuevo_sube_de_nivel_no_sale_dos_veces() -> None:
+    viejo = _detallar_n2(_con_pasos(_IAM, _CLI), "Escribir el plan", "Aprobar el plan")
+    nuevo = _con_pasos(_IAM, _CLI, ("Escribir el plan", "Crea un usuario IAM con permisos de solo lectura."))
+    m = rm.conservar(viejo, nuevo, ["n2-b1-p1"], {})
+    ids = [p["id"] for p in rm.pasos(m)]
+    assert ids.count("n2-b1-p1") == 1 and [p["id"] for p in m["niveles"][1]["bloques"][0]["pasos"]] == ["n2-b1-p2"]
+
+
 async def test_rehacer_por_la_api_conserva_lo_hecho_avisa_y_se_puede_volver(cliente, monkeypatch) -> None:
     from magister.proyectos import trabajo
 
@@ -299,3 +330,128 @@ async def test_rehacer_por_la_api_conserva_lo_hecho_avisa_y_se_puede_volver(clie
     assert list(_titulos(p["roadmap"]).values())[0] == "Leer los costes del mes" and p["anterior"] is True
     sin = (await cliente.post("/api/proyectos", json={"nombre": "Otro", "idea": "Otro proyecto sin roadmap aún.", "investigar": False})).json()["id"]
     assert (await cliente.post(f"/api/proyectos/{sin}/volver")).status_code == 409
+
+
+# --- Detallar solo los bloques vacíos ---------------------------------------------------------------------------------
+
+_DESPLEGAR = rm.BloqueGen(titulo="Desplegar el agente", priming="Llevarlo a la nube cuando el plan ya se aprueba.")
+
+
+def _rehecho_con_bloque_nuevo() -> tuple[dict, list[str]]:
+    """Un nivel 2 que detallaste y rehiciste: el roadmap nuevo trae su bloque de antes y uno nuevo sin pareja."""
+    viejo = _detallar_n2(_con_pasos(_IAM, _CLI), "Escribir el plan", "Aprobar el plan")
+    r = _roadmap(2)
+    r.niveles[0].bloques[0].pasos = [_paso(_IAM[0]), _paso(_CLI[0])]
+    r.niveles[1].bloques.append(_DESPLEGAR)
+    hechos = ["n2-b1-p1"]
+    return rm.conservar(viejo, rm.montar(r), hechos, {"n2-b1-p1": "2026-11-03T10:00:00+00:00"}), hechos
+
+
+def test_un_nivel_con_un_bloque_nuevo_sin_pasos_se_puede_detallar() -> None:
+    m, _ = _rehecho_con_bloque_nuevo()
+    n2 = m["niveles"][1]
+    assert n2["detallado"] and [len(b["pasos"]) for b in n2["bloques"]] == [2, 0]
+    assert rm.por_detallar(n2) and [b["titulo"] for b in rm.bloques_vacios(n2)] == ["Desplegar el agente"]
+    assert not rm.por_detallar(m["niveles"][0])
+    assert rm.por_detallar(rm.montar(_roadmap(2))["niveles"][1])  # esbozado del todo: como siempre
+
+
+def test_rellenar_los_bloques_vacios_no_toca_los_que_tienen_pasos() -> None:
+    m, _ = _rehecho_con_bloque_nuevo()
+    plan, desplegar = m["niveles"][1]["bloques"]
+    # El id que le tocaría al primer paso nuevo ya lo usa el diario: no se reparte.
+    ocupado = f"{desplegar['id']}-p1"
+    detalle = rm.NivelDetallado(bloques=[rm.BloqueGen(titulo="Desplegar el agente", priming="…", pasos=[_paso("Subir la imagen"), _paso("Lanzar el servicio")])])
+    nuevo = rm.con_bloques_rellenos(m, 2, detalle, frozenset({ocupado}))
+    n2 = nuevo["niveles"][1]
+    assert n2["bloques"][0] == plan  # mismos ids, títulos y pasos
+    assert n2["bloques"][1]["id"] == desplegar["id"] and n2["bloques"][1]["titulo"] == desplegar["titulo"]
+    assert [p["id"] for p in n2["bloques"][1]["pasos"]] == [f"{desplegar['id']}-p2", f"{desplegar['id']}-p3"]
+    assert [p["titulo"] for p in n2["bloques"][1]["pasos"]] == ["Subir la imagen", "Lanzar el servicio"]
+    assert n2["detallado"] and not rm.por_detallar(n2)
+    assert nuevo["niveles"][0] == m["niveles"][0] and nuevo["ya_no_estan"] == m["ya_no_estan"]
+    assert len(set(p["id"] for p in rm.pasos(nuevo))) == len(rm.pasos(nuevo))
+
+
+def test_el_prompt_pide_solo_los_bloques_vacios_y_ensena_los_pasos_que_ya_hay() -> None:
+    datos = {"nombre": "Copiloto", "idea": "Un agente."}
+    m, hechos = _rehecho_con_bloque_nuevo()
+    sistema = rm.sistema_nivel(m, 2, hechos, [], datos)
+    assert "Devuelve solo los bloques que aún no tienen pasos (1), en este orden y con el mismo título: «Desplegar el agente»." in sistema
+    nivel = sistema.split("<nivel_a_detallar>")[1]
+    assert '"pasos_que_ya_tiene": [\n    "Escribir el plan",\n    "Aprobar el plan"\n   ]' in nivel
+    # Un nivel esbozado del todo se pide entero, como siempre.
+    entero = rm.sistema_nivel(rm.montar(_roadmap(2)), 2, [], [], datos)
+    assert rm._ENCARGO_TODO in entero and "pasos_que_ya_tiene" not in entero
+    # Las reglas: un bloque por cada vacío y sin repetir los pasos que ya están.
+    reglas = rm.reglas_relleno(m["niveles"][1], 2)
+    bien = rm.NivelDetallado(bloques=[rm.BloqueGen(titulo="Desplegar el agente", priming="…", pasos=[_paso("Subir la imagen"), _paso("Lanzar el servicio")])])
+    assert reglas(bien) == []
+    de_mas = rm.NivelDetallado(bloques=[*bien.bloques, *bien.bloques])
+    assert any("exactamente 1 bloques" in e for e in reglas(de_mas))
+    repite = rm.NivelDetallado(bloques=[rm.BloqueGen(titulo="Desplegar el agente", priming="…", pasos=[_paso("Escribir el plan"), _paso("Lanzar el servicio")])])
+    assert any("ya están en otro bloque" in e and "Escribir el plan" in e for e in reglas(repite))
+
+
+async def test_detallar_nivel_rellena_solo_los_vacios_y_sin_vacios_no_llama_al_modelo(monkeypatch) -> None:
+    m, hechos = _rehecho_con_bloque_nuevo()
+    llamadas = []
+
+    async def estructurar_falso(sistema, entrada, Modelo, reglas=None, **_):
+        llamadas.append(entrada)
+        d = Modelo(bloques=[rm.BloqueGen(titulo="Desplegar el agente", priming="…", pasos=[_paso("Subir la imagen"), _paso("Lanzar el servicio")])])
+        assert reglas(d) == []
+        return d
+
+    monkeypatch.setattr(rm, "estructurar", estructurar_falso)
+    datos = {"nombre": "Copiloto", "idea": "Un agente."}
+    nuevo = await rm.detallar_nivel(m, 2, hechos, [], datos)
+    assert llamadas == ["Devuelve solo los bloques sin pasos, con sus pasos."]
+    assert nuevo["niveles"][1]["bloques"][0] == m["niveles"][1]["bloques"][0]
+    assert len(nuevo["niveles"][1]["bloques"][1]["pasos"]) == 2
+    # Un reintento del trabajo encuentra el nivel completo: no rehace nada ni llama al modelo.
+    assert await rm.detallar_nivel(nuevo, 2, hechos, [], datos) == nuevo and len(llamadas) == 1
+
+
+async def test_detallar_por_la_api_un_nivel_con_un_bloque_nuevo(cliente, monkeypatch) -> None:
+    from magister.proyectos import trabajo
+
+    r = _roadmap(2)
+    r.niveles[1].bloques[0].pasos = [_paso("Escribir el plan"), _paso("Aprobar el plan")]
+    r.niveles[1].bloques.append(_DESPLEGAR)
+    mapa = rm.montar(r)
+    assert mapa["niveles"][1]["detallado"]
+
+    async def roadmap_falso(datos, referencias):
+        return mapa
+
+    async def sin_dibujo(datos, mapa):
+        return None
+
+    async def fase(*a):
+        return None
+
+    async def estructurar_falso(sistema, entrada, Modelo, reglas=None, **_):
+        return Modelo(bloques=[rm.BloqueGen(titulo="Desplegar el agente", priming="…", pasos=[_paso("Subir la imagen"), _paso("Lanzar el servicio")])])
+
+    monkeypatch.setattr(rm, "generar_roadmap", roadmap_falso)
+    monkeypatch.setattr(rm, "dibujar_arquitectura", sin_dibujo)
+    monkeypatch.setattr(rm, "estructurar", estructurar_falso)
+    monkeypatch.setattr(trabajo.cola, "fase", fase)
+
+    pid = (await cliente.post("/api/proyectos", json={"nombre": "Copiloto", "idea": "Un agente que opera mi cuenta de AWS.", "investigar": False})).json()["id"]
+    await trabajo.ejecutar(0, "proyecto_roadmap", {"proyecto_id": pid, "investigar": False})
+    await cliente.put(f"/api/proyectos/{pid}/pasos/n2-b1-p1", json={"hecho": True})
+    antes = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    assert antes["progreso"]["nivel"] == 1
+    # El nivel 1, completo: 409 como siempre. El 2 tiene un bloque sin pasos: se puede detallar.
+    assert (await cliente.post(f"/api/proyectos/{pid}/niveles/1/detallar")).status_code == 409
+    assert (await cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar")).status_code == 200
+    await trabajo.ejecutar(0, "proyecto_nivel", {"proyecto_id": pid, "numero": 2})
+    p = (await cliente.get(f"/api/proyectos/{pid}")).json()
+    n2 = p["roadmap"]["niveles"][1]
+    assert n2["bloques"][0] == antes["roadmap"]["niveles"][1]["bloques"][0]
+    assert [x["id"] for x in n2["bloques"][1]["pasos"]] == ["n2-b2-p1", "n2-b2-p2"]
+    assert p["hechos"] == ["n2-b1-p1"] and list(p["hechos_en"]) == ["n2-b1-p1"]
+    r = await cliente.post(f"/api/proyectos/{pid}/niveles/2/detallar")
+    assert r.status_code == 409 and r.json()["detail"] == "ese nivel ya tiene sus pasos"

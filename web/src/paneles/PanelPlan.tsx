@@ -569,7 +569,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                         {idea}{' '}
                         <button
                           className="boton-mini"
-                          title="Abre Proyectos con la idea copiada, para pegarla al crearlo"
+                          title="Abre un proyecto nuevo con esta idea ya escrita: solo te falta ponerle nombre"
                           onClick={async () => {
                             try {
                               sessionStorage.setItem('magister-idea-proyecto', idea) // PanelProyectos rellena con ella el proyecto nuevo

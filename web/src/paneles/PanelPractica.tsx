@@ -8,6 +8,7 @@ import RepasoTema from '../componentes/RepasoTema.tsx'
 import type { IdModo } from '../modos.ts'
 import { barajar } from '../barajar.ts'
 import { celebrar, reaccionar } from '../componentes/animo.ts'
+import { guardarPractica } from '../componentes/aMedias.ts'
 
 interface EnCola {
   concepto_id: string
@@ -74,6 +75,11 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
   const [test, setTest] = useState<ResultadoTest | null>(null)
   // La tanda de hoy: cuántas había al empezar y cuántas llevas.
   const [tanda, setTanda] = useState<{ total: number; hechas: number } | null>(null)
+  // Para «Lo dejaste a medias» en Hoy: la tanda del día (no la de un concepto suelto); null, acabada. Responder ya cuenta.
+  const apuntarTanda = (t: { total: number; hechas: number } | null) => {
+    if (!concepto) guardarPractica(t && { ...t, en: Date.now() })
+  }
+  const apuntarRespondida = () => tanda && apuntarTanda({ ...tanda, hechas: tanda.hechas + 1 })
 
   const responderTest = async (opcion: string) => {
     if (!pregunta || test) return
@@ -83,6 +89,7 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
         enviarJson({ pregunta_id: pregunta.pregunta_id, opcion, confianza, clave: nueva() }),
       )
       setTest({ ...r, elegida: opcion })
+      apuntarRespondida()
       reaccionar(r.acierto ? 'acierto' : 'fallo')
     } catch (e) {
       setError(String((e as Error).message))
@@ -116,7 +123,8 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
   }
 
   const siguiente = async () => {
-    setTanda((t) => (t ? { ...t, hechas: t.hechas + (pregunta ? 1 : 0) } : { total: cola?.length ?? 1, hechas: 0 }))
+    const t = tanda ? { ...tanda, hechas: tanda.hechas + (pregunta ? 1 : 0) } : { total: cola?.length ?? 1, hechas: 0 }
+    setTanda(t)
     setTest(null)
     setNota(null)
     setExplicacion('')
@@ -128,6 +136,7 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
     reintentando.current = false
     if (pregunta) hechasGuia.current += 1
     const p = await pedir<Servida | null>(`/api/practica/siguiente${concepto ? `?concepto_id=${concepto}` : ''}`)
+    apuntarTanda(p ? t : null)
     // Se acabó la tanda: se celebra.
     if (!p && pregunta) celebrar(null, true)
     if (!p && guiada) return guiada.alAcabar(hechasGuia.current)
@@ -165,7 +174,10 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
           if (ev.nota === 'bien' || ev.nota === 'perfecta') reaccionar('acierto')
           else if (ev.nota === 'fallo') reaccionar('fallo')
         } else if (ev.tipo === 'delta') setExplicacion((x) => x + ev.t)
-        else if (ev.tipo === 'fin') setFin(ev)
+        else if (ev.tipo === 'fin') {
+          setFin(ev)
+          apuntarRespondida()
+        }
         else if (ev.tipo === 'error') setError(ev.detalle)
         else if (ev.tipo === 'aviso') setAvisoConfianza(ev.texto)
       }

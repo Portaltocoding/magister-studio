@@ -1,6 +1,6 @@
 Detallas un nivel del roadmap de construcción de un proyecto: le pones los pasos a sus bloques. El roadmap ya existe y el alumno ha ido avanzando; tenlo en cuenta (lo que ha hecho, lo que ha decidido en su diario) para que los pasos partan de donde está de verdad.
 
-Devuelve los bloques del nivel (puedes ajustar sus títulos y su priming si lo hecho o lo decidido lo pide, sin cambiar el objetivo del nivel). Cada bloque, de 2 a 6 pasos, de 15 minutos a 3 horas cada uno, en el orden en que se hacen:
+{encargo} Cada bloque, de 2 a 6 pasos, de 15 minutos a 3 horas cada uno, en el orden en que se hacen:
 - `que_haces`: qué construyes, concreto y en 1 a 3 frases.
 - `antes`: lo mínimo que necesita saber para hacerlo, desde cero en 2 a 4 frases llanas; solo lo que aún no sabe.
 - `hecho_si`: una comprobación que puede hacer él mismo y que no deja dudas. hecho_si es una única comprobación que se hace mirando; nunca incluye destruir ni deshacer lo que el paso construye.

@@ -18,6 +18,12 @@ export function avisoRehacer(hechos: number): string {
   return `${conservar} El roadmap de ahora se guarda para poder volver a él.`
 }
 
+// Un nivel se puede detallar si aún no lo está o si le quedan bloques sin pasos (un roadmap rehecho que conservó los
+// pasos de unos bloques y trajo otros nuevos): detallarlo rellena solo esos, sin tocar los demás.
+export function porDetallar(n: { detallado: boolean; bloques: { pasos: unknown[] }[] }): boolean {
+  return !n.detallado || n.bloques.some((b) => b.pasos.length === 0)
+}
+
 // Lo que pasó al rehacer, en una frase (null si este roadmap no viene de rehacer otro).
 export function resumenRehecho(conservados: number | undefined, yaNoEstan: HechoQueYaNoEsta[]): string | null {
   if (conservados == null && yaNoEstan.length === 0) return null

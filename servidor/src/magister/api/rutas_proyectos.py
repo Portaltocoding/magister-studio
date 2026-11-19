@@ -7,7 +7,7 @@ from sqlalchemy import delete, select, update
 from magister.datos.material import Trabajo
 from magister.datos.proyectos import Decision, Proyecto
 from magister.datos.sesion import nueva_sesion
-from magister.proyectos.roadmap import apuntar_perdidos, pasos
+from magister.proyectos.roadmap import apuntar_perdidos, pasos, por_detallar
 from magister.trabajos import cola
 
 rutas = APIRouter(prefix="/api")
@@ -26,9 +26,9 @@ def _progreso(p: Proyecto) -> dict:
     todos = pasos(p.roadmap or {})
     hechos = set(p.hechos or [])
     niveles = (p.roadmap or {}).get("niveles", [])
-    # El nivel en el que estás: el primero con pasos sin hacer (o sin detallar).
+    # El nivel en el que estás: el primero con pasos sin hacer (o por detallar, aunque sea un bloque).
     actual = next((n["numero"] for n in niveles
-                   if not n.get("detallado") or any(x["id"] not in hechos for b in n["bloques"] for x in b["pasos"])),
+                   if por_detallar(n) or any(x["id"] not in hechos for b in n["bloques"] for x in b["pasos"])),
                   len(niveles) or None)
     return {"pasos": len(todos), "hechos": sum(1 for x in todos if x["id"] in hechos), "nivel": actual, "niveles": len(niveles)}
 
@@ -228,8 +228,9 @@ async def detallar(pid: int, numero: int) -> dict:
         raise HTTPException(404, "ese nivel no existe")
     if p.estado == "generando":
         raise HTTPException(409, "ya se está generando algo de este proyecto")
-    # Volver a detallarlo machacaría sus pasos con otros y lo marcado como hecho dejaría de cuadrar.
-    if nivel.get("detallado"):
+    # Volver a detallarlo machacaría sus pasos con otros y lo marcado como hecho dejaría de cuadrar. Si le quedan
+    # bloques sin pasos (un roadmap rehecho que trajo uno nuevo), se rellenan solo esos.
+    if not por_detallar(nivel):
         raise HTTPException(409, "ese nivel ya tiene sus pasos")
     await _encolar(pid, "proyecto_nivel", {"numero": numero, "vez": await _siguiente_vez(pid)})
     return _salida(await _proyecto(pid))
