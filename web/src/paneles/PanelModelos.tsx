@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { pedir } from '../api.ts'
+import { TextoError } from '../componentes/Cargando.tsx'
 import './modelos.css'
 
 interface Calidad {
@@ -111,7 +112,7 @@ export default function PanelModelos() {
         Qué modelo hace cada tarea y cuánto cuesta, con los datos de tus últimos {dias} días. El coste es el
         equivalente en API: con la suscripción no pagas por llamada.
       </p>
-      {error && <p className="aviso-dudosa">{error}</p>}
+      {error && <TextoError texto={error} antes="No se pudo cargar el mapa. " className="aviso-dudosa" />}
       {!mapa && !error && <p className="vacio">Cargando…</p>}
       {mapa && (
         <>

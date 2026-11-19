@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { reglasDeEstilo } from './bloquesDiagrama.ts'
 
 // Un diagrama SVG del tutor que se dibuja solo, trazo a trazo (como Vivus o Manim): primero las líneas,
 // luego los rellenos y por último los textos. Sin caja de fondo: los colores se adaptan al tema.
@@ -30,10 +31,31 @@ function recolorear(valor: string | null): string | null {
   return 'var(--dg-relleno)'
 }
 
+// Los estilos del <style> pasan a atributos de cada elemento, para limpiarlos y recolorearlos como los demás; el
+// atributo propio manda y las reglas de clase pesan más que las de tipo. Luego se quitan el <style> y las clases.
+function estilosEnLinea(raiz: Element) {
+  const estilos = Array.from(raiz.querySelectorAll('style'))
+  if (!estilos.length) return
+  const reglas = reglasDeEstilo(estilos.map((s) => s.textContent ?? '').join('\n'))
+  reglas.sort((a, b) => Number(Boolean(a.clase)) - Number(Boolean(b.clase)))
+  for (const s of estilos) s.remove()
+  for (const el of Array.from(raiz.querySelectorAll('*'))) {
+    const clases = (el.getAttribute('class') ?? '').split(/\s+/)
+    const puestas = new Map<string, string>()
+    for (const r of reglas) {
+      if ((r.tipo && r.tipo !== el.nodeName) || (r.clase && !clases.includes(r.clase))) continue
+      for (const [nombre, valor] of r.propiedades) puestas.set(nombre, valor)
+    }
+    for (const [nombre, valor] of puestas) if (ATRIBUTOS.has(nombre) && !el.hasAttribute(nombre)) el.setAttribute(nombre, valor)
+    el.removeAttribute('class')
+  }
+}
+
 function limpiar(svg: string): string | null {
   const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
   const raiz = doc.documentElement
   if (raiz.nodeName !== 'svg' || doc.querySelector('parsererror')) return null
+  estilosEnLinea(raiz)
   const recorrer = (el: Element) => {
     for (const hijo of Array.from(el.children)) {
       if (!ETIQUETAS.has(hijo.nodeName)) {

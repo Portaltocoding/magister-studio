@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from '../componentes/Markdown.tsx'
 import { enviarJson, flujo, pedir } from '../api.ts'
 import Vacio from '../componentes/Vacio.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import MarcoFoco from '../componentes/MarcoFoco.tsx'
 import RepasoTema from '../componentes/RepasoTema.tsx'
 import type { IdModo } from '../modos.ts'
@@ -374,7 +374,7 @@ export default function PanelPractica({ concepto, irA, guiada }: { concepto?: st
           )}
           </>
           )}
-          {error && <p role="alert">{error}</p>}
+          {error && <TextoError texto={error} />}
         </section>
         </MarcoFoco>
       )}

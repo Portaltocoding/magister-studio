@@ -17,7 +17,8 @@ import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Colores from '../componentes/Colores.tsx'
 import { acentoDe, usarColores, variables } from '../componentes/colores.ts'
 import Pensando from '../componentes/Pensando.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
+import { errorLegible } from '../componentes/errores.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
 
 // Lo que sale si no eliges nada: lo de casi siempre.
@@ -473,7 +474,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
           </header>
         )}
 
-        {error && <p role="alert">{error}</p>}
+        {error && <TextoError texto={error} />}
         {falloMaterial && <Cargando error={falloMaterial} reintentar={cargar} />}
         {aviso && (
           <p className="nota" role="status">
@@ -500,7 +501,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         {trabajo && (enCurso || trabajo.estado === 'fallido') && (
           <div className="progreso" role="status">
             {trabajo.estado === 'fallido' ? (
-              <p>Falló: {trabajo.error}</p>
+              <TextoError texto={trabajo.error} antes="No se ha podido preparar. " rol="status" />
             ) : (
               <Pensando
                 texto={`${NODOS[trabajo.nodo ?? ''] ?? trabajo.nodo ?? 'En cola'}${trabajo.total > 1 ? ` · bloque ${trabajo.paso + 1} de ${trabajo.total}` : ''}`}
@@ -555,7 +556,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                             )
                             setTextos((x) => ({ ...x, apuntes: r.texto }))
                           } catch (e) {
-                            alert(`No se pudo rehacer: ${(e as Error).message}`)
+                            alert(`No se pudo rehacer. ${errorLegible(mensajeDe(e)).mensaje}`)
                           }
                         },
                       }

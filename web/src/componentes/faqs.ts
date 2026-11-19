@@ -212,3 +212,42 @@ export function faqsDe(seccion: string): Faq[] {
   const generales = FAQS.filter((f) => f.secciones.includes('*') && !propias.includes(f))
   return [...propias, ...generales]
 }
+
+// ===== Lo que el chat vacío te sugiere =====
+
+const EXPLICAME = 'Explícame esta pantalla'
+// En un proyecto abierto, el asesor puede cambiarlo: las sugerencias lo enseñan pidiéndole un cambio de verdad.
+export const SUGERENCIAS_PROYECTO = [EXPLICAME, '¿Qué pasos le faltan a este roadmap?', 'Reorganiza este nivel para que tenga más sentido']
+
+// Las tres sugerencias del chat vacío. `seccion` es la clave de la ruta ('repaso', 'proyectos/12'…).
+export function sugerenciasDe(seccion: string, enProyecto: boolean): string[] {
+  if (enProyecto) return [...SUGERENCIAS_PROYECTO]
+  const otras = faqsDe(seccion.split('/')[0]).map((f) => f.pregunta)
+  return [...new Set([EXPLICAME, ...otras])].slice(0, 3)
+}
+
+// ===== ¿Ha ofrecido un cambio sin prepararlo? =====
+
+// El asesor ofrece un cambio en una pregunta final («¿Lo añado al nivel 1?», «¿Quieres que lo guarde en tus notas?»).
+// Si la reconocemos, bajo la respuesta salen «Sí, prepáralo» y «No, déjalo». Conservadora: ante la duda, no.
+const YO = 'añado|agrego|meto|pongo|incluyo|muevo|cambio|quito|borro|elimino|ordeno|reordeno|reorganizo|renombro|apunto|anoto|guardo|marco|parto|divido|separo|junto|preparo|hago'
+const QUE = 'añada|agregue|meta|ponga|incluya|mueva|cambie|quite|borre|elimine|ordene|reordene|reorganice|renombre|apunte|anote|guarde|marque|parta|divida|separe|junte|prepare|haga'
+// Sin pronombre, solo los verbos que no pueden ser otra cosa («¿Cambio de nivel?» no es una oferta).
+const SOLOS = 'añado|agrego|muevo|quito|reordeno|reorganizo|renombro|apunto|anoto|guardo|preparo|divido'
+const PRONOMBRE = '(?:(?:te|le)\\s+)?(?:lo|la|los|las)\\s+|(?:te|le)\\s+'
+const OFRECE = new RegExp(`^¿\\s*(?:(?:${PRONOMBRE})(?:${YO})|quieres\\s+que\\s+(?:${PRONOMBRE})?(?:${QUE})|(?:${SOLOS}))(?=[\\s,?])`, 'iu')
+
+export function ofreceCambio(texto: string): boolean {
+  // Si trae el bloque `cambio`, ya lo está preparando: no hay nada que confirmar.
+  if (texto.includes('```cambio')) return false
+  const t = texto.replace(/```acciones[\s\S]*?(```|$)/g, '').replace(/[\s*_]+$/, '')
+  if (!t.endsWith('?')) return false
+  const i = t.lastIndexOf('¿')
+  if (i < 0) return false
+  const pregunta = t.slice(i)
+  // Una sola pregunta, sin alternativas («¿Lo añado al nivel 1 o al 2?» no se contesta con un sí).
+  if (pregunta.slice(0, -1).includes('?') || /\s[ou]\s/i.test(pregunta)) return false
+  // Que empiece frase: «Si quieres, ¿lo añado?» no vale.
+  if (!/(^|[.!?…:»)\n])[\s*_]*$/.test(t.slice(0, i))) return false
+  return OFRECE.test(pregunta)
+}

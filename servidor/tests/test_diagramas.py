@@ -14,6 +14,40 @@ def test_reglas_del_svg() -> None:
     assert dg.reglas(dg.Dibujo(svg=SVG.replace("<rect", '<rect onclick="x()"')))
 
 
+def test_topes_de_tamano() -> None:
+    assert dg.excesos(SVG) == []
+    caja = '<rect class="c" x="20" y="20" width="210" height="64" rx="10"/><text class="t" x="125" y="58">Tesis</text>'
+    grande = SVG.replace("</svg>", caja * 60 +"</svg>")
+    avisos = dg.excesos(grande)
+    assert any("caracteres" in a for a in avisos) and any("formas y textos" in a for a in avisos)
+    assert dg.excesos(SVG.replace("<rect", "<!-- caja --><rect")) == ["svg: sin comentarios, <title>, <desc> ni metadatos"]
+    # No son reglas: un dibujo grande pero válido no provoca otro intento (otra llamada cara).
+    assert dg.reglas(dg.Dibujo(svg=grande)) == []
+
+
+@pytest.mark.anyio
+async def test_un_dibujo_grande_se_da_y_se_avisa(monkeypatch, caplog) -> None:
+    grande =SVG.replace("</svg>", '<text class="s" x="1" y="1">verbo</text>' * 80 + "</svg>")
+    llamadas = []
+
+    async def estructurar_falso(*a, **k):
+        llamadas.append(1)
+        return dg.Dibujo(svg=grande)
+
+    monkeypatch.setattr(dg, "estructurar", estructurar_falso)
+    with caplog.at_level("WARNING", logger="magister.diagramas"):
+        assert await dg._llamar("Mapa de ideas del tema", "texto") == grande
+    assert llamadas == [1] and "más grande de lo pedido" in caplog.text
+
+
+def test_el_prompt_pide_un_dibujo_corto() -> None:
+    from magister.cerebro.prompts import cargar
+
+    texto = cargar("diagrama_chat").rellenar()
+    assert "<style>.c{fill:#e8e6e0" in texto and "12 cajas, 14 flechas y 40 textos" in texto
+    assert "Antes de dibujar, decide" not in texto  # invitaba a razonar por escrito antes del SVG
+
+
 def test_el_tutor_sabe_encargar_diagramas() -> None:
     from magister.cerebro.prompts import cargar
 

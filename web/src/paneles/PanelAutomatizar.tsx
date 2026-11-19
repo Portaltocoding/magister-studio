@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
 import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import { errorLegible } from '../componentes/errores.ts'
 
 // Automatizar: reglas que enciendes y Magister cumple solo, cada pocos minutos, de una en una.
 
@@ -135,7 +136,7 @@ export default function PanelAutomatizar() {
         <button className="boton" onClick={ahora}>
           Revisar ahora
         </button>
-        {aviso && <span className="nota" role="status">{aviso}</span>}
+        {aviso && <span className="nota" role="status">{errorLegible(aviso).mensaje}</span>}
       </div>
 
       <section className="pg-seccion">

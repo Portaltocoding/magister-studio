@@ -18,7 +18,7 @@ import {
   type Tema,
 } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 
 // La Biblioteca, más allá de tus fuentes: rastrear la web en busca de buenas fuentes y guardar páginas o PDF
 // desde un enlace (se descargan, se limpian y se indexan para que el tutor las cite).
@@ -125,11 +125,7 @@ function Buscar() {
     <div className="panel biblioteca">
       <h1>Buscar fuentes</h1>
       <p className="nota">Magister rastrea la web, lee las páginas y te propone las mejores, con el porqué. Tú decides cuáles se guardan.</p>
-      {aviso && (
-        <p className="nota" role="status">
-          {aviso}
-        </p>
-      )}
+      {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
 
       <section>
         <h2>Sobre un tema</h2>
@@ -347,11 +343,7 @@ function GuardarWeb() {
         </button>
       </div>
       {fallo && <Cargando error={fallo} reintentar={cargarFuentes} />}
-      {aviso && (
-        <p className="nota" role="status">
-          {aviso}
-        </p>
-      )}
+      {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
       {destino != null && (
         <section>
           <h2>Guardado en esta fuente</h2>

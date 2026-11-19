@@ -127,3 +127,19 @@
 @media (prefers-reduced-motion: reduce) { .asesor-cambio { animation: none; } }
 .asesor-cambio-consultado { margin: 8px 0 0; font-size: 0.8rem; color: var(--suave); }
 .asesor-cambio-aviso { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--borde); font-size: 0.88rem; line-height: 1.45; }
+/* Textos largos (rutas, ids, nombres sin espacios) que no desborden la ventanita. */
+.asesor-tu, .asesor-tutor, .asesor-cambio { overflow-wrap: anywhere; min-width: 0; }
+.asesor-cambio-botones { flex-wrap: wrap; }
+.asesor-cambio:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+/* Si tarda en preparar el cambio: por qué y que se puede parar. */
+.asesor-cambio-lento { margin: 4px 0 0; font-size: 0.78rem; line-height: 1.4; color: var(--suave); animation: asesor-mensaje 300ms var(--asesor-curva) both; }
+/* «Sí, prepáralo» y «No, déjalo» bajo un cambio que ofreció sin prepararlo. */
+.asesor-si-no { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.asesor-si-no button {
+  font: inherit; font-size: 0.84rem; font-weight: 600; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--acento); background: var(--acento); color: var(--fondo);
+  animation: asesor-mensaje 300ms var(--asesor-curva) 120ms both;
+}
+.asesor-si-no button.suave { background: none; color: var(--texto); border-color: var(--borde); font-weight: 500; }
+.asesor-si-no button:focus-visible, .asesor-sugerencias button:focus-visible, .asesor-acciones button:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .asesor-cambio-lento, .asesor-si-no button { animation: none; } }

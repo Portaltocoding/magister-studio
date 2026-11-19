@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Markdown from '../componentes/Markdown.tsx'
 import { enviarJson, pedir } from '../api.ts'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { DetalleTecnico, mensajeDe } from '../componentes/Cargando.tsx'
+import { errorLegible } from '../componentes/errores.ts'
 import Vacio from '../componentes/Vacio.tsx'
 import '../triaje.css'
 
@@ -190,12 +191,15 @@ export default function PanelTriaje() {
       </nav>
 
       {fallo && (
-        <p className="nota triaje-fallo" role="alert">
-          {fallo}{' '}
-          <button type="button" className="boton-mini" onClick={() => { setFallo(null); cargar() }}>
-            Reintentar
-          </button>
-        </p>
+        <>
+          <p className="nota triaje-fallo" role="alert">
+            {errorLegible(fallo).mensaje}{' '}
+            <button type="button" className="boton-mini" onClick={() => { setFallo(null); cargar() }}>
+              Reintentar
+            </button>
+          </p>
+          <DetalleTecnico detalle={errorLegible(fallo).detalle} />
+        </>
       )}
 
       {aviso && (

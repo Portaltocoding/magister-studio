@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { BotonLibro, guardarIndice, TituloEditable, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
 import Horario from '../componentes/Horario.tsx'
 import VideosDelPlan from '../componentes/VideosDelPlan.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import {
   enviarJson,
@@ -155,11 +155,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
           </button>
         ))}
       </div>
-      {aviso && (
-        <p className="nota" role="status">
-          {aviso}
-        </p>
-      )}
+      {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
       {reajuste && (
         <section className="propuesta">
           <h2>Reajuste propuesto</h2>

@@ -35,6 +35,28 @@ def reglas(d: Dibujo) -> list[str]:
     return errores
 
 
+# Topes de tamaño (diagrama_chat.md: 12 cajas, 14 flechas, 40 textos, estilos por clase). Con atributos repetidos en cada
+# elemento salían 6.500 caracteres de mediana y 10.600 como mucho (163 dibujos, 18-11-2026). No son reglas: un reintento
+# es otra llamada cara, así que un dibujo válido que se pasa se da igual y solo se avisa en el registro.
+MAX_CARACTERES = 6000
+MAX_ELEMENTOS = 70  # formas y textos, con las tres puntas de flecha de <defs>
+ELEMENTO = re.compile(r"<(rect|circle|ellipse|line|path|polyline|polygon|text)\b", re.I)
+SOBRA = re.compile(r"<!--|<\s*(title|desc|metadata)\b", re.I)
+
+
+def excesos(svg: str) -> list[str]:
+    """Lo que se pasa de los topes, dicho como una regla (vacía si cabe)."""
+    avisos = []
+    if len(svg) > MAX_CARACTERES:
+        avisos.append(f"svg: {len(svg)} caracteres, el tope es {MAX_CARACTERES}; los estilos van en el <style> por clase")
+    n = len(ELEMENTO.findall(svg))
+    if n > MAX_ELEMENTOS:
+        avisos.append(f"svg: {n} formas y textos, el tope es {MAX_ELEMENTOS} (12 cajas, 14 flechas y 40 textos)")
+    if SOBRA.search(svg):
+        avisos.append("svg: sin comentarios, <title>, <desc> ni metadatos")
+    return avisos
+
+
 # Freno: peticiones iguales a la vez comparten una sola llamada, y como mucho se dibujan dos diagramas a la vez. Un fallo
 # de la web (pedía un dibujo por cada trozo de la respuesta) lanzó 77 llamadas en siete minutos; esto lo habría cortado.
 A_LA_VEZ = 2
@@ -85,4 +107,7 @@ async def _llamar(encargo: str, contexto: str) -> str | None:
     except ErrorEstructura as e:
         registro.warning("diagrama sin salida válida: %s", e)
         return None
-    return d.svg.strip()
+    svg = d.svg.strip()
+    for aviso in excesos(svg):
+        registro.warning("diagrama más grande de lo pedido: %s", aviso)
+    return svg

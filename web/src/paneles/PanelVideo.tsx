@@ -1,7 +1,8 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { enviarJson, listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { DetalleTecnico, mayuscula, mensajeDe, TextoError } from '../componentes/Cargando.tsx'
+import { errorLegible } from '../componentes/errores.ts'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import ControlVoz, { usarAjustesVoz } from '../componentes/ControlVoz.tsx'
 import { pronunciar, vocesMagister, vocesMagisterListas, vozElegida, vozMagister } from '../componentes/voz.ts'
@@ -446,20 +447,26 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
         </button>
       )}
       {t?.estado === 'fallido' && !enMarcha && (
-        <span className="nota" role="alert">
-          No se pudo montar: {t.error}{' '}
-          <button type="button" className="boton-mini" onClick={() => void pedirMp4()}>
-            Reintentar
-          </button>
-        </span>
+        <>
+          <span className="nota" role="alert">
+            No se pudo montar. {mayuscula(errorLegible(t.error).mensaje)}{' '}
+            <button type="button" className="boton-mini" onClick={() => void pedirMp4()}>
+              Reintentar
+            </button>
+          </span>
+          <DetalleTecnico detalle={errorLegible(t.error).detalle} />
+        </>
       )}
       {fallo && (
-        <span className="nota" role="alert">
-          {fallo}{' '}
-          <button type="button" className="boton-mini" onClick={() => void mirar()}>
-            Reintentar
-          </button>
-        </span>
+        <>
+          <span className="nota" role="alert">
+            {errorLegible(fallo).mensaje}{' '}
+            <button type="button" className="boton-mini" onClick={() => void mirar()}>
+              Reintentar
+            </button>
+          </span>
+          <DetalleTecnico detalle={errorLegible(fallo).detalle} />
+        </>
       )}
     </div>
   )
@@ -576,7 +583,7 @@ function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; e
         ))}
       </div>
       <BarraCuota accion={{ accion: 'video', minutos }} />
-      {error && <p role="alert">{error}</p>}
+      {error && <TextoError texto={error} />}
       <div className="botones">
         <button className="boton boton-principal" onClick={hacer}>
           Hacer el vídeo

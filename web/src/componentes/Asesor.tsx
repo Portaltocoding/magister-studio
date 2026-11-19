@@ -5,7 +5,7 @@ import { mensajeDe } from './Cargando.tsx'
 import Mascota from '../Mascota.tsx'
 import { MODOS } from '../modos.ts'
 import { EVENTO_SUENO } from './animo.ts'
-import { buscarFaq, faqsDe } from './faqs.ts'
+import { buscarFaq, ofreceCambio, sugerenciasDe } from './faqs.ts'
 import { aCss } from './escala.ts'
 
 // El asesor: la mascota de la barra de arriba, cogida y dejada donde quieras. Se queda flotando sobre la pantalla y,
@@ -409,7 +409,12 @@ function usarAvisoAtasco(activo: boolean): { texto: string | null; paso: string 
 
 // Una respuesta del asesor: el texto y, debajo, sus botones (si propuso alguno). Los bloques del chat grande que
 // aquí no se ven (test, opciones, dibujos) se quitan.
-function RespuestaAsesor({ m, alCambiar, alRepetir }: { m: Mensaje; alCambiar: (c: CambioAsesor) => void; alRepetir: () => void }) {
+function RespuestaAsesor({ m, alCambiar, alRepetir, enfocarCambio = false }: {
+  m: Mensaje
+  alCambiar: (c: CambioAsesor) => void
+  alRepetir: () => void
+  enfocarCambio?: boolean
+}) {
   if (!m.texto) return <div className="asesor-tutor"><span className="asesor-escribiendo" aria-label="Pensando" /></div>
   const { cuerpo, acciones } = separarAcciones(m.texto)
   // El bloque ```cambio es el encargo para el servidor: lo que ves es la tarjeta con el cambio ya preparado.
@@ -417,14 +422,10 @@ function RespuestaAsesor({ m, alCambiar, alRepetir }: { m: Mensaje; alCambiar: (
   return (
     <div className="asesor-tutor">
       <Markdown>{limpio}</Markdown>
-      {m.preparando && (
-        <p className="asesor-cambio-preparando" role="status">
-          <span className="asesor-escribiendo" aria-hidden="true" /> {m.preparando}
-        </p>
-      )}
+      {m.preparando && <Preparando texto={m.preparando} />}
       {m.fallo && <p className="nota">No he podido preparar el cambio: {m.fallo}.</p>}
       {m.aviso && <p className="asesor-cambio-aviso">{m.aviso}</p>}
-      {m.cambio && <TarjetaCambio cambio={m.cambio} alCambiar={alCambiar} alRepetir={alRepetir} />}
+      {m.cambio && <TarjetaCambio cambio={m.cambio} alCambiar={alCambiar} alRepetir={alRepetir} enfocar={enfocarCambio} />}
       {acciones.length > 0 && (
         <div className="asesor-acciones">
           {acciones.map((a) => (
@@ -438,6 +439,24 @@ function RespuestaAsesor({ m, alCambiar, alRepetir }: { m: Mensaje; alCambiar: (
   )
 }
 
+// Lo que está haciendo mientras prepara el cambio. Si tarda, dice por qué y que se puede parar.
+const LENTO_MS = 20_000
+function Preparando({ texto }: { texto: string }) {
+  const [lento, setLento] = useState(false)
+  useEffect(() => {
+    const t = window.setTimeout(() => setLento(true), LENTO_MS)
+    return () => window.clearTimeout(t)
+  }, [])
+  return (
+    <div role="status">
+      <p className="asesor-cambio-preparando">
+        <span className="asesor-escribiendo" aria-hidden="true" /> {texto}
+      </p>
+      {lento && <p className="asesor-cambio-lento">Está escribiendo los pasos: puede tardar medio minuto. Puedes pararlo.</p>}
+    </div>
+  )
+}
+
 const TITULO_CAMBIO: Record<CambioAsesor['estado'], string> = {
   propuesta: 'Te propongo este cambio',
   aplicada: 'Hecho',
@@ -447,10 +466,35 @@ const TITULO_CAMBIO: Record<CambioAsesor['estado'], string> = {
 }
 
 // El cambio que ofreció el asesor: nada se toca hasta que pulsas «Aplicar», y lo aplicado se puede deshacer.
-function TarjetaCambio({ cambio, alCambiar, alRepetir }: { cambio: CambioAsesor; alCambiar: (c: CambioAsesor) => void; alRepetir: () => void }) {
+function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
+  cambio: CambioAsesor
+  alCambiar: (c: CambioAsesor) => void
+  alRepetir: () => void
+  // Acaba de llegar a lo que preguntaste: «Aplicar» coge el foco si no estás escribiendo otra cosa.
+  enfocar?: boolean
+}) {
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const caja = useRef<HTMLDivElement | null>(null)
+  const aplicar = useRef<HTMLButtonElement | null>(null)
+  const devolverFoco = useRef(false)
+  useEffect(() => {
+    if (!enfocar || cambio.estado !== 'propuesta') return
+    const a = document.activeElement
+    const escribiendo = a instanceof HTMLInputElement && a.value.trim() !== ''
+    if (!a || a === document.body || (a.closest('.asesor-chat') && !escribiendo)) aplicar.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando aparece
+  }, [enfocar])
+  // Al aplicar, descartar o deshacer, el botón pulsado desaparece: el foco pasa al siguiente (o a la tarjeta).
+  useEffect(() => {
+    if (ocupado || !devolverFoco.current) return
+    devolverFoco.current = false
+    const a = document.activeElement
+    if (a && a !== document.body && !caja.current?.contains(a)) return
+    ;(caja.current?.querySelector<HTMLButtonElement>('button:not(:disabled)') ?? caja.current)?.focus()
+  }, [ocupado, cambio.estado])
   const hacer = async (que: 'aplicar' | 'descartar' | 'deshacer') => {
+    devolverFoco.current = !!caja.current?.contains(document.activeElement)
     setOcupado(true)
     setError(null)
     try {
@@ -467,8 +511,8 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir }: { cambio: CambioAsesor;
     }
   }
   return (
-    <div className={`asesor-cambio ${cambio.estado}`} role="group" aria-label={TITULO_CAMBIO[cambio.estado]}>
-      <p className="asesor-cambio-etq">
+    <div ref={caja} tabIndex={-1} className={`asesor-cambio ${cambio.estado}`} role="group" aria-label={TITULO_CAMBIO[cambio.estado]}>
+      <p className="asesor-cambio-etq" role="status">
         {cambio.estado === 'aplicada' ? '✓ ' : ''}
         {TITULO_CAMBIO[cambio.estado]}
       </p>
@@ -490,12 +534,12 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir }: { cambio: CambioAsesor;
           </button>
         </div>
       )}
-      {error && <p className="nota">{error}</p>}
+      {error && <p className="nota" role="alert">{error}</p>}
       {(cambio.estado === 'propuesta' || cambio.estado === 'aplicada') && (
         <div className="asesor-cambio-botones">
           {cambio.estado === 'propuesta' ? (
             <>
-              <button type="button" disabled={ocupado} onClick={() => void hacer('aplicar')}>
+              <button ref={aplicar} type="button" disabled={ocupado} onClick={() => void hacer('aplicar')}>
                 {ocupado ? 'Aplicando…' : 'Aplicar'}
               </button>
               <button type="button" className="suave" disabled={ocupado} onClick={() => void hacer('descartar')}>
@@ -550,9 +594,12 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   // acaba de nacer con la pregunta en marcha no se recarga encima de ella.
   const cid = hilos[viendo]?.cid
   const recien = useRef<number | null>(null)
+  // El cambio que acaba de llegar a lo que preguntaste (no los que se recargan al volver a la conversación).
+  const cambioVivo = useRef<number | null>(null)
   useEffect(() => {
     setError(null)
     if (cid != null && cid === recien.current) return
+    cambioVivo.current = null
     setMensajes([])
     if (cid == null) return
     Promise.all([listarMensajes(cid), cambiosDe(cid).catch(() => [] as CambioAsesor[])])
@@ -610,6 +657,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
         else if (ev.tipo === 'fase' && ev.nodo === 'preparar_cambio') alUltimo({ preparando: ev.detalle ?? 'Preparando el cambio…' })
         else if (ev.tipo === 'cambio') {
           const { tipo: _tipo, ...cambio } = ev
+          cambioVivo.current = cambio.id
           alUltimo({ preparando: null, cambio })
         } else if (ev.tipo === 'cambio_fallido') alUltimo(ev.explicado ? { preparando: null, aviso: ev.detalle } : { preparando: null, fallo: ev.detalle })
         else if (ev.tipo === 'error') throw new Error(ev.detalle)
@@ -623,12 +671,17 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
       })
       if (!(e instanceof DOMException && e.name === 'AbortError')) setError('No he podido contestar. Prueba otra vez en un momento.')
     } finally {
+      // Si la respuesta acaba sin cambio ni fallo, que no se quede «Preparando el cambio…» para siempre.
+      setMensajes((m) => {
+        const u = m[m.length - 1]
+        return u?.preparando ? [...m.slice(0, -1), { ...u, preparando: null }] : m
+      })
       setPensando(false)
     }
   }
 
   // Una sola pantalla: la conversación de la sección en la que estás. Tres sugerencias para empezar; si no, escribes.
-  const sugerencias = ['Explícame esta pantalla', ...faqsDe(aqui.clave.split('/')[0]).map((f) => f.pregunta)].slice(0, 3)
+  const sugerencias = sugerenciasDe(aqui.clave, proyectoEnPantalla() != null)
 
   return (
     <section className={`asesor-chat ${lado} ${vertical}`} role="dialog" aria-label={`Tu asesor · ${aqui.nombre}`}>
@@ -672,7 +725,19 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
                 m={m}
                 alCambiar={(c) => setMensajes((ms) => ms.map((x) => (x.cambio?.id === c.id ? { ...x, cambio: c } : x)))}
                 alRepetir={() => void preguntar('Prepáralo otra vez sobre el proyecto como está ahora.')}
+                enfocarCambio={m.cambio != null && m.cambio.id === cambioVivo.current}
               />
+              {/* Ofreció un cambio sin prepararlo («¿Lo añado al nivel 1?»): contestar es un clic. */}
+              {i === mensajes.length - 1 && !pensando && !m.cambio && !m.fallo && !m.aviso && ofreceCambio(m.texto) && (
+                <div className="asesor-si-no">
+                  <button type="button" onClick={() => void preguntar('Sí, prepáralo')}>
+                    Sí, prepáralo
+                  </button>
+                  <button type="button" className="suave" onClick={() => void preguntar('No, déjalo')}>
+                    No, déjalo
+                  </button>
+                </div>
+              )}
             </div>
           ),
         )}

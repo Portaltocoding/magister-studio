@@ -4,6 +4,7 @@ import Pensando from '../componentes/Pensando.tsx'
 import Mascota from '../Mascota.tsx'
 import { Locutor } from '../componentes/voz.ts'
 import ControlVoz from '../componentes/ControlVoz.tsx'
+import { TextoError } from '../componentes/Cargando.tsx'
 
 // Hablar: estudias de palabra. Dices tu pregunta, el tutor contesta para el oído y te lo lee; luego vuelve a escucharte.
 // La respuesta se lee con una voz instalada en tu equipo. El dictado usa el reconocimiento de voz del navegador.
@@ -197,7 +198,7 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
         </label>
         <ControlVoz />
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <TextoError texto={error} />}
       <p className="nota hablar-aviso">
         La respuesta se lee con una voz instalada en tu equipo. El dictado es el de tu navegador: en Chrome, el audio se envía a
         Google para pasarlo a texto. Si prefieres que no salga de tu equipo, escribe la pregunta.

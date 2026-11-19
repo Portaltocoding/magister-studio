@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { borrarNota, comentarNota, EVENTO_NOTAS, listarNotas, type Nota } from '../api.ts'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
+import { TextoError } from '../componentes/Cargando.tsx'
 
 // Mis notas: lo que guardaste de Estudio libre. Se buscan, se comentan, se borran y se descargan en Markdown.
 
@@ -115,7 +116,7 @@ export default function PanelNotas() {
     return notas.filter((n) => `${n.texto} ${n.comentario ?? ''} ${n.origen ?? ''}`.toLowerCase().includes(q))
   }, [notas, busca])
 
-  if (error) return <div className="panel"><p role="alert">No se pudieron cargar tus notas: {error}</p></div>
+  if (error) return <div className="panel"><TextoError texto={error} antes="No se pudieron cargar tus notas. " /></div>
   if (!notas) return <div className="panel" />
   if (!notas.length)
     return (

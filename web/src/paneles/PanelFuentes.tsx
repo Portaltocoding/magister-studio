@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import {
   pedir,
   crearFuente,
@@ -101,11 +101,7 @@ export default function PanelFuentes() {
         {estado ? `${estado.documentos} documentos · ${estado.fragmentos} fragmentos indexados` : ''} · El tutor responde
         con tus fuentes y cita cada afirmación.
       </p>
-      {aviso && (
-        <p className="nota" role="status">
-          {aviso}
-        </p>
-      )}
+      {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
 
       {propuestas.length > 0 && (
         <p className="nota">

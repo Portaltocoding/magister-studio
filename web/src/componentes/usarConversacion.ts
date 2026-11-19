@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { ErrorApi, EVENTO_NOTAS, type EventoTutor, type Mensaje, type Propuesta } from '../api.ts'
 import type { Burbuja } from './Hilo.tsx'
+import { errorLegible } from './errores.ts'
 
 let contador = 0
 const claveNueva = () => `tmp-${++contador}`
@@ -126,7 +127,7 @@ export function usarConversacion(
               }))
               break
             case 'error':
-              actualizarUltima((b) => ({ ...b, contenido: ev.detalle, estado: 'error' }))
+              actualizarUltima((b) => ({ ...b, contenido: errorLegible(ev.detalle).mensaje, estado: 'error' }))
               break
             default:
               break // un evento desconocido no rompe el cliente

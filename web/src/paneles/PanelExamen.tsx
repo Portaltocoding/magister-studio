@@ -5,7 +5,8 @@ import remarkMath from 'remark-math'
 import { enviarJson, flujo, listarPlanes, pedir, type ResumenPlan } from '../api.ts'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Pensando from '../componentes/Pensando.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
+import { errorLegible } from '../componentes/errores.ts'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
 import { barajar } from '../barajar.ts'
@@ -274,7 +275,7 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
               </div>
             )}
           </div>
-          {error && <p role="alert">{error}</p>}
+          {error && <TextoError texto={error} />}
           <div className="vacio-acciones">
             <button className="boton boton-principal" disabled={!elegidas.length || !disponibles} onClick={empezar}>
               {modo === 'examen' ? 'Empezar el examen' : 'Empezar la evaluación'}
@@ -435,7 +436,7 @@ function Haciendo({ examen, alAcabar, alSalir }: { examen: Examen; alAcabar: (r:
       setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: c.nota, intento_id: c.intento_id, explicacion: c.explicacion } }))
     } catch (e) {
       // Sin esto se quedaba en «Corrigiendo…» para siempre; así se puede volver a comprobar.
-      setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: null, explicacion: `No he podido corregirla: ${(e as Error).message}. Pulsa «Comprobar» otra vez.` } }))
+      setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: null, explicacion: `No he podido corregirla. ${errorLegible(mensajeDe(e)).mensaje} Pulsa «Comprobar» otra vez.` } }))
     } finally {
       setCorrigiendoUna(false)
     }

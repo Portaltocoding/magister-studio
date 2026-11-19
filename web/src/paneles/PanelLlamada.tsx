@@ -5,7 +5,7 @@ import { conPreguntas, narrarApuntes, type FraseClase } from '../componentes/nar
 import { todosLosModos, usarPreferencias } from '../componentes/preferencias.ts'
 import Mascota from '../Mascota.tsx'
 import ControlVoz from '../componentes/ControlVoz.tsx'
-import Cargando, { mensajeDe } from '../componentes/Cargando.tsx'
+import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import Diagrama from '../componentes/Diagrama.tsx'
 import MapaConceptos, { type Mapa } from '../componentes/MapaConceptos.tsx'
 import { TextoLibro } from '../componentes/LectorLibro.tsx'
@@ -970,7 +970,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           Mejor con auriculares: así no se oye a sí mismo. La voz del tutor es la de tu equipo; el dictado es el de tu navegador
           (en Chrome, el audio va a Google para pasarlo a texto). La conversación se guarda como las demás.
         </p>
-        {error && <p role="alert">{error}</p>}
+        {error && <TextoError texto={error} />}
       </div>
     )
   }
@@ -1120,7 +1120,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           <small>Colgar</small>
         </button>
       </div>
-      {error && <p role="alert" className="nota">{error}</p>}
+      {error && <TextoError texto={error} className="nota" />}
       {listaNotas}
       {banco && (
         <details className="llamada-transcripcion">
