@@ -163,6 +163,26 @@ async def estado() -> dict:
     return {v: vigente(e.get(v), ahora) for v in VENTANAS}
 
 
+# La cota prudente (sin muestras) solo dice algo si Magister ya ha gastado algo apreciable en la ventana: en una
+# instalación nueva, con céntimos de Magister y la barra llena por el uso de Claude fuera de él, la división se dispara
+# (se llegó a ver «+111634 %»). Y una estimación sin calibrar de más de una ventana entera no es creíble: «sin datos».
+GASTO_MINIMO_COTA = 0.25  # dólares equivalentes de Magister en la ventana
+
+
+def cota_prudente(uso: float, gastado: float) -> float | None:
+    """Fracción de la ventana por dólar, sin muestras: lo usado entre lo que Magister ha gastado en ella. None si
+    Magister apenas ha gastado (no se puede atribuir la barra a Magister)."""
+    return uso / gastado if gastado >= GASTO_MINIMO_COTA else None
+
+
+def extra_creible(coste: float, por_coste: float | None, calibrada: bool) -> float | None:
+    """Cuánto subiría la barra. Sin coste o sin calibración razonable, None («sin datos») mejor que una cifra absurda."""
+    if not por_coste or coste <= 0:
+        return None
+    extra = round(coste * por_coste, 4)
+    return None if not calibrada and extra > 1 else extra
+
+
 async def estimar(accion: str, minutos: int | None = None, lecciones: int | None = None) -> dict:
     """Cuánto subiría cada barra con esta acción (fracción de la ventana), y si la cifra está calibrada."""
     e = await _estado_guardado()
@@ -176,8 +196,7 @@ async def estimar(accion: str, minutos: int | None = None, lecciones: int | None
         # Sin muestras, la cota prudente solo vale con una ventana vigente (la de una renovada ya no dice nada).
         if not calibrada and d and d["reinicia"] > ahora:
             gastado = await _coste_en_ventana(v, d["reinicia"])
-            por_coste = d["uso"] / gastado if gastado > 0 else None
+            por_coste = cota_prudente(d["uso"], gastado)
         # Sin coste conocido (aún no hay llamadas de esa acción) no hay estimación: mejor «sin datos» que «gratis».
-        extra = round(coste * por_coste, 4) if por_coste and coste > 0 else None
-        salida[v] = {"extra": extra, "calibrada": calibrada}
+        salida[v] = {"extra": extra_creible(coste, por_coste, calibrada), "calibrada": calibrada}
     return salida
