@@ -50,7 +50,7 @@ RUN if [ "$CON_VOZ" = "1" ]; then \
     fi
 
 RUN useradd --create-home --uid 1000 magister \
-    && mkdir -p /datos /copias && chown magister:magister /datos /copias
+    && mkdir -p /datos /copias /opt/hf && chown magister:magister /datos /copias /opt/hf
 WORKDIR /app
 COPY --from=dependencias --chown=magister:magister /app /app
 COPY --chown=magister:magister migraciones ./migraciones
@@ -58,17 +58,30 @@ COPY --chown=magister:magister alembic.ini ./
 COPY --chown=magister:magister config ./config
 COPY --chown=magister:magister evals ./evals
 COPY --chown=magister:magister entrada.sh ./entrada.sh
+# Lo usan los arrancadores para sacar el token de `claude setup-token` sin copiarlo a mano.
+COPY --chown=magister:magister scripts/token_claude.py ./token_claude.py
 # Las reglas de tono, el glosario y la rúbrica del juez viven en docs/ del repo (fuera de servidor/): llegan por el
 # contexto «docs» de compose.yaml (additional_contexts) y van a /docs, donde las busca magister.tono.
 COPY --from=docs tono.md glosario.md rubrica.md /docs/
-# Todo lo que se guarda va a /datos (volumen) y las copias de la base a /copias (otro volumen); los modelos de
-# embeddings (unos 600 MB) se descargan una vez a /datos/hf y sobreviven a actualizar.
-ENV PATH="/app/.venv/bin:$PATH" HOME=/home/magister PYTHONUTF8=1 HF_HOME=/datos/hf \
+# Todo lo que se guarda va a /datos (volumen) y las copias de la base a /copias (otro volumen). Los modelos locales
+# (e5 y el reranker) vienen ya dentro de la imagen, en /opt/hf (ver abajo).
+ENV PATH="/app/.venv/bin:$PATH" HOME=/home/magister PYTHONUTF8=1 HF_HOME=/opt/hf \
     MAGISTER_CHECKPOINTS=/datos/checkpoints.sqlite MAGISTER_CRUDO=/datos/crudo MAGISTER_SALIDAS=/datos/salidas \
     MAGISTER_REGISTROS=/datos/registros MAGISTER_SERVIR_WEB=false \
     MAGISTER_VOZ_PIPER=/opt/piper/piper MAGISTER_VOZ_DIR=/opt/piper-voces \
     MAGISTER_CHROME=/usr/bin/chromium CHROME_PATH=/usr/bin/chromium \
     MAGISTER_COPIAS=/copias MAGISTER_CONTENEDOR_DB= MAGISTER_COPIA_DIARIA=true
 USER magister
+# Los modelos locales de embeddings (multilingual-e5-small, MIT) y de reordenación (mmarco-mMiniLMv2, Apache 2.0),
+# unos 1 GB, se descargan al construir la imagen: así nadie espera a la primera pregunta. Se cargan una vez para
+# bajar justo lo que usan (safetensors, sin los .bin ni ONNX). Los nombres salen de magister.config, como al usarlos.
+# CON_MODELOS=0 los deja fuera y se descargan la primera vez, como antes.
+ARG CON_MODELOS=1
+RUN if [ "$CON_MODELOS" = "1" ]; then \
+      python -c "from magister.config import ajustes; \
+from sentence_transformers import CrossEncoder, SentenceTransformer; \
+SentenceTransformer(ajustes.embeddings_modelo, device='cpu'); \
+CrossEncoder(ajustes.reranker_modelo, device='cpu')"; \
+    fi
 EXPOSE 8000
 ENTRYPOINT ["sh", "/app/entrada.sh"]

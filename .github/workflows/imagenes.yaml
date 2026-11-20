@@ -1,0 +1,200 @@
+# Las imágenes de Magister en ghcr.io (api y web, para amd64 y arm64) y, en cada etiqueta v*, los paquetes
+# Magister-Windows.zip y Magister-Mac.zip en la Release.
+#
+#   push a main  -> :latest y :sha-<corto>
+#   etiqueta v*  -> :<versión> (1.2.3), :<mayor>.<menor> y :estable (la que usan los paquetes; no en las -rc)
+#
+# Cada arquitectura se construye en su runner nativo (ubuntu-24.04 y ubuntu-24.04-arm, sin QEMU) y se sube por
+# digest; luego `unir` junta los dos digests en una sola etiqueta multiarquitectura.
+name: imagenes
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGEN_API: ghcr.io/portaltocoding/magister-studio-api
+  IMAGEN_WEB: ghcr.io/portaltocoding/magister-studio-web
+
+concurrency:
+  group: imagenes-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  construir:
+    name: construir (${{ matrix.imagen }}, ${{ matrix.arq }})
+    strategy:
+      fail-fast: true
+      matrix:
+        imagen: [api, web]
+        arq: [amd64, arm64]
+        include:
+          - arq: amd64
+            runner: ubuntu-24.04
+          - arq: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Hacer sitio en el disco (la imagen de la API, con los modelos, pasa de 4 GB)
+        if: matrix.imagen == 'api'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Elegir imagen y contexto
+        id: cual
+        run: |
+          if [ "${{ matrix.imagen }}" = "api" ]; then
+            echo "nombre=$IMAGEN_API" >> "$GITHUB_OUTPUT"
+            echo "contexto=./servidor" >> "$GITHUB_OUTPUT"
+            echo "contextos=docs=./docs" >> "$GITHUB_OUTPUT"
+          else
+            echo "nombre=$IMAGEN_WEB" >> "$GITHUB_OUTPUT"
+            echo "contexto=./web" >> "$GITHUB_OUTPUT"
+            echo "contextos=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y subir (por digest)
+        id: construir
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: ${{ steps.cual.outputs.contexto }}
+          build-contexts: ${{ steps.cual.outputs.contextos }}
+          platforms: linux/${{ matrix.arq }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=magister-studio-${{ matrix.imagen }}
+          outputs: type=image,name=${{ steps.cual.outputs.nombre }},push-by-digest=true,name-canonical=true,push=true
+          # La caché va al propio registro (la de GitHub Actions tiene 10 GB y la API sola casi los llena).
+          cache-from: type=registry,ref=${{ steps.cual.outputs.nombre }}:cache-${{ matrix.arq }}
+          cache-to: type=registry,ref=${{ steps.cual.outputs.nombre }}:cache-${{ matrix.arq }},mode=max
+          provenance: false
+
+      - name: Guardar el digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          digest="${{ steps.construir.outputs.digest }}"
+          touch "$RUNNER_TEMP/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digest-${{ matrix.imagen }}-${{ matrix.arq }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  unir:
+    name: unir (${{ matrix.imagen }})
+    needs: construir
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        imagen: [api, web]
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-${{ matrix.imagen }}-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Nombre de la imagen
+        id: cual
+        run: |
+          if [ "${{ matrix.imagen }}" = "api" ]; then echo "nombre=$IMAGEN_API" >> "$GITHUB_OUTPUT"
+          else echo "nombre=$IMAGEN_WEB" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Etiquetas
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ steps.cual.outputs.nombre }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=estable,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+
+      - name: Crear la etiqueta multiarquitectura
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          NOMBRE: ${{ steps.cual.outputs.nombre }}
+        run: |
+          etiquetas=$(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          test -n "$etiquetas" || { echo "No hay ninguna etiqueta que poner"; exit 1; }
+          # shellcheck disable=SC2086
+          docker buildx imagetools create $etiquetas \
+            --annotation "index:org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --annotation "index:org.opencontainers.image.description=Magister Studio (${{ matrix.imagen }})" \
+            $(printf "$NOMBRE@sha256:%s " *)
+
+      - name: Comprobar que trae amd64 y arm64
+        run: |
+          primera=$(jq -r '.tags[0]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          docker buildx imagetools inspect "$primera"
+          docker buildx imagetools inspect --raw "$primera" | jq -e '[.manifests[].platform.architecture] | (index("amd64") != null and index("arm64") != null)'
+
+  paquetes:
+    name: paquetes de la Release
+    needs: unir
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Montar Magister-Windows.zip y Magister-Mac.zip
+        run: bash scripts/paquetes.sh dist
+
+      - name: Comprobar el compose del paquete
+        run: |
+          cd dist/Magister-Mac/sistema
+          mkdir -p ../secretos && touch ../secretos/claude_token ../secretos/postgres_password ../secretos/canario
+          docker compose -f compose.yaml config --quiet
+          rm -rf ../secretos
+
+      - name: Publicar en la Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ETIQUETA: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$ETIQUETA" >/dev/null 2>&1; then
+            previa=()
+            case "$ETIQUETA" in *-*) previa=(--prerelease) ;; esac
+            gh release create "$ETIQUETA" "${previa[@]}" --verify-tag --title "Magister $ETIQUETA" --generate-notes \
+              --notes "Para instalar: Mac, Magister-Mac.zip (o la línea de Terminal de docs/instalar.md); Windows, Magister-Windows.zip."
+          fi
+          gh release upload "$ETIQUETA" dist/Magister-Windows.zip dist/Magister-Mac.zip --clobber

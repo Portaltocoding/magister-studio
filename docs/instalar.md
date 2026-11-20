@@ -1,79 +1,87 @@
 # Instalar Magister Studio
 
-Magister funciona dentro de **Docker** en Mac, Windows y Linux: no hay que instalar Python, Node ni nada más. Se abre con doble clic y se usa en el navegador, en **http://localhost:8080**. Todo se queda en tu equipo, salvo las conversaciones con Claude, que van con tu propia cuenta.
+Magister funciona dentro de **Docker** en Mac, Windows y Linux: no hay que instalar Python, Node ni nada más, y no se construye nada en tu equipo (se descargan imágenes ya hechas). Se abre con doble clic y se usa en el navegador, en **http://localhost:8080**. Todo se queda en tu equipo, salvo las conversaciones con Claude, que van con tu propia cuenta.
 
 ## Lo que necesitas
 
-- **Docker Desktop** (Mac y Windows) o **Docker Engine** (Linux). Gratis para uso personal.
 - **Una cuenta de Claude con suscripción Pro o Max**, la tuya. Magister habla con Claude con tu cuenta y gasta de tu suscripción, no de la de otra persona.
 - Unos **15 GB libres** en el disco y **8 GB de memoria** como mínimo (mejor 16 GB).
-- Internet la primera vez: se descargan varios GB (de 10 a 40 minutos según tu conexión).
+- Internet la primera vez: se descargan unos 3 GB, más Docker si no lo tienes (de 5 a 30 minutos según tu conexión).
+- **Docker** no hace falta tenerlo: si falta, el arrancador lo instala (en Linux, no: ver abajo).
 
-## 1. Descargar Magister
+## El enlace que hay que enviar
 
-Elige una:
+| Equipo | Enlace |
+|---|---|
+| **Mac** (lo más fácil) | Abrir la app **Terminal**, pegar esta línea y pulsar Intro:<br>`curl -fsSL https://raw.githubusercontent.com/Portaltocoding/magister-studio/main/instalar-mac.sh \| bash` |
+| Mac (con zip) | <https://github.com/Portaltocoding/magister-studio/releases/latest/download/Magister-Mac.zip> |
+| **Windows** | <https://github.com/Portaltocoding/magister-studio/releases/latest/download/Magister-Windows.zip> |
 
-- **Sin saber nada de git:** en la página del repositorio, botón verde **Code → Download ZIP**. Descomprímelo en una carpeta que no vayas a mover, por ejemplo `Documentos/Magister`.
-- **Con git:** `git clone https://github.com/Portaltocoding/magister-studio.git`
+Los enlaces de los zip no cambian: siempre bajan la última versión publicada.
 
-## 2. Instalar Docker y arrancar Magister
+## Mac
 
-### Mac
+**Opción 1, con Terminal (sin avisos del Mac).** Abre **Terminal** (Cmd+Espacio, escribe «Terminal», Intro), pega la línea de arriba y pulsa Intro. Descarga Magister en la carpeta **Magister** de tu usuario y lo arranca. Como no pasa por el navegador, el Mac no pone pegas.
 
-1. Descarga Docker Desktop desde <https://www.docker.com/products/docker-desktop/> (elige **Apple Silicon** si tu Mac tiene chip M1, M2, M3 o M4; si no, **Intel**). Arrástralo a Aplicaciones, ábrelo una vez y acepta las condiciones.
-2. En la carpeta de Magister, doble clic en **`Magister.command`**.
-   - Si el Mac dice que no puede abrirlo porque es de un desarrollador no identificado: abre **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el aviso de `Magister.command` y pulsa **Abrir igualmente**. Solo hace falta la primera vez.
-   - Si dice que no tienes permiso: abre la app **Terminal**, escribe `bash ` (con un espacio), arrastra `magister.sh` a la ventana y pulsa Intro.
+**Opción 2, con el zip.** Descarga `Magister-Mac.zip`, haz doble clic para descomprimirlo y, en la carpeta, doble clic en **`Magister.command`**. La primera vez el Mac dirá que es de un *desarrollador no identificado* (no está firmado): pulsa **Aceptar**, abre **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el aviso de `Magister.command` y pulsa **Abrir igualmente**.
 
-### Windows
+Lo que verás la primera vez:
 
-1. Descarga Docker Desktop desde <https://www.docker.com/products/docker-desktop/> e instálalo dejando marcada la opción **WSL 2**. Reinicia si te lo pide, ábrelo una vez y acepta las condiciones.
-2. En la carpeta de Magister, doble clic en **`Magister-docker.bat`**.
-   - Si sale «Windows protegió su PC»: **Más información → Ejecutar de todas formas**. Solo la primera vez.
+1. Si no tienes Docker, lo descarga (el de tu chip, Apple o Intel) y el Mac te pide **tu contraseña** para copiarlo a Aplicaciones.
+2. Se abre Docker. En su ventana: **Accept**; si pide tu contraseña, escríbela; si pide iniciar sesión, **Skip** (no hace falta cuenta). Magister espera solo.
+3. Descarga Magister (unos 3 GB).
+4. **Conectar con Claude:** se abre el navegador; inicia sesión en Claude y pulsa **Authorize**. La página te da un código: cópialo, vuelve a la ventana de Terminal, pégalo (**Cmd+V**) y pulsa Intro. El token se guarda solo.
+5. Arranca y abre **http://localhost:8080**.
 
-### Linux
+## Windows
 
-1. Instala Docker Engine y el plugin de Compose siguiendo <https://docs.docker.com/engine/install/> (en Ubuntu y Debian, el paquete `docker-compose-plugin`). Para usarlo sin `sudo`: `sudo usermod -aG docker $USER`, y cierra y vuelve a abrir la sesión.
-2. En una terminal, dentro de la carpeta de Magister: `bash magister.sh`
+Descarga `Magister-Windows.zip`, clic derecho → **Extraer todo** → **Extraer**, y en la carpeta que sale, doble clic en **`Magister.bat`**. Si sale «Windows protegió su PC»: **Más información → Ejecutar de todas formas**.
 
-## 3. El primer arranque
+Lo que verás la primera vez:
 
-El arrancador lo hace todo y te va diciendo qué pasa:
+1. Si no tienes Docker, lo instala con `winget`. Cuando Windows pregunte si permites cambios, pulsa **Sí**.
+2. Si a Windows le falta WSL (lo que usa Docker), lo instala (otra vez **Sí**) y te pide **reiniciar**. Al volver, doble clic otra vez en `Magister.bat`: sigue donde se quedó. Lo mismo si Docker recién instalado no arranca hasta reiniciar.
+3. Se abre Docker. En su ventana: **Accept**; si pide iniciar sesión, **Skip**.
+4. Descarga Magister (unos 3 GB).
+5. **Conectar con Claude:** igual que en Mac, pegando el código con **Ctrl+V**.
+6. Arranca y abre **http://localhost:8080**.
 
-1. Comprueba que Docker está instalado y en marcha (si no lo está, lo abre).
-2. Crea la carpeta `secretos/` con una contraseña para tu base de datos.
-3. **Te pide tu token de Claude.** Se abre un enlace para iniciar sesión en Claude con tu cuenta; al terminar, sale en pantalla un token largo que empieza por `sk-ant-`. Cópialo y pégalo donde te lo pide. (Si ya tienes Claude Code instalado, es lo mismo que `claude setup-token`.) Se guarda en `secretos/claude_token`, y no hay que repetirlo hasta que caduque, en un año.
-4. Prepara y arranca Magister. **La primera vez tarda bastante**; las siguientes, unos segundos.
-5. Abre el navegador en **http://localhost:8080**.
+## Linux
 
-Después, para usarlo, vuelve a hacer doble clic en el arrancador. Si ya está en marcha, solo abre el navegador. Para apagarlo: `Magister-docker.bat parar` (Windows) o `bash magister.sh parar` (Mac y Linux), o cierra Docker Desktop.
+Instala Docker Engine y el plugin de Compose (<https://docs.docker.com/engine/install/>; en Ubuntu y Debian, `docker-compose-plugin`) y, para usarlo sin `sudo`, `sudo usermod -aG docker $USER` y vuelve a entrar en la sesión. Después descarga `Magister-Mac.zip` (el arrancador es el mismo), descomprímelo y ejecuta `bash sistema/magister.sh`.
 
-> La carpeta `secretos/` es tuya: no la compartas ni la subas a ningún sitio. Si descargas Magister de nuevo en otra carpeta, cópiala a la nueva.
+## Cada día
+
+- **Abrir:** doble clic en `Magister.command` (Mac) o `Magister.bat` (Windows). Si ya está en marcha, solo abre el navegador.
+- **Apagar:** doble clic en `Parar Magister.command` o `Parar Magister.bat` (o cierra Docker). Tus datos se quedan guardados.
+- **Actualizar:** no hay que hacer nada. Cada vez que lo abres (estando apagado) busca la versión nueva con `docker compose pull` y, si la hay, la descarga. Para tenerla ya: **Parar** y volver a abrir. Si alguna vez una versión trae cambios en los arrancadores, basta con volver a pegar la línea de Terminal (Mac) o descomprimir el zip nuevo **encima** de la carpeta de antes (Windows).
+
+> La carpeta `secretos/` (al lado del arrancador) es tuya: guarda tu conexión con Claude y la contraseña de tu base. No la compartas ni la borres. Si pones Magister en otra carpeta, cópiala a la nueva.
 
 ## Tus datos y las copias
 
-- Tus planes, fuentes, apuntes y repasos se guardan en Docker (los volúmenes `magister-studio_magister-studio-datos`, `magister-studio_magister-studio-api` y `magister-studio_magister-studio-copias`), no en la carpeta de Magister. **Sobreviven a apagar, a actualizar y a borrar la carpeta**.
+- Tus planes, fuentes, apuntes y repasos se guardan en Docker (los volúmenes `magister-studio_magister-studio-datos`, `magister-studio_magister-studio-api` y `magister-studio_magister-studio-copias`), no en la carpeta de Magister. **Sobreviven a apagar, a actualizar y a borrar la carpeta**. Son los mismos con el zip que con el repo.
 - Magister hace **una copia de la base cada día** (guarda 7 diarias, 4 semanales y 12 mensuales). Desde **Ajustes** puedes verlas, hacer una ahora y restaurar una.
-- Para tener una copia **fuera de Docker** (por si reinstalas Docker o cambias de equipo): **Ajustes → Descargar mis datos**, o bien, en una terminal dentro de la carpeta de Magister, `docker compose --profile docker cp api:/copias ./copias-docker`.
+- Para tener una copia **fuera de Docker**: **Ajustes → Descargar mis datos**.
 - Lo único que borra tus datos es eliminar esos volúmenes (`docker volume rm ...`, `docker compose down -v`) o usar «Clean / Purge data» o «Reset to factory defaults» en Docker Desktop. No lo hagas sin una copia fuera.
 
-## Actualizar
+## Desde el repo (para desarrollar)
 
-1. Consigue la versión nueva:
-   - **Con git:** en la carpeta de Magister, `git pull`.
-   - **Con el ZIP:** descarga el nuevo y descomprímelo **encima** de la carpeta de antes (sustituyendo los ficheros). Si lo pones en otra carpeta, copia a ella la carpeta `secretos/`.
-2. Haz doble clic en el arrancador. Si Magister estaba en marcha, apágalo antes (`parar`) para que se reconstruya con lo nuevo; el arrancador reconstruye lo que haya cambiado y tus datos siguen ahí.
+Con el repo clonado, `Magister.command`, `Magister-docker.bat` y `magister.sh` hacen lo mismo, pero **construyen** las imágenes con el `compose.yaml` de la raíz (`docker compose --profile docker build`; la primera vez, de 10 a 40 minutos). El paquete usa `distribucion/compose.yaml`, que solo tira de `ghcr.io/portaltocoding/magister-studio-api` y `-web`.
+
+Publicar una versión: las imágenes se construyen solas en cada push a `main` (`:latest`) y en cada etiqueta `v*` (`:1.2.3` y `:estable`, la que usan los paquetes), con `.github/workflows/imagenes.yaml`; la etiqueta además adjunta `Magister-Windows.zip` y `Magister-Mac.zip` a la Release (`scripts/paquetes.sh`). Para sacar una: `git tag v1.0.1 && git push origin v1.0.1`.
 
 ## Problemas frecuentes
 
 | Qué pasa | Qué hacer |
 |---|---|
-| «No encuentro Docker» | Instala Docker Desktop (o Docker Engine en Linux) y ábrelo una vez antes de abrir Magister. |
-| «Docker no termina de arrancar» | Abre Docker Desktop a mano y espera a que diga *Engine running*. En Windows, si habla de WSL, sigue sus instrucciones (suele bastar con `wsl --update` en PowerShell y reiniciar). |
-| El chat responde con un error de Claude o de autenticación | Tu token ha caducado o está mal copiado. Borra `secretos/claude_token`, apaga Magister (`parar`) y vuelve a abrirlo: te lo pedirá otra vez. |
-| «Ya hay datos de Magister en este equipo, pero falta secretos/postgres_password» | Has descargado Magister en otra carpeta: copia la carpeta `secretos/` de la instalación anterior. |
-| «port is already allocated» o el 8080 está ocupado | Otro programa usa el puerto 8080 (o el 5433). Ciérralo, o arranca con otro puerto: `MAGISTER_DOCKER_PUERTO_WEB=8090 bash magister.sh` (Mac y Linux) o `$env:MAGISTER_DOCKER_PUERTO_WEB=8090; .\Magister-docker.bat` (PowerShell), y abre http://localhost:8090. |
+| Mac: «desarrollador no identificado» | Usa la línea de Terminal, o **Ajustes del Sistema → Privacidad y seguridad → Abrir igualmente**. |
+| Windows: «Windows protegió su PC» | **Más información → Ejecutar de todas formas**. |
+| Windows: doble clic en `Magister.bat` y dice que primero descomprimas | Lo has abierto dentro del zip. Clic derecho en el zip → **Extraer todo**, y ábrelo desde la carpeta. |
+| «Docker no termina de arrancar» | Reinicia el equipo y vuelve a abrir Magister. Si sigue, abre Docker Desktop a mano y mira si te pide algo. |
+| «No he podido descargar Magister» | Revisa la conexión y el espacio libre (15 GB) y vuelve a abrirlo: sigue donde se quedó. |
+| El chat responde con un error de Claude o de autenticación | Tu token ha caducado (dura un año). Apaga Magister, borra `secretos/claude_token` y vuelve a abrirlo: te pedirá conectar otra vez. |
+| «Ya hay datos de Magister en este equipo, pero falta secretos/postgres_password» | Has puesto Magister en otra carpeta: copia la carpeta `secretos/` de la instalación anterior. |
+| «otro programa está usando el puerto 8080» | Ciérralo, o arranca con otro puerto: `MAGISTER_DOCKER_PUERTO_WEB=8090 bash sistema/magister.sh` (Mac y Linux) o `$env:MAGISTER_DOCKER_PUERTO_WEB=8090; .\Magister.bat` (PowerShell), y abre http://localhost:8090. |
 | Va muy lento o se cierra solo | Dale más memoria a Docker: Docker Desktop → Settings → Resources (8 GB o más). |
-| La primera pregunta sobre tus documentos tarda | La primera vez se descargan los modelos de búsqueda (unos 600 MB). Después ya no. |
-| No suena la voz o no se puede descargar el vídeo | La voz se instala al preparar Magister; si en ese momento falló la descarga, apágalo (`parar`), en una terminal en la carpeta de Magister escribe `docker compose --profile docker build --no-cache api` y vuelve a abrirlo. El resto de la app funciona sin voz. |
-| Quiero ver qué está pasando | En una terminal en la carpeta de Magister: `docker compose --profile docker logs -f api`. |
+| Quiero ver qué está pasando | En una terminal, en la carpeta `sistema`: `docker compose -f compose.yaml logs -f api`. |

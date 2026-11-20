@@ -8,7 +8,12 @@ Hablas con él de lo que quieres aprender y te propone un plan y un calendario e
 
 ## Instalar (Mac, Windows y Linux)
 
-Con Docker y un arrancador de doble clic (`Magister.command` en Mac, `Magister-docker.bat` en Windows, `magister.sh` en Linux). Cada persona usa su propia cuenta de Claude. Paso a paso, actualizar y problemas frecuentes: **[docs/instalar.md](docs/instalar.md)**.
+Un zip pequeño y un doble clic: el arrancador instala Docker si falta, descarga las imágenes ya hechas de ghcr.io, conecta tu cuenta de Claude y abre el navegador. Cada persona usa su propia cuenta de Claude.
+
+- **Windows:** [Magister-Windows.zip](https://github.com/Portaltocoding/magister-studio/releases/latest/download/Magister-Windows.zip) → Extraer todo → `Magister.bat`.
+- **Mac:** en Terminal, `curl -fsSL https://raw.githubusercontent.com/Portaltocoding/magister-studio/main/instalar-mac.sh | bash` (o [Magister-Mac.zip](https://github.com/Portaltocoding/magister-studio/releases/latest/download/Magister-Mac.zip) → `Magister.command`).
+
+Paso a paso, qué hay que pulsar, actualizar y problemas frecuentes: **[docs/instalar.md](docs/instalar.md)**. Desde el repo, `Magister.command`, `Magister-docker.bat` y `magister.sh` hacen lo mismo pero construyen las imágenes.
 
 ## Arrancar (Windows, para desarrollar)
 

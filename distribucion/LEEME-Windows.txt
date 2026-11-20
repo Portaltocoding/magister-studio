@@ -1,0 +1,24 @@
+MAGISTER STUDIO EN WINDOWS
+==========================
+
+Necesitas una cuenta de Claude Pro o Max, unos 15 GB libres y conexión a internet.
+
+PARA EMPEZAR
+1. Si aún no lo has hecho, descomprime el zip: clic derecho > «Extraer todo» > «Extraer».
+2. En la carpeta que sale, doble clic en «Magister.bat».
+3. Si sale «Windows protegió su PC»: «Más información» > «Ejecutar de todas formas». Solo la primera vez.
+
+LO QUE VERÁS LA PRIMERA VEZ (todo lo demás lo hace solo)
+- Si no tienes Docker, se instala solo: cuando Windows pregunte si permites cambios, pulsa «Sí».
+- Si te pide reiniciar el ordenador, reinícialo y vuelve a hacer doble clic en «Magister.bat».
+- En la ventana de Docker: «Accept»; si pide iniciar sesión, «Skip».
+- Se abre el navegador: inicia sesión en Claude y pulsa «Authorize». Copia el código que te da,
+  pégalo en la ventana negra (Ctrl+V) y pulsa Intro.
+- La primera descarga tarda (de 5 a 30 minutos). Al terminar se abre Magister en el navegador.
+
+CADA DÍA
+- Abrir: doble clic en «Magister.bat» (se actualiza solo si hay versión nueva).
+- Apagar: doble clic en «Parar Magister.bat». Tus datos se quedan guardados.
+
+No borres la carpeta «secretos»: es tu conexión con Claude y la llave de tus datos. No la compartas.
+Más ayuda: https://github.com/Portaltocoding/magister-studio/blob/main/docs/instalar.md

@@ -11,7 +11,7 @@ if [ -f /run/secrets/postgres_password ]; then
   # Para pg_dump, pg_restore y psql de las copias (MAGISTER_CONTENEDOR_DB vacío: se lanzan aquí mismo).
   export PGHOST=db PGPORT=5432 PGPASSWORD="$CLAVE"
 fi
-mkdir -p /datos/crudo /datos/salidas /datos/registros /datos/hf
+mkdir -p /datos/crudo /datos/salidas /datos/registros
 alembic upgrade head
 # Si una migración ha cambiado cómo se trocean las fuentes, lo ya guardado se reindexa antes de abrir la API.
 magister indexar --al-arrancar

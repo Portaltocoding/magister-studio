@@ -6,3 +6,5 @@ servidor/Dockerfile  text eol=lf
 web/Dockerfile       text eol=lf
 web/Caddyfile        text eol=lf
 *.bat      text eol=crlf
+# El LEEME del paquete de Windows, con CRLF para el Bloc de notas antiguo.
+distribucion/LEEME-Windows.txt  text eol=crlf
