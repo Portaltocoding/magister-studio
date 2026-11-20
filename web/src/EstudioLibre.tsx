@@ -241,6 +241,11 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
             {t('libre.notaPlan')}
           </p>
         )}
+        {tipo === 'libre' && (
+          <button type="button" className="libre-a-plan" onClick={() => irARuta('#/nuevo-plan')}>
+            {t('libre.aPlan')}
+          </button>
+        )}
         {error && <p role="alert">{error}</p>}
         <Hilo
           burbujas={[]}
@@ -252,11 +257,6 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           bajoCaja={opcionesChat}
           {...conAdjuntos}
         />
-        {tipo === 'libre' && (
-          <button type="button" className="libre-a-plan" onClick={() => irARuta('#/nuevo-plan')}>
-            {t('libre.aPlan')}
-          </button>
-        )}
       </div>
     )
   }

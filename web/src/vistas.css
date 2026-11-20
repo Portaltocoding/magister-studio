@@ -552,7 +552,9 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 
 /* ===== Modos de aprendizaje y lo que el tutor recuerda ===== */
 /* Opciones del chat, debajo de la caja y discretas: lo principal es escribir. */
-.pie-chat { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 8px; padding: 0 4px; font-size: 0.85rem; color: var(--suave); }
+.pie-chat { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 10px; padding: 0 4px; font-size: 0.85rem; color: var(--suave); }
+/* En la portada de Estudio libre todo va centrado: las opciones también, bajo la caja. */
+.libre .pie-chat { justify-content: center; }
 .selector-modo { position: relative; }
 .selector-idioma { display: inline-flex; border: 1px solid var(--borde); border-radius: 999px; overflow: hidden; }
 .selector-idioma button { font: inherit; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; padding: 3px 9px; border: 0; background: transparent; color: var(--suave); cursor: pointer; }
@@ -1001,7 +1003,7 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .biblioteca-lista a { color: var(--texto); font-weight: 600; overflow-wrap: anywhere; }
 .biblioteca-lista small { color: var(--suave); font-size: 0.85rem; }
 .biblioteca-botones { display: flex; gap: 6px; flex: none; }
-.biblioteca-enlaces { width: 100%; box-sizing: border-box; font: inherit; font-family: var(--mono, ui-monospace, monospace); font-size: 0.9rem; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 10px 0; resize: vertical; }
+.biblioteca-enlaces { width: 100%; box-sizing: border-box; font: inherit; font-family: var(--fuente-mono); font-size: 0.9rem; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 10px 0; resize: vertical; }
 .biblioteca-opciones { gap: 14px; align-items: center; flex-wrap: wrap; }
 .biblioteca-opciones select { font: inherit; color: var(--texto); background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 8px; padding: 4px 8px; }
 /* Arriba de la Biblioteca, cómo están tus fuentes; y meter de una vez lo que propuso el research. */
@@ -1013,7 +1015,7 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 
 /* Desde Estudio libre, el camino al plan. */
 .libre-a-plan {
-  border: 0; background: none; padding: 2px 0; margin: 22px auto 0; display: block; cursor: pointer; font: inherit; font-size: 0.9rem;
+  border: 0; background: none; padding: 2px 0; margin: -6px auto 22px; display: block; cursor: pointer; font: inherit; font-size: 0.92rem;
   color: var(--suave);
 }
 .libre-a-plan:hover { color: var(--texto); text-decoration: underline; text-underline-offset: 3px; }
@@ -1080,4 +1082,4 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 .ajustes-copia-fila small { color: var(--suave); }
 .ajustes-restaurar { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .ajustes-restaurar p { margin: 0; }
-.ajustes-restaurar input { font: inherit; font-family: ui-monospace, monospace; letter-spacing: 0.05em; max-width: 12em; }
+.ajustes-restaurar input { font: inherit; font-family: var(--fuente-mono); letter-spacing: 0.05em; max-width: 12em; }
