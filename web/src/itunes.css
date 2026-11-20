@@ -137,6 +137,10 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 .mascota-ojo { animation: parpadeo 6s infinite; transform-box: view-box; }
 .mascota-ojo + .mascota-ojo { animation-delay: 0.02s; }
 @keyframes parpadeo { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+/* Pupila de gato: rendija vertical que se ensancha un poco al escuchar o hablar. */
+.mascota .mascota-rendija { transform-box: fill-box; transform-origin: center; transition: transform 300ms ease-out; }
+.mascota.gesto-escuchando .mascota-rendija, .mascota.gesto-hablando .mascota-rendija { transform: scaleX(1.7); }
+@media (prefers-reduced-motion: reduce) { .mascota .mascota-rendija { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .mascota-ojo { animation: none; } .mascota .mascota-pupila, .mascota .mascota-brillo { transition: none; } }
 /* Quieta (la de la barra, hasta que la sacas como asesor): ni parpadea ni cierra los ojos al pasar por encima. */
 .mascota.quieta .mascota-ojo, .mascota.quieta .mascota-figura { animation: none !important; transform: none !important; transition: none !important; }
