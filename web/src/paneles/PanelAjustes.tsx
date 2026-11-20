@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { descargarMisDatos, hacerCopia, listarCopias, restaurarCopia, type CopiaBase } from '../api.ts'
+import { descargarMisDatos, guardarBienvenida, hacerCopia, listarCopias, restaurarCopia, type CopiaBase } from '../api.ts'
 import { avisoRestaurar, confirmaRestaurar, fechaCopia, nombreDescarga, PALABRA_RESTAURAR, tamano, tipoCopia } from './datosAjustes.ts'
+import { EVENTO_BIENVENIDA, limpiarNombre } from '../componentes/bienvenida.ts'
 import Aprendido from '../componentes/Aprendido.tsx'
 import Colores from '../componentes/Colores.tsx'
 import ControlVoz from '../componentes/ControlVoz.tsx'
@@ -233,6 +234,33 @@ export default function PanelAjustes() {
           />
           Avisarme cuando empiece una sesión y al acabar cada pomodoro
         </label>
+      </section>
+
+      <section className="ajustes-seccion">
+        <h2>Bienvenida</h2>
+        <p className="nota">Cómo te llama la mascota y la presentación de la primera vez: tu nombre, tu cuenta de Claude y una prueba.</p>
+        <label className="afinar-avisos">
+          Tu nombre{' '}
+          <input
+            key={p?.nombre ?? ''}
+            defaultValue={p?.nombre ?? ''}
+            maxLength={60}
+            placeholder="Cómo te llamo"
+            onBlur={(e) => {
+              const nombre = limpiarNombre(e.target.value)
+              if (nombre !== (p?.nombre ?? '')) void cambiarPreferencias({ nombre })
+            }}
+          />
+        </label>
+        <div className="ajustes-fila-botones">
+          <button
+            type="button"
+            className="boton"
+            onClick={() => guardarBienvenida('pendiente').then(() => window.dispatchEvent(new Event(EVENTO_BIENVENIDA)))}
+          >
+            Ver la bienvenida otra vez
+          </button>
+        </div>
       </section>
 
       <TusDatos />

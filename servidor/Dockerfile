@@ -58,7 +58,7 @@ COPY --chown=magister:magister alembic.ini ./
 COPY --chown=magister:magister config ./config
 COPY --chown=magister:magister evals ./evals
 COPY --chown=magister:magister entrada.sh ./entrada.sh
-# Lo usan los arrancadores para sacar el token de `claude setup-token` sin copiarlo a mano.
+# El alta por terminal (ya no la piden los arrancadores: la página conecta la cuenta con cerebro/cuenta.py).
 COPY --chown=magister:magister scripts/token_claude.py ./token_claude.py
 # Las reglas de tono, el glosario y la rúbrica del juez viven en docs/ del repo (fuera de servidor/): llegan por el
 # contexto «docs» de compose.yaml (additional_contexts) y van a /docs, donde las busca magister.tono.
@@ -67,7 +67,7 @@ COPY --from=docs tono.md glosario.md rubrica.md /docs/
 # (e5 y el reranker) vienen ya dentro de la imagen, en /opt/hf (ver abajo).
 ENV PATH="/app/.venv/bin:$PATH" HOME=/home/magister PYTHONUTF8=1 HF_HOME=/opt/hf \
     MAGISTER_CHECKPOINTS=/datos/checkpoints.sqlite MAGISTER_CRUDO=/datos/crudo MAGISTER_SALIDAS=/datos/salidas \
-    MAGISTER_REGISTROS=/datos/registros MAGISTER_SERVIR_WEB=false \
+    MAGISTER_REGISTROS=/datos/registros MAGISTER_SERVIR_WEB=false MAGISTER_CLAUDE_TOKEN_FICHERO=/datos/claude_token \
     MAGISTER_VOZ_PIPER=/opt/piper/piper MAGISTER_VOZ_DIR=/opt/piper-voces \
     MAGISTER_CHROME=/usr/bin/chromium CHROME_PATH=/usr/bin/chromium \
     MAGISTER_COPIAS=/copias MAGISTER_CONTENEDOR_DB= MAGISTER_COPIA_DIARIA=true

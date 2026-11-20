@@ -30,8 +30,7 @@ Lo que verás la primera vez:
 1. Si no tienes Docker, lo descarga (el de tu chip, Apple o Intel) y el Mac te pide **tu contraseña** para copiarlo a Aplicaciones.
 2. Se abre Docker. En su ventana: **Accept**; si pide tu contraseña, escríbela; si pide iniciar sesión, **Skip** (no hace falta cuenta). Magister espera solo.
 3. Descarga Magister (unos 3 GB).
-4. **Conectar con Claude:** se abre el navegador; inicia sesión en Claude y pulsa **Authorize**. La página te da un código: cópialo, vuelve a la ventana de Terminal, pégalo (**Cmd+V**) y pulsa Intro. El token se guarda solo.
-5. Arranca y abre **http://localhost:8080**.
+4. Arranca y abre **http://localhost:8080**, donde te recibe la mascota (ver «La bienvenida»).
 
 ## Windows
 
@@ -43,12 +42,25 @@ Lo que verás la primera vez:
 2. Si a Windows le falta WSL (lo que usa Docker), lo instala (otra vez **Sí**) y te pide **reiniciar**. Al volver, doble clic otra vez en `Magister.bat`: sigue donde se quedó. Lo mismo si Docker recién instalado no arranca hasta reiniciar.
 3. Se abre Docker. En su ventana: **Accept**; si pide iniciar sesión, **Skip**.
 4. Descarga Magister (unos 3 GB).
-5. **Conectar con Claude:** igual que en Mac, pegando el código con **Ctrl+V**.
-6. Arranca y abre **http://localhost:8080**.
+5. Arranca y abre **http://localhost:8080**, donde te recibe la mascota (ver «La bienvenida»).
 
 ## Linux
 
 Instala Docker Engine y el plugin de Compose (<https://docs.docker.com/engine/install/>; en Ubuntu y Debian, `docker-compose-plugin`) y, para usarlo sin `sudo`, `sudo usermod -aG docker $USER` y vuelve a entrar en la sesión. Después descarga `Magister-Mac.zip` (el arrancador es el mismo), descomprímelo y ejecuta `bash sistema/magister.sh`.
+
+## La bienvenida (conectar con Claude sin terminal)
+
+Los arrancadores ya no piden nada en la terminal: arrancan Magister y abren la página. La primera vez, la mascota te recibe en pocos pasos:
+
+1. **¿Cómo te llamo?** Tu nombre se usa en los saludos (se cambia en Ajustes → Bienvenida).
+2. **Conecta tu cuenta de Claude.** Pulsa **Conectar con Claude**: se abre una pestaña de Claude; inicia sesión, pulsa **Authorize**, copia el código que te da y pégalo en Magister. Si el código no vale, pulsa **Probar otra vez**. Este paso se salta si ya hay una cuenta conectada.
+3. **Una prueba rápida:** la mascota te saluda con la voz y hace una llamada mínima al modelo para confirmar que todo funciona.
+4. **¿Qué quieres aprender?** Abre el cuestionario de «Crear mi plan».
+5. **¿Tienes apuntes o PDF?** Opcional: te lleva a Biblioteca → Tus fuentes para subirlos.
+
+Se puede saltar (**Saltar la bienvenida**) y se reabre desde **Ajustes → Bienvenida → Ver la bienvenida otra vez**. El token se guarda en el volumen de datos de Magister (`/datos/claude_token`, permisos 600), no en `secretos/`, y no sale nunca de la API.
+
+**Por la terminal (alternativa):** si prefieres no usar la página, ejecuta `claude setup-token` en una terminal y pega el token (empieza por `sk-ant-`) en `secretos/claude_token` antes de arrancar. Lo que se conecte desde la página manda sobre ese fichero.
 
 ## Cada día
 
@@ -80,7 +92,7 @@ Publicar una versión: las imágenes se construyen solas en cada push a `main` (
 | Windows: doble clic en `Magister.bat` y dice que primero descomprimas | Lo has abierto dentro del zip. Clic derecho en el zip → **Extraer todo**, y ábrelo desde la carpeta. |
 | «Docker no termina de arrancar» | Reinicia el equipo y vuelve a abrir Magister. Si sigue, abre Docker Desktop a mano y mira si te pide algo. |
 | «No he podido descargar Magister» | Revisa la conexión y el espacio libre (15 GB) y vuelve a abrirlo: sigue donde se quedó. |
-| El chat responde con un error de Claude o de autenticación | Tu token ha caducado (dura un año). Apaga Magister, borra `secretos/claude_token` y vuelve a abrirlo: te pedirá conectar otra vez. |
+| El chat responde con un error de Claude o de autenticación | Tu token ha caducado (dura un año). La mascota te vuelve a enseñar el paso «Conecta tu cuenta de Claude»; también puedes ir a Ajustes → Bienvenida → Ver la bienvenida otra vez. |
 | «Ya hay datos de Magister en este equipo, pero falta secretos/postgres_password» | Has puesto Magister en otra carpeta: copia la carpeta `secretos/` de la instalación anterior. |
 | «otro programa está usando el puerto 8080» | Ciérralo, o arranca con otro puerto: `MAGISTER_DOCKER_PUERTO_WEB=8090 bash sistema/magister.sh` (Mac y Linux) o `$env:MAGISTER_DOCKER_PUERTO_WEB=8090; .\Magister.bat` (PowerShell), y abre http://localhost:8090. |
 | Va muy lento o se cierra solo | Dale más memoria a Docker: Docker Desktop → Settings → Resources (8 GB o más). |

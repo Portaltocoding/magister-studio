@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { hoyIso, listarConversaciones, type Conversacion } from './api.ts'
+import { hoyIso, listarConversaciones, verBienvenida, type Conversacion } from './api.ts'
 import BarraLateral from './BarraLateral.tsx'
 import BarraSesion from './BarraSesion.tsx'
 import Riel, { pendienteDeHoy, usarHoy } from './Riel.tsx'
 import Paleta from './componentes/Paleta.tsx'
 import { avisosActivos } from './componentes/Afinar.tsx'
 import Asesor from './componentes/Asesor.tsx'
+import Bienvenida from './componentes/Bienvenida.tsx'
+import { EVENTO_BIENVENIDA, EVENTO_CUENTA_CAIDA, modoDe, type Modo } from './componentes/bienvenida.ts'
 import { avisar } from './componentes/pomodoro.ts'
 import { acentoDe, sincronizarAcento, usarColores, variables } from './componentes/colores.ts'
 import Central from './Central.tsx'
@@ -94,6 +96,26 @@ export default function Marco() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => sincronizarAcento(colores), [])
   useEffect(() => setMenu(false), [modo, activa])
+  // La bienvenida de la primera vez (o el paso de Claude, si la cuenta ha caducado): lo decide el servidor.
+  const [bienvenida, setBienvenida] = useState<{ modo: Modo; nombre: string; cuentaConectada: boolean } | null>(null)
+  const mirarBienvenida = useCallback(() => {
+    verBienvenida()
+      .then((e) => {
+        const modo = modoDe(e)
+        if (modo) setBienvenida((abierta) => abierta ?? { modo, nombre: e.nombre, cuentaConectada: e.cuenta.conectada })
+      })
+      .catch(() => undefined)
+  }, [])
+  useEffect(() => {
+    mirarBienvenida()
+    // Una petición ha fallado por la cuenta de Claude, o se reabre desde Ajustes.
+    window.addEventListener(EVENTO_CUENTA_CAIDA, mirarBienvenida)
+    window.addEventListener(EVENTO_BIENVENIDA, mirarBienvenida)
+    return () => {
+      window.removeEventListener(EVENTO_CUENTA_CAIDA, mirarBienvenida)
+      window.removeEventListener(EVENTO_BIENVENIDA, mirarBienvenida)
+    }
+  }, [mirarBienvenida])
   const [tipoNueva, setTipoNueva] = useState<'libre' | 'plan'>(() => (inicial.nuevoPlan ? 'plan' : 'libre'))
 
   const recargar = useCallback(() => {
@@ -203,6 +225,7 @@ export default function Marco() {
         />
       </main>
       <Asesor />
+      {bienvenida && <Bienvenida {...bienvenida} alCerrar={() => setBienvenida(null)} />}
     </div>
   )
 }

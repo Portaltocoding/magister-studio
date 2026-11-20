@@ -20,13 +20,15 @@ O BIEN, CON ESTA CARPETA
 LO QUE VERÁS LA PRIMERA VEZ (todo lo demás lo hace solo)
 - Si no tienes Docker, se instala solo: el Mac te pedirá tu contraseña.
 - En la ventana de Docker: «Accept»; si pide tu contraseña, escríbela; si pide iniciar sesión, «Skip».
-- Se abre el navegador: inicia sesión en Claude y pulsa «Authorize». Copia el código que te da,
-  pégalo en la ventana negra (Cmd+V) y pulsa Intro.
 - La primera descarga tarda (de 5 a 30 minutos). Al terminar se abre Magister en el navegador.
+- En el navegador, la mascota te recibe y te pide conectar tu cuenta de Claude: pulsa «Conectar con
+  Claude», inicia sesión en la pestaña que se abre, pulsa «Authorize», copia el código que te da y
+  pégalo en Magister. No hace falta tocar la ventana negra.
 
 CADA DÍA
 - Abrir: doble clic en «Magister.command» (se actualiza solo si hay versión nueva).
 - Apagar: doble clic en «Parar Magister.command». Tus datos se quedan guardados.
 
-No borres la carpeta «secretos»: es tu conexión con Claude y la llave de tus datos. No la compartas.
+No borres la carpeta «secretos»: es la llave de tus datos. No la compartas. Tu conexión con Claude
+se guarda dentro de Magister; si caduca, la mascota te pedirá conectarla otra vez.
 Más ayuda: https://github.com/Portaltocoding/magister-studio/blob/main/docs/instalar.md

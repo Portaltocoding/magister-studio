@@ -6579,6 +6579,166 @@
         }
       }
     },
+    "/api/bienvenida": {
+      "get": {
+        "tags": [
+          "bienvenida"
+        ],
+        "summary": "Ver",
+        "description": "Qué pasos enseñar: el estado de la bienvenida, cómo te llama la mascota y si la cuenta de Claude funciona.",
+        "operationId": "ver_api_bienvenida_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ver Api Bienvenida Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bienvenida/estado": {
+      "put": {
+        "tags": [
+          "bienvenida"
+        ],
+        "summary": "Guardar Estado",
+        "description": "«hecha» o «omitida» la cierran para siempre; «pendiente» la reabre (Ajustes).",
+        "operationId": "guardar_estado_api_bienvenida_estado_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Estado"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Guardar Estado Api Bienvenida Estado Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bienvenida/cuenta/iniciar": {
+      "post": {
+        "tags": [
+          "bienvenida"
+        ],
+        "summary": "Iniciar Cuenta",
+        "description": "Arranca el inicio de sesión de Claude y devuelve el enlace que la página abre en otra pestaña.",
+        "operationId": "iniciar_cuenta_api_bienvenida_cuenta_iniciar_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Iniciar Cuenta Api Bienvenida Cuenta Iniciar Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bienvenida/cuenta/codigo": {
+      "post": {
+        "tags": [
+          "bienvenida"
+        ],
+        "summary": "Terminar Cuenta",
+        "description": "El código que enseña Claude: se acaba el alta y el token queda guardado (no se devuelve).",
+        "operationId": "terminar_cuenta_api_bienvenida_cuenta_codigo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Codigo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Terminar Cuenta Api Bienvenida Cuenta Codigo Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bienvenida/probar": {
+      "post": {
+        "tags": [
+          "bienvenida"
+        ],
+        "summary": "Probar",
+        "description": "Una llamada mínima al modelo: confirma que la cuenta funciona.",
+        "operationId": "probar_api_bienvenida_probar_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Probar Api Bienvenida Probar Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/modelos/mapa": {
       "get": {
         "summary": "Ver Mapa",
@@ -6856,6 +7016,21 @@
         ],
         "title": "CambiarEstilo"
       },
+      "Codigo": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Codigo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo"
+        ],
+        "title": "Codigo"
+      },
       "ConversacionEntrada": {
         "properties": {
           "titulo": {
@@ -7071,6 +7246,24 @@
           "frases"
         ],
         "title": "EscenaVideo"
+      },
+      "Estado": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "hecha",
+              "omitida"
+            ],
+            "title": "Estado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado"
+        ],
+        "title": "Estado"
       },
       "EstadoSesion": {
         "properties": {
@@ -8474,6 +8667,12 @@
             ],
             "title": "Idioma",
             "default": "es"
+          },
+          "nombre": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Nombre",
+            "default": ""
           },
           "instrucciones": {
             "items": {

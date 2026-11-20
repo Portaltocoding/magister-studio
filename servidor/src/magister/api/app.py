@@ -29,6 +29,7 @@ from magister.api.rutas_notas import rutas as rutas_notas
 from magister.api.rutas_voz import rutas as rutas_voz
 from magister.api.rutas_proyectos import rutas as rutas_proyectos
 from magister.api.rutas_cuota import rutas as rutas_cuota
+from magister.api.rutas_bienvenida import rutas as rutas_bienvenida
 from magister.api.rutas_video import rutas as rutas_video
 from magister.api.seguridad import Proteccion
 from magister.config import ajustes
@@ -315,6 +316,7 @@ app.include_router(rutas_examen)
 app.include_router(rutas_video)
 app.include_router(rutas_borrar)
 app.include_router(rutas_cuota)
+app.include_router(rutas_bienvenida)
 app.include_router(rutas_modelos)
 from magister.api.rutas_datos import rutas as rutas_datos  # noqa: E402
 

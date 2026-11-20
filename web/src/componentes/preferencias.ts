@@ -20,6 +20,8 @@ export interface PreferenciasTutor {
   tests: boolean
   opciones: boolean
   idioma: 'es' | 'en'
+  // Cómo te llama la mascota (lo pregunta la bienvenida).
+  nombre: string
   instrucciones: string[]
   modos: ModoAprendizaje[]
   modo: string | null

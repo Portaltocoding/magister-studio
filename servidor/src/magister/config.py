@@ -29,6 +29,9 @@ class Ajustes(BaseSettings):
 
     # Seguridad mínima
     token: str = ""
+    # Dónde guarda la página el token de Claude que saca el alta de bienvenida (permisos 600). Se lee en cada llamada a
+    # claude y manda sobre CLAUDE_CODE_OAUTH_TOKEN. En Docker va al volumen de datos (/datos/claude_token).
+    claude_token_fichero: str = str(RAIZ_SERVIDOR / "datos_locales" / "claude_token")
 
     # Bases de datos
     db_url: str = "postgresql+asyncpg://magister:magister@127.0.0.1:5433/magister"

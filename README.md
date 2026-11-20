@@ -33,7 +33,7 @@ Para desarrollar con recarga en caliente, tres terminales:
 | 2 | `cd servidor && uv run alembic upgrade head && uv run uvicorn magister.api.app:app --port 8000` (sin `--reload`) | 8000 |
 | 3 | `cd web && npm run dev` | 5173 |
 
-Todo dentro de Docker: `docker compose --profile docker up -d` (ver [ADR-0016](docs/adr/0016-despliegue.md); necesita `secretos/` con el token de `claude setup-token`).
+Todo dentro de Docker: `docker compose --profile docker up -d` (ver [ADR-0016](docs/adr/0016-despliegue.md); necesita `secretos/`; la cuenta de Claude se conecta desde la página la primera vez, ver [docs/instalar.md](docs/instalar.md)).
 
 ## Cómo se usa
 

@@ -2,8 +2,12 @@
 # Entrada del contenedor de la API: el token de claude sale de un secreto, se migra y se arranca.
 set -e
 if [ -f /run/secrets/claude_token ]; then
-  CLAUDE_CODE_OAUTH_TOKEN="$(tr -d ' \r\n' < /run/secrets/claude_token)"
-  export CLAUDE_CODE_OAUTH_TOKEN
+  # Vacío (los arrancadores ya no lo piden): la página de bienvenida conecta la cuenta y guarda el token en /datos.
+  TOKEN_SECRETO="$(tr -d ' \r\n' < /run/secrets/claude_token)"
+  if [ -n "$TOKEN_SECRETO" ]; then
+    CLAUDE_CODE_OAUTH_TOKEN="$TOKEN_SECRETO"
+    export CLAUDE_CODE_OAUTH_TOKEN
+  fi
 fi
 if [ -f /run/secrets/postgres_password ]; then
   CLAVE="$(tr -d '\r\n' < /run/secrets/postgres_password)"

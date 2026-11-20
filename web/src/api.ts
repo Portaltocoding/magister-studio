@@ -1,6 +1,7 @@
 // El único fichero de la página que sabe cómo habla la API.
 // Todas las URL son relativas: el proxy (Vite, Caddy o Electron) las lleva a la API.
 import { textoValidacion } from './componentes/errores.ts'
+import { esErrorDeCuenta, EVENTO_CUENTA_CAIDA, type EstadoBienvenida } from './componentes/bienvenida.ts'
 
 // Una petición no ha llegado al servidor: la cabecera (BarraSesion) lo comprueba ya, sin esperar a su minuto.
 export const EVENTO_SIN_RESPUESTA = 'magister-sin-respuesta'
@@ -128,11 +129,17 @@ export interface PlanSustituido {
   conserva: { lecciones: string[]; horas_hechas: number; fuentes: number }
 }
 
+// El servidor dice que la cuenta de Claude no vale (token caducado o revocado): la bienvenida vuelve al paso de Claude.
+function avisarSiCuentaCaida(texto: string | undefined) {
+  if (typeof window !== 'undefined' && esErrorDeCuenta(texto)) window.dispatchEvent(new Event(EVENTO_CUENTA_CAIDA))
+}
+
 export class ErrorApi extends Error {
   codigo: number
   constructor(codigo: number, detalle: string) {
     super(detalle)
     this.codigo = codigo
+    avisarSiCuentaCaida(detalle)
   }
 }
 
@@ -668,3 +675,11 @@ export const listarCopias = () => pedir<{ copias: CopiaBase[]; ocupado: boolean 
 export const hacerCopia = () => pedir<CopiaBase>('/api/datos/copias', { method: 'POST' })
 export const restaurarCopia = (copia: string, confirmacion: string) =>
   pedir<{ copia_previa: string; restaurada: string }>('/api/datos/copias/restaurar', enviarJson({ copia, confirmacion }))
+
+// La bienvenida de la primera vez y la conexión con Claude (el token no viaja nunca: solo el enlace y el código).
+export const verBienvenida = () => pedir<EstadoBienvenida>('/api/bienvenida')
+export const guardarBienvenida = (estado: EstadoBienvenida['estado']) =>
+  pedir<{ estado: string }>('/api/bienvenida/estado', enviarJson({ estado }, 'PUT'))
+export const iniciarCuenta = () => pedir<{ enlace: string }>('/api/bienvenida/cuenta/iniciar', { method: 'POST' })
+export const enviarCodigoCuenta = (codigo: string) => pedir<{ conectada: boolean }>('/api/bienvenida/cuenta/codigo', enviarJson({ codigo }))
+export const probarCuenta = () => pedir<{ ok: boolean; cuenta: boolean; mensaje: string }>('/api/bienvenida/probar', { method: 'POST' })

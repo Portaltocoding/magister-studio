@@ -6,7 +6,7 @@
 #     de ghcr.io): descarga lo nuevo con `docker compose pull` y arranca sin construir nada.
 #   - En el repo (raíz, con el compose.yaml de desarrollo): construye las imágenes, como siempre.
 # En los dos: instala Docker Desktop si falta (winget), lo arranca, prepara la primera vez los secretos (contraseña de
-# la base, canario y tu token de Claude, que saca solo de `claude setup-token`), levanta todo y abre el navegador.
+# la base y canario), levanta todo y abre el navegador. La cuenta de Claude se conecta en la página, la primera vez.
 # Uso: Magister.bat            arranca (o solo abre el navegador si ya está en marcha)
 #      Magister.bat parar      lo apaga
 param([string]$Orden = "")
@@ -171,6 +171,7 @@ if (-not (Test-Path $canario) -or (Get-Item $canario).Length -eq 0) {
     Escribir $canario ("mg-" + (Aleatorio 32 "0123456789abcdef"))
 }
 $fichToken = Join-Path $secretos "claude_token"
+# Vacío salvo que pegues tu token a mano: el contenedor lo necesita para arrancar, y la página guarda el suyo en /datos.
 if (-not (Test-Path $fichToken)) { Escribir $fichToken "" }
 
 # 5. Lo último de Magister (paquete) o construirlo (repo)
@@ -192,43 +193,8 @@ if ($modo -eq "paquete") {
     if ($LASTEXITCODE -ne 0) { Salir "No he podido preparar Magister. Comprueba tu conexión a internet y el espacio en el disco, y vuelve a abrir Magister." }
 }
 
-# 6. El token de Claude (tu cuenta, con tu suscripción)
-function TokenValido { (Test-Path $fichToken) -and ((Get-Content $fichToken -Raw -ErrorAction SilentlyContinue) -match '^\s*sk-ant-') }
-if (-not (TokenValido)) {
-    Decir ("------------------------------------------------------------------`n" +
-        "Falta conectar Magister con tu cuenta de Claude (Pro o Max). Se hace una sola vez:`n" +
-        "  1. Se abrirá el navegador: inicia sesión en Claude y pulsa «Authorize».`n" +
-        "  2. Te enseñará un código: cópialo, vuelve a esta ventana, pégalo (Ctrl+V) y pulsa Intro.`n" +
-        "Lo demás lo hago yo.`n" +
-        "------------------------------------------------------------------")
-    Read-Host "Pulsa Intro para empezar" | Out-Null
-    $enlace = Join-Path $secretos ".enlace"
-    Remove-Item $enlace -Force -ErrorAction SilentlyContinue
-    # Abre en el navegador el enlace de inicio de sesión que deja token_claude.py, en cuanto aparece.
-    $vigia = Start-Job -ArgumentList $enlace -ScriptBlock {
-        param($f)
-        for ($i = 0; $i -lt 900; $i++) {
-            if (Test-Path $f) {
-                $u = (Get-Content $f -Raw).Trim()
-                if ($u -match '^https://[^\s"]+$') { Start-Process $u; break }
-            }
-            Start-Sleep -Seconds 1
-        }
-    }
-    docker run --rm -it -v "${secretos}:/salida" --entrypoint python $imagenApi /app/token_claude.py /salida
-    Stop-Job $vigia -ErrorAction SilentlyContinue
-    Remove-Job $vigia -Force -ErrorAction SilentlyContinue
-    Remove-Item $enlace -Force -ErrorAction SilentlyContinue
-    if (TokenValido) {
-        Decir "Hecho: Magister ya está conectado con tu cuenta de Claude."
-    } else {
-        # Plan B: pegarlo a mano.
-        Write-Host ""
-        $token = (Read-Host "No he visto el token. Si en pantalla hay uno que empieza por sk-ant-, cópialo, pégalo aquí y pulsa Intro") -replace '\s', ''
-        if ($token -notlike "sk-ant-*") { Salir "Sin el token no puedo conectar con Claude. Vuelve a hacer doble clic en Magister para intentarlo otra vez." }
-        Escribir $fichToken $token
-    }
-}
+# 6. La cuenta de Claude ya no se pide aquí: la página de Magister la conecta la primera vez que la abres (sin terminal).
+#    Si prefieres la terminal, escribe tu token (`claude setup-token`) en secretos\claude_token antes de arrancar.
 
 # 7. Levantar todo
 $env:MAGISTER_DOCKER_DB_CLAVE = (Get-Content $clave -Raw).Trim()

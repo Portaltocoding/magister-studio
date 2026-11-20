@@ -13,6 +13,7 @@ import './proyectos.css'
 import './asesor.css'
 import './animo.css'
 import './riso.css'
+import './bienvenida.css'
 import { aplicarTema } from './componentes/tema.ts'
 import { aplicarTamano } from './componentes/escala.ts'
 

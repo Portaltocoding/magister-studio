@@ -45,6 +45,7 @@ const YA_LEGIBLES = new Set([MENSAJE_FRENO, MENSAJE_ESTRUCTURA])
 // («tras 5 intentos: …», «N intentos sin salida válida; último: error del modelo: plazo agotado»).
 const REGLAS: [RegExp, string][] = [
   [/freno:|por demasiadas llamadas seguidas/i, MENSAJE_FRENO],
+  [/cuenta de Claude no está conectada/i, 'Tu cuenta de Claude no está conectada o ha caducado. Vuelve a conectarla desde Ajustes, en «Bienvenida».'],
   [/en pausa tras varios fallos seguidos/i, 'El modelo ha fallado varias veces seguidas y descansa un minuto. Vuelve a pedirlo luego.'],
   [/no encuentro el programa claude/i, 'No encuentro el programa del modelo (claude) en tu equipo. Comprueba que está instalado y reinicia Magister.'],
   [/usage limit|hit your limit|limit reached|rate[ _-]?limit|\b429\b/i, 'Has llegado al límite de uso del modelo. Vuelve a pedirlo cuando se renueve.'],

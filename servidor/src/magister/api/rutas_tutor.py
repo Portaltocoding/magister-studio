@@ -256,6 +256,8 @@ class PreferenciasTutor(BaseModel):
     tests: bool = True
     opciones: bool = True
     idioma: Literal["es", "en"] = "es"
+    # Cómo te llama la mascota (lo pregunta la bienvenida; se cambia en Ajustes).
+    nombre: str = Field("", max_length=60)
     instrucciones: list[str] = Field(default_factory=list, max_length=30)
     modos: list[ModoPropio] = Field(default_factory=list, max_length=20)
     modo: str | None = None

@@ -7,7 +7,7 @@
 #     ghcr.io): descarga lo nuevo con `docker compose pull` y arranca sin construir nada.
 #   - En el repo (raíz, con el compose.yaml de desarrollo): construye las imágenes, como siempre.
 # En los dos: instala Docker Desktop si falta (Mac), lo arranca, prepara la primera vez los secretos (contraseña de la
-# base, canario y tu token de Claude, que saca solo de `claude setup-token`), levanta todo y abre el navegador.
+# base y canario), levanta todo y abre el navegador. La cuenta de Claude se conecta en la página, la primera vez.
 set -u
 AQUI="$(cd "$(dirname "$0")" && pwd)" || exit 1
 export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:$HOME/.docker/bin"
@@ -111,18 +111,6 @@ contraseña del Mac, escríbela; y si te pide iniciar sesión, pulsa «Skip» (n
   return 1
 }
 
-# Abre en el navegador el enlace de inicio de sesión que deja token_claude.py, en cuanto aparece.
-vigilar_enlace() {
-  local i
-  for i in $(seq 1 900); do
-    if [ -s "$SECRETOS/.enlace" ]; then
-      abrir_enlace "$(cat "$SECRETOS/.enlace")"
-      return 0
-    fi
-    sleep 1
-  done
-}
-
 echo "=== Magister Studio ==="
 
 # 1. Docker instalado
@@ -186,6 +174,7 @@ fi
 if [ ! -s "$SECRETOS/canario" ]; then
   printf 'mg-%s' "$(LC_ALL=C tr -dc 'a-f0-9' </dev/urandom | head -c 32)" > "$SECRETOS/canario"
 fi
+# Vacío salvo que pegues tu token a mano: el contenedor lo necesita para arrancar, y la página guarda el suyo en /datos.
 [ -f "$SECRETOS/claude_token" ] || : > "$SECRETOS/claude_token"
 chmod 644 "$SECRETOS/postgres_password" "$SECRETOS/canario" "$SECRETOS/claude_token"  # el contenedor los lee con otro usuario
 
@@ -206,40 +195,8 @@ else
 disco, y vuelve a abrir Magister."
 fi
 
-# 6. El token de Claude (tu cuenta, con tu suscripción)
-token_valido() { grep -q '^sk-ant-' "$SECRETOS/claude_token" 2>/dev/null; }
-if ! token_valido; then
-  decir "------------------------------------------------------------------
-Falta conectar Magister con tu cuenta de Claude (Pro o Max). Se hace una sola vez:
-  1. Se abrirá el navegador: inicia sesión en Claude y pulsa «Authorize».
-  2. Te enseñará un código: cópialo, vuelve a esta ventana, pégalo (Cmd+V) y pulsa Intro.
-Lo demás lo hago yo.
-------------------------------------------------------------------"
-  read -r -p "Pulsa Intro para empezar. " _ || true
-  rm -f "$SECRETOS/.enlace"
-  vigilar_enlace &
-  VIGIA=$!
-  USUARIO=()
-  # En Linux la carpeta montada es de tu usuario: claude corre con tu uid para poder escribir el token en ella.
-  if [ "$SISTEMA" = "Linux" ]; then USUARIO=(--user "$(id -u):$(id -g)" -e HOME=/tmp); fi
-  # ${USUARIO[@]+...}: el bash de los Mac (3.2) no deja usar un array vacío con set -u.
-  docker run --rm -it ${USUARIO[@]+"${USUARIO[@]}"} -v "$(cd "$SECRETOS" && pwd):/salida" \
-    --entrypoint python "$IMAGEN_API" /app/token_claude.py /salida
-  kill "$VIGIA" >/dev/null 2>&1
-  rm -f "$SECRETOS/.enlace"
-  if token_valido; then
-    decir "Hecho: Magister ya está conectado con tu cuenta de Claude."
-  else
-    # Plan B: pegarlo a mano.
-    printf '\n'
-    read -r -p "No he visto el token. Si en pantalla hay uno que empieza por sk-ant-, cópialo, pégalo aquí y pulsa Intro: " token || true
-    token="$(printf '%s' "${token:-}" | tr -d ' \r\n')"
-    case "$token" in
-      sk-ant-*) printf '%s' "$token" > "$SECRETOS/claude_token"; chmod 644 "$SECRETOS/claude_token" ;;
-      *) salir "Sin el token no puedo conectar con Claude. Vuelve a hacer doble clic en Magister para intentarlo otra vez." ;;
-    esac
-  fi
-fi
+# 6. La cuenta de Claude ya no se pide aquí: la página de Magister la conecta la primera vez que la abres (sin terminal).
+#    Si prefieres la terminal, escribe tu token (`claude setup-token`) en secretos/claude_token antes de arrancar.
 
 # 7. Levantar todo
 MAGISTER_DOCKER_DB_CLAVE="$(cat "$SECRETOS/postgres_password")"

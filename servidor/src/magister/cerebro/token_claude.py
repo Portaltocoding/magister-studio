@@ -1,7 +1,7 @@
 """Conducir `claude setup-token` desde código: sacar el enlace de inicio de sesión, pasarle el código y leer el token.
 
-Lo usan el arrancador (servidor/scripts/token_claude.py, en modo interactivo en la terminal) y, más adelante, el
-alta desde la propia página (el navegador pide la cuenta de Claude):
+Lo usan el alta desde la propia página (cerebro/cuenta.py: el navegador pide la cuenta de Claude) y, como alternativa
+por terminal, servidor/scripts/token_claude.py:
 
     with SesionToken() as sesion:
         enlace = sesion.arrancar()             # https://claude.ai/oauth/authorize?...  -> se enseña al usuario

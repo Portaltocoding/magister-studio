@@ -171,8 +171,13 @@ def _escribir_sistema(sistema: str) -> str:
 
 
 async def _proceso_claude(args: list[str], entrada: str) -> AsyncIterator[dict]:
+    from magister.cerebro import cuenta
+
+    # El token que dio la página de bienvenida se lee en cada llamada (sin reiniciar la API) y manda sobre el de la variable.
+    entorno = await asyncio.to_thread(cuenta.entorno_claude)
     proc = await asyncio.create_subprocess_exec(
         *args,
+        env=entorno,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -219,14 +224,23 @@ async def _proceso_claude(args: list[str], entrada: str) -> AsyncIterator[dict]:
                         evento["_limites"] = limites
                     resultado = evento
                     if evento.get("is_error"):
-                        raise ErrorModelo(str(evento.get("result") or evento.get("subtype") or "error del modelo"))
+                        texto_error = str(evento.get("result") or evento.get("subtype") or "error del modelo")
+                        if cuenta.es_error_de_cuenta(texto_error):
+                            cuenta.marcar_caida()
+                            raise ErrorModelo(cuenta.MENSAJE_CUENTA)  # sin el texto crudo: la página vuelve al paso de Claude
+                        raise ErrorModelo(texto_error)
                 yield evento
             codigo = await proc.wait()
             await tarea_err
+            if codigo != 0 or resultado is None:
+                if cuenta.es_error_de_cuenta(final_err()):
+                    cuenta.marcar_caida()
+                    raise ErrorModelo(cuenta.MENSAJE_CUENTA)
             if codigo != 0:
                 raise ErrorModelo(f"claude salió con código {codigo}: {final_err()}")
             if resultado is None:
                 raise ErrorModelo(f"claude terminó sin resultado: {final_err()}")
+            cuenta.marcar_buena()
     except TimeoutError:
         raise ErrorModelo("plazo agotado") from None
     finally:

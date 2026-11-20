@@ -493,6 +493,8 @@ PREFERENCIAS_POR_DEFECTO = {"longitud": "normal", "nivel": "normal", "estilo": "
                             "diagramas": True, "tests": True, "opciones": True,
                             # En qué idioma contesta el chat escrito (la voz y el material siguen en español).
                             "idioma": "es",
+                            # Cómo te llama la mascota en los saludos de la página (no entra en los prompts).
+                            "nombre": "",
                             # Lo que le has dicho que recuerde («a partir de ahora...») y tus modos de aprendizaje.
                             "instrucciones": [], "modos": [], "modo": None}
 
