@@ -33,3 +33,7 @@ afinar/datos/
 herramientas/piper/
 servidor/registros/
 afinar/*.gguf
+
+# Herramientas locales de cada equipo (skills del editor y su candado)
+.claude/
+skills-lock.json

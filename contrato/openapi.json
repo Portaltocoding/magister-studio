@@ -418,7 +418,7 @@
     "/api/conversaciones/{cid}/propuesta": {
       "get": {
         "summary": "Propuesta Pendiente",
-        "description": "El plan propuesto que espera tu decisión, o null. Sirve para recuperarlo al recargar.",
+        "description": "El plan propuesto que espera tu decisión (con `sustituye`), o null si no hay ninguno. Sirve para recuperarlo al\nrecargar. Una conversación que no existe da 404.",
         "operationId": "propuesta_pendiente_api_conversaciones__cid__propuesta_get",
         "parameters": [
           {
@@ -1178,6 +1178,7 @@
     "/api/temas/{tema_id}/plan/reajuste/aceptar": {
       "post": {
         "summary": "Aceptar Reajuste",
+        "description": "Guarda el reajuste propuesto. Se comprueba antes de borrar nada: una lista vacía, una lección que no está en el\nplan, horas fuera de (0, 12] o una fecha anterior a hoy dan 422 con el motivo.",
         "operationId": "aceptar_reajuste_api_temas__tema_id__plan_reajuste_aceptar_post",
         "parameters": [
           {
@@ -1694,7 +1695,7 @@
     "/api/research": {
       "post": {
         "summary": "Lanzar",
-        "description": "Las lecciones que el plan marca con `necesita_fuentes` = «no» se saltan (salvo una sola o `forzar`): la\nrespuesta dice cuáles en `saltadas` y por qué en `aviso`.",
+        "description": "Las lecciones que el plan marca con `necesita_fuentes` = «no» se saltan (salvo con `forzar`): la\nrespuesta dice cuáles en `saltadas` y por qué en `aviso`.",
         "operationId": "lanzar_api_research_post",
         "requestBody": {
           "content": {
@@ -2710,6 +2711,7 @@
     "/api/planes/{plan_id}/libro": {
       "get": {
         "summary": "Ver Libro",
+        "description": "Cómo va el libro, con lo que la web necesita: nunca la ruta del PDF en el disco (se baja por /libro/pdf).",
         "operationId": "ver_libro_api_planes__plan_id__libro_get",
         "parameters": [
           {
@@ -2835,7 +2837,7 @@
     "/api/planes/{plan_id}/materiales": {
       "get": {
         "summary": "Materiales Del Plan",
-        "description": "Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha.",
+        "description": "Por lección: el estado del último material de cada tipo, cuántas fichas tiene y si hay un trabajo en marcha.\n\n- `tipos[tipo]`: el estado del último material de ese tipo (`generando` solo si no hay ninguno terminado).\n- `ids[tipo]` y `apuntes_id`: SOLO de materiales terminados (listo, revisar o bloqueado); uno a medias no se puede\n  abrir (su contrato está a medio hacer). `apuntes_listos` dice si hay apuntes que se pueden estudiar\n  (listo o revisar): es el campo que debe mirar quien ofrezca «Empezar».\n- `trabajo`: el trabajo de material en marcha, si lo hay: `{\"id\", \"estado\": \"pendiente\" | \"en_curso\",\n  \"tipos\": [...]}` («En cola» frente a «Generando», y si solo se hacen las diapositivas o el guion).\n  `en_marcha` sigue para quien ya lo miraba.",
         "operationId": "materiales_del_plan_api_planes__plan_id__materiales_get",
         "parameters": [
           {
@@ -3445,6 +3447,56 @@
         }
       }
     },
+    "/api/practica/ultimo": {
+      "get": {
+        "summary": "Ver Ultimo",
+        "description": "El último intento de Repaso (de las últimas `minutos`), con su nota y su explicación: lo que enseña la\ninterfaz si recargaste mientras se corregía. Espera antes a las correcciones que sigan en marcha.",
+        "operationId": "ver_ultimo_api_practica_ultimo_get",
+        "parameters": [
+          {
+            "name": "minutos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 120,
+              "title": "Minutos"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Ver Ultimo Api Practica Ultimo Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/practica/autoevaluacion": {
       "post": {
         "summary": "Autoevaluar",
@@ -3489,6 +3541,7 @@
     "/api/practica/intentos/{intento_id}": {
       "patch": {
         "summary": "Corregir Nota",
+        "description": "La única escritura que admite `intentos`. Dice además si cambia algo: solo el primer intento espaciado del día\nde cada concepto es un repaso; tu nota en los demás queda apuntada pero no mueve el programador.",
         "operationId": "corregir_nota_api_practica_intentos__intento_id__patch",
         "parameters": [
           {
@@ -3497,6 +3550,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "format": "uuid",
               "title": "Intento Id"
             }
           }
@@ -3574,6 +3628,22 @@
               "default": 14,
               "title": "Dias"
             }
+          },
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plan Id"
+            }
           }
         ],
         "responses": {
@@ -3623,6 +3693,22 @@
               "default": "usuario",
               "title": "Fuente"
             }
+          },
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plan Id"
+            }
           }
         ],
         "responses": {
@@ -3658,15 +3744,43 @@
       "get": {
         "summary": "Resumen",
         "operationId": "resumen_api_progreso_resumen_get",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plan Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Resumen Api Progreso Resumen Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -5464,6 +5578,7 @@
       },
       "delete": {
         "summary": "Borrar",
+        "description": "Borra el proyecto y, antes, cancela sus trabajos de la cola que aún no han acabado (si no, el modelo se gasta\nen un proyecto que ya no existe).",
         "operationId": "borrar_api_proyectos__pid__delete",
         "parameters": [
           {
@@ -5597,6 +5712,7 @@
     "/api/proyectos/{pid}/pasos/{paso_id}": {
       "put": {
         "summary": "Marcar",
+        "description": "Marca o desmarca un paso. Con la fila bloqueada, como el arnés del asesor: varias marcas a la vez (clics\nseguidos en varias casillas) se hacen una detrás de otra y no se pisan.",
         "operationId": "marcar_api_proyectos__pid__pasos__paso_id__put",
         "parameters": [
           {
@@ -6378,6 +6494,7 @@
           "cuota"
         ],
         "summary": "Estimar",
+        "description": "`lecciones`, con material o research: lo de varias lecciones a la vez.",
         "operationId": "estimar_api_cuota_estimar_get",
         "parameters": [
           {
@@ -6415,6 +6532,24 @@
                 }
               ],
               "title": "Minutos"
+            }
+          },
+          {
+            "name": "lecciones",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lecciones"
             }
           }
         ],
@@ -6653,6 +6788,15 @@
             "maxLength": 2000,
             "title": "Respuesta",
             "default": ""
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "espaciado",
+              "reintento"
+            ],
+            "title": "Tipo",
+            "default": "espaciado"
           }
         },
         "type": "object",
@@ -7497,8 +7641,7 @@
           },
           "respuesta": {
             "type": "string",
-            "maxLength": 8000,
-            "minLength": 1,
+            "maxLength": 200000,
             "title": "Respuesta"
           },
           "confianza": {
@@ -7771,6 +7914,18 @@
             "type": "boolean",
             "title": "Cuenta",
             "default": true
+          },
+          "respuestas_rapidas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Respuestas Rapidas"
           }
         },
         "type": "object",
@@ -8418,13 +8573,14 @@
         "properties": {
           "sesiones": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/SesionReajuste"
             },
             "type": "array",
+            "maxItems": 2000,
             "title": "Sesiones"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "sesiones"
@@ -8613,15 +8769,9 @@
             "title": "Objetivos"
           },
           "forzar": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Forzar"
+            "type": "boolean",
+            "title": "Forzar",
+            "default": false
           }
         },
         "type": "object",
@@ -8679,6 +8829,15 @@
             "maxLength": 80,
             "minLength": 8,
             "title": "Clave"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "espaciado",
+              "reintento"
+            ],
+            "title": "Tipo",
+            "default": "espaciado"
           }
         },
         "type": "object",
@@ -8774,6 +8933,46 @@
           "modelo"
         ],
         "title": "Salud"
+      },
+      "SesionReajuste": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Clave"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          },
+          "inicio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inicio"
+          },
+          "horas": {
+            "type": "number",
+            "title": "Horas"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "clave",
+          "fecha",
+          "horas"
+        ],
+        "title": "SesionReajuste",
+        "description": "Una sesión del reajuste que aceptas, tal como la propuso `POST /plan/reajuste` (`sesiones`)."
       },
       "TemaEntrada": {
         "properties": {
