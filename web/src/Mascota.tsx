@@ -5,11 +5,17 @@ import { estaDormida, EVENTO_REACCION, EVENTO_SUENO, vigilarSueno, type Reaccion
 // la primera: silueta negra y plana con dos ojos blancos alargados, sin pupila, que miran hacia el cursor y parpadean.
 // Es decorativa: no recibe foco ni la leen los lectores de pantalla.
 
-export type FormaMascota = 'buho' | 'sencilla'
+export type FormaMascota = 'buho' | 'sencilla' | 'cerebro' | 'planeta'
 export const FORMAS: { id: FormaMascota; nombre: string }[] = [
   { id: 'buho', nombre: 'Búho' },
   { id: 'sencilla', nombre: 'Sencilla' },
+  { id: 'cerebro', nombre: 'Cerebro' },
+  { id: 'planeta', nombre: 'Planeta' },
 ]
+// Colores propios de las optativas (el cerebro es rosa y el anillo del planeta ámbar en los dos temas).
+const ROSA = '#e8a6b0'
+const ROSA_OSCURO = '#c97f8c'
+const AMBAR = '#e8a33d'
 
 const CLAVE = 'magister-mascota'
 const EVENTO = 'magister-mascota'
@@ -82,12 +88,13 @@ export type GestoMascota = 'normal' | 'pensando' | 'escuchando' | 'hablando'
 // Ojos como los de la primera mascota: blancos, alargados y sin pupila; se mueven enteros hacia donde miras.
 // `giro` inclina los dos ojos hacia fuera (grados): el izquierdo hacia la izquierda y el derecho hacia la derecha. El
 // giro va en un <g> aparte para que el parpadeo (un transform de CSS en el ojo) no lo pise.
-function Ojos({ izq, der, ancho, alto, m, giro = 0 }: { izq: Punto; der: Punto; ancho: number; alto: number; m: Punto; giro?: number }) {
+// `clase` da el color: blancos sobre el cuerpo oscuro (por defecto) o pupilas oscuras tras las gafas del cerebro.
+function Ojos({ izq, der, ancho, alto, m, giro = 0, clase = 'mascota-blanco' }: { izq: Punto; der: Punto; ancho: number; alto: number; m: Punto; giro?: number; clase?: string }) {
   return (
     <g className="mascota-ojos" style={{ transform: `translate(${m.x}px, ${m.y}px)` }}>
       {[izq, der].map((o, k) => (
         <g key={k} transform={`rotate(${k === 0 ? -giro : giro} ${o.x} ${o.y})`}>
-          <ellipse className="mascota-ojo mascota-blanco" cx={o.x} cy={o.y} rx={ancho} ry={alto} style={{ transformOrigin: `${o.x}px ${o.y}px` }} />
+          <ellipse className={`mascota-ojo ${clase}`} cx={o.x} cy={o.y} rx={ancho} ry={alto} style={{ transformOrigin: `${o.x}px ${o.y}px` }} />
         </g>
       ))}
     </g>
@@ -296,6 +303,32 @@ export default function Mascota({
           <>
             <circle className="mascota-cuerpo" cx="60" cy="62" r="54" />
             <Ojos izq={{ x: 42, y: 58 }} der={{ x: 78, y: 58 }} ancho={7.5} alto={17.8} giro={28} m={m} />
+          </>
+        )}
+        {forma === 'cerebro' && (
+          <>
+            {/* Cerebro flotante con gafas redondas de profesor y pajarita: las pupilas, tras los cristales. */}
+            <path fill={ROSA} d="M30 70 C14 66 14 42 30 38 C30 22 50 16 60 26 C70 16 90 22 90 38 C106 42 106 66 90 70 C88 84 70 86 60 78 C50 86 32 84 30 70Z" />
+            <path fill="none" stroke={ROSA_OSCURO} strokeWidth="2.4" strokeLinecap="round" d="M60 26 L60 78 M40 40 q8 6 2 14 M78 40 q-8 6 -2 14 M34 60 q10 -2 12 8 M86 60 q-10 -2 -12 8" />
+            <circle className="mascota-blanco" cx="46" cy="52" r="11" style={{ stroke: 'var(--m-cuerpo)', strokeWidth: 3 }} />
+            <circle className="mascota-blanco" cx="74" cy="52" r="11" style={{ stroke: 'var(--m-cuerpo)', strokeWidth: 3 }} />
+            <line x1="57" y1="52" x2="63" y2="52" style={{ stroke: 'var(--m-cuerpo)', strokeWidth: 3 }} />
+            <Ojos izq={{ x: 46, y: 52 }} der={{ x: 74, y: 52 }} ancho={3} alto={5} m={{ x: m.x * 0.5, y: m.y * 0.5 }} clase="mascota-pupila" />
+            <path fill={AMBAR} d="M48 96 L60 90 L72 96 L72 104 L60 98 L48 104Z" />
+            <circle cx="60" cy="97" r="3" fill="#c98622" />
+          </>
+        )}
+        {forma === 'planeta' && (
+          <>
+            {/* Planeta con anillo y los ojos inclinados de la sencilla: el anillo pasa por detrás y por delante. */}
+            <ellipse cx="60" cy="64" rx="56" ry="12" fill="none" stroke={AMBAR} strokeWidth="5" transform="rotate(-14 60 64)" />
+            <circle className="mascota-cuerpo" cx="60" cy="60" r="38" />
+            <path fill="none" strokeWidth="5" strokeLinecap="round" style={{ stroke: 'color-mix(in srgb, var(--m-claro) 12%, var(--m-cuerpo))' }} d="M26 46 q20 6 40 -2 q14 -6 28 4 M24 70 q22 8 46 0 q12 -4 24 4" />
+            <Ojos izq={{ x: 48, y: 58 }} der={{ x: 72, y: 58 }} ancho={5.5} alto={12.5} giro={28} m={m} />
+            <path fill="none" stroke={AMBAR} strokeWidth="5" d="M4 70 Q60 86 116 56" transform="rotate(-2 60 64)" />
+            <circle cx="16" cy="20" r="2" fill={AMBAR} />
+            <circle cx="104" cy="16" r="1.6" fill={AMBAR} />
+            <circle cx="96" cy="104" r="2" fill={AMBAR} />
           </>
         )}
       </g>
