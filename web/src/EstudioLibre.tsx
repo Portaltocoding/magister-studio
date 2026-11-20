@@ -29,7 +29,7 @@ import { escribirEnChat } from './componentes/preferencias.ts'
 import { recienCreadaTras } from './componentes/turnos.ts'
 import Mascota from './Mascota.tsx'
 import PropuestaPlan from './PropuestaPlan.tsx'
-import { SelectorIdioma, SelectorModo } from './componentes/Modos.tsx'
+import { SelectorModo } from './componentes/Modos.tsx'
 
 interface Props {
   conversacionId: number | null
@@ -200,17 +200,18 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           {aviso}
         </p>
       )}
-      {tipo === 'libre' && (
-        <div className="pie-chat">
-          <SelectorModo />
-          <SelectorIdioma />
-          <label className="interruptor" title={t('libre.noCuentaTitulo')}>
-            <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} /> {t('libre.noCuenta')}
-          </label>
-        </div>
-      )}
     </>
   )
+  // Debajo de la caja, discretas: el modo y «esto no cuenta». El idioma ya no va aquí: es el de toda la app (Ajustes).
+  const opcionesChat =
+    tipo === 'libre' ? (
+      <div className="pie-chat">
+        <SelectorModo />
+        <label className="interruptor" title={t('libre.noCuentaTitulo')}>
+          <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} /> {t('libre.noCuenta')}
+        </label>
+      </div>
+    ) : undefined
 
   if (conversacionId == null && !pendiente && tipo === 'plan' && !aMano) {
     return (
@@ -240,11 +241,6 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
             {t('libre.notaPlan')}
           </p>
         )}
-        {tipo === 'libre' && (
-          <button type="button" className="libre-a-plan" onClick={() => irARuta('#/nuevo-plan')}>
-            {t('libre.aPlan')}
-          </button>
-        )}
         {error && <p role="alert">{error}</p>}
         <Hilo
           burbujas={[]}
@@ -253,8 +249,14 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           alParar={parar}
           placeholder={tipo === 'plan' ? t('libre.phPlan') : t('libre.phLibre')}
           pie={pie}
+          bajoCaja={opcionesChat}
           {...conAdjuntos}
         />
+        {tipo === 'libre' && (
+          <button type="button" className="libre-a-plan" onClick={() => irARuta('#/nuevo-plan')}>
+            {t('libre.aPlan')}
+          </button>
+        )}
       </div>
     )
   }
@@ -275,7 +277,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   return (
     <div className="vista-hilo">
       {error && <TextoError texto={error} />}
-      <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} fase={fase} espera={espera} guardable={tipo === 'libre'} {...conAdjuntos} />
+      <Hilo burbujas={burbujas} escribiendo={escribiendo} alEnviar={alEnviar} alParar={parar} pie={pie} bajoCaja={opcionesChat} fase={fase} espera={espera} guardable={tipo === 'libre'} {...conAdjuntos} />
     </div>
   )
 }

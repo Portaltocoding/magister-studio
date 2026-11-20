@@ -551,7 +551,8 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 
 
 /* ===== Modos de aprendizaje y lo que el tutor recuerda ===== */
-.pie-chat { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+/* Opciones del chat, debajo de la caja y discretas: lo principal es escribir. */
+.pie-chat { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 8px; padding: 0 4px; font-size: 0.85rem; color: var(--suave); }
 .selector-modo { position: relative; }
 .selector-idioma { display: inline-flex; border: 1px solid var(--borde); border-radius: 999px; overflow: hidden; }
 .selector-idioma button { font: inherit; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; padding: 3px 9px; border: 0; background: transparent; color: var(--suave); cursor: pointer; }
@@ -1012,7 +1013,7 @@ body.redimensionando { cursor: ew-resize; user-select: none; }
 
 /* Desde Estudio libre, el camino al plan. */
 .libre-a-plan {
-  border: 0; background: none; padding: 2px 0; margin: -4px 0 14px; cursor: pointer; font: inherit; font-size: 0.92rem;
+  border: 0; background: none; padding: 2px 0; margin: 22px auto 0; display: block; cursor: pointer; font: inherit; font-size: 0.9rem;
   color: var(--suave);
 }
 .libre-a-plan:hover { color: var(--texto); text-decoration: underline; text-underline-offset: 3px; }

@@ -46,6 +46,8 @@ interface Props {
   alParar: () => void
   placeholder?: string
   pie?: ReactNode
+  // Lo que va debajo de la caja de escribir (las opciones del chat): lo principal, escribir, queda arriba.
+  bajoCaja?: ReactNode
   deshabilitado?: boolean
   // Adjuntar ficheros: si se pasa, sale el clip y se puede arrastrar sobre la caja.
   alAdjuntar?: (ficheros: File[]) => void
@@ -168,6 +170,7 @@ export default function Hilo({
   alParar,
   placeholder,
   pie,
+  bajoCaja,
   deshabilitado,
   alAdjuntar,
   adjuntos,
@@ -419,6 +422,7 @@ export default function Hilo({
           </button>
         )}
       </form>
+      {bajoCaja}
       {avisoOcupado && (
         <p className="nota" role="status">
           {t('hilo.ocupado')}

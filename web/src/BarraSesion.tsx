@@ -143,9 +143,12 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
           </div>
         )}
       </div>
-      <span className={estado === 'conectado' ? 'estado estado-si' : 'estado estado-no'} title={textoEstado}>
-        <span className="estado-texto">{textoEstado}</span>
-      </span>
+      {/* «Conectado» no dice nada: solo se enseña cuando hay un problema. */}
+      {estado === 'sin conexión' && (
+        <span className="estado estado-no" title={textoEstado} role="status">
+          <span className="estado-texto">{textoEstado}</span>
+        </span>
+      )}
       <Tomate />
       <Afinar />
     </header>
