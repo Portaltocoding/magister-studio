@@ -6,20 +6,25 @@ import { Locutor } from './voz.ts'
 import {
   codigoLimpio,
   codigoPosible,
-  CUENTA_INICIAL,
   enlaceSeguro,
   fraseDePrueba,
+  inicialCuenta,
   limpiarNombre,
   pasosDe,
+  PASOS_CONEXION,
   posicion,
   reducirCuenta,
+  resultadoClaude,
+  resultadoVoz,
   RUTA_APUNTES,
   RUTA_PLAN,
   siguiente,
   textoMascota,
   TITULOS,
+  TRAS_LA_PRUEBA,
   type Modo,
   type Paso,
+  type Resultado,
 } from './bienvenida.ts'
 
 interface Props {
@@ -34,8 +39,9 @@ const mensajeDe = (e: unknown) => (e instanceof Error ? e.message : 'Algo ha fal
 // La mascota te recibe en pocos pasos: cómo te llama, tu cuenta de Claude (sin terminal), una prueba, tu primer plan y
 // tus apuntes. La lógica (qué pasos, cuándo se saltan, la conexión) está en bienvenida.ts; esto solo pinta y llama a la API.
 export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectada, alCerrar }: Props) {
-  const pasos = pasosDe(modo, cuentaConectada)
+  const pasos = pasosDe(modo)
   const [paso, setPaso] = useState<Paso>(pasos[0])
+  const [conectada, setConectada] = useState(cuentaConectada)
   const [nombre, setNombre] = useState(nombreInicial)
   const [gesto, setGesto] = useState<GestoMascota>('hablando')
   const caja = useRef<HTMLDivElement>(null)
@@ -88,8 +94,19 @@ export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectad
             }}
           />
         )}
-        {paso === 'cuenta' && <PasoCuenta alGesto={setGesto} alConectada={avanzar} />}
-        {paso === 'prueba' && <PasoPrueba nombre={nombre} alGesto={setGesto} alSeguir={avanzar} alVolverACuenta={() => setPaso('cuenta')} />}
+        {paso === 'cuenta' && <PasoCuenta conectada={conectada} alGesto={setGesto} alSeguir={avanzar} alConectada={() => setConectada(true)} />}
+        {paso === 'prueba' && (
+          <PasoPrueba
+            nombre={nombre}
+            modo={modo}
+            alGesto={setGesto}
+            alSeguir={avanzar}
+            alVolverACuenta={() => {
+              setConectada(false)
+              setPaso('cuenta')
+            }}
+          />
+        )}
         {paso === 'plan' && (
           <div className="bienvenida-botones">
             <button type="button" className="boton boton-principal" onClick={() => void cerrar('hecha', RUTA_PLAN)}>
@@ -145,9 +162,20 @@ function PasoNombre({ nombre, alCambiar, alSeguir }: { nombre: string; alCambiar
   )
 }
 
-// Conectar la cuenta de Claude sin terminal: el servidor da el enlace, se abre en otra pestaña y se pega aquí el código.
-function PasoCuenta({ alGesto, alConectada }: { alGesto: (g: GestoMascota) => void; alConectada: () => void }) {
-  const [e, enviar] = useReducer(reducirCuenta, CUENTA_INICIAL)
+// La cuenta de Claude: siempre se ve cuál está conectada. Para conectar (o cambiar) sin terminal, el servidor da el enlace,
+// se abre en otra pestaña y se pega aquí el código.
+function PasoCuenta({
+  conectada,
+  alGesto,
+  alSeguir,
+  alConectada,
+}: {
+  conectada: boolean
+  alGesto: (g: GestoMascota) => void
+  alSeguir: () => void
+  alConectada: () => void
+}) {
+  const [e, enviar] = useReducer(reducirCuenta, conectada, inicialCuenta)
   const [codigo, setCodigo] = useState('')
 
   useEffect(() => {
@@ -158,7 +186,7 @@ function PasoCuenta({ alGesto, alConectada }: { alGesto: (g: GestoMascota) => vo
     enviar({ tipo: 'pulsar' })
     try {
       const { enlace } = await iniciarCuenta()
-      if (!enlaceSeguro(enlace)) throw new Error('No he recibido un enlace de Claude válido. Prueba otra vez.')
+      if (!enlaceSeguro(enlace)) throw new Error('No he recibido un enlace de Claude válido. Pulsa «Probar otra vez».')
       // Algunos navegadores bloquean abrir pestañas tras una espera: por eso el enlace también se ofrece como botón.
       window.open(enlace, '_blank', 'noopener')
       enviar({ tipo: 'enlace', enlace })
@@ -182,6 +210,53 @@ function PasoCuenta({ alGesto, alConectada }: { alGesto: (g: GestoMascota) => vo
     enviar({ tipo: 'reiniciar' })
   }
 
+  if (e.fase === 'conectada')
+    return (
+      <>
+        <p className="bienvenida-ok" role="status">
+          Tu cuenta de Claude ya está conectada ✓
+        </p>
+        <p>Magister usa tu propia suscripción de Claude Pro o Max: no hay otra cuenta ni otro gasto.</p>
+        <div className="bienvenida-botones">
+          <button type="button" className="boton boton-principal" onClick={alSeguir}>
+            Seguir
+          </button>
+          <button type="button" className="boton boton-discreto" onClick={() => enviar({ tipo: 'otra' })}>
+            Conectar otra cuenta
+          </button>
+        </div>
+      </>
+    )
+  if (e.fase === 'lista')
+    return (
+      <>
+        <p className="bienvenida-ok" role="status">
+          ✓ Cuenta conectada
+        </p>
+        <div className="bienvenida-botones">
+          <button type="button" className="boton boton-principal" onClick={alSeguir}>
+            Seguir
+          </button>
+        </div>
+      </>
+    )
+  if (e.fase === 'sinpty')
+    return (
+      <>
+        <p>{conectada ? 'Para cambiar de cuenta, hazlo desde la versión de Docker de Magister: desde este equipo no se puede.' : 'Conectar tu cuenta de Claude se hace desde la versión de Docker de Magister: desde este equipo no se puede.'}</p>
+        <div className="bienvenida-botones">
+          {conectada ? (
+            <button type="button" className="boton boton-principal" onClick={() => enviar({ tipo: 'volver' })}>
+              Volver
+            </button>
+          ) : (
+            <button type="button" className="boton boton-principal" onClick={alSeguir}>
+              Seguir
+            </button>
+          )}
+        </div>
+      </>
+    )
   if (e.fase === 'error')
     return (
       <>
@@ -206,13 +281,14 @@ function PasoCuenta({ alGesto, alConectada }: { alGesto: (g: GestoMascota) => vo
       >
         <ol className="bienvenida-pasos">
           <li>
-            En la pestaña de Claude, inicia sesión y pulsa «Authorize». Si no se ha abierto,{' '}
+            Ya he abierto Claude en otra pestaña. Si no se ha abierto,{' '}
             <a href={e.enlace ?? '#'} target="_blank" rel="noopener noreferrer">
-              ábrela aquí
+              pulsa aquí
             </a>
             .
           </li>
-          <li>Claude te enseñará un código. Cópialo y pégalo aquí.</li>
+          <li>Inicia sesión y pulsa «Authorize».</li>
+          <li>Claude te enseña un código: cópialo y pégalo aquí.</li>
         </ol>
         <input
           className="bienvenida-campo"
@@ -236,29 +312,45 @@ function PasoCuenta({ alGesto, alConectada }: { alGesto: (g: GestoMascota) => vo
       </form>
     )
   return (
-    <div className="bienvenida-botones">
-      <button type="button" className="boton boton-principal" onClick={() => void conectar()} disabled={e.fase === 'abriendo'}>
-        {e.fase === 'abriendo' ? 'Preparando el enlace…' : 'Conectar con Claude'}
-      </button>
-    </div>
+    <>
+      <ol className="bienvenida-pasos">
+        {PASOS_CONEXION.map((p) => (
+          <li key={p}>{p}</li>
+        ))}
+      </ol>
+      {e.fase === 'abriendo' && (
+        <p role="status" aria-live="polite">
+          Estoy preparando la conexión con Claude… Tarda unos segundos.
+        </p>
+      )}
+      <div className="bienvenida-botones">
+        <button type="button" className="boton boton-principal" onClick={() => void conectar()} disabled={e.fase === 'abriendo'}>
+          {e.fase === 'abriendo' ? 'Preparando…' : 'Abrir Claude'}
+        </button>
+      </div>
+    </>
   )
 }
 
 // La mascota saluda con la voz y una llamada mínima al modelo confirma que la cuenta funciona.
 function PasoPrueba({
   nombre,
+  modo,
   alGesto,
   alSeguir,
   alVolverACuenta,
 }: {
   nombre: string
+  modo: Modo
   alGesto: (g: GestoMascota) => void
   alSeguir: () => void
   alVolverACuenta: () => void
 }) {
   type Fase = 'listo' | 'probando' | 'bien' | 'mal'
   const [fase, setFase] = useState<Fase>('listo')
-  const [fallo, setFallo] = useState<{ mensaje: string; cuenta: boolean } | null>(null)
+  const [voz, setVoz] = useState<Resultado | null>(null)
+  const [claude, setClaude] = useState<Resultado | null>(null)
+  const [cuentaFalla, setCuentaFalla] = useState(false)
   const locutor = useRef<Locutor | null>(null)
 
   useEffect(() => () => locutor.current?.parar(), [])
@@ -268,41 +360,52 @@ function PasoPrueba({
 
   const probar = async () => {
     setFase('probando')
-    setFallo(null)
+    setVoz(null)
+    setClaude(null)
+    setCuentaFalla(false)
     // Se pulsa un botón antes: el navegador deja sonar la voz.
+    let pudoHablar = true
     try {
       locutor.current ??= new Locutor()
       locutor.current.nueva()
       locutor.current.decir(fraseDePrueba(nombre))
       locutor.current.cerrar()
     } catch {
-      /* sin voz en este navegador: la prueba sigue */
+      pudoHablar = false
     }
+    const v = resultadoVoz(pudoHablar)
+    setVoz(v)
+    let c: Resultado
     try {
       const r = await probarCuenta()
-      if (r.ok) setFase('bien')
-      else {
-        setFallo({ mensaje: r.mensaje, cuenta: r.cuenta })
-        setFase('mal')
-      }
-    } catch (x) {
-      setFallo({ mensaje: mensajeDe(x), cuenta: true })
-      setFase('mal')
+      c = resultadoClaude(r)
+      setCuentaFalla(!r.ok && !r.cuenta)
+    } catch {
+      c = resultadoClaude({ ok: false, cuenta: true })
     }
+    setClaude(c)
+    setFase(v.ok && c.ok ? 'bien' : 'mal')
   }
+
+  const linea = (r: Resultado | null, espera: string) =>
+    r ? (
+      <li className={r.ok ? 'bienvenida-ok' : 'bienvenida-error'}>
+        {r.ok ? '✓ ' : '✗ '}
+        {r.texto}
+      </li>
+    ) : (
+      <li>{espera}</li>
+    )
 
   return (
     <>
-      {fase === 'bien' && (
-        <p className="bienvenida-ok" role="status">
-          Todo funciona: te oigo, me oyes y Claude contesta.
-        </p>
+      {fase !== 'listo' && (
+        <ul className="bienvenida-pasos" role="status" aria-live="polite">
+          {linea(voz, 'Voz: probando…')}
+          {linea(claude, 'Claude: preguntándole…')}
+        </ul>
       )}
-      {fase === 'mal' && fallo && (
-        <p className="bienvenida-error" role="alert">
-          {fallo.mensaje}
-        </p>
-      )}
+      {fase === 'bien' && <p>{TRAS_LA_PRUEBA[modo]}</p>}
       <div className="bienvenida-botones">
         {fase === 'bien' ? (
           <button type="button" className="boton boton-principal" onClick={alSeguir}>
@@ -313,7 +416,7 @@ function PasoPrueba({
             {fase === 'probando' ? 'Probando…' : fase === 'mal' ? 'Probar otra vez' : 'Hacer la prueba'}
           </button>
         )}
-        {fase === 'mal' && fallo && !fallo.cuenta && (
+        {fase === 'mal' && cuentaFalla && (
           <button type="button" className="boton" onClick={alVolverACuenta}>
             Conectar la cuenta
           </button>

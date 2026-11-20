@@ -182,8 +182,8 @@ async def iniciar_alta() -> str:
             raise ErrorCuenta("No he conseguido el enlace de Claude. Pulsa «Probar otra vez».") from None
         except (ImportError, OSError):  # sin pty (Windows) o sin el programa
             await asyncio.to_thread(sesion.cerrar)
-            raise ErrorCuenta("Conectar desde aquí solo funciona en la versión instalada con Docker. En este equipo, "
-                              "inicia sesión ejecutando «claude» en una terminal.") from None
+            raise ErrorCuenta("Conectar o cambiar la cuenta de Claude se hace desde la versión de Docker de Magister, "
+                              "no desde este equipo.") from None
         _alta.sesion, _alta.desde = sesion, time.monotonic()
         return enlace
 

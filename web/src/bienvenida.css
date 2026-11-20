@@ -34,3 +34,7 @@
 .bienvenida-ok { margin: 8px 0; color: var(--ok); }
 .bienvenida-saltar { margin-top: 14px; border: 0; background: transparent; color: var(--suave); font: inherit; font-size: 0.85rem; text-decoration: underline; cursor: pointer; }
 .bienvenida-saltar:hover { color: var(--texto); }
+.bienvenida .boton-discreto { border-color: transparent; background: transparent; color: var(--suave); font-size: 0.85rem; text-decoration: underline; }
+.bienvenida .boton-discreto:hover { color: var(--texto); }
+ul.bienvenida-pasos { list-style: none; padding-left: 0; }
+ul.bienvenida-pasos li { margin: 4px 0; }

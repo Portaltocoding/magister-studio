@@ -7,15 +7,21 @@ import {
   codigoPosible,
   enlaceSeguro,
   esErrorDeCuenta,
+  esSinPty,
   fraseDePrueba,
+  inicialCuenta,
   limpiarNombre,
   modoDe,
   pasosDe,
+  PASOS_CONEXION,
   posicion,
   reducirCuenta,
+  resultadoClaude,
+  resultadoVoz,
   saludo,
   siguiente,
   textoMascota,
+  TRAS_LA_PRUEBA,
   type EstadoCuenta,
   type EventoCuenta,
 } from '../src/componentes/bienvenida.ts'
@@ -30,17 +36,45 @@ test('solo se enseña la primera vez, y el paso de Claude si la cuenta ha caduca
   assert.equal(modoDe({ estado: 'pendiente', cuenta: { conectada: false, caida: true } }), 'completa')
 })
 
-test('el paso de Claude se salta si ya hay cuenta (el desarrollo con tu propio login)', () => {
-  assert.deepEqual(pasosDe('completa', false), ['nombre', 'cuenta', 'prueba', 'plan', 'apuntes'])
-  assert.deepEqual(pasosDe('completa', true), ['nombre', 'prueba', 'plan', 'apuntes'])
-  assert.deepEqual(pasosDe('reconectar', true), ['cuenta', 'prueba'])
+test('el paso de Claude se enseña siempre, también con cuenta ya conectada', () => {
+  assert.deepEqual(pasosDe('completa'), ['nombre', 'cuenta', 'prueba', 'plan', 'apuntes'])
+  assert.deepEqual(pasosDe('reconectar'), ['cuenta', 'prueba'])
 })
 
 test('avanzar y contar los pasos', () => {
-  const pasos = pasosDe('completa', true)
-  assert.equal(siguiente(pasos, 'nombre'), 'prueba')
+  const pasos = pasosDe('completa')
+  assert.equal(siguiente(pasos, 'nombre'), 'cuenta')
   assert.equal(siguiente(pasos, 'apuntes'), null)
-  assert.deepEqual(posicion(pasos, 'plan'), { n: 3, de: 4 })
+  assert.deepEqual(posicion(pasos, 'plan'), { n: 4, de: 5 })
+  assert.deepEqual(posicion(pasosDe('reconectar'), 'prueba'), { n: 2, de: 2 })
+})
+
+test('la cuenta empieza conectada o con las instrucciones, y «Conectar otra cuenta» las enseña', () => {
+  assert.equal(inicialCuenta(true).fase, 'conectada')
+  assert.equal(inicialCuenta(false).fase, 'inicio')
+  assert.equal(reducirCuenta(inicialCuenta(true), { tipo: 'otra' }).fase, 'inicio')
+  assert.equal(reducirCuenta(inicialCuenta(false), { tipo: 'otra' }).fase, 'inicio')
+  assert.equal(PASOS_CONEXION.length, 3)
+})
+
+test('sin pty se dice sin jerga y se puede volver a la cuenta conectada', () => {
+  const msg = 'Conectar o cambiar la cuenta de Claude se hace desde la versión de Docker de Magister, no desde este equipo.'
+  assert.equal(esSinPty(msg), true)
+  assert.equal(esSinPty('El código no ha valido'), false)
+  const e = correr([{ tipo: 'otra' }, { tipo: 'pulsar' }, { tipo: 'fallo', mensaje: msg }], inicialCuenta(true))
+  assert.equal(e.fase, 'sinpty')
+  assert.equal(e.error, null)
+  assert.equal(reducirCuenta(e, { tipo: 'volver' }).fase, 'conectada')
+})
+
+test('la prueba da dos resultados, voz y Claude, con qué hacer si falla', () => {
+  assert.equal(resultadoVoz(true).ok, true)
+  assert.match(resultadoVoz(false).texto, /sube el volumen/i)
+  assert.equal(resultadoClaude({ ok: true, cuenta: true }).ok, true)
+  assert.match(resultadoClaude({ ok: false, cuenta: false }).texto, /Conecta tu cuenta/)
+  assert.match(resultadoClaude({ ok: false, cuenta: true }).texto, /Probar otra vez/)
+  assert.match(textoMascota('prueba', ''), /te saludaré en voz alta/)
+  assert.match(TRAS_LA_PRUEBA.completa, /plan/)
 })
 
 test('el nombre se limpia y el saludo lo usa', () => {
