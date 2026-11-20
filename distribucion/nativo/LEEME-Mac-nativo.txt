@@ -1,0 +1,35 @@
+MAGISTER STUDIO EN TU MAC (SIN DOCKER)
+======================================
+
+Necesitas una cuenta de Claude Pro o Max, unos 10 GB libres y conexión a internet.
+
+FORMA MÁS FÁCIL (sin avisos del Mac)
+1. Abre la app Terminal (Cmd+Espacio, escribe «Terminal» y pulsa Intro).
+2. Pega esta línea y pulsa Intro:
+
+   curl -fsSL https://raw.githubusercontent.com/Portaltocoding/magister-studio/main/instalar-mac-sin-docker.sh | bash
+
+   Magister queda en la carpeta «Magister» de tu usuario.
+
+O BIEN, CON ESTA CARPETA
+1. Doble clic en «Magister (sin Docker).command».
+2. Si el Mac dice que es de un desarrollador no identificado: pulsa «Aceptar», abre
+   Ajustes del Sistema > Privacidad y seguridad, baja hasta el aviso y pulsa «Abrir igualmente».
+   Solo la primera vez.
+
+LO QUE VERÁS LA PRIMERA VEZ (todo lo demás lo hace solo)
+- Si no tienes Homebrew (el instalador de programas de los Mac), se instala: te pide la contraseña de tu Mac
+  (al escribirla no se ve nada, es normal) y que pulses Intro. Si el Mac abre una ventana para instalar las
+  «herramientas de desarrollo», acéptala: tarda unos minutos y Magister sigue solo.
+- Después se instalan los programas que faltan y se prepara tu base de datos. Tarda de 10 a 30 minutos.
+- Al terminar se abre Magister en el navegador. La mascota te recibe y te pide conectar tu cuenta de Claude:
+  pulsa «Conectar con Claude», inicia sesión en la pestaña que se abre, pulsa «Authorize», copia el código
+  que te da y pégalo en Magister.
+
+CADA DÍA
+- Abrir: doble clic en «Magister (sin Docker).command». Puedes cerrar la ventana negra: Magister sigue.
+- Apagar: doble clic en «Parar Magister (sin Docker).command». Tus datos se quedan guardados.
+
+Tus datos están en la carpeta «Magister» de tu usuario, dentro de «datos» y «secretos». No borres «secretos»:
+es la llave de tus datos. No la compartas.
+Más ayuda: https://github.com/Portaltocoding/magister-studio/blob/main/docs/instalar.md

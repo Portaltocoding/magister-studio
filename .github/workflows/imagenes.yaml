@@ -1,5 +1,6 @@
 # Las imágenes de Magister en ghcr.io (api y web, para amd64 y arm64) y, en cada etiqueta v*, los paquetes
-# Magister-Windows.zip y Magister-Mac.zip en la Release.
+# Magister-Windows.zip y Magister-Mac.zip en la Release (con Docker) y Magister-Windows-sin-Docker.zip y
+# Magister-Mac-sin-Docker.zip (sin Docker: llevan el código y se montan en los jobs pagina, nativo-mac y nativo-windows).
 #
 #   push a main  -> :latest y :sha-<corto>
 #   etiqueta v*  -> :<versión> (1.2.3), :<mayor>.<menor> y :estable (la que usan los paquetes; no en las -rc)
@@ -195,6 +196,119 @@ jobs:
             previa=()
             case "$ETIQUETA" in *-*) previa=(--prerelease) ;; esac
             gh release create "$ETIQUETA" "${previa[@]}" --verify-tag --title "Magister $ETIQUETA" --generate-notes \
-              --notes "Para instalar: Mac, Magister-Mac.zip (o la línea de Terminal de docs/instalar.md); Windows, Magister-Windows.zip."
+              --notes "Para instalar, con Docker: Mac, Magister-Mac.zip (o la línea de Terminal de docs/instalar.md); Windows, Magister-Windows.zip. Sin Docker: Magister-Mac-sin-Docker.zip y Magister-Windows-sin-Docker.zip. Cuál elegir: docs/instalar.md."
           fi
           gh release upload "$ETIQUETA" dist/Magister-Windows.zip dist/Magister-Mac.zip --clobber
+
+  # ===== Paquetes SIN Docker (Magister-Mac-sin-Docker.zip y Magister-Windows-sin-Docker.zip) =====
+  # No dependen de las imágenes: llevan el código y la página. Corren en paralelo con la construcción de las imágenes.
+  pagina:
+    name: página (web/dist) para los paquetes sin Docker
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Construir la página
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pagina-dist
+          path: web/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  nativo-mac:
+    name: paquete Mac sin Docker
+    needs: pagina
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: pagina-dist
+          path: web/dist
+
+      - name: Revisar los arrancadores
+        run: |
+          bash -n distribucion/nativo/magister-nativo.sh
+          bash -n distribucion/nativo/Magister-sin-Docker.command
+          bash -n distribucion/nativo/Parar-sin-Docker.command
+          bash -n instalar-mac-sin-docker.sh
+
+      - name: Montar Magister-Mac-sin-Docker.zip
+        run: bash scripts/paquetes-nativos.sh mac dist
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zip-mac-sin-docker
+          path: dist/Magister-Mac-sin-Docker.zip
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  nativo-windows:
+    name: paquete Windows sin Docker
+    needs: pagina
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: pagina-dist
+          path: web/dist
+
+      # Postgres 16 portable (EDB) + pgvector construido con MSVC (nmake), ffmpeg, Piper con sus voces, uv, Node,
+      # pandoc, poppler y Git portable. El propio script comprueba cada pieza (initdb, CREATE EXTENSION vector,
+      # libx264, «Hola» con cada voz).
+      - name: Descargar y construir las herramientas
+        run: bash scripts/herramientas-windows.sh "$RUNNER_TEMP/herramientas-windows"
+
+      - name: Montar Magister-Windows-sin-Docker.zip
+        run: bash scripts/paquetes-nativos.sh windows dist "$RUNNER_TEMP/herramientas-windows"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zip-windows-sin-docker
+          path: dist/Magister-Windows-sin-Docker.zip
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  publicar-nativos:
+    name: publicar los paquetes sin Docker
+    needs: [paquetes, nativo-mac, nativo-windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: zip-*-sin-docker
+          path: ${{ runner.temp }}/zips
+          merge-multiple: true
+
+      # `paquetes` ya creó la Release (si faltaba) con los dos paquetes de Docker: aquí se añaden los otros dos.
+      - name: Subir a la Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ETIQUETA: ${{ github.ref_name }}
+        run: |
+          ls -l "$RUNNER_TEMP/zips"
+          gh release upload "$ETIQUETA" "$RUNNER_TEMP/zips/Magister-Mac-sin-Docker.zip" "$RUNNER_TEMP/zips/Magister-Windows-sin-Docker.zip" --clobber

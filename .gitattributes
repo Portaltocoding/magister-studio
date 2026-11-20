@@ -8,3 +8,7 @@ web/Caddyfile        text eol=lf
 *.bat      text eol=crlf
 # El LEEME del paquete de Windows, con CRLF para el Bloc de notas antiguo.
 distribucion/LEEME-Windows.txt  text eol=crlf
+# Los paquetes sin Docker: el de Windows (.ps1 con BOM para PowerShell 5, y su LEEME) con CRLF.
+distribucion/nativo/*.ps1  text eol=crlf
+distribucion/nativo/*-nativo.bat text eol=crlf
+distribucion/nativo/LEEME-Windows-nativo.txt text eol=crlf

@@ -9,6 +9,18 @@ Magister funciona dentro de **Docker** en Mac, Windows y Linux: no hay que insta
 - Internet la primera vez: se descargan unos 3 GB, más Docker si no lo tienes (de 5 a 30 minutos según tu conexión).
 - **Docker** no hace falta tenerlo: si falta, el arrancador lo instala (en Linux, no: ver abajo).
 
+## ¿Cuál descargo?
+
+Hay dos formas de instalar Magister, en Mac y en Windows. Las dos hacen lo mismo y se usan igual; cambia cómo se instalan.
+
+| | **Con Docker** (`Magister-Mac.zip`, `Magister-Windows.zip`) | **Sin Docker** (`Magister-Mac-sin-Docker.zip`, `Magister-Windows-sin-Docker.zip`) |
+|---|---|---|
+| **Lo bueno** | Lo más probado: todo va aislado, sin tocar el resto de tu ordenador. El zip pesa poco y se actualiza solo. | No instala Docker, que es pesado y en Windows pide reiniciar. Arranca más rápido y gasta menos memoria. |
+| **Lo malo** | Docker Desktop ocupa mucho y gasta memoria aunque no uses Magister; en Windows puede pedir reiniciar. | Es nuevo y menos probado. En Mac instala programas con Homebrew (te pide tu contraseña); en Windows el zip pesa unos 0,6 GB. Para actualizar hay que bajar el zip nuevo. |
+| **Mejor si** | Ya tienes Docker o tu ordenador va sobrado. | Quieres lo más ligero, o no puedes o no quieres instalar Docker. |
+
+En los dos casos Magister se abre en **http://localhost:8080** y los datos se quedan en tu ordenador. Si dudas, usa la de Docker. Los datos de una y otra son independientes: pasar de una a otra no los lleva consigo (usa las copias de Ajustes → Tus datos).
+
 ## El enlace que hay que enviar
 
 | Equipo | Enlace |
@@ -16,6 +28,9 @@ Magister funciona dentro de **Docker** en Mac, Windows y Linux: no hay que insta
 | **Mac** (lo más fácil) | Abrir la app **Terminal**, pegar esta línea y pulsar Intro:<br>`curl -fsSL https://raw.githubusercontent.com/Portaltocoding/magister-studio/main/instalar-mac.sh \| bash` |
 | Mac (con zip) | <https://github.com/Portaltocoding/magister-studio/releases/latest/download/Magister-Mac.zip> |
 | **Windows** | <https://github.com/Portaltocoding/magister-studio/releases/latest/download/Magister-Windows.zip> |
+
+| **Mac sin Docker** | Terminal: `curl -fsSL https://raw.githubusercontent.com/Portaltocoding/magister-studio/main/instalar-mac-sin-docker.sh \| bash`, o <https://github.com/Portaltocoding/magister-studio/releases/latest/download/Magister-Mac-sin-Docker.zip> |
+| **Windows sin Docker** | <https://github.com/Portaltocoding/magister-studio/releases/latest/download/Magister-Windows-sin-Docker.zip> |
 
 Los enlaces de los zip no cambian: siempre bajan la última versión publicada.
 
@@ -43,6 +58,26 @@ Lo que verás la primera vez:
 3. Se abre Docker. En su ventana: **Accept**; si pide iniciar sesión, **Skip**.
 4. Descarga Magister (unos 3 GB).
 5. Arranca y abre **http://localhost:8080**, donde te recibe la mascota (ver «La bienvenida»).
+
+## Mac sin Docker
+
+Pega en **Terminal** la línea de arriba (o descomprime `Magister-Mac-sin-Docker.zip` y haz doble clic en **`Magister (sin Docker).command`**; el Mac avisará de que es de un desarrollador no identificado, como en la opción con Docker). Lo que verás la primera vez:
+
+1. Si no tienes **Homebrew** (el instalador de programas de los Mac), lo instala: te pide la **contraseña de tu Mac** (al escribirla no se ve nada) y que pulses Intro. Si el Mac abre una ventana para instalar las herramientas de desarrollo, acéptala: tarda unos minutos y Magister sigue solo.
+2. Instala lo que falte (Postgres, ffmpeg, uv, Node, pandoc, poppler y Claude), prepara una base de datos privada en `~/Magister/datos` y descarga las piezas de Magister y los modelos de búsqueda (de 10 a 30 minutos en total).
+3. Abre **http://localhost:8080**, donde te recibe la mascota (ver «La bienvenida»; la cuenta de Claude se conecta ahí).
+
+Para abrirlo cada día, doble clic en `Magister (sin Docker).command`; para apagarlo, en `Parar Magister (sin Docker).command`. La contraseña de la base está en `~/Magister/secretos`: no la borres.
+
+## Windows sin Docker
+
+Descarga `Magister-Windows-sin-Docker.zip` (unos 0,6 GB), clic derecho → **Extraer todo** → **Extraer**, y en la carpeta que sale, doble clic en **`Magister.bat`** (si sale «Windows protegió su PC»: **Más información → Ejecutar de todas formas**). Lo que verás la primera vez:
+
+1. Prepara la base de datos y las piezas de Magister (de 10 a 30 minutos; no pide permisos de administrador ni reiniciar).
+2. **Conectar tu cuenta de Claude, en la ventana negra:** se instala Claude y se abre una página suya; inicia sesión y pulsa **Autorizar**. Si te pide un código, cópialo y pégalo en la ventana (clic derecho) con Intro. En Windows no se hace desde la página de bienvenida; la sesión queda guardada en tu usuario.
+3. Se abre **http://localhost:8080**, donde te recibe la mascota (el paso de la cuenta de Claude se salta: ya está conectada).
+
+Tus datos están en `%LOCALAPPDATA%\Magister` (no en la carpeta del zip): puedes borrar la carpeta descomprimida y bajar otra versión sin perderlos. Para apagarlo, doble clic en `Parar Magister.bat`. Los apuntes en PDF usan Chrome o, si no lo tienes, Edge (que ya viene con Windows).
 
 ## Linux
 
