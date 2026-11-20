@@ -322,7 +322,7 @@ body.en-foco .tomate-boton .tomate-icono, body.en-foco .riel-hoy.con-aviso svg {
   --texto: #1f1e1c; --fondo: #fbf9f4; --tarjeta: #ffffff; --borde: #dcd6c9; --suave: #6b675f; --activo: #ebe7de;
   color-scheme: light; color: var(--zen-texto); background: var(--zen-papel);
 }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   :root .foco.zen {
     --zen-marco: #181716; --zen-texto: #e4e0d8; --zen-suave: #9a968f; --zen-linea: #2c2b28;
     --zen-boton-borde: #3d3c39; --zen-boton-texto: #d9d9d9; --zen-caja: #242320; --zen-caja-borde: #36352f; --zen-pista: #3a3936;
@@ -387,7 +387,7 @@ body.en-foco .tomate-boton .tomate-icono, body.en-foco .riel-hoy.con-aviso svg {
 :root .foco.zen .foco-confianza .opcion:not([data-elegida="true"]) { color: var(--zen-tinta); border-color: color-mix(in srgb, var(--zen-tinta) 25%, transparent); background: transparent; }
 :root .foco.zen .foco-confianza .opcion[data-elegida="true"] { color: var(--zen-tinta); }
 :root .foco.zen .foco-comprobar .correccion { background: color-mix(in srgb, var(--zen-tinta) 6%, var(--zen-papel)); color: var(--zen-tinta); border: 0; }
-@media (prefers-color-scheme: light) {
+@media not all /* nunca claro */ {
   :root .foco.zen .foco-hecho.nota-bien, :root .foco.zen .foco-hecho.nota-perfecta { color: #1f8a4c; }
   :root .foco.zen .foco-hecho.nota-fallo { color: #c8463c; }
   :root .foco.zen .foco-hecho.nota-parcial { color: #b0700a; }
@@ -444,7 +444,7 @@ body.en-foco .tomate-boton .tomate-icono, body.en-foco .riel-hoy.con-aviso svg {
 :root .foco.zen .foco-flojeo h2 { color: var(--zen-texto); }
 :root .foco.zen .foco-nota { color: var(--zen-tinta); background: color-mix(in srgb, var(--zen-acento-texto) 10%, var(--zen-papel)); border-left-color: var(--zen-marca); }
 :root .foco.zen .foco-nota:not([open]) { background: transparent; border-left-color: color-mix(in srgb, var(--zen-marca) 40%, transparent); }
-@media (prefers-color-scheme: light) {
+@media not all /* nunca claro */ {
   :root .foco.zen .foco-papel [data-u].duda { text-decoration-color: color-mix(in srgb, #c8463c 70%, transparent); }
 }
 
@@ -478,7 +478,7 @@ body.en-foco .tomate-boton .tomate-icono, body.en-foco .riel-hoy.con-aviso svg {
 .foco-dictado-error { margin: 0 0 10px; font-size: 0.88rem; color: #f3b8b2; }
 :root .foco.zen .foco-dictado-aviso { background: var(--zen-caja); color: var(--zen-texto); border-color: var(--zen-caja-borde); }
 :root .foco.zen .foco-dictado-aviso .boton:not(.boton-principal) { color: var(--zen-texto); border-color: var(--zen-boton-borde); }
-@media (prefers-color-scheme: light) { :root .foco.zen .foco-dictado-error { color: #c8463c; } }
+@media not all /* nunca claro */ { :root .foco.zen .foco-dictado-error { color: #c8463c; } }
 
 /* ===== Barra lateral por secciones ===== */
 .grupos-modos { display: flex; flex-direction: column; gap: 14px; }

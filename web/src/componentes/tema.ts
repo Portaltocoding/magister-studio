@@ -3,7 +3,7 @@
 
 export type Tema = 'clasico' | 'riso'
 export const TEMAS: { id: Tema; nombre: string; descripcion: string }[] = [
-  { id: 'clasico', nombre: 'Clásico', descripcion: 'Sobrio, claro u oscuro según tu equipo' },
+  { id: 'clasico', nombre: 'Clásico', descripcion: 'Sobrio y oscuro' },
   { id: 'riso', nombre: 'Parchís', descripcion: 'Alegre: blanco, rojo, azul, amarillo y verde, todo redondo' },
 ]
 const CLAVE = 'magister-tema'

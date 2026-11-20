@@ -75,7 +75,7 @@
   background: none; color: var(--texto); border-radius: 0; padding: 0; box-shadow: none;
   font-family: inherit; font-size: 1.0625rem; line-height: 1.72; max-width: var(--lb-col);
 }
-@media (prefers-color-scheme: dark) { .lector-texto { --lb-resaltador: rgb(216 184 96 / 0.26); } }
+@media all /* siempre oscuro */ { .lector-texto { --lb-resaltador: rgb(216 184 96 / 0.26); } }
 /* El foco siempre va sobre fondo oscuro, sea cual sea el tema del sistema. */
 .foco .lector-texto { --lb-nota: #d8b860; --lb-resaltador: rgb(216 184 96 / 0.28); }
 .lector-texto p { margin: 0 0 16px; }

@@ -111,7 +111,7 @@
   --dg-mal: #e8615b;
   --dg-bien: #62c47c;
 }
-@media (prefers-color-scheme: light) { .diagrama-vivo { --dg-realce: #b9770e; --dg-mal: #c0392b; --dg-bien: #2e8b57; } }
+@media not all /* nunca claro */ { .diagrama-vivo { --dg-realce: #b9770e; --dg-mal: #c0392b; --dg-bien: #2e8b57; } }
 /* Los apuntes ya no van en papel crema: el diagrama sigue al tema; en el foco, siempre oscuro. */
 .foco .lector-texto .diagrama-vivo { --dg-realce: #e0a23c; --dg-mal: #e8615b; --dg-bien: #62c47c; }
 /* Los diagramas ricos (mapas de argumentos, de posiciones, de ideas) son más grandes. */
@@ -245,7 +245,7 @@ button.grupo-titulo:hover { color: var(--texto); }
 
 /* ===== Sobrio: sin azul. El acento de la interfaz es la tinta (negro en claro, hueso en oscuro). ===== */
 :root { --acento: #2b2a28; --acento-suave: #e9e7e3; }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   :root { --acento: #e6e4e0; --acento-suave: #34332f; }
 }
 .boton-principal { color: var(--fondo); }

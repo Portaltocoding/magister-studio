@@ -39,11 +39,12 @@ export default function Marco() {
   // se vuelve a plegar al elegir algo, al pulsar fuera o con Esc. Ctrl+B la abre y la cierra.
   const [menu, setMenu] = useState(false)
   // Fijada: la barra lateral ocupa su sitio y no se cierra sola. Sin fijar: tira de iconos y se abre por encima.
+  // De partida va fijada; si la pliegas, se recuerda.
   const [fija, setFija] = useState(() => {
     try {
-      return localStorage.getItem('magister-lateral-fija') === 'si'
+      return localStorage.getItem('magister-lateral-fija') !== 'no'
     } catch {
-      return false
+      return true
     }
   })
   const fijar = useCallback((si: boolean) => {

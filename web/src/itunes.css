@@ -5,7 +5,7 @@
   --radio-grande: 16px;
   --sombra-suave: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.08);
 }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   :root { --sombra-suave: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 30px rgb(0 0 0 / 0.28); }
 }
 
@@ -90,7 +90,7 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 .pastilla-nota { background: color-mix(in srgb, var(--texto) 6%, transparent); border-left: 3px dashed var(--tipo-nota); }
 /* Progreso: de gris claro (flojo) a casi negro (dominado); en oscuro, al revés. */
 :root { --viz-ord-1: #cfccc5; --viz-ord-2: #8d8a83; --viz-ord-3: #34322e; --viz-serie: #4a4843; }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   :root { --viz-ord-1: #4e4c47; --viz-ord-2: #9a968f; --viz-ord-3: #ece9e3; --viz-serie: #cfccc5; }
 }
 /* Verde de «ver la respuesta» con contraste suficiente sobre el papel. */
@@ -118,7 +118,7 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 
 /* ===== Mascota: búho, birrete o gota de tinta ===== */
 .mascota { --m-cuerpo: #1f1e1c; --m-claro: #f4f2ed; --m-medio: #8d8a83; --m-pupila: #161514; overflow: visible; }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   .mascota { --m-cuerpo: #4a4743; --m-claro: #f4f2ed; --m-medio: #a8a49c; --m-pupila: #161514; }
 }
 .mascota .mascota-cuerpo { fill: var(--m-cuerpo); stroke: none; }
@@ -185,7 +185,7 @@ button.hoy-cifra:disabled { cursor: default; opacity: 0.75; }
 .mascota .mascota-cuerpo { fill: var(--m-cuerpo); }
 .mascota .mascota-blanco { fill: #fff; }
 .mascota-ojos { transition: transform 120ms ease-out; }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   .mascota { --m-cuerpo: #111; }
   .mascota .mascota-cuerpo { stroke: color-mix(in srgb, #fff 22%, transparent) !important; stroke-width: 2; }
 }

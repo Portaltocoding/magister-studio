@@ -1,3 +1,7 @@
+/* Magister va siempre en oscuro: los bloques «@media all» marcados «siempre oscuro» son los del modo oscuro. Los
+   controles nativos y las barras de desplazamiento, también oscuros; Parchís (riso.css) sigue siendo claro. */
+html { color-scheme: dark; }
+html[data-tema="riso"] { color-scheme: light; }
 :root {
   --fondo: #fafaf9;
   --panel: #f2f1ef;
@@ -14,7 +18,7 @@
   background: var(--fondo);
 }
 
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   :root {
     --fondo: #1d1c1b;
     --panel: #252422;
@@ -117,7 +121,7 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .mascota-ojos { transition: none; }
 }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   /* Sobre fondo oscuro, un borde suave para que la bola no se pierda. */
   .mascota-cuerpo { stroke: var(--borde); stroke-width: 2; }
 }
@@ -299,7 +303,7 @@ button.chip { cursor: pointer; font: inherit; font-size: 0.8rem; color: var(--te
   --clase: #2f8a5b;
   --notac: #8a6d1f;
 }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   :root {
     --acento: #7ea2ef;
     --acento-suave: #26324a;
@@ -467,7 +471,7 @@ body { overflow: hidden; }
 .voto-mal { color: #c2453a; border-color: #c2453a; }
 .voto-bien:hover, .voto-bien.votado { background: #2f8a5b; color: #fff; }
 .voto-mal:hover, .voto-mal.votado { background: #c2453a; color: #fff; }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   .voto-bien { color: #6cc196; border-color: #6cc196; }
   .voto-mal { color: #e5817a; border-color: #e5817a; }
   .voto-bien:hover, .voto-bien.votado { background: #3c9b6b; color: #fff; }

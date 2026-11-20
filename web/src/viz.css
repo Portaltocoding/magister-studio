@@ -10,7 +10,7 @@
   --viz-rejilla: #e4e2de;
   --viz-superficie: var(--fondo);
 }
-@media (prefers-color-scheme: dark) {
+@media all /* siempre oscuro */ {
   .progreso-panel {
     --viz-ord-1: #1c5cab;
     --viz-ord-2: #3987e5;
