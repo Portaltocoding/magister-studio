@@ -79,22 +79,12 @@ export function usarForma(): FormaMascota {
 // Cómo está: cambia la mirada y el gesto. «pensando» mira arriba; «escuchando» ladea la cabeza; «hablando» se mueve un poco.
 export type GestoMascota = 'normal' | 'pensando' | 'escuchando' | 'hablando'
 
-// Ojos de gato: almendra blanca con las esquinas externas algo levantadas, pupila vertical (se ensancha al escuchar o
-// hablar) y un brillito. Se mueven enteros hacia donde miras y el párpado (el parpadeo) cierra la almendra.
+// Ojos como los de la primera mascota: blancos, alargados y sin pupila; se mueven enteros hacia donde miras.
 function Ojos({ izq, der, ancho, alto, m }: { izq: Punto; der: Punto; ancho: number; alto: number; m: Punto }) {
-  const w = ancho
-  const h = alto
-  const almendra = `M${-w} 0 C${-w * 0.45} ${-h * 1.3} ${w * 0.45} ${-h * 1.3} ${w} 0 C${w * 0.45} ${h * 1.3} ${-w * 0.45} ${h * 1.3} ${-w} 0 Z`
   return (
     <g className="mascota-ojos" style={{ transform: `translate(${m.x}px, ${m.y}px)` }}>
       {[izq, der].map((o, k) => (
-        <g key={k} className="mascota-ojo" style={{ transformOrigin: `${o.x}px ${o.y}px` }}>
-          <g transform={`translate(${o.x} ${o.y}) rotate(${k === 0 ? 8 : -8})`}>
-            <path className="mascota-blanco" d={almendra} />
-            <ellipse className="mascota-pupila mascota-rendija" cx={0} cy={0} rx={w * 0.2} ry={h * 0.92} />
-            <circle className="mascota-brillo" cx={-w * 0.12} cy={-h * 0.3} r={Math.max(1.2, w * 0.1)} />
-          </g>
-        </g>
+        <ellipse key={k} className="mascota-ojo mascota-blanco" cx={o.x} cy={o.y} rx={ancho} ry={alto} style={{ transformOrigin: `${o.x}px ${o.y}px` }} />
       ))}
     </g>
   )
@@ -293,7 +283,7 @@ export default function Mascota({
             <circle className="mascota-disco" cx="43" cy="58" r="19" />
             <circle className="mascota-disco" cx="77" cy="58" r="19" />
             <path className="mascota-pluma" d="M50 90 l5 4 l5 -4 M60 90 l5 4 l5 -4 M55 98 l5 4 l5 -4" />
-            <Ojos izq={{ x: 43, y: 58 }} der={{ x: 77, y: 58 }} ancho={13} alto={8.5} m={m} />
+            <Ojos izq={{ x: 43, y: 58 }} der={{ x: 77, y: 58 }} ancho={8} alto={14} m={m} />
             <path className="mascota-pico" d="M54.5 69 Q60 66 65.5 69 L60 79 Z" />
             <path className="mascota-pata" d="M44 111 q2 4 4 0 q2 4 4 0 M68 111 q2 4 4 0 q2 4 4 0" />
           </>
@@ -301,7 +291,7 @@ export default function Mascota({
         {forma === 'sencilla' && (
           <>
             <circle className="mascota-cuerpo" cx="60" cy="62" r="54" />
-            <Ojos izq={{ x: 42, y: 58 }} der={{ x: 78, y: 58 }} ancho={14} alto={10} m={m} />
+            <Ojos izq={{ x: 42, y: 58 }} der={{ x: 78, y: 58 }} ancho={7.5} alto={19} m={m} />
           </>
         )}
       </g>
