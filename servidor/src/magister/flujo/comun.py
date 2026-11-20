@@ -2,7 +2,9 @@
 
 import asyncio
 import json
+import re
 import time
+import unicodedata
 from datetime import date
 from datetime import time as dt_time
 
@@ -250,6 +252,8 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
         partes.append(perfil)
     if p is not None:
         try:
+            # Contesta en el idioma en que escribe; la preferencia solo manda cuando el mensaje no lo dice.
+            p = {**p, "idioma": idioma_efectivo(p, estado.get("mensaje"))}
             if estado.get("modo"):
                 p = {**p, "modo": None if estado["modo"] == "normal" else estado["modo"]}
             if estado.get("asesor"):
@@ -266,6 +270,10 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
             "Lo que el alumno estudia en Magister:\n" + lecciones + "\n"
             "Si lo que pregunta está en una de esas lecciones, nómbrala («lo tienes en L2») para que la abra en Lecciones o en "
             "el modo foco; si ya la hizo, conecta con lo que vio allí. No repitas la lista.")
+    if estado.get("adjuntos_resumen"):
+        from magister.flujo import adjuntos as adj
+
+        partes.append(adj.bloque(estado["adjuntos_resumen"]))
     if conversacion and not de_leccion:
         if flojos:
             partes.append("Conceptos que el alumno tiene flojos ahora mismo (falló o casi olvidó): " + ", ".join(flojos) + ". "
@@ -591,9 +599,42 @@ IDIOMA_INGLES_PLAN = ("The student chose English. Write everything the student w
                       "sources are in Spanish. Keep JSON keys, enum values and lesson codes exactly as specified.")
 
 
-def con_idioma(sistema: str, p: dict) -> str:
-    """El prompt con la orden de idioma si el alumno ha elegido inglés. Puro: las preferencias entran como argumento."""
-    return f"{sistema}\n\n{IDIOMA_INGLES_PLAN}" if p.get("idioma") == "en" else sistema
+# Palabras sueltas de uso muy común que solo existen en uno de los dos idiomas (se dejan fuera las que valen en ambos:
+# «a», «no», «me», «he», «as»…). Sirven para saber en qué idioma escribe el alumno sin llamar a ningún modelo.
+_PALABRAS_ES = frozenset(
+    "el la los las un una unos unas de del que y en es por con para como pero mas muy esto eso estos estas quiero quieres "
+    "hagamos hacer haz hazme puedes puedo necesito explicame explica dime cual cuales cuando donde porque sobre entre "
+    "hola gracias tambien ahora vamos tengo tienes sin esta este ese esa nos mi mis tu tus su sus ya si lo se al "
+    "aprender estudiar proyecto paso plan".split())
+_PALABRAS_EN = frozenset(
+    "the and is are to of in it that this these those for with what how why when where can could would should please "
+    "want need make let lets explain tell show give me my you your we our they them their i am was were be been have has "
+    "do does did not but or if then so just also now about from into learn study project step roadmap".split())
+
+
+def idioma_del_mensaje(texto: str | None) -> str | None:
+    """«es» o «en» según en qué idioma escribe el alumno, o None si no se sabe (corto, mezclado o dudoso). Puro y sin
+    modelo: cuenta palabras de uso común de cada idioma (y las marcas del español: «¿», «¡», «ñ» y las vocales con tilde)."""
+    palabras = re.findall(r"[a-záéíóúüñ]+", (texto or "").lower())
+    if len(palabras) < 2:
+        return None
+    sin_tildes = ["".join(c for c in unicodedata.normalize("NFD", p) if not unicodedata.combining(c)) for p in palabras]
+    es = sum(1 for p in sin_tildes if p in _PALABRAS_ES) + (2 if re.search(r"[¿¡ñáéíóú]", texto or "") else 0)
+    en = sum(1 for p in sin_tildes if p in _PALABRAS_EN)
+    if max(es, en) < 2 or es == en:
+        return None
+    return "es" if es > en else "en"
+
+
+def idioma_efectivo(p: dict, mensaje: str | None = None) -> str:
+    """El idioma en que contesta el tutor: el del mensaje si se reconoce y, si no, la preferencia `idioma` (es por defecto)."""
+    return idioma_del_mensaje(mensaje) or ("en" if p.get("idioma") == "en" else "es")
+
+
+def con_idioma(sistema: str, p: dict, mensaje: str | None = None) -> str:
+    """El prompt con la orden de idioma si hay que contestar en inglés: el idioma en que escribe el alumno y, si no se
+    reconoce, su preferencia. Puro: las preferencias y el mensaje entran como argumento."""
+    return f"{sistema}\n\n{IDIOMA_INGLES_PLAN}" if idioma_efectivo(p, mensaje) == "en" else sistema
 
 
 async def idioma_del_alumno() -> str:
@@ -604,12 +645,12 @@ async def idioma_del_alumno() -> str:
         return "es"
 
 
-async def con_idioma_del_alumno(sistema: str) -> str:
-    """Lo mismo leyendo sus preferencias; si no se pueden leer, el prompt tal cual (el español es el de partida)."""
+async def con_idioma_del_alumno(sistema: str, mensaje: str | None = None) -> str:
+    """Lo mismo leyendo sus preferencias; si no se pueden leer, solo manda el idioma del mensaje (si no, el español)."""
     try:
-        return con_idioma(sistema, await preferencias_tutor())
+        return con_idioma(sistema, await preferencias_tutor(), mensaje)
     except Exception:  # noqa: BLE001
-        return sistema
+        return con_idioma(sistema, {}, mensaje)
 
 
 def texto_preferencias(p: dict) -> str:

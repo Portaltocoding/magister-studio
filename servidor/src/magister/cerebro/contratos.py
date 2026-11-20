@@ -31,6 +31,15 @@ class Recuperado:
 
 
 @dataclass(frozen=True)
+class ResumenVersion:
+    """Lo que se sabe de un documento sin leerlo entero: su título y los apartados (encabezados) que tiene."""
+
+    version_id: int
+    titulo: str
+    secciones: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class Filtros:
     tema_id: int | None = None  # N devuelve los documentos del tema N y los que no tienen tema
     fuente_tipos: list[str] | None = None
@@ -118,6 +127,11 @@ class Buscador(Protocol):
 
     async def indice_fuentes(self, tema_id: int | None, max_caracteres: int = 6000) -> str: ...
 
+    # Los documentos que el alumno adjunta al chat: su título y apartados, y sus primeros fragmentos por id de versión.
+    async def resumen_versiones(self, version_ids: list[int], max_secciones: int = 12) -> list[ResumenVersion]: ...
+
+    async def primeros_fragmentos(self, version_ids: list[int], por_version: int = 3) -> list[Recuperado]: ...
+
 
 class BuscadorFalso:
     """Devuelve siempre los mismos tres fragmentos, con rangos 1, 2 y 3."""
@@ -133,12 +147,36 @@ class BuscadorFalso:
         self.consultas: list[str] = []
         self.filtros: list[Filtros | None] = []
         self.params: list[Consulta | None] = []
+        self.documentos: dict[int, tuple[str, list[str], list[str]]] = {}
+        self.pedidos: list[tuple[str, list[int]]] = []
 
     async def buscar(self, consulta, k, filtros=None, params=None, consulta_original=None) -> ResultadoBusqueda:
         self.consultas.append(consulta)
         self.filtros.append(filtros)
         self.params.append(params)
+        if filtros and filtros.version_ids is not None and self.documentos:
+            # Restringida a esas versiones: solo sus fragmentos.
+            return ResultadoBusqueda(self._trozos(filtros.version_ids, k)[:k], None)
         return ResultadoBusqueda([] if self.vacio else self.FRAGMENTOS[:k], None)
+
+    # Para las pruebas de los adjuntos: `documentos` es {version_id: (título, [apartados], [fragmentos])}.
+    async def resumen_versiones(self, version_ids, max_secciones=12) -> list[ResumenVersion]:
+        self.pedidos.append(("resumen", list(version_ids)))
+        return [ResumenVersion(v, self.documentos[v][0], self.documentos[v][1][:max_secciones])
+                for v in version_ids if v in self.documentos]
+
+    async def primeros_fragmentos(self, version_ids, por_version=3) -> list[Recuperado]:
+        self.pedidos.append(("primeros", list(version_ids)))
+        return self._trozos(version_ids, por_version)
+
+    def _trozos(self, version_ids, por_version) -> list[Recuperado]:
+        salida: list[Recuperado] = []
+        for v in version_ids:
+            if v in self.documentos:
+                titulo, _, trozos = self.documentos[v]
+                for t in trozos[:por_version]:
+                    salida.append(Recuperado(9000 + len(salida), len(salida) + 1, 1.0, t, titulo, f"subida/{titulo}", "pdf", v))
+        return salida
 
     async def indice_fuentes(self, tema_id, max_caracteres=6000) -> str:
         return "" if self.vacio else "- Apuntes BD\n- Libro BD: cap. 5 JOINs; cap. 11 Índices"

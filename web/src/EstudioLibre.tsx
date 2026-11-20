@@ -1,4 +1,5 @@
 import { usarAdjuntos } from './componentes/usarAdjuntos.ts'
+import { paraEnviar } from './componentes/adjuntosPuro.ts'
 import { t } from './i18n/i18n.ts'
 import { usarIdioma } from './i18n/usarIdioma.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -62,10 +63,14 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     setAviso(avisoAlAceptar(r.tareas.length, r.aviso))
   }, [])
 
+  // Los adjuntos listos (o aún leyéndose) viajan con el mensaje; el servidor los recuerda en la conversación.
+  const adjuntosAhora = useRef<() => { ids: number[]; vaciar: () => void }>(() => ({ ids: [], vaciar: () => undefined }))
   const abrir = useCallback(
     (texto: string, signal: AbortSignal) => {
       if (conversacionId == null) throw new Error('sin conversación')
-      return enviar(conversacionId, texto, signal, !noCuenta)
+      const { ids, vaciar } = adjuntosAhora.current()
+      if (ids.length) vaciar()
+      return enviar(conversacionId, texto, signal, !noCuenta, false, ids.length ? { adjuntos: ids } : {})
     },
     [conversacionId, noCuenta],
   )
@@ -87,8 +92,9 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     alYaDecidido,
   )
   const [pendiente, setPendiente] = useState<string | null>(null)
-  const { adjuntos, subir, quitar } = usarAdjuntos()
-  const conAdjuntos = { alAdjuntar: subir, adjuntos, alQuitarAdjunto: quitar }
+  const { adjuntos, subir, quitar, vaciar, aviso: avisoAdjuntar } = usarAdjuntos()
+  adjuntosAhora.current = () => ({ ids: paraEnviar(adjuntos), vaciar })
+  const conAdjuntos = { alAdjuntar: subir, adjuntos, alQuitarAdjunto: quitar, avisoAdjuntar }
   // La que acabamos de crear aquí: no se recarga desde la API, o borraría la respuesta que está llegando.
   const recienCreada = useRef<number | null>(null)
 

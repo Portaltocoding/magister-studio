@@ -62,6 +62,8 @@ class Conversacion(Base):
     tipo: Mapped[str] = mapped_column(String(10), server_default="libre")
     creada_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
     actualizada_en: Mapped[datetime] = mapped_column(Fecha, server_default=func.now())
+    # Los documentos que adjuntaste en esta conversación (ids de `versiones`, sin repetir): cada turno los conoce.
+    adjuntos: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
 
 
 class Mensaje(Base):

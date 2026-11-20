@@ -313,6 +313,8 @@ export interface ExtraMensaje {
   proyecto_id?: number | null
   // El plan activo de la app (Roadmap, Calendario, Hoy): el asesor mueve sus sesiones y marca o prepara sus lecciones.
   plan_activo_id?: number | null
+  // Los documentos que acabas de adjuntar (ids de versión): la conversación los recuerda en los turnos siguientes.
+  adjuntos?: number[]
 }
 
 // Un cambio que propone el asesor. Las líneas las escribe el código del servidor, no el modelo; nada cambia hasta

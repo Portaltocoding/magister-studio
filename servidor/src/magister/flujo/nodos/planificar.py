@@ -1,6 +1,7 @@
 from magister.cerebro.estructura import ErrorEstructura, Intento, estructurar
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
+from magister.flujo import adjuntos as adj
 from magister.flujo import fuentes as fuentes_plan
 from magister.flujo.comun import con_idioma_del_alumno, fase, hoy_de, perfil_de, perfil_json, reglas_plan
 from magister.flujo.estado import Estado
@@ -40,7 +41,10 @@ async def planificar(estado: Estado, buscador=None) -> dict:
         fuentes=await fuentes_plan.contexto_para_plan(buscador, perfil.tema or ""),
         hoy=hoy.isoformat(),
     )
-    sistema = await con_idioma_del_alumno(sistema)
+    if estado.get("adjuntos_resumen"):
+        # Los documentos adjuntados son las fuentes del tema del plan: sus títulos y apartados orientan las lecciones.
+        sistema += "\n\n" + adj.para_el_plan(estado["adjuntos_resumen"])
+    sistema = await con_idioma_del_alumno(sistema, estado.get("mensaje"))
     fallidos: list[Intento] = []
     try:
         plan = await estructurar(

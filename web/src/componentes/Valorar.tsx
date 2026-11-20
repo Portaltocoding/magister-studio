@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 // Por qué no sirve: cada motivo afina lo que Magister aprende de ti. La lista la da el servidor (tono/confianza.py,
 // MOTIVOS), una vez por página: Valorar sale junto a cada respuesta.
@@ -21,6 +23,7 @@ interface Props {
 
 // Me sirve o no me sirve, junto a cada respuesta. «No me sirve» pide qué falla y puede pedir otra explicación.
 export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
+  usarIdioma()
   const [voto, setVoto] = useState<boolean | null>(inicial)
   const [abierto, setAbierto] = useState(false)
   const [comentario, setComentario] = useState('')
@@ -50,36 +53,34 @@ export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
     setAbierto(false)
     setHecho(true)
     if (otra && alPedirOtra)
-      alPedirOtra(
-        `Esa explicación no me ha servido${comentario.trim() ? `: ${comentario.trim()}` : ''}. Explícamelo de otra forma.`,
-      )
+      alPedirOtra(t('valorar.otra', { motivo: comentario.trim() ? `: ${comentario.trim()}` : '' }))
   }
 
   return (
     <div className="valorar">
       <button className={`voto voto-bien ${voto === true ? 'votado' : ''}`} aria-pressed={voto === true} disabled={enviando || voto === true} onClick={() => votar(true)}>
-        ✓ Me sirve
+        {t('valorar.meSirve')}
       </button>
       <button
         className={`voto voto-mal ${voto === false ? 'votado' : ''}`}
         aria-pressed={voto === false}
         onClick={() => setAbierto(!abierto)}
       >
-        ✗ No me sirve
+        {t('valorar.noMeSirve')}
       </button>
       {hecho && !abierto && !fallo && (
         <span className="nota" role="status">
-          Anotado, gracias.
+          {t('valorar.anotado')}
         </span>
       )}
       {fallo && (
         <span className="nota" role="alert">
-          No se ha podido guardar. Prueba otra vez.
+          {t('valorar.fallo')}
         </span>
       )}
       {abierto && (
         <div className="valorar-caja">
-          <div className="valorar-motivos" role="group" aria-label="Qué ha fallado">
+          <div className="valorar-motivos" role="group" aria-label={t('valorar.queFallo')}>
             {lista.map(({ id, nombre }) => (
               <button
                 key={id}
@@ -94,18 +95,18 @@ export default function Valorar({ traza, inicial, alPedirOtra }: Props) {
           </div>
           <textarea
             autoFocus
-            placeholder="Algo más que quieras decirle (opcional)"
-            aria-label="Qué ha fallado"
+            placeholder={t('valorar.algoMas')}
+            aria-label={t('valorar.queFallo')}
             value={comentario}
             onChange={(e) => setComentario(e.target.value)}
           />
           <div className="botones">
             <button className="boton" onClick={() => votar(false)}>
-              Enviar
+              {t('valorar.enviar')}
             </button>
             {alPedirOtra && (
               <button className="boton boton-principal" onClick={() => votar(false, true)}>
-                Enviar y pedir otra explicación
+                {t('valorar.enviarOtra')}
               </button>
             )}
           </div>

@@ -1,5 +1,6 @@
 from magister.config import ajustes
 from magister.datos.plan import guardar_plan
+from magister.datos.repositorio_fuentes import vincular_versiones_a_tema
 from magister.flujo.comun import ahora_de, decir, escribir, fase, hoy_de, perfil_de
 from magister.flujo.estado import Estado
 from magister.flujo.fuentes import calcular_apoyo
@@ -30,6 +31,8 @@ async def guardar(estado: Estado, buscador=None) -> dict:
         emparejar=emparejar_lecciones,
     )
     await recolocar_con_progreso(plan_id, tema_id, hoy_de(estado), ahora_de(estado))
+    # Lo que adjuntaste para pedir este plan pasa a ser fuente de su tema (como una fuente subida con tema).
+    await vincular_versiones_a_tema(list(estado.get("adjuntos") or []), tema_id)
     await calcular_apoyo(buscador, plan_id, tema_id)
     escribir(guardado={"plan_id": plan_id, "tema_id": tema_id})
     decir(

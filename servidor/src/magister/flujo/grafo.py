@@ -19,7 +19,7 @@ from langgraph.graph.state import CompiledStateGraph
 from magister.flujo.estado import Estado
 from magister.flujo.nodos.calendarizar import calendarizar
 from magister.flujo.nodos.conversar import conversar
-from magister.flujo.nodos.extraer import extraer
+from magister.flujo.nodos.extraer import hacer_extraer
 from magister.cerebro.contratos import Buscador
 from magister.flujo.nodos.guardar import hacer_guardar
 from magister.flujo.nodos.negociar import explicar_fallo, negociar
@@ -75,7 +75,7 @@ def construir_grafo(
     """Con `buscador`, la rama de estudio es reescribir, recuperar y responder con citas;
     sin él (pruebas antiguas), `conversar` sin fuentes."""
     g = StateGraph(Estado)
-    g.add_node("extraer", extraer)
+    g.add_node("extraer", hacer_extraer(buscador))
     g.add_node("preguntar", preguntar)
     g.add_node("planificar", hacer_planificar(buscador))
     g.add_node("calendarizar", calendarizar)

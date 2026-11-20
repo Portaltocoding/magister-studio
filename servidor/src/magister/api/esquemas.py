@@ -81,6 +81,9 @@ class MensajeEntrada(BaseModel):
     # El plan activo de la app (el de Roadmap, Calendario y Hoy): sobre él prepara el asesor los cambios del calendario.
     # No es `plan_id`, que es el de la lección de la que se habla.
     plan_activo_id: int | None = None
+    # Los documentos que acabas de adjuntar con «+» (ids de versión, listos o aún indexándose): la conversación los
+    # recuerda y cada turno los conoce.
+    adjuntos: list[int] = Field(default_factory=list, max_length=30)
     # Cabe el banco entero del examen oral (unas 20 preguntas pasan de 3000 caracteres).
     contexto: str | None = Field(None, max_length=12_000)
 

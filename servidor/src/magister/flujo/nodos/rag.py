@@ -17,6 +17,7 @@ from magister.cerebro.modelo import Turno
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
 from magister.datos import repositorio_fuentes as rf
+from magister.flujo import adjuntos as adj
 from magister.flujo.comun import (
     acciones_de_estudio,
     decir,
@@ -70,6 +71,8 @@ async def reescribir(estado: Estado) -> dict:
         return {"consulta": mensaje, "aclaracion": None}
     if r.consulta:
         return {"consulta": r.consulta, "aclaracion": None}
+    if estado.get("adjuntos"):  # «esto» son los documentos adjuntados: no hay nada que aclarar
+        return {"consulta": mensaje, "aclaracion": None}
     return {"consulta": None, "aclaracion": r.aclaracion or "¿A qué te refieres exactamente?"}
 
 
@@ -88,24 +91,28 @@ def hacer_recuperar(buscador: Buscador):
         # En una llamada sobre una lección, sus apuntes ya van en el prompt: buscar en las fuentes solo añade texto.
         # El asesor tampoco busca: lo que necesita es la pantalla, que ya le llega.
         if (estado.get("llamada") and estado.get("leccion_clave")) or estado.get("asesor"):
-            return {"recuperados": [], "busqueda_id": None}
+            return {"recuperados": [], "busqueda_id": None, "adjuntos_resumen": []}
         fase("recuperar")
         consulta = estado.get("consulta") or estado.get("mensaje", "")
         tema_id = estado.get("tema_id")
+        # Los documentos adjuntados en la conversación: su título y apartados, y sus fragmentos (los primeros si el
+        # mensaje señala «esto»), siempre delante de lo que traiga la búsqueda normal.
+        adjuntos = list(estado.get("adjuntos") or [])
+        resumen = await adj.resumen(buscador, adjuntos)
+        de_adjuntos = await adj.fragmentos(buscador, adjuntos, consulta, estado.get("mensaje", ""), K) if resumen else []
+        if de_adjuntos and adj.es_deictico(estado.get("mensaje", "")):
+            # «Esto» no se busca en la biblioteca: no diría nada y gastaría una búsqueda.
+            return {"recuperados": de_adjuntos, "busqueda_id": None, "adjuntos_resumen": resumen}
         # Acotar y ampliar: con tema, primero sus fuentes (y las que no tienen tema); solo si ahí no hay nada, toda la
         # biblioteca. Sin tema, toda la biblioteca de una vez.
         r, hay = await _buscar_y_decidir(buscador, consulta, Filtros(tema_id=tema_id), estado.get("mensaje"))
         if not hay and tema_id is not None:
             r, hay = await _buscar_y_decidir(buscador, consulta, Filtros(), estado.get("mensaje"))
-        return {
-            "recuperados": [
-                {"id": x.fragmento_id, "texto": x.texto, "titulo": x.documento_titulo, "tipo": x.fuente_tipo, "uri": x.uri}
-                for x in r.recuperados
-            ]
-            if hay
-            else [],
-            "busqueda_id": r.busqueda_id,
-        }
+        normales = [
+            {"id": x.fragmento_id, "texto": x.texto, "titulo": x.documento_titulo, "tipo": x.fuente_tipo, "uri": x.uri}
+            for x in r.recuperados
+        ] if hay else []
+        return {"recuperados": adj.fusionar(de_adjuntos, normales), "busqueda_id": r.busqueda_id, "adjuntos_resumen": resumen}
 
     return recuperar
 
@@ -123,6 +130,8 @@ async def _buscar_y_decidir(buscador: Buscador, consulta: str, filtros: Filtros,
 
 
 def _es_externo(x: dict) -> bool:
+    if x.get("externo"):  # lo adjuntado por el alumno: viene de un fichero, no es confiable
+        return True
     # Una URL guardada en una fuente que no es «web» sigue siendo contenido de la web.
     return x["tipo"] == "web" or (x.get("uri") or "").startswith(("http://", "https://"))
 
@@ -132,7 +141,7 @@ def _bloque(recuperados: list[dict]) -> str:
 
     partes = []
     for x in recuperados:
-        texto = marcar_externo(x["texto"], x["id"], "web") if _es_externo(x) else x["texto"]
+        texto = marcar_externo(x["texto"], x["id"], x.get("externo") or "web") if _es_externo(x) else x["texto"]
         partes.append(f'<fragmento id="{x["id"]}" fuente="{titulo_para_atributo(x["titulo"])} ({x["tipo"]})">\n{texto}\n</fragmento>')
     aviso = AVISO + "\n\n" if any(_es_externo(x) for x in recuperados) else ""
     return aviso + "\n\n".join(partes)

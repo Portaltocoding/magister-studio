@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react'
 import { EVENTO_NOTAS, guardarNota, listarNotas } from '../api.ts'
 import { aCss } from './escala.ts'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 // Guardar lo que te interesa de Estudio libre en «Mis notas»: la respuesta entera (botón bajo cada una)
 // o solo el trozo que marques con el ratón o el teclado.
@@ -24,11 +26,12 @@ export function usarGuardadas(activo: boolean): Set<number> {
 }
 
 export function BotonGuardar({ mensajeId, texto, guardada }: { mensajeId: number; texto: string; guardada: boolean }) {
+  usarIdioma()
   const [estado, setEstado] = useState<'listo' | 'guardando' | 'error'>('listo')
   if (guardada)
     return (
-      <a className="guardar-nota guardada" href="#/notas" title="Abrir Mis notas">
-        ✓ En mis notas
+      <a className="guardar-nota guardada" href="#/notas" title={t('nota.abrir')}>
+        {t('nota.enMisNotas')}
       </a>
     )
   return (
@@ -36,7 +39,7 @@ export function BotonGuardar({ mensajeId, texto, guardada }: { mensajeId: number
       type="button"
       className="guardar-nota"
       disabled={estado === 'guardando'}
-      title="Guarda esta respuesta entera en Mis notas. Para guardar solo un trozo, márcalo."
+      title={t('nota.titulo')}
       onClick={async () => {
         setEstado('guardando')
         try {
@@ -48,7 +51,7 @@ export function BotonGuardar({ mensajeId, texto, guardada }: { mensajeId: number
         }
       }}
     >
-      {estado === 'guardando' ? 'Guardando…' : estado === 'error' ? 'No se pudo: reintentar' : 'Guardar en mis notas'}
+      {estado === 'guardando' ? t('nota.guardando') : estado === 'error' ? t('nota.reintentar') : t('nota.guardar')}
     </button>
   )
 }
@@ -63,6 +66,7 @@ interface Marcado {
 
 // Al marcar texto dentro de una respuesta del tutor sale un botón flotante encima: «Guardar lo marcado».
 export function GuardarMarcado({ zona }: { zona: RefObject<HTMLElement | null> }) {
+  usarIdioma()
   const [marcado, setMarcado] = useState<Marcado | null>(null)
   const [hecho, setHecho] = useState(false)
 
@@ -131,7 +135,7 @@ export function GuardarMarcado({ zona }: { zona: RefObject<HTMLElement | null> }
         }
       }}
     >
-      {hecho ? '✓ Guardado en Mis notas' : 'Guardar lo marcado'}
+      {hecho ? t('nota.guardadoMarcado') : t('nota.guardarMarcado')}
     </button>
   )
 }

@@ -91,7 +91,7 @@ async def mensaje(
                      "ahora": ahora.strftime("%H:%M") if ahora else None, "voz": voz,
                      # Siempre se escriben todas: así un mensaje no hereda la llamada o el modo del anterior.
                      "llamada": False, "modo": None, "plan_id_leccion": None, "leccion_clave": None, "contexto": None, "nota_guardada": False,
-                     "corregir": False, "asesor": False,
+                     "corregir": False, "asesor": False, "adjuntos": [],
                      **{k: v for k, v in (extra or {}).items()}}
     if await fase_actual(cid) is None:
         entrada["fase"] = fase_inicial

@@ -52,7 +52,9 @@ interface Props {
   // Adjuntar ficheros: si se pasa, sale el clip y se puede arrastrar sobre la caja.
   alAdjuntar?: (ficheros: File[]) => void
   adjuntos?: Adjunto[]
-  alQuitarAdjunto?: (nombre: string) => void
+  alQuitarAdjunto?: (id: number) => void
+  // Por qué no se ha podido adjuntar algo (tipo, tamaño, repetido): se dice, nunca se calla.
+  avisoAdjuntar?: string | null
   // Lo que está haciendo el tutor («Buscando en tus fuentes»): va dentro de la burbuja que espera.
   fase?: string | null
   espera?: Espera
@@ -175,6 +177,7 @@ export default function Hilo({
   alAdjuntar,
   adjuntos,
   alQuitarAdjunto,
+  avisoAdjuntar,
   fase,
   espera,
   guardable = false,
@@ -370,14 +373,14 @@ export default function Hilo({
         {adjuntos && adjuntos.length > 0 && (
           <ul className="adjuntos">
             {adjuntos.map((a) => (
-              <li key={a.nombre} className={`adjunto ${a.estado}`} title={a.detalle ?? ''}>
+              <li key={a.id} className={`adjunto ${a.estado}`} title={a.detalle ?? ''}>
                 <span className="adjunto-icono" aria-hidden>
                   {a.estado === 'listo' ? '✓' : a.estado === 'error' ? '!' : '…'}
                 </span>
                 <span className="adjunto-nombre">{a.nombre}</span>
-                <small>{estadoAdjunto(a.estado)}</small>
+                <small>{estadoAdjunto(a.estado)}{a.estado === 'error' && a.detalle ? `: ${a.detalle}` : ''}</small>
                 {alQuitarAdjunto && (
-                  <button type="button" aria-label={t('hilo.quitar', { nombre: a.nombre })} onClick={() => alQuitarAdjunto(a.nombre)}>
+                  <button type="button" aria-label={t('hilo.quitar', { nombre: a.nombre })} onClick={() => alQuitarAdjunto(a.id)}>
                     ×
                   </button>
                 )}
@@ -423,6 +426,11 @@ export default function Hilo({
         )}
       </form>
       {bajoCaja}
+      {avisoAdjuntar && (
+        <p className="nota" role="alert">
+          {avisoAdjuntar}
+        </p>
+      )}
       {avisoOcupado && (
         <p className="nota" role="status">
           {t('hilo.ocupado')}

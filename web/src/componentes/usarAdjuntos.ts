@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { t, type Clave } from '../i18n/i18n.ts'
+import { clasificar, type Rechazo } from './adjuntosPuro.ts'
 import { crearFuente, listarDocumentos, listarFuentes, pedir, subirFichero, type VersionInfo } from '../api.ts'
 
 const verVersion = (vid: number) => pedir<VersionInfo & { fragmentos: number }>(`/api/versiones/${vid}`)
@@ -7,7 +9,9 @@ const verVersion = (vid: number) => pedir<VersionInfo & { fragmentos: number }>(
 // y desde ese momento el tutor lo usa y lo cita como el resto de tus fuentes.
 
 export interface Adjunto {
+  id: number // cada adjunto tiene el suyo: el mismo fichero dos veces, o dos con el mismo nombre, no se pisan
   nombre: string
+  tamano: number
   version_id: number | null
   estado: 'subiendo' | 'indexando' | 'listo' | 'error'
   detalle?: string
@@ -15,6 +19,13 @@ export interface Adjunto {
 
 const FUENTE = 'Adjuntos del chat'
 export const ACEPTA = '.pdf,.md,.markdown,.txt,.html,.htm'
+let contador = 0
+
+// Lo que se dice cuando un fichero no se puede adjuntar (nunca en silencio).
+export function avisoDeRechazos(rs: Rechazo[]): string | null {
+  if (!rs.length) return null
+  return rs.map((r) => t(`hilo.adj.no.${r.motivo}` as Clave, { nombre: r.nombre })).join(' ')
+}
 
 async function fuenteDeAdjuntos(): Promise<number> {
   const fs = await listarFuentes()
@@ -26,27 +37,35 @@ export function usarAdjuntos(temaId: number | null = null) {
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([])
   const [fuente, setFuente] = useState<number | null>(null)
 
+  const [aviso, setAviso] = useState<string | null>(null)
+  // Lo último que se ve de la lista: `subir` no depende de ella para no quedarse con una copia vieja.
+  const actuales = useRef<Adjunto[]>([])
+  actuales.current = adjuntos
+
   const subir = useCallback(
     async (ficheros: File[]) => {
       if (!ficheros.length) return
-      setAdjuntos((a) => [...a, ...ficheros.map((f) => ({ nombre: f.name, version_id: null, estado: 'subiendo' as const }))])
+      const { aceptados, rechazados } = clasificar(ficheros, actuales.current.map((a) => ({ nombre: a.nombre, tamano: a.tamano, estado: a.estado })))
+      setAviso(avisoDeRechazos(rechazados))
+      if (!aceptados.length) return
+      const nuevos = aceptados.map((f) => ({ f, id: ++contador }))
+      setAdjuntos((a) => [...a, ...nuevos.map(({ f, id }) => ({ id, nombre: f.name, tamano: f.size, version_id: null, estado: 'subiendo' as const }))])
+      const cambiar = (id: number, cambio: Partial<Adjunto>) => setAdjuntos((a) => a.map((x) => (x.id === id ? { ...x, ...cambio } : x)))
       try {
         const fid = fuente ?? (await fuenteDeAdjuntos())
         setFuente(fid)
         await Promise.all(
-          ficheros.map(async (f) => {
+          nuevos.map(async ({ f, id }) => {
             try {
               const r = await subirFichero(fid, f, temaId)
-              setAdjuntos((a) => a.map((x) => (x.nombre === f.name && x.estado === 'subiendo' ? { ...x, version_id: r.version_id, estado: 'indexando' } : x)))
+              cambiar(id, { version_id: r.version_id, estado: 'indexando' })
             } catch (e) {
-              setAdjuntos((a) =>
-                a.map((x) => (x.nombre === f.name && x.estado === 'subiendo' ? { ...x, estado: 'error', detalle: String((e as Error).message) } : x)),
-              )
+              cambiar(id, { estado: 'error', detalle: String((e as Error).message) })
             }
           }),
         )
       } catch (e) {
-        setAdjuntos((a) => a.map((x) => (x.estado === 'subiendo' ? { ...x, estado: 'error', detalle: String((e as Error).message) } : x)))
+        for (const { id } of nuevos) cambiar(id, { estado: 'error', detalle: String((e as Error).message) })
       }
     },
     [fuente, temaId],
@@ -76,6 +95,7 @@ export function usarAdjuntos(temaId: number | null = null) {
           if (v.estado === 'retirada' && v.motivo === 'sin cambios') {
             v = docs.find((d) => d.uri === `subida/${x.nombre}`)?.version ?? undefined
             if (!v) return x
+            x = { ...x, version_id: v.id } // la que sigue viva: es la que ve el tutor
           }
           if (v.estado === 'lista') return { ...x, estado: 'listo' }
           if (v.estado === 'cuarentena' || v.estado === 'retirada')
@@ -87,6 +107,11 @@ export function usarAdjuntos(temaId: number | null = null) {
     return () => clearInterval(t)
   }, [fuente, adjuntos])
 
-  const quitar = (nombre: string) => setAdjuntos((a) => a.filter((x) => x.nombre !== nombre))
-  return { adjuntos, subir, quitar }
+  const quitar = (id: number) => setAdjuntos((a) => a.filter((x) => x.id !== id))
+  // Tras enviar: la caja queda limpia; la conversación ya los recuerda en el servidor.
+  const vaciar = useCallback(() => {
+    setAdjuntos((a) => a.filter((x) => x.estado === 'subiendo'))
+    setAviso(null)
+  }, [])
+  return { adjuntos, subir, quitar, vaciar, aviso, avisar: setAviso }
 }

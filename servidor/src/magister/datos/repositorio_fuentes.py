@@ -270,3 +270,18 @@ async def tema_de_version(s: AsyncSession, version_id: int) -> int | None:
         return None
     d = await s.get(Documento, v.documento_id)
     return d.tema_id if d else None
+
+
+async def vincular_versiones_a_tema(version_ids: list[int], tema_id: int) -> int:
+    """Los documentos de esas versiones que aún no tienen tema pasan al tema del plan (como una fuente subida con tema).
+    Uno que ya es de otro tema se queda donde está. Devuelve cuántos documentos se vincularon."""
+    if not version_ids:
+        return 0
+    from sqlalchemy import update
+
+    from magister.datos.sesion import nueva_sesion
+
+    async with nueva_sesion() as s, s.begin():
+        docs = (await s.scalars(select(Version.documento_id).where(Version.id.in_(version_ids)))).all()
+        r = await s.execute(update(Documento).where(Documento.id.in_(list(docs)), Documento.tema_id.is_(None)).values(tema_id=tema_id))
+        return r.rowcount or 0

@@ -162,6 +162,7 @@ class Preparado:
     pregunta_id: int | None = None
     # El cuerpo lo valida solo la dependencia: si la ruta también lo declaraba, cada error salía dos veces en el 422.
     cuerpo: MensajeEntrada | None = None
+    adjuntos: list[int] | None = None  # todos los documentos adjuntados en la conversación (ids de versión)
 
 
 # Un turno cada vez por conversación. Si llega otro con uno en marcha (lo reenvías, o en la llamada el dictado manda tu
@@ -254,9 +255,11 @@ async def preparar_mensaje(
     nota = None
     if tipo != "plan" and not cuerpo.voz and pide_guardar(cuerpo.contenido):
         nota = await guardar_respuesta_anterior(s, cid)
+    # Los adjuntos de este mensaje se suman a los de la conversación: «y ahora un proyecto de esto» los sigue conociendo.
+    adjuntos = await dc.sumar_adjuntos(s, cid, cuerpo.adjuntos)
     pregunta = await dc.guardar_pregunta(s, cid, cuerpo.contenido, cuerpo.cuenta)
     turnos = [{"rol": m.rol, "contenido": m.contenido} for m in await dc.historial_completo(s, cid)]
-    return Preparado(tipo, turnos, cuerpo.cuenta, nota, pregunta.id, cuerpo)
+    return Preparado(tipo, turnos, cuerpo.cuenta, nota, pregunta.id, cuerpo, adjuntos)
 
 
 @rutas.post("/conversaciones/{cid}/mensajes", response_class=EventSourceResponse)
@@ -273,6 +276,7 @@ async def enviar_mensaje(
                                            "leccion_clave": cuerpo.leccion_clave, "contexto": cuerpo.contexto,
                                            "corregir": cuerpo.corregir and cuerpo.llamada,
                                            "asesor": cuerpo.asesor,
+                                           "adjuntos": p.adjuntos or [],
                                            "nota_guardada": p.nota is not None},
                                     ahora=hora_actual())
         eventos = _propuestas_con_sustitucion(eventos, cid)

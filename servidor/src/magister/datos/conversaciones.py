@@ -164,3 +164,33 @@ async def citas_de_mensajes(s: AsyncSession, ids: list[int]) -> dict[int, list[d
             {"fragmento_id": c.fragmento_id, "cita_literal": c.cita_literal, "dudosa": c.dudosa}
         )
     return salida
+
+
+async def sumar_adjuntos(s: AsyncSession, cid: int, version_ids: list[int]) -> list[int]:
+    """Suma a la conversación las versiones que adjuntas (solo las que existen, sin repetir) y devuelve todas las que
+    tiene. Lo que viaja son ids; el texto se trae al final, por id."""
+    from magister.datos.fuentes import Version
+
+    c = await s.get(Conversacion, cid)
+    if c is None:
+        return []
+    actuales = [int(x) for x in (c.adjuntos or [])]
+    nuevos: list[int] = []
+    for vid in dict.fromkeys(version_ids):
+        v = await s.get(Version, vid)
+        if v is None:
+            continue
+        if v.estado == "retirada":
+            # Volver a adjuntar un fichero que ya tenías deja su versión retirada («sin cambios»): vale la que sigue viva.
+            viva = await s.scalar(select(Version.id).where(Version.documento_id == v.documento_id, Version.estado != "retirada")
+                                  .order_by(Version.id.desc()).limit(1))
+            if viva is None:
+                continue
+            vid = viva
+        if vid not in actuales and vid not in nuevos:
+            nuevos.append(vid)
+    if nuevos:
+        c.adjuntos = [*actuales, *nuevos]
+        await s.commit()
+        return c.adjuntos
+    return actuales

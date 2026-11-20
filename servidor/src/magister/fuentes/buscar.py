@@ -14,7 +14,7 @@ from dataclasses import replace
 
 from sqlalchemy import text
 
-from magister.cerebro.contratos import Consulta, Filtros, Recuperado, ResultadoBusqueda
+from magister.cerebro.contratos import Consulta, Filtros, Recuperado, ResultadoBusqueda, ResumenVersion
 from magister.datos import repositorio_fuentes as rf
 from magister.datos.fuentes import Busqueda
 from magister.datos.sesion import nueva_sesion
@@ -265,3 +265,48 @@ class BuscadorHibrido:
                     lineas.append(f"  {linea.strip()}")
         salida = "\n".join(lineas)
         return salida[:max_caracteres]
+
+    async def resumen_versiones(self, version_ids: list[int], max_secciones: int = 12) -> list[ResumenVersion]:
+        """Título y apartados (encabezados, hasta dos niveles) de cada versión, en el orden pedido. Funciona también con
+        una versión que aún se está indexando (si ya tiene texto)."""
+        from magister.fuentes.trocear import _secciones
+
+        if not version_ids:
+            return []
+        sql = text("select v.id, d.titulo, v.texto from versiones v join documentos d on d.id = v.documento_id "
+                   "where v.id = any(:ids)")
+        async with nueva_sesion() as s:
+            filas = {r[0]: r for r in (await s.execute(sql, {"ids": list(version_ids)})).all()}
+        salida: list[ResumenVersion] = []
+        for vid in version_ids:
+            if vid not in filas:
+                continue
+            _, titulo, texto = filas[vid]
+            rutas: list[str] = []
+            for _i, _f, ruta in _secciones(texto or ""):
+                if ruta:
+                    r = " > ".join(ruta[:2])
+                    if r not in rutas:
+                        rutas.append(r)
+            salida.append(ResumenVersion(vid, titulo, rutas[:max_secciones]))
+        return salida
+
+    async def primeros_fragmentos(self, version_ids: list[int], por_version: int = 3) -> list[Recuperado]:
+        """Los primeros fragmentos (por orden en el documento) de cada versión, con la configuración activa: para cuando
+        el mensaje no dice qué buscar («haz un roadmap de esto»)."""
+        if not version_ids:
+            return []
+        config_id, _ = await _config(None)
+        sql = text(
+            "select id, version_id from (select f.id, f.version_id, f.orden, "
+            "row_number() over (partition by f.version_id order by f.orden) as n from fragmentos f "
+            "join versiones v on v.id = f.version_id "
+            "where f.version_id = any(:ids) and f.config_id = :c and v.estado = 'lista') x where n <= :n"
+        )
+        async with nueva_sesion() as s:
+            filas = (await s.execute(sql, {"ids": list(version_ids), "c": config_id, "n": por_version})).all()
+        por_v: dict[int, list[int]] = {}
+        for fid, vid in sorted(filas, key=lambda r: r[0]):
+            por_v.setdefault(int(vid), []).append(int(fid))
+        pares = [(fid, 1.0) for vid in version_ids for fid in por_v.get(vid, [])]
+        return await hidratar(pares)

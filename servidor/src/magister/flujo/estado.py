@@ -23,6 +23,8 @@ class Estado(TypedDict, total=False):
     contexto: str | None  # dónde está la llamada
     corregir: bool  # en la llamada, el alumno responde a una pregunta del tutor: la corrige el modelo grande
     asesor: bool  # la mascota flotante: contesta corto sobre la pantalla que tiene abierta (va en `contexto`)
+    adjuntos: list[int]  # versiones que el alumno ha adjuntado en la conversación (ids; el texto se trae por id)
+    adjuntos_resumen: list[dict]  # de cada una: versión, título y apartados (lo que el tutor sabe de lo adjuntado)
     nota_guardada: bool  # la app acaba de guardar en Mis notas la respuesta anterior
     turnos: list[Turno]  # historial completo de la conversación (lo pasa la API)
     perfil: dict

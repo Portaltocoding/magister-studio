@@ -1,5 +1,6 @@
 from magister.cerebro.modelo import Turno
 from magister.cerebro.prompts import cargar
+from magister.flujo import adjuntos as adj
 from magister.flujo.comun import con_idioma_del_alumno, escribir, fase, hablar, hoy_de, perfil_de, perfil_json, sin_etiquetas, turnos_recientes
 from magister.flujo.estado import Estado
 from magister.plan.perfil import huecos
@@ -15,7 +16,9 @@ async def preguntar(estado: Estado) -> dict:
         mensaje=sin_etiquetas(estado.get("mensaje", "")),
         hoy=hoy_de(estado).isoformat(),
     )
-    sistema = await con_idioma_del_alumno(sistema)
+    if estado.get("adjuntos_resumen"):
+        sistema += "\n\n" + adj.para_el_plan(estado["adjuntos_resumen"])
+    sistema = await con_idioma_del_alumno(sistema, estado.get("mensaje"))
     await hablar(sistema, [Turno("usuario", "Escribe tu siguiente turno para el alumno.")])
     faltan = huecos(perfil)
     if faltan and faltan[0] in OPCIONES:
