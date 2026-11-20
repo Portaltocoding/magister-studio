@@ -15,7 +15,7 @@ rutas = APIRouter(prefix="/api")
 @rutas.get("/voz/voces")
 async def voces() -> list[dict]:
     """Las voces instaladas (vacío si Piper no está: la pantalla usa entonces la voz del navegador)."""
-    return [{"id": v.id, "nombre": v.nombre} for v in piper.disponibles()]
+    return [{"id": v.id, "nombre": v.nombre, "idioma": v.idioma} for v in piper.disponibles()]
 
 
 class Frase(BaseModel):

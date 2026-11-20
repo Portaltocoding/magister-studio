@@ -2,7 +2,9 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { enviarCodigoCuenta, guardarBienvenida, iniciarCuenta, probarCuenta } from '../api.ts'
 import Mascota, { type GestoMascota } from '../Mascota.tsx'
 import { cambiarPreferencias } from './preferencias.ts'
-import { Locutor } from './voz.ts'
+import { Locutor, vocesMagisterListas, vozMagister } from './voz.ts'
+import { IDIOMAS, fijarIdioma, t, type Idioma } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import {
   codigoLimpio,
   codigoPosible,
@@ -11,7 +13,7 @@ import {
   inicialCuenta,
   limpiarNombre,
   pasosDe,
-  PASOS_CONEXION,
+  pasosConexion,
   posicion,
   reducirCuenta,
   resultadoClaude,
@@ -20,8 +22,8 @@ import {
   RUTA_PLAN,
   siguiente,
   textoMascota,
-  TITULOS,
-  TRAS_LA_PRUEBA,
+  tituloDe,
+  trasLaPrueba,
   type Modo,
   type Paso,
   type Resultado,
@@ -31,14 +33,17 @@ interface Props {
   modo: Modo
   nombre: string
   cuentaConectada: boolean
+  // false sin pty (desarrollo en Windows): no se ofrece conectar ni cambiar la cuenta.
+  puedeConectar?: boolean
   alCerrar: () => void
 }
 
-const mensajeDe = (e: unknown) => (e instanceof Error ? e.message : 'Algo ha fallado. Prueba otra vez.')
+const mensajeDe = (e: unknown) => (e instanceof Error ? e.message : t('bienvenida.error.generico'))
 
 // La mascota te recibe en pocos pasos: cómo te llama, tu cuenta de Claude (sin terminal), una prueba, tu primer plan y
 // tus apuntes. La lógica (qué pasos, cuándo se saltan, la conexión) está en bienvenida.ts; esto solo pinta y llama a la API.
-export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectada, alCerrar }: Props) {
+export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectada, puedeConectar = true, alCerrar }: Props) {
+  const { idioma } = usarIdioma() // la bienvenida vuelve a pintarse al elegir idioma
   const pasos = pasosDe(modo)
   const [paso, setPaso] = useState<Paso>(pasos[0])
   const [conectada, setConectada] = useState(cuentaConectada)
@@ -76,13 +81,14 @@ export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectad
       <div className="bienvenida" role="dialog" aria-modal="true" aria-labelledby="bienvenida-titulo" tabIndex={-1} ref={caja}>
         <Mascota gesto={gesto} />
         <p className="bienvenida-habla" aria-live="polite">
-          {textoMascota(paso, nombre, modo)}
+          {textoMascota(paso, nombre, modo, idioma)}
         </p>
         <p className="bienvenida-paso">
-          Paso {n} de {de}
+          {t('bienvenida.paso', { n, de })}
         </p>
-        <h2 id="bienvenida-titulo">{TITULOS[paso]}</h2>
+        <h2 id="bienvenida-titulo">{tituloDe(paso, idioma)}</h2>
 
+        {paso === 'idioma' && <PasoIdioma alSeguir={avanzar} />}
         {paso === 'nombre' && (
           <PasoNombre
             nombre={nombre}
@@ -94,7 +100,7 @@ export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectad
             }}
           />
         )}
-        {paso === 'cuenta' && <PasoCuenta conectada={conectada} alGesto={setGesto} alSeguir={avanzar} alConectada={() => setConectada(true)} />}
+        {paso === 'cuenta' && <PasoCuenta conectada={conectada} puede={puedeConectar} alGesto={setGesto} alSeguir={avanzar} alConectada={() => setConectada(true)} />}
         {paso === 'prueba' && (
           <PasoPrueba
             nombre={nombre}
@@ -110,29 +116,72 @@ export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectad
         {paso === 'plan' && (
           <div className="bienvenida-botones">
             <button type="button" className="boton boton-principal" onClick={() => void cerrar('hecha', RUTA_PLAN)}>
-              Crear mi plan
+              {t('bienvenida.plan.crear')}
             </button>
             <button type="button" className="boton" onClick={avanzar}>
-              Ahora no
+              {t('bienvenida.ahoraNo')}
             </button>
           </div>
         )}
         {paso === 'apuntes' && (
           <div className="bienvenida-botones">
             <button type="button" className="boton boton-principal" onClick={() => void cerrar('hecha', RUTA_APUNTES)}>
-              Subir apuntes o PDF
+              {t('bienvenida.apuntes.subir')}
             </button>
             <button type="button" className="boton" onClick={() => void cerrar('hecha')}>
-              Ahora no
+              {t('bienvenida.ahoraNo')}
             </button>
           </div>
         )}
 
         <button type="button" className="bienvenida-saltar" onClick={omitir}>
-          {modo === 'reconectar' ? 'Ahora no' : 'Saltar la bienvenida'}
+          {modo === 'reconectar' ? t('bienvenida.ahoraNo') : t('bienvenida.saltar')}
         </button>
       </div>
     </div>
+  )
+}
+
+// El primer paso: el idioma de la pantalla, de lo que dice la mascota, de la voz y del tutor. Se guarda al pulsar.
+function PasoIdioma({ alSeguir }: { alSeguir: () => void }) {
+  const [elegido, setElegido] = useState<Idioma | null>(null)
+  const [voz, setVoz] = useState<string | null>(null)
+  const elegir = (i: Idioma) => {
+    setElegido(i)
+    fijarIdioma(i)
+    void cambiarPreferencias({ idioma: i }).catch(() => undefined)
+    // La voz inglesa: una de Magister (Piper) si el servidor tiene alguna; si no, la del navegador.
+    void vocesMagisterListas.then(() => setVoz(vozMagister() ? t('bienvenida.idioma.vozMagister') : t('bienvenida.idioma.vozNavegador')))
+  }
+  return (
+    <>
+      <div className="bienvenida-botones bienvenida-idiomas" role="radiogroup" aria-label="Idioma / Language">
+        {IDIOMAS.map((i) => (
+          <button
+            key={i.id}
+            type="button"
+            role="radio"
+            aria-checked={elegido === i.id}
+            autoFocus={i.id === 'es'}
+            className={`boton bienvenida-idioma ${elegido === i.id ? 'boton-principal' : ''}`}
+            onClick={() => elegir(i.id)}
+          >
+            {i.nombre}
+          </button>
+        ))}
+      </div>
+      {elegido && (
+        <>
+          <p>{t('bienvenida.idioma.nota')}</p>
+          {elegido === 'en' && voz && <p role="status">{t('bienvenida.idioma.vozEn', { voz })}</p>}
+          <div className="bienvenida-botones">
+            <button type="button" className="boton boton-principal" onClick={alSeguir}>
+              {t('bienvenida.seguir')}
+            </button>
+          </div>
+        </>
+      )}
+    </>
   )
 }
 
@@ -150,13 +199,13 @@ function PasoNombre({ nombre, alCambiar, alSeguir }: { nombre: string; alCambiar
         value={nombre}
         maxLength={60}
         autoFocus
-        placeholder="Tu nombre"
-        aria-label="Tu nombre"
+        placeholder={t('bienvenida.nombre.placeholder')}
+        aria-label={t('bienvenida.nombre.placeholder')}
         autoComplete="given-name"
         onChange={(e) => alCambiar(e.target.value)}
       />
       <button type="submit" className="boton boton-principal">
-        {limpiarNombre(nombre) ? 'Seguir' : 'Prefiero no decirlo'}
+        {limpiarNombre(nombre) ? t('bienvenida.seguir') : t('bienvenida.nombre.prefiero')}
       </button>
     </form>
   )
@@ -166,16 +215,18 @@ function PasoNombre({ nombre, alCambiar, alSeguir }: { nombre: string; alCambiar
 // se abre en otra pestaña y se pega aquí el código.
 function PasoCuenta({
   conectada,
+  puede,
   alGesto,
   alSeguir,
   alConectada,
 }: {
   conectada: boolean
+  puede: boolean
   alGesto: (g: GestoMascota) => void
   alSeguir: () => void
   alConectada: () => void
 }) {
-  const [e, enviar] = useReducer(reducirCuenta, conectada, inicialCuenta)
+  const [e, enviar] = useReducer(reducirCuenta, undefined, () => inicialCuenta(conectada, puede))
   const [codigo, setCodigo] = useState('')
 
   useEffect(() => {
@@ -186,7 +237,7 @@ function PasoCuenta({
     enviar({ tipo: 'pulsar' })
     try {
       const { enlace } = await iniciarCuenta()
-      if (!enlaceSeguro(enlace)) throw new Error('No he recibido un enlace de Claude válido. Pulsa «Probar otra vez».')
+      if (!enlaceSeguro(enlace)) throw new Error(t('bienvenida.error.enlace'))
       // Algunos navegadores bloquean abrir pestañas tras una espera: por eso el enlace también se ofrece como botón.
       window.open(enlace, '_blank', 'noopener')
       enviar({ tipo: 'enlace', enlace })
@@ -214,16 +265,18 @@ function PasoCuenta({
     return (
       <>
         <p className="bienvenida-ok" role="status">
-          Tu cuenta de Claude ya está conectada ✓
+          {t('bienvenida.cuenta.conectada')}
         </p>
-        <p>Magister usa tu propia suscripción de Claude Pro o Max: no hay otra cuenta ni otro gasto.</p>
+        <p>{t('bienvenida.cuenta.suscripcion')}</p>
         <div className="bienvenida-botones">
           <button type="button" className="boton boton-principal" onClick={alSeguir}>
-            Seguir
+            {t('bienvenida.seguir')}
           </button>
-          <button type="button" className="boton boton-discreto" onClick={() => enviar({ tipo: 'otra' })}>
-            Conectar otra cuenta
-          </button>
+          {puede && (
+            <button type="button" className="boton boton-discreto" onClick={() => enviar({ tipo: 'otra' })}>
+              {t('bienvenida.cuenta.otra')}
+            </button>
+          )}
         </div>
       </>
     )
@@ -231,11 +284,11 @@ function PasoCuenta({
     return (
       <>
         <p className="bienvenida-ok" role="status">
-          ✓ Cuenta conectada
+          {t('bienvenida.cuenta.lista')}
         </p>
         <div className="bienvenida-botones">
           <button type="button" className="boton boton-principal" onClick={alSeguir}>
-            Seguir
+            {t('bienvenida.seguir')}
           </button>
         </div>
       </>
@@ -243,15 +296,15 @@ function PasoCuenta({
   if (e.fase === 'sinpty')
     return (
       <>
-        <p>{conectada ? 'Para cambiar de cuenta, hazlo desde la versión de Docker de Magister: desde este equipo no se puede.' : 'Conectar tu cuenta de Claude se hace desde la versión de Docker de Magister: desde este equipo no se puede.'}</p>
+        <p>{t('bienvenida.cuenta.sinPty')}</p>
         <div className="bienvenida-botones">
           {conectada ? (
             <button type="button" className="boton boton-principal" onClick={() => enviar({ tipo: 'volver' })}>
-              Volver
+              {t('bienvenida.cuenta.volver')}
             </button>
           ) : (
             <button type="button" className="boton boton-principal" onClick={alSeguir}>
-              Seguir
+              {t('bienvenida.seguir')}
             </button>
           )}
         </div>
@@ -265,7 +318,7 @@ function PasoCuenta({
         </p>
         <div className="bienvenida-botones">
           <button type="button" className="boton boton-principal" onClick={otraVez}>
-            Probar otra vez
+            {t('bienvenida.cuenta.otraVez')}
           </button>
         </div>
       </>
@@ -281,14 +334,14 @@ function PasoCuenta({
       >
         <ol className="bienvenida-pasos">
           <li>
-            Ya he abierto Claude en otra pestaña. Si no se ha abierto,{' '}
+            {t('bienvenida.cuenta.yaAbierto1')}{' '}
             <a href={e.enlace ?? '#'} target="_blank" rel="noopener noreferrer">
-              pulsa aquí
+              {t('bienvenida.cuenta.pulsaAqui')}
             </a>
             .
           </li>
-          <li>Inicia sesión y pulsa «Authorize».</li>
-          <li>Claude te enseña un código: cópialo y pégalo aquí.</li>
+          <li>{t('bienvenida.cuenta.paso2')}</li>
+          <li>{t('bienvenida.cuenta.paso3')}</li>
         </ol>
         <input
           className="bienvenida-campo"
@@ -296,17 +349,17 @@ function PasoCuenta({
           autoFocus
           spellCheck={false}
           autoComplete="off"
-          placeholder="Pega aquí el código"
-          aria-label="Código de Claude"
+          placeholder={t('bienvenida.cuenta.pegaCodigo')}
+          aria-label={t('bienvenida.cuenta.codigoClaude')}
           disabled={e.fase === 'enviando'}
           onChange={(ev) => setCodigo(ev.target.value)}
         />
         <div className="bienvenida-botones">
           <button type="submit" className="boton boton-principal" disabled={!codigoPosible(codigo) || e.fase === 'enviando'}>
-            {e.fase === 'enviando' ? 'Conectando…' : 'Conectar'}
+            {e.fase === 'enviando' ? t('bienvenida.cuenta.conectando') : t('bienvenida.cuenta.conectar')}
           </button>
           <button type="button" className="boton" onClick={otraVez} disabled={e.fase === 'enviando'}>
-            Empezar de nuevo
+            {t('bienvenida.cuenta.empezar')}
           </button>
         </div>
       </form>
@@ -314,18 +367,18 @@ function PasoCuenta({
   return (
     <>
       <ol className="bienvenida-pasos">
-        {PASOS_CONEXION.map((p) => (
+        {pasosConexion().map((p) => (
           <li key={p}>{p}</li>
         ))}
       </ol>
       {e.fase === 'abriendo' && (
         <p role="status" aria-live="polite">
-          Estoy preparando la conexión con Claude… Tarda unos segundos.
+          {t('bienvenida.cuenta.preparandoTexto')}
         </p>
       )}
       <div className="bienvenida-botones">
         <button type="button" className="boton boton-principal" onClick={() => void conectar()} disabled={e.fase === 'abriendo'}>
-          {e.fase === 'abriendo' ? 'Preparando…' : 'Abrir Claude'}
+          {e.fase === 'abriendo' ? t('bienvenida.cuenta.preparando') : t('bienvenida.cuenta.abrir')}
         </button>
       </div>
     </>
@@ -401,29 +454,29 @@ function PasoPrueba({
     <>
       {fase !== 'listo' && (
         <ul className="bienvenida-pasos" role="status" aria-live="polite">
-          {linea(voz, 'Voz: probando…')}
-          {linea(claude, 'Claude: preguntándole…')}
+          {linea(voz, t('bienvenida.prueba.vozProbando'))}
+          {linea(claude, t('bienvenida.prueba.claudeProbando'))}
         </ul>
       )}
-      {fase === 'bien' && <p>{TRAS_LA_PRUEBA[modo]}</p>}
+      {fase === 'bien' && <p>{trasLaPrueba(modo)}</p>}
       <div className="bienvenida-botones">
         {fase === 'bien' ? (
           <button type="button" className="boton boton-principal" onClick={alSeguir}>
-            Seguir
+            {t('bienvenida.seguir')}
           </button>
         ) : (
           <button type="button" className="boton boton-principal" onClick={() => void probar()} disabled={fase === 'probando'}>
-            {fase === 'probando' ? 'Probando…' : fase === 'mal' ? 'Probar otra vez' : 'Hacer la prueba'}
+            {fase === 'probando' ? t('bienvenida.prueba.probando') : fase === 'mal' ? t('bienvenida.cuenta.otraVez') : t('bienvenida.prueba.hacer')}
           </button>
         )}
         {fase === 'mal' && cuentaFalla && (
           <button type="button" className="boton" onClick={alVolverACuenta}>
-            Conectar la cuenta
+            {t('bienvenida.prueba.conectar')}
           </button>
         )}
         {fase === 'mal' && (
           <button type="button" className="boton" onClick={alSeguir}>
-            Seguir igualmente
+            {t('bienvenida.prueba.igualmente')}
           </button>
         )}
       </div>

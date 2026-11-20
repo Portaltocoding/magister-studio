@@ -24,6 +24,31 @@ CLAVE = "bienvenida"
 SISTEMA_PRUEBA = "Responde únicamente con la palabra: listo"
 
 
+# Lo que la pantalla enseña tal cual (los fallos del alta y de la prueba) sale en el idioma elegido. El español es el
+# mensaje original de cerebro/cuenta.py; aquí está su versión en inglés (y la pantalla reconoce «you signed in with»).
+EN = {
+    "Ya estoy preparando la conexión. Espera unos segundos.": "I'm already preparing the connection. Wait a few seconds.",
+    "No he conseguido el enlace de Claude. Pulsa «Probar otra vez».": 'I couldn\'t get the Claude link. Press "Try again".',
+    "En este equipo Magister ya usa la cuenta de Claude con la que iniciaste sesión.":
+        "On this computer Magister already uses the Claude account you signed in with.",
+    "La conexión ha caducado. Pulsa «Probar otra vez» para empezar de nuevo.": 'The connection has expired. Press "Try again" to start over.',
+    "Ese código no ha valido. Pulsa «Probar otra vez» y copia el código entero.": 'That code didn\'t work. Press "Try again" and copy the whole code.',
+    "El código no ha dado un token válido.": "The code didn't give a valid token.",
+    "Claude no me deja entrar con esta cuenta. Vuelve a conectarla.": "Claude won't let me in with this account. Connect it again.",
+    "El modelo no ha contestado. Prueba otra vez en un momento.": "The model didn't answer. Try again in a moment.",
+}
+
+
+async def en_su_idioma(mensaje: str) -> str:
+    """El mensaje en el idioma de las preferencias (sin traducción conocida, tal cual)."""
+    try:
+        if (await preferencias_tutor()).get("idioma") == "en":
+            return EN.get(mensaje, mensaje)
+    except Exception:  # noqa: BLE001  # las preferencias no pueden romper un aviso
+        pass
+    return mensaje
+
+
 async def _estado_guardado() -> str:
     async with nueva_sesion() as s:
         fila = await s.get(Ajuste, CLAVE)
@@ -35,7 +60,7 @@ async def ver() -> dict:
     """Qué pasos enseñar: el estado de la bienvenida, cómo te llama la mascota y si la cuenta de Claude funciona."""
     c = await cuenta.estado()
     return {"estado": await _estado_guardado(), "nombre": (await preferencias_tutor()).get("nombre", ""),
-            "cuenta": {"conectada": c["conectada"], "caida": c["caida"]}}
+            "cuenta": {"conectada": c["conectada"], "caida": c["caida"], "puede_conectar": cuenta.puede_conectar()}}
 
 
 class Estado(BaseModel):
@@ -58,7 +83,7 @@ async def iniciar_cuenta() -> dict:
     try:
         return {"enlace": await cuenta.iniciar_alta()}
     except cuenta.ErrorCuenta as e:
-        raise HTTPException(409, str(e)) from None
+        raise HTTPException(409, await en_su_idioma(str(e))) from None
 
 
 class Codigo(BaseModel):
@@ -71,7 +96,7 @@ async def terminar_cuenta(cuerpo: Codigo) -> dict:
     try:
         await cuenta.terminar_alta(cuerpo.codigo)
     except cuenta.ErrorCuenta as e:
-        raise HTTPException(400, str(e)) from None
+        raise HTTPException(400, await en_su_idioma(str(e))) from None
     return {"conectada": True}
 
 
@@ -83,6 +108,6 @@ async def probar() -> dict:
             pass
     except ErrorModelo as e:
         if cuenta.es_error_de_cuenta(str(e)) or cuenta.caida():
-            return {"ok": False, "cuenta": False, "mensaje": "Claude no me deja entrar con esta cuenta. Vuelve a conectarla."}
-        return {"ok": False, "cuenta": True, "mensaje": "El modelo no ha contestado. Prueba otra vez en un momento."}
+            return {"ok": False, "cuenta": False, "mensaje": await en_su_idioma("Claude no me deja entrar con esta cuenta. Vuelve a conectarla.")}
+        return {"ok": False, "cuenta": True, "mensaje": await en_su_idioma("El modelo no ha contestado. Prueba otra vez en un momento.")}
     return {"ok": True, "cuenta": True, "mensaje": ""}

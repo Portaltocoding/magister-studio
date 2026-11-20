@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
 import { EVENTO_CONECTADO } from './Cargando.tsx'
+import { esIdioma, fijarIdioma } from '../i18n/i18n.ts'
 
 // Las preferencias del tutor, compartidas entre la mascota, el selector de modo y las tarjetas del chat.
 // Un cambio en un sitio se ve al momento en los demás.
@@ -31,15 +32,24 @@ export interface PreferenciasTutor {
 const EVENTO = 'magister-preferencias'
 let cache: PreferenciasTutor | null = null
 
+// El idioma de las preferencias es el de toda la pantalla (i18n/i18n.ts).
+const aplicarIdioma = (p: PreferenciasTutor) => {
+  if (esIdioma(p.idioma)) fijarIdioma(p.idioma)
+}
+
 export async function cargarPreferencias(): Promise<PreferenciasTutor> {
   cache = await pedir<PreferenciasTutor>('/api/preferencias')
+  aplicarIdioma(cache)
   return cache
 }
 
 export async function cambiarPreferencias(cambio: Partial<PreferenciasTutor>): Promise<PreferenciasTutor> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { modos_de_serie, ...resto } = cambio as PreferenciasTutor
+  // El idioma se cambia al instante: la pantalla no espera al servidor (si falla, se queda el elegido en este navegador).
+  if (esIdioma(cambio.idioma)) fijarIdioma(cambio.idioma)
   cache = await pedir<PreferenciasTutor>('/api/preferencias', enviarJson(resto, 'PUT'))
+  aplicarIdioma(cache)
   window.dispatchEvent(new CustomEvent(EVENTO, { detail: cache }))
   return cache
 }

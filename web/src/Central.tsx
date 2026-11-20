@@ -2,7 +2,8 @@ import { lazy, Suspense } from 'react'
 import Pensando, { NOMBRES, VARIANTES } from './componentes/Pensando.tsx'
 import FalloPantalla from './componentes/FalloPantalla.tsx'
 import EstudioLibre from './EstudioLibre.tsx'
-import { familiaDe, type IdModo } from './modos.ts'
+import { familiaDe, nombreModo, type IdModo } from './modos.ts'
+import { usarIdioma } from './i18n/usarIdioma.ts'
 import PanelPractica from './paneles/PanelPractica.tsx'
 import PanelTutor from './paneles/PanelTutor.tsx'
 import PanelGuia from './paneles/PanelGuia.tsx'
@@ -40,14 +41,15 @@ interface Props {
 
 // Las pestañas de la entrada en la que estás (Practicar: Repaso y Examen…).
 function Pestanas({ modo, irA }: { modo: IdModo; irA: (m: IdModo) => void }) {
+  usarIdioma() // los nombres de las pestañas siguen al idioma
   const familia = familiaDe(modo)
   // Una entrada con una sola sección (Proyectos) no necesita conmutador.
   if (!familia || familia.length < 2) return null
   return (
     <nav className="pestanas-modo" role="tablist" aria-label="Secciones">
-      {familia.map(([id, texto]) => (
+      {familia.map(([id]) => (
         <button key={id} type="button" role="tab" aria-selected={id === modo} className={id === modo ? 'actual' : ''} onClick={() => irA(id)}>
-          {texto}
+          {nombreModo(id)}
         </button>
       ))}
     </nav>

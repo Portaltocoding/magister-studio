@@ -33,6 +33,8 @@ async def _del_tutor() -> dict:
     salida: dict = {}
     if v.get("instrucciones"):
         salida["instrucciones"] = list(v["instrucciones"])
+    if v.get("idioma") == "en":  # los apuntes, las diapositivas y las preguntas salen en inglés
+        salida["idioma"] = "en"
     nivel = {"cero": "nada", "experto": "avanzado"}.get(v.get("nivel", ""))
     if nivel:
         salida["nivel_tutor"] = nivel

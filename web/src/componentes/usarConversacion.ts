@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { ErrorApi, EVENTO_NOTAS, type EventoTutor, type Mensaje, type Propuesta } from '../api.ts'
 import type { Burbuja } from './Hilo.tsx'
-import { errorLegible, MENSAJE_SIN_CONEXION } from './errores.ts'
+import { errorLegible, esSinConexion, mensajeSinConexion } from './errores.ts'
 import { escribirEnChat } from './preferencias.ts'
 import { crearTurnos, trasFalloAlEnviar, trasFalloSinConexion } from './turnos.ts'
 
@@ -88,7 +88,7 @@ export function usarConversacion(
       // El aviso de «sin conexión» de un intento anterior sobra en cuanto lo reenvías.
       setBurbujas((previas) => {
         const u = previas[previas.length - 1]
-        const sinAviso = u && u.estado === 'error' && u.contenido === MENSAJE_SIN_CONEXION ? previas.slice(0, -1) : previas
+        const sinAviso = u && u.estado === 'error' && esSinConexion(u.contenido) ? previas.slice(0, -1) : previas
         return [...sinAviso, ...nuevas]
       })
       setEscribiendo(true)
@@ -178,7 +178,7 @@ export function usarConversacion(
           actualizarUltima((b) => ({ ...b, estado: 'interrumpido' }))
         } else if (!empezo && e instanceof ErrorApi && e.codigo === 0) {
           // Sin conexión no ha llegado nada: tu mensaje sale del hilo (no se envió) y vuelve a la caja para reenviarlo.
-          const error: Burbuja = { clave: claveNueva(), rol: 'tutor', contenido: MENSAJE_SIN_CONEXION, estado: 'error' }
+          const error: Burbuja = { clave: claveNueva(), rol: 'tutor', contenido: mensajeSinConexion(), estado: 'error' }
           setBurbujas((previas) => trasFalloSinConexion(previas, error, propia !== null))
           if (propia !== null) escribirEnChat(propia)
         } else if (!empezo && e instanceof ErrorApi) {

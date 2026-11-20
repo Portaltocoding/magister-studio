@@ -167,6 +167,15 @@ def _cerrar_alta() -> None:
         sesion.cerrar()
 
 
+def puede_conectar() -> bool:
+    """¿Se puede hacer el alta desde la página en este equipo? Hace falta pty (Linux, macOS, Docker) y el programa claude."""
+    try:
+        import pty  # noqa: F401
+    except ImportError:
+        return False
+    return shutil.which("claude") is not None
+
+
 async def iniciar_alta() -> str:
     """Lanza `claude setup-token` y devuelve el enlace de inicio de sesión. Una sola a la vez: pedir otra cierra la
     anterior (el «Probar otra vez»), salvo que una esté arrancando justo ahora."""
@@ -182,8 +191,7 @@ async def iniciar_alta() -> str:
             raise ErrorCuenta("No he conseguido el enlace de Claude. Pulsa «Probar otra vez».") from None
         except (ImportError, OSError):  # sin pty (Windows) o sin el programa
             await asyncio.to_thread(sesion.cerrar)
-            raise ErrorCuenta("Conectar o cambiar la cuenta de Claude se hace desde la versión de Docker de Magister, "
-                              "no desde este equipo.") from None
+            raise ErrorCuenta("En este equipo Magister ya usa la cuenta de Claude con la que iniciaste sesión.") from None
         _alta.sesion, _alta.desde = sesion, time.monotonic()
         return enlace
 

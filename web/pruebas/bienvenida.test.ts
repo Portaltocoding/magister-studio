@@ -13,7 +13,8 @@ import {
   limpiarNombre,
   modoDe,
   pasosDe,
-  PASOS_CONEXION,
+  puedeCambiarCuenta,
+  pasosConexion,
   posicion,
   reducirCuenta,
   resultadoClaude,
@@ -21,7 +22,8 @@ import {
   saludo,
   siguiente,
   textoMascota,
-  TRAS_LA_PRUEBA,
+  tituloDe,
+  trasLaPrueba,
   type EstadoCuenta,
   type EventoCuenta,
 } from '../src/componentes/bienvenida.ts'
@@ -37,15 +39,16 @@ test('solo se enseña la primera vez, y el paso de Claude si la cuenta ha caduca
 })
 
 test('el paso de Claude se enseña siempre, también con cuenta ya conectada', () => {
-  assert.deepEqual(pasosDe('completa'), ['nombre', 'cuenta', 'prueba', 'plan', 'apuntes'])
+  assert.deepEqual(pasosDe('completa'), ['idioma', 'nombre', 'cuenta', 'prueba', 'plan', 'apuntes'])
   assert.deepEqual(pasosDe('reconectar'), ['cuenta', 'prueba'])
 })
 
 test('avanzar y contar los pasos', () => {
   const pasos = pasosDe('completa')
+  assert.equal(siguiente(pasos, 'idioma'), 'nombre')
   assert.equal(siguiente(pasos, 'nombre'), 'cuenta')
   assert.equal(siguiente(pasos, 'apuntes'), null)
-  assert.deepEqual(posicion(pasos, 'plan'), { n: 4, de: 5 })
+  assert.deepEqual(posicion(pasos, 'plan'), { n: 5, de: 6 })
   assert.deepEqual(posicion(pasosDe('reconectar'), 'prueba'), { n: 2, de: 2 })
 })
 
@@ -54,11 +57,11 @@ test('la cuenta empieza conectada o con las instrucciones, y «Conectar otra cue
   assert.equal(inicialCuenta(false).fase, 'inicio')
   assert.equal(reducirCuenta(inicialCuenta(true), { tipo: 'otra' }).fase, 'inicio')
   assert.equal(reducirCuenta(inicialCuenta(false), { tipo: 'otra' }).fase, 'inicio')
-  assert.equal(PASOS_CONEXION.length, 3)
+  assert.equal(pasosConexion().length, 3)
 })
 
 test('sin pty se dice sin jerga y se puede volver a la cuenta conectada', () => {
-  const msg = 'Conectar o cambiar la cuenta de Claude se hace desde la versión de Docker de Magister, no desde este equipo.'
+  const msg = 'En este equipo Magister ya usa la cuenta de Claude con la que iniciaste sesión.'
   assert.equal(esSinPty(msg), true)
   assert.equal(esSinPty('El código no ha valido'), false)
   const e = correr([{ tipo: 'otra' }, { tipo: 'pulsar' }, { tipo: 'fallo', mensaje: msg }], inicialCuenta(true))
@@ -74,7 +77,7 @@ test('la prueba da dos resultados, voz y Claude, con qué hacer si falla', () =>
   assert.match(resultadoClaude({ ok: false, cuenta: false }).texto, /Conecta tu cuenta/)
   assert.match(resultadoClaude({ ok: false, cuenta: true }).texto, /Probar otra vez/)
   assert.match(textoMascota('prueba', ''), /te saludaré en voz alta/)
-  assert.match(TRAS_LA_PRUEBA.completa, /plan/)
+  assert.match(trasLaPrueba('completa'), /plan/)
 })
 
 test('el nombre se limpia y el saludo lo usa', () => {
@@ -133,4 +136,28 @@ test('un fallo de cuenta se reconoce y se dice sin texto técnico', () => {
   const l = errorLegible(texto)
   assert.match(l.mensaje, /Vuelve a conectarla/)
   assert.equal(l.mensaje.includes('ErrorModelo'), false)
+})
+
+test('el primer paso es el idioma y la bienvenida sale en inglés si se elige', () => {
+  assert.equal(pasosDe('completa')[0], 'idioma')
+  assert.equal(tituloDe('idioma', 'es'), 'Idioma / Language')
+  assert.equal(tituloDe('nombre', 'en'), 'What should I call you?')
+  assert.match(textoMascota('plan', '', 'completa', 'en'), /what you want to learn/)
+  assert.match(textoMascota('cuenta', 'Lucía', 'completa', 'en'), /^Lucía, to think/)
+  assert.equal(saludo('Lucía', 'en'), 'Hi, Lucía')
+  assert.match(fraseDePrueba('Lucía', 'en'), /^Hi, Lucía. I'm Magister/)
+  assert.match(resultadoVoz(false, 'en').texto, /turn the volume up/i)
+  assert.match(resultadoClaude({ ok: false, cuenta: false }, 'en').texto, /Connect your account/)
+  assert.equal(pasosConexion('en').length, 3)
+  assert.equal(esSinPty('On this computer Magister already uses the Claude account you signed in with.'), true)
+})
+
+test('sin pty no se ofrece conectar: con cuenta solo se ve cuál es, sin cuenta el aviso llano', () => {
+  assert.equal(puedeCambiarCuenta({ puede_conectar: false }), false)
+  assert.equal(puedeCambiarCuenta({ puede_conectar: true }), true)
+  assert.equal(puedeCambiarCuenta({}), true) // un servidor antiguo no manda el campo
+  assert.equal(inicialCuenta(true, false).fase, 'conectada')
+  assert.equal(inicialCuenta(false, false).fase, 'sinpty')
+  assert.equal(inicialCuenta(false, true).fase, 'inicio')
+  assert.equal(inicialCuenta(false).fase, 'inicio')
 })

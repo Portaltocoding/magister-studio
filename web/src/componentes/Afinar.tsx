@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from './preferencias.ts'
 import Mascota from '../Mascota.tsx'
+import { IDIOMAS, t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { abrirAsesor, asesorActivo, EVENTO_COGER, EVENTO_ESTADO } from './Asesor.tsx'
 
 // La mascota de la barra de arriba: siempre a la vista; al pulsarla, los ajustes rápidos del tutor (cómo te explica).
@@ -9,17 +11,20 @@ import { abrirAsesor, asesorActivo, EVENTO_COGER, EVENTO_ESTADO } from './Asesor
 
 type Preferencias = PreferenciasTutor
 
-export const GRUPOS: { campo: 'longitud' | 'nivel' | 'estilo' | 'idioma'; titulo: string; opciones: [string, string][] }[] = [
-  { campo: 'longitud', titulo: 'Respuestas', opciones: [['breve', 'Breves'], ['normal', 'Normales'], ['detallada', 'Detalladas']] },
-  { campo: 'nivel', titulo: 'Tu nivel', opciones: [['cero', 'Desde cero'], ['normal', 'Normal'], ['experto', 'Avanzado']] },
-  { campo: 'estilo', titulo: 'Cómo explicar', opciones: [['directo', 'Directo'], ['analogias', 'Con analogías'], ['codigo', 'Con código']] },
-  { campo: 'idioma', titulo: 'Idioma del chat', opciones: [['es', 'Español'], ['en', 'English']] },
+export type CampoAfinar = 'longitud' | 'nivel' | 'estilo' | 'idioma'
+
+// Se piden al pintar (no al cargar el módulo): así salen en el idioma de ahora.
+export const grupos = (): { campo: CampoAfinar; titulo: string; opciones: [string, string][] }[] => [
+  { campo: 'longitud', titulo: t('afinar.longitud'), opciones: [['breve', t('afinar.longitud.breve')], ['normal', t('afinar.longitud.normal')], ['detallada', t('afinar.longitud.detallada')]] },
+  { campo: 'nivel', titulo: t('afinar.nivel'), opciones: [['cero', t('afinar.nivel.cero')], ['normal', t('afinar.nivel.normal')], ['experto', t('afinar.nivel.experto')]] },
+  { campo: 'estilo', titulo: t('afinar.estilo'), opciones: [['directo', t('afinar.estilo.directo')], ['analogias', t('afinar.estilo.analogias')], ['codigo', t('afinar.estilo.codigo')]] },
+  { campo: 'idioma', titulo: t('idioma.titulo'), opciones: IDIOMAS.map((i): [string, string] => [i.id, i.nombre]) },
 ]
 
-export const EXTRAS: { campo: 'diagramas' | 'tests' | 'opciones'; texto: string }[] = [
-  { campo: 'diagramas', texto: 'Diagramas' },
-  { campo: 'tests', texto: 'Test al cerrar un tema' },
-  { campo: 'opciones', texto: 'Sugerencias para seguir' },
+export const extras = (): { campo: 'diagramas' | 'tests' | 'opciones'; texto: string }[] => [
+  { campo: 'diagramas', texto: t('afinar.diagramas') },
+  { campo: 'tests', texto: t('afinar.tests') },
+  { campo: 'opciones', texto: t('afinar.opciones') },
 ]
 
 export const avisosActivos = () => {
@@ -31,6 +36,7 @@ export const avisosActivos = () => {
 }
 
 export default function Afinar() {
+  usarIdioma() // vuelve a pintar al cambiar el idioma
   const [abierto, setAbierto] = useState(false)
   const p = usarPreferencias()
   const [guardado, setGuardado] = useState(false)
@@ -106,7 +112,7 @@ export default function Afinar() {
             <p className="nota">Cargando…</p>
           ) : (
             <>
-              {GRUPOS.map((g) => (
+              {grupos().map((g) => (
                 <div key={g.campo} className="afinar-grupo">
                   <span>{g.titulo}</span>
                   <div className="afinar-segmentos" role="radiogroup" aria-label={g.titulo}>
@@ -125,7 +131,7 @@ export default function Afinar() {
                 </div>
               ))}
               <div className="afinar-extras">
-                {EXTRAS.map((x) => (
+                {extras().map((x) => (
                   <label key={x.campo}>
                     <input type="checkbox" checked={p[x.campo]} onChange={(e) => cambiar({ [x.campo]: e.target.checked } as Partial<Preferencias>)} />
                     {x.texto}

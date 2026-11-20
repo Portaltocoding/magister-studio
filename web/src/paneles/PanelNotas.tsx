@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { t } from '../i18n/i18n.ts'
 import Markdown from '../componentes/Markdown.tsx'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
@@ -122,15 +123,15 @@ export default function PanelNotas() {
     return (
       <div className="panel">
         <Vacio
-          etiqueta="Biblioteca"
-          titulo="Aún no has guardado nada"
-          texto="En Estudio libre, lo que te parezca importante se queda aquí. Tres formas de guardarlo:"
+          etiqueta={t('vacio.notas.etq')}
+          titulo={t('vacio.notas.titulo')}
+          texto={t('vacio.notas.texto')}
           pasos={[
-            { titulo: 'Una respuesta entera', texto: 'Pulsa «Guardar en mis notas» debajo de la respuesta.' },
-            { titulo: 'Solo un trozo', texto: 'Márcalo con el ratón y pulsa «Guardar lo marcado».' },
-            { titulo: 'Diciéndolo', texto: 'Escribe «guárdalo» o «guarda esto» y se guarda la respuesta anterior.' },
+            { titulo: t('vacio.notas.p1.t'), texto: t('vacio.notas.p1.x') },
+            { titulo: t('vacio.notas.p2.t'), texto: t('vacio.notas.p2.x') },
+            { titulo: t('vacio.notas.p3.t'), texto: t('vacio.notas.p3.x') },
           ]}
-          acciones={[{ texto: 'Ir a Estudio libre', principal: true, alPulsar: () => irARuta('#/libre') }]}
+          acciones={[{ texto: t('vacio.notas.ir'), principal: true, alPulsar: () => irARuta('#/libre') }]}
         />
       </div>
     )

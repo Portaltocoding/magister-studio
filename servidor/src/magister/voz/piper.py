@@ -25,12 +25,17 @@ class Voz:
     nombre: str
     modelo: str  # fichero .onnx dentro de MAGISTER_VOZ_DIR
     hablante: int | None = None
+    idioma: str = "es"
 
 
 VOCES = [
     Voz("sharvard-f", "Sharvard (mujer)", "es_ES-sharvard-medium.onnx", 1),
     Voz("sharvard-m", "Sharvard (hombre)", "es_ES-sharvard-medium.onnx", 0),
     Voz("davefx", "Davefx (hombre)", "es_ES-davefx-medium.onnx"),
+    # Voces inglesas: solo salen si el .onnx está en MAGISTER_VOZ_DIR (hoy no hay ninguna; el inglés va por el navegador).
+    # Se bajan de https://huggingface.co/rhasspy/piper-voices junto a su .onnx.json.
+    Voz("amy", "Amy (woman)", "en_US-amy-medium.onnx", idioma="en"),
+    Voz("lessac", "Lessac (man)", "en_US-lessac-medium.onnx", idioma="en"),
 ]
 MAX_CACHE = 300
 MAX_TEXTO = 600

@@ -3,6 +3,10 @@
 // - Oido: escucha continuo, con resultados provisionales, y se reinicia solo si el navegador lo corta.
 // - esEco: distingue tu voz de la del propio tutor que el micro recoge por los altavoces.
 import { paraLaVoz } from './pronunciacion.ts'
+import { idiomaActual, t as texto, type Idioma } from '../i18n/i18n.ts'
+
+// El código de idioma de las voces y del dictado del navegador.
+export const LENGUA: Record<Idioma, string> = { es: 'es-ES', en: 'en-US' }
 
 export interface Reconocimiento {
   lang: string
@@ -19,10 +23,39 @@ export interface Reconocimiento {
 export const Reconocedor = (window as unknown as { SpeechRecognition?: new () => Reconocimiento; webkitSpeechRecognition?: new () => Reconocimiento })
   .SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => Reconocimiento }).webkitSpeechRecognition
 
-// Una voz en español instalada en el equipo (no de un servicio en la red).
-export function vozLocal(): SpeechSynthesisVoice | null {
-  const es = (window.speechSynthesis?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().startsWith('es'))
-  return es.find((v) => v.localService && v.lang === 'es-ES') ?? es.find((v) => v.localService) ?? es[0] ?? null
+type VozNav = Pick<SpeechSynthesisVoice, 'name' | 'lang' | 'localService'>
+
+// Las voces del navegador de un idioma.
+export const delIdioma = <V extends Pick<SpeechSynthesisVoice, 'lang'>>(voces: V[], idioma: Idioma): V[] => voces.filter((v) => v.lang.toLowerCase().startsWith(idioma))
+
+// Una voz instalada en el equipo (no de un servicio en la red) en ese idioma.
+export function mejorVozLocal<V extends VozNav>(voces: V[], idioma: Idioma): V | null {
+  const del = delIdioma(voces, idioma)
+  return del.find((v) => v.localService && v.lang === LENGUA[idioma]) ?? del.find((v) => v.localService) ?? del[0] ?? null
+}
+
+// La voz del navegador: la elegida (si es de este idioma), o una «Natural» si el navegador la tiene (Edge), o la local.
+export function elegirVozNavegador<V extends VozNav>(voces: V[], nombre: string | null, idioma: Idioma): V | null {
+  const del = delIdioma(voces, idioma)
+  return (
+    (nombre && del.find((v) => v.name === nombre)) ||
+    del.find((v) => /natural/i.test(v.name) && v.lang === LENGUA[idioma]) ||
+    del.find((v) => /natural/i.test(v.name)) ||
+    mejorVozLocal(voces, idioma)
+  )
+}
+
+// La voz de Magister (Piper) con la que se habla: la elegida o la primera de ese idioma, o null si no hay ninguna de ese
+// idioma (entonces toca la del navegador). Una voz sin idioma es española.
+export function elegirVozMagister(voces: VozMagister[], ajuste: string | null, idioma: Idioma): string | null {
+  const del = voces.filter((x) => (x.idioma ?? 'es') === idioma)
+  if (ajuste?.startsWith('piper:')) return del.some((x) => x.id === ajuste.slice(6)) ? ajuste.slice(6) : (del[0]?.id ?? null)
+  if (ajuste === null) return del[0]?.id ?? null
+  return null
+}
+
+export function vozLocal(idioma: Idioma = idiomaActual()): SpeechSynthesisVoice | null {
+  return mejorVozLocal(window.speechSynthesis?.getVoices() ?? [], idioma)
 }
 
 // Lo que se lee: sin bloques, sin marcas de Markdown y con las fórmulas avisadas. Lo que va por líneas (títulos,
@@ -30,12 +63,12 @@ export function vozLocal(): SpeechSynthesisVoice | null {
 export function paraLeer(t: string): string {
   return t
     .replace(/```[\s\S]*?```/g, '\n')
-    .replace(/\$\$[\s\S]*?\$\$/g, ' (la fórmula está en pantalla) ')
-    .replace(/\$([^$\n]+)\$/g, (_, f: string) => (/[\\^{}]/.test(f) ? 'una fórmula' : f))
+    .replace(/\$\$[\s\S]*?\$\$/g, texto('voz.formula'))
+    .replace(/\$([^$\n]+)\$/g, (_, f: string) => (/[\\^{}]/.test(f) ? texto('voz.unaFormula') : f))
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\{[^}]*\}/g, '$1')
     .replace(/\s*\{[.#][^}]*\}/g, '')
-    .replace(/https?:\/\/\S+/g, 'un enlace')
+    .replace(/https?:\/\/\S+/g, texto('voz.enlace'))
     .replace(/^\s*\|.*$/gm, '')
     .replace(/^#+\s+(.+?)\s*$/gm, '$1.')
     .replace(/^\s*>\s?/gm, '')
@@ -44,8 +77,8 @@ export function paraLeer(t: string): string {
     .replace(/(^|\s)[*_](?=\S)/g, '$1')
     .replace(/(?<=\S)[*_](?=\s|$|[.,;:!?)])/g, '')
     .replace(/\s*\|\s*/g, ', ')
-    .replace(/\s*=>\s*/g, ' entonces ')
-    .replace(/\s*->\s*/g, ' a ')
+    .replace(/\s*=>\s*/g, idiomaActual() === 'en' ? ' then ' : ' entonces ')
+    .replace(/\s*->\s*/g, idiomaActual() === 'en' ? ' to ' : ' a ')
     .replace(/\[(\d+)\]/g, '')
     .replace(/\p{Extended_Pictographic}️?/gu, '')
     .replace(/([.!?…:;])\s*\./g, '$1')
@@ -66,6 +99,8 @@ const PRONUNCIACION: [RegExp, string][] = [
 // Los términos sueltos (siglas, SQL, HTTP, unidades...) van en el glosario de pronunciación: componentes/pronunciacion.ts.
 
 export function pronunciar(frase: string): string {
+  // El glosario y las reglas son de una voz española: una voz inglesa lee los términos técnicos tal cual.
+  if (idiomaActual() === 'en') return frase.replace(/\s+/g, ' ').trim()
   let t = frase
   for (const [patron, por] of PRONUNCIACION) {
     t = por === ' $&' ? t.replace(patron, (m) => ' ' + m.replace(/[/?=&{}%]+/g, ' ').trim()) : t.replace(patron, por)
@@ -101,24 +136,19 @@ export function guardarAjustesVoz(a: AjustesVoz) {
   window.dispatchEvent(new CustomEvent('magister-voz', { detail: a }))
 }
 export function vocesEspanol(): SpeechSynthesisVoice[] {
-  return (window.speechSynthesis?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().startsWith('es'))
+  return delIdioma(window.speechSynthesis?.getVoices() ?? [], 'es')
 }
-// La voz del navegador: la elegida, o una «Natural» si el navegador la tiene (Edge), o la local en español.
+// La voz del navegador del idioma de ahora (en español, la de siempre).
 export function vozElegida(): SpeechSynthesisVoice | null {
-  const nombre = leerAjustesVoz().voz
-  const voces = vocesEspanol()
-  return (
-    (nombre && voces.find((v) => v.name === nombre)) ||
-    voces.find((v) => /natural/i.test(v.name) && v.lang === 'es-ES') ||
-    voces.find((v) => /natural/i.test(v.name)) ||
-    vozLocal()
-  )
+  return elegirVozNavegador(window.speechSynthesis?.getVoices() ?? [], leerAjustesVoz().voz, idiomaActual())
 }
 
 // Las voces naturales de Magister (Piper, en el servidor): suenan mucho mejor que las de Windows y no salen del equipo.
 export interface VozMagister {
   id: string
   nombre: string
+  // «es» o «en»; el servidor lo manda desde que hay voces inglesas (sin él, española).
+  idioma?: Idioma
 }
 export let vocesMagister: VozMagister[] = []
 export const vocesMagisterListas: Promise<VozMagister[]> =
@@ -135,10 +165,7 @@ export const vocesMagisterListas: Promise<VozMagister[]> =
 
 // La voz de Magister con la que se habla ahora, o null si toca la del navegador.
 export function vozMagister(): string | null {
-  const v = leerAjustesVoz().voz
-  if (v?.startsWith('piper:')) return vocesMagister.some((x) => x.id === v.slice(6)) ? v.slice(6) : (vocesMagister[0]?.id ?? null)
-  if (v === null) return vocesMagister[0]?.id ?? null
-  return null
+  return elegirVozMagister(vocesMagister, leerAjustesVoz().voz, idiomaActual())
 }
 
 // El audio (WAV) de una frase con una voz de Magister, o null si el servidor no puede. Es la misma petición para la
@@ -323,7 +350,7 @@ export class Locutor {
 
   private conNavegador(frase: string, vez: number) {
     const u = new SpeechSynthesisUtterance(pronunciar(frase))
-    u.lang = 'es-ES'
+    u.lang = LENGUA[idiomaActual()]
     const voz = vozElegida()
     if (voz) u.voice = voz
     u.rate = leerAjustesVoz().velocidad
@@ -408,7 +435,7 @@ export class Oido {
   private arrancar() {
     if (!Reconocedor || !this.activo) return
     const r = new Reconocedor()
-    r.lang = 'es-ES'
+    r.lang = LENGUA[idiomaActual()]
     r.interimResults = true
     r.continuous = true
     r.onresult = (e) => {

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { borrarConversacion, ErrorApi, type Conversacion } from './api.ts'
 import { errorLegible } from './componentes/errores.ts'
-import { GRUPOS, TALLER, type IdModo } from './modos.ts'
+import { ayudaGrupo, ayudaModo, GRUPOS, nombreGrupo, nombreModo, TALLER, type IdModo } from './modos.ts'
+import { usarIdioma } from './i18n/usarIdioma.ts'
 import { claveSeccion } from './componentes/tema.ts'
 
 interface Props {
@@ -41,6 +42,7 @@ export default function BarraLateral({
   oculta = false,
   alFijar,
 }: Props) {
+  const { t } = usarIdioma()
   const [plegadas, setPlegadas] = useState<string[]>(leerPlegadas)
   const plegar = (nombre: string, si: boolean) => {
     const nuevas = si ? [...plegadas.filter((n) => n !== nombre), nombre] : plegadas.filter((n) => n !== nombre)
@@ -64,7 +66,7 @@ export default function BarraLateral({
       }}
     >
       <div className="marca">
-        <button type="button" className="marca-nombre" onClick={() => alElegir('libre')} title="Estudio libre">
+        <button type="button" className="marca-nombre" onClick={() => alElegir('libre')} title={nombreModo('libre')}>
           Magister
         </button>
         {alFijar && (
@@ -73,8 +75,8 @@ export default function BarraLateral({
             className={`boton-plegar boton-fijar ${fija ? 'activo' : ''}`}
             onClick={() => alFijar(!fija)}
             aria-pressed={fija}
-            aria-label={fija ? 'Soltar la barra lateral' : 'Fijar la barra lateral'}
-            title={fija ? 'Soltar: vuelve a plegarse y se abre por encima' : 'Fijar: se queda siempre abierta a la izquierda'}
+            aria-label={fija ? t('barra.soltar') : t('barra.fijar')}
+            title={fija ? t('barra.soltarTitulo') : t('barra.fijarTitulo')}
           >
             <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden>
               <path d="M7.5 3.5h5l-.8 4.2 2.8 2.8H5.5l2.8-2.8z" fill={fija ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
@@ -83,7 +85,7 @@ export default function BarraLateral({
           </button>
         )}
         {alCerrar && !fija && (
-          <button type="button" className="boton-plegar" onClick={alCerrar} aria-label="Plegar la barra lateral" title="Plegar (Ctrl+B o Esc)">
+          <button type="button" className="boton-plegar" onClick={alCerrar} aria-label={t('barra.plegar')} title={t('barra.plegarTitulo')}>
             <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden>
               <rect x="2.5" y="3.5" width="15" height="13" rx="3" fill="none" stroke="currentColor" strokeWidth="1.4" />
               <line x1="7.5" y1="3.5" x2="7.5" y2="16.5" stroke="currentColor" strokeWidth="1.4" />
@@ -92,7 +94,7 @@ export default function BarraLateral({
         )}
       </div>
 
-      <nav aria-label="Modos" className="grupos-modos">
+      <nav aria-label={t('barra.modos')} className="grupos-modos">
         {GRUPOS.map((g, ig) => {
           // Las que se abren desde dentro de su pantalla (Tutor, desde Hoy) no se listan aquí.
           const visibles = g.modos.filter((m) => !m.soloDentro)
@@ -107,12 +109,12 @@ export default function BarraLateral({
                     type="button"
                     className="modo"
                     disabled={!m.encendido}
-                    title={m.ayuda}
+                    title={ayudaModo(m.id)}
                     aria-current={m.id === modoActivo ? 'page' : undefined}
                     onClick={() => alElegir(m.id)}
                   >
-                    <span>{m.nombre}</span>
-                    {!m.encendido && <span className="pronto">pronto</span>}
+                    <span>{nombreModo(m.id)}</span>
+                    {!m.encendido && <span className="pronto">{t('barra.pronto')}</span>}
                   </button>
                 </li>
               ))}
@@ -140,13 +142,13 @@ export default function BarraLateral({
                 <button
                   type="button"
                   className="entrada"
-                  title={g.ayuda}
+                  title={ayudaGrupo(g.nombre)}
                   onClick={() => {
                     if (plegada) plegar(g.nombre, false)
                     alElegir(g.modos[0].id)
                   }}
                 >
-                  {g.nombre}
+                  {nombreGrupo(g.nombre)}
                 </button>
                 {!sola && (
                 <button
@@ -154,8 +156,8 @@ export default function BarraLateral({
                   className="plegar-seccion"
                   aria-expanded={!plegada}
                   aria-controls={idLista}
-                  aria-label={plegada ? `Desplegar ${g.nombre}` : `Plegar ${g.nombre}`}
-                  title={plegada ? 'Desplegar' : 'Plegar'}
+                  aria-label={plegada ? t('barra.desplegarSeccion', { nombre: nombreGrupo(g.nombre) }) : t('barra.plegarSeccion', { nombre: nombreGrupo(g.nombre) })}
+                  title={plegada ? t('barra.desplegar') : t('barra.plegarCorto')}
                   onClick={() => plegar(g.nombre, !plegada)}
                 >
                   <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden>
@@ -168,20 +170,20 @@ export default function BarraLateral({
             </div>
           )
         })}
-        <button type="button" className={`enlace-taller ${TALLER.some((m) => m.id === modoActivo) ? 'actual' : ''}`} onClick={() => alElegir('etiquetar')} title="Para calibrar Magister: tono, banco de preguntas y animaciones">
-          Taller
+        <button type="button" className={`enlace-taller ${TALLER.some((m) => m.id === modoActivo) ? 'actual' : ''}`} onClick={() => alElegir('etiquetar')} title={t('barra.tallerAyuda')}>
+          {t('barra.taller')}
         </button>
       </nav>
 
       <section className="conversaciones">
         <div className="cabecera-seccion">
-          <h2>Conversaciones</h2>
+          <h2>{t('barra.conversaciones')}</h2>
           <button type="button" className="boton-mini" onClick={() => alElegirConversacion(null)}>
-            Nueva
+            {t('barra.nueva')}
           </button>
         </div>
         {conversaciones.length === 0 ? (
-          <p className="vacio">Aún no tienes conversaciones.</p>
+          <p className="vacio">{t('barra.sinConversaciones')}</p>
         ) : (
           <ul className="modos">
             {conversaciones.map((c) => (
@@ -198,15 +200,15 @@ export default function BarraLateral({
                 <button
                   type="button"
                   className="borrar"
-                  aria-label={`Borrar ${c.titulo}`}
+                  aria-label={t('barra.borrar', { titulo: c.titulo })}
                   onClick={async () => {
-                    if (!confirm(`¿Borrar «${c.titulo}»?`)) return
+                    if (!confirm(t('barra.confirmarBorrar', { titulo: c.titulo }))) return
                     try {
                       await borrarConversacion(c.id)
                     } catch (e) {
                       // Ya no existe (la borraste en otra pestaña): es lo que querías, se quita de la lista.
                       if (!(e instanceof ErrorApi && e.codigo === 404)) {
-                        alert(`No he podido borrar «${c.titulo}». ${errorLegible(e instanceof Error ? e.message : String(e)).mensaje}`)
+                        alert(t('barra.falloBorrar', { titulo: c.titulo, motivo: errorLegible(e instanceof Error ? e.message : String(e)).mensaje }))
                         alCambiar()
                         return
                       }

@@ -26,6 +26,9 @@
 .bienvenida-habla { margin: 4px 0 6px; font-size: 1rem; line-height: 1.45; }
 .bienvenida-paso { margin: 0 0 4px; color: var(--suave); font-size: 0.78rem; }
 .bienvenida-botones { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0 4px; }
+/* El paso del idioma: dos botones grandes, uno al lado del otro. */
+.bienvenida-idiomas { gap: 14px; }
+.bienvenida-idioma { flex: 1 1 140px; max-width: 220px; padding: 18px 20px; font-size: 1.25rem; }
 .bienvenida-campo { flex: 1 1 220px; min-width: 0; font: inherit; padding: 8px 12px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); }
 .bienvenida-codigo { text-align: left; }
 .bienvenida-pasos { margin: 0 0 12px; padding-left: 20px; line-height: 1.5; }

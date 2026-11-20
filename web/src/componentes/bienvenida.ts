@@ -1,7 +1,9 @@
+import { idiomaActual, traducir, type Clave, type Idioma } from '../i18n/i18n.ts'
+
 // La bienvenida de la primera vez: qué pasos hay, cuáles se saltan y cómo avanza la conexión con Claude. Puro, con
 // pruebas en web/pruebas/bienvenida.test.ts; Bienvenida.tsx solo pinta y llama a la API.
 
-export type Paso = 'nombre' | 'cuenta' | 'prueba' | 'plan' | 'apuntes'
+export type Paso = 'idioma' | 'nombre' | 'cuenta' | 'prueba' | 'plan' | 'apuntes'
 
 // «completa»: la primera vez (o «Ver la bienvenida otra vez» en Ajustes). «reconectar»: ya la viste, pero la cuenta de
 // Claude ha caducado: solo se vuelve al paso de Claude y a la prueba.
@@ -10,8 +12,12 @@ export type Modo = 'completa' | 'reconectar'
 export interface EstadoBienvenida {
   estado: 'pendiente' | 'hecha' | 'omitida'
   nombre: string
-  cuenta: { conectada: boolean; caida: boolean }
+  // false en el desarrollo sin pty (Windows): desde esa máquina no se puede conectar ni cambiar la cuenta.
+  cuenta: { conectada: boolean; caida: boolean; puede_conectar?: boolean }
 }
+
+// «Conectar otra cuenta» solo se ofrece si de verdad se puede (un servidor antiguo no manda el campo: se da por bueno).
+export const puedeCambiarCuenta = (cuenta: { puede_conectar?: boolean }): boolean => cuenta.puede_conectar !== false
 
 // null: no hay nada que enseñar.
 export function modoDe(e: Pick<EstadoBienvenida, 'estado' | 'cuenta'>): Modo | null {
@@ -22,7 +28,7 @@ export function modoDe(e: Pick<EstadoBienvenida, 'estado' | 'cuenta'>): Modo | n
 // El paso de Claude se enseña siempre: si ya hay cuenta, dice cuál está conectada y deja cambiarla.
 export function pasosDe(modo: Modo): Paso[] {
   if (modo === 'reconectar') return ['cuenta', 'prueba']
-  return ['nombre', 'cuenta', 'prueba', 'plan', 'apuntes']
+  return ['idioma', 'nombre', 'cuenta', 'prueba', 'plan', 'apuntes']
 }
 
 export const siguiente = (pasos: Paso[], actual: Paso): Paso | null => pasos[pasos.indexOf(actual) + 1] ?? null
@@ -30,42 +36,31 @@ export const siguiente = (pasos: Paso[], actual: Paso): Paso | null => pasos[pas
 export const posicion = (pasos: Paso[], actual: Paso): { n: number; de: number } => ({ n: pasos.indexOf(actual) + 1, de: pasos.length })
 
 // ===== Textos =====
+// Todos salen del diccionario (i18n/es.ts, i18n/en.ts). El idioma entra como argumento (por defecto, el de ahora) para
+// que se puedan probar los dos.
 
 export function limpiarNombre(texto: string): string {
   return texto.replace(/\s+/g, ' ').trim().slice(0, 60)
 }
 
-export const saludo = (nombre: string): string => (nombre ? `Hola, ${nombre}` : 'Hola')
+export const saludo = (nombre: string, idioma: Idioma = idiomaActual()): string =>
+  nombre ? traducir(idioma, 'bienvenida.saludo', { nombre }) : traducir(idioma, 'bienvenida.saludoSolo')
 
-export const TITULOS: Record<Paso, string> = {
-  nombre: '¿Cómo te llamo?',
-  cuenta: 'Tu cuenta de Claude',
-  prueba: 'Una prueba rápida',
-  plan: '¿Qué quieres aprender?',
-  apuntes: '¿Tienes apuntes o PDF?',
-}
+export const tituloDe = (paso: Paso, idioma: Idioma = idiomaActual()): string => traducir(idioma, `bienvenida.titulo.${paso}`)
 
 // Lo que dice la mascota (y lo que sale en pantalla debajo de su cara).
-export function textoMascota(paso: Paso, nombre: string, modo: Modo = 'completa'): string {
-  switch (paso) {
-    case 'nombre':
-      return 'Hola, soy Magister, tu tutor. Vamos a dejarlo todo listo en un momento. ¿Cómo quieres que te llame?'
-    case 'cuenta':
-      return modo === 'reconectar'
-        ? 'Tu conexión con Claude ha caducado o ya no vale. Se arregla en un minuto: vuelve a conectarla.'
-        : `${nombre ? `${limpiarNombre(nombre)}, p` : 'P'}ara pensar y explicarte uso tu cuenta de Claude. Te enseño cuál tengo conectada.`
-    case 'prueba':
-      return 'Pulsa el botón: te saludaré en voz alta y le haré una pregunta corta a Claude.'
-    case 'plan':
-      return 'Cuéntame qué quieres aprender y te preparo un plan con sus lecciones, fechas y fuentes.'
-    case 'apuntes':
-      return 'Si ya tienes apuntes o PDF, súbelos y estudiaremos con lo tuyo. También puedes hacerlo luego.'
+export function textoMascota(paso: Paso, nombre: string, modo: Modo = 'completa', idioma: Idioma = idiomaActual()): string {
+  if (paso === 'cuenta') {
+    if (modo === 'reconectar') return traducir(idioma, 'bienvenida.mascota.reconectar')
+    const limpio = limpiarNombre(nombre)
+    return limpio ? traducir(idioma, 'bienvenida.mascota.cuentaNombre', { nombre: limpio }) : traducir(idioma, 'bienvenida.mascota.cuenta')
   }
+  return traducir(idioma, `bienvenida.mascota.${paso}`)
 }
 
 // Lo que dice en voz alta al probar.
-export const fraseDePrueba = (nombre: string): string =>
-  `${saludo(limpiarNombre(nombre))}. Soy Magister, tu tutor. Si me estás oyendo, la voz funciona.`
+export const fraseDePrueba = (nombre: string, idioma: Idioma = idiomaActual()): string =>
+  traducir(idioma, 'bienvenida.fraseDePrueba', { saludo: saludo(limpiarNombre(nombre), idioma) })
 
 // ===== La prueba: dos resultados, voz y Claude =====
 
@@ -75,37 +70,33 @@ export interface Resultado {
 }
 
 // El navegador no puede saber si de verdad se oye: solo si ha podido empezar a hablar.
-export const resultadoVoz = (pudoHablar: boolean): Resultado =>
-  pudoHablar
-    ? { ok: true, texto: 'Voz: te he saludado. Si no me has oído, sube el volumen y pulsa «Probar otra vez».' }
-    : { ok: false, texto: 'Voz: no he podido hablar desde este navegador. Sube el volumen, mira que no esté en silencio y pulsa «Probar otra vez».' }
+export const resultadoVoz = (pudoHablar: boolean, idioma: Idioma = idiomaActual()): Resultado => ({
+  ok: pudoHablar,
+  texto: traducir(idioma, pudoHablar ? 'bienvenida.prueba.vozOk' : 'bienvenida.prueba.vozMal'),
+})
 
-export const resultadoClaude = (r: { ok: boolean; cuenta: boolean }): Resultado =>
+export const resultadoClaude = (r: { ok: boolean; cuenta: boolean }, idioma: Idioma = idiomaActual()): Resultado =>
   r.ok
-    ? { ok: true, texto: 'Claude: me ha contestado, tu cuenta funciona.' }
-    : r.cuenta
-      ? { ok: false, texto: 'Claude: no me ha contestado. Pulsa «Probar otra vez» en un momento.' }
-      : { ok: false, texto: 'Claude: no me deja entrar con esta cuenta. Conecta tu cuenta y vuelve a probar.' }
+    ? { ok: true, texto: traducir(idioma, 'bienvenida.prueba.claudeOk') }
+    : { ok: false, texto: traducir(idioma, r.cuenta ? 'bienvenida.prueba.claudeNoContesta' : 'bienvenida.prueba.claudeNoEntra') }
 
-export const TRAS_LA_PRUEBA: Record<Modo, string> = {
-  completa: 'Lo siguiente: me cuentas qué quieres aprender y te preparo tu plan.',
-  reconectar: 'Ya está: puedes seguir con lo tuyo.',
-}
+export const trasLaPrueba = (modo: Modo, idioma: Idioma = idiomaActual()): string => traducir(idioma, `bienvenida.tras.${modo}`)
 
 // ===== La conexión con Claude =====
 
 export type FaseCuenta = 'conectada' | 'inicio' | 'abriendo' | 'codigo' | 'enviando' | 'lista' | 'error' | 'sinpty'
 
-export const PASOS_CONEXION = [
-  'Pulsa «Abrir Claude»: se abre la página de Claude.',
-  'Inicia sesión y pulsa «Authorize».',
-  'Claude te enseña un código: cópialo y pégalo aquí.',
-]
+export const pasosConexion = (idioma: Idioma = idiomaActual()): string[] =>
+  [1, 2, 3].map((n) => traducir(idioma, `bienvenida.conexion.${n}` as Clave))
 
 // Sin pty (el desarrollo en Windows) el servidor no puede hacer el alta: lo dice sin jerga (cerebro/cuenta.py).
-export const esSinPty = (texto: string | null | undefined): boolean => /versión de Docker/i.test(texto ?? '')
+export const esSinPty = (texto: string | null | undefined): boolean => /con la que iniciaste sesión|you signed in with/i.test(texto ?? '')
 
-export const inicialCuenta = (conectada: boolean): EstadoCuenta => ({ ...CUENTA_INICIAL, fase: conectada ? 'conectada' : 'inicio' })
+// Sin pty (puede = false) no hay alta posible: con cuenta, se ve cuál es; sin ella, el aviso llano y «Seguir».
+export const inicialCuenta = (conectada: boolean, puede = true): EstadoCuenta => ({
+  ...CUENTA_INICIAL,
+  fase: conectada ? 'conectada' : puede ? 'inicio' : 'sinpty',
+})
 
 export interface EstadoCuenta {
   fase: FaseCuenta

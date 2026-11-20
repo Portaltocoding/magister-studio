@@ -5,7 +5,9 @@ import { EVENTO_BIENVENIDA, limpiarNombre } from '../componentes/bienvenida.ts'
 import Aprendido from '../componentes/Aprendido.tsx'
 import Colores from '../componentes/Colores.tsx'
 import ControlVoz from '../componentes/ControlVoz.tsx'
-import { avisosActivos, EXTRAS, GRUPOS } from '../componentes/Afinar.tsx'
+import { avisosActivos, extras, grupos } from '../componentes/Afinar.tsx'
+import { IDIOMAS } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from '../componentes/preferencias.ts'
 import { elegirTema, temaGuardado, TEMAS, type Tema } from '../componentes/tema.ts'
 import { aplicarTamano, tamanoGuardado, TAMANOS, type IdTamano } from '../componentes/escala.ts'
@@ -22,6 +24,7 @@ const MUESTRAS: Record<Tema, { fondo: string; texto: string; colores: string[] }
 }
 
 export default function PanelAjustes() {
+  const { t, idioma } = usarIdioma()
   const p = usarPreferencias()
   const forma = usarForma()
   const [tema, setTema] = useState<Tema>(temaGuardado)
@@ -39,22 +42,34 @@ export default function PanelAjustes() {
   return (
     <div className="panel ajustes">
       <div className="ajustes-cabeza">
-        <h1>Ajustes</h1>
+        <h1>{t('ajustes.titulo')}</h1>
         <small className={`ajustes-guardado ${guardado ? 'visible' : ''}`} role="status">
-          ✓ Guardado
+          {t('ajustes.guardado')}
         </small>
       </div>
-      <p className="nota">Lo rápido también está en la mascota de arriba: púlsala y cambia el tono sin salir de donde estás.</p>
+      <p className="nota">{t('ajustes.nota')}</p>
 
       <section className="ajustes-seccion">
-        <h2>Cómo te explica</h2>
-        <p className="nota">Se aplica desde tu próximo mensaje.</p>
+        <h2>{t('idioma.titulo')}</h2>
+        <p className="nota">{t('idioma.nota')}</p>
+        <div className="afinar-segmentos" role="radiogroup" aria-label={t('idioma.titulo')}>
+          {IDIOMAS.map((i) => (
+            <button key={i.id} type="button" role="radio" aria-checked={idioma === i.id} onClick={() => void cambiar({ idioma: i.id })}>
+              {i.nombre}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="ajustes-seccion">
+        <h2>{t('ajustes.explica')}</h2>
+        <p className="nota">{t('ajustes.explicaNota')}</p>
         {!p ? (
           <Cargando />
         ) : (
           <>
             <div className="ajustes-filas">
-              {GRUPOS.map((g) => (
+              {grupos().filter((g) => g.campo !== 'idioma').map((g) => (
                 <div key={g.campo} className="afinar-grupo">
                   <span>{g.titulo}</span>
                   <div className="afinar-segmentos" role="radiogroup" aria-label={g.titulo}>
@@ -73,9 +88,9 @@ export default function PanelAjustes() {
                 </div>
               ))}
               <div className="afinar-grupo">
-                <span>Modo</span>
-                <select id="ajustes-modo" value={p.modo ?? ''} onChange={(e) => cambiar({ modo: e.target.value || null })} aria-label="Modo de aprendizaje">
-                  <option value="">Normal</option>
+                <span>{t('ajustes.modo')}</span>
+                <select id="ajustes-modo" value={p.modo ?? ''} onChange={(e) => cambiar({ modo: e.target.value || null })} aria-label={t('ajustes.modoAria')}>
+                  <option value="">{t('ajustes.modoNormal')}</option>
                   {todosLosModos(p).map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.nombre}
@@ -85,7 +100,7 @@ export default function PanelAjustes() {
               </div>
             </div>
             <div className="afinar-extras">
-              {EXTRAS.map((x) => (
+              {extras().map((x) => (
                 <label key={x.campo}>
                   <input type="checkbox" checked={p[x.campo]} onChange={(e) => cambiar({ [x.campo]: e.target.checked } as Partial<PreferenciasTutor>)} />
                   {x.texto}
@@ -97,8 +112,8 @@ export default function PanelAjustes() {
       </section>
 
       <section className="ajustes-seccion">
-        <h2>Lo que recuerda de ti</h2>
-        <p className="nota">Instrucciones que el tutor tiene siempre en cuenta.</p>
+        <h2>{t('ajustes.recuerda')}</h2>
+        <p className="nota">{t('ajustes.recuerdaNota')}</p>
         {p && (
           <>
             {p.instrucciones.length ? (
@@ -106,14 +121,14 @@ export default function PanelAjustes() {
                 {p.instrucciones.map((x, i) => (
                   <li key={i}>
                     <span>{x}</span>
-                    <button className="borrar" aria-label="Olvidar esto" onClick={() => cambiar({ instrucciones: p.instrucciones.filter((_, k) => k !== i) })}>
+                    <button className="borrar" aria-label={t('ajustes.olvidar')} onClick={() => cambiar({ instrucciones: p.instrucciones.filter((_, k) => k !== i) })}>
                       ×
                     </button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="nota">Nada aún.</p>
+              <p className="nota">{t('ajustes.nadaAun')}</p>
             )}
             <form
               className="afinar-anadir"
@@ -124,9 +139,9 @@ export default function PanelAjustes() {
                 setNueva('')
               }}
             >
-              <input id="ajustes-instruccion" value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Ej.: los ejemplos de código, en Python" aria-label="Nueva instrucción" />
+              <input id="ajustes-instruccion" value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder={t('ajustes.ejemploInstruccion')} aria-label={t('ajustes.nuevaInstruccion')} />
               <button className="boton-mini" disabled={!nueva.trim()}>
-                Añadir
+                {t('ajustes.anadir')}
               </button>
             </form>
           </>
@@ -135,8 +150,8 @@ export default function PanelAjustes() {
       </section>
 
       <section className="ajustes-seccion">
-        <h2>Aspecto</h2>
-        <div className="ajustes-temas" role="radiogroup" aria-label="Aspecto">
+        <h2>{t('ajustes.aspecto')}</h2>
+        <div className="ajustes-temas" role="radiogroup" aria-label={t('ajustes.aspecto')}>
           {TEMAS.map((t) => {
             const m = MUESTRAS[t.id]
             return (
@@ -166,8 +181,8 @@ export default function PanelAjustes() {
           })}
         </div>
         <div className="afinar-grupo">
-          <span>Tamaño de la interfaz</span>
-          <div className="afinar-segmentos" role="radiogroup" aria-label="Tamaño de la interfaz">
+          <span>{t('ajustes.tamano')}</span>
+          <div className="afinar-segmentos" role="radiogroup" aria-label={t('ajustes.tamano')}>
             {TAMANOS.map((t) => (
               <button
                 key={t.id}
@@ -185,8 +200,8 @@ export default function PanelAjustes() {
           </div>
         </div>
         <div className="afinar-grupo">
-          <span>Mascota</span>
-          <div className="afinar-mascotas" role="radiogroup" aria-label="Mascota">
+          <span>{t('ajustes.mascota')}</span>
+          <div className="afinar-mascotas" role="radiogroup" aria-label={t('ajustes.mascota')}>
             {FORMAS.map((f) => (
               <button key={f.id} type="button" role="radio" aria-checked={forma === f.id} onClick={() => elegirForma(f.id)}>
                 <Mascota forma={f.id} mini />
@@ -198,24 +213,24 @@ export default function PanelAjustes() {
         <div className="ajustes-fila-botones">
           <Colores clase="boton" />
           <button type="button" className="boton" onClick={() => (window.location.hash = '#/animaciones')}>
-            Ver las animaciones de espera
+            {t('ajustes.animaciones')}
           </button>
         </div>
       </section>
 
       <section className="ajustes-seccion">
-        <h2>Voz</h2>
-        <p className="nota">La velocidad y la voz del tutor, en la llamada y al leer en voz alta.</p>
+        <h2>{t('ajustes.voz')}</h2>
+        <p className="nota">{t('ajustes.vozNota')}</p>
         <ControlVoz />
         <div className="ajustes-fila-botones">
           <button type="button" className="boton" onClick={() => (window.location.hash = '#/pronunciacion')}>
-            Cómo pronuncia los términos técnicos
+            {t('ajustes.pronunciacion')}
           </button>
         </div>
       </section>
 
       <section className="ajustes-seccion">
-        <h2>Avisos</h2>
+        <h2>{t('ajustes.avisos')}</h2>
         <label className="afinar-avisos">
           <input
             type="checkbox"
@@ -232,20 +247,20 @@ export default function PanelAjustes() {
               setAvisos(si)
             }}
           />
-          Avisarme cuando empiece una sesión y al acabar cada pomodoro
+          {t('ajustes.avisosTexto')}
         </label>
       </section>
 
       <section className="ajustes-seccion">
-        <h2>Bienvenida</h2>
-        <p className="nota">Cómo te llama la mascota y la presentación de la primera vez: tu nombre, tu cuenta de Claude y una prueba.</p>
+        <h2>{t('ajustes.bienvenida')}</h2>
+        <p className="nota">{t('ajustes.bienvenidaNota')}</p>
         <label className="afinar-avisos">
-          Tu nombre{' '}
+          {t('ajustes.tuNombre')}{' '}
           <input
             key={p?.nombre ?? ''}
             defaultValue={p?.nombre ?? ''}
             maxLength={60}
-            placeholder="Cómo te llamo"
+            placeholder={t('ajustes.comoTeLlamo')}
             onBlur={(e) => {
               const nombre = limpiarNombre(e.target.value)
               if (nombre !== (p?.nombre ?? '')) void cambiarPreferencias({ nombre })
@@ -258,7 +273,7 @@ export default function PanelAjustes() {
             className="boton"
             onClick={() => guardarBienvenida('pendiente').then(() => window.dispatchEvent(new Event(EVENTO_BIENVENIDA)))}
           >
-            Ver la bienvenida otra vez
+            {t('ajustes.verBienvenida')}
           </button>
         </div>
       </section>

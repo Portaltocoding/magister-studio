@@ -7,7 +7,7 @@ import Paleta from './componentes/Paleta.tsx'
 import { avisosActivos } from './componentes/Afinar.tsx'
 import Asesor from './componentes/Asesor.tsx'
 import Bienvenida from './componentes/Bienvenida.tsx'
-import { EVENTO_BIENVENIDA, EVENTO_CUENTA_CAIDA, modoDe, type Modo } from './componentes/bienvenida.ts'
+import { EVENTO_BIENVENIDA, EVENTO_CUENTA_CAIDA, modoDe, puedeCambiarCuenta, type Modo } from './componentes/bienvenida.ts'
 import { avisar } from './componentes/pomodoro.ts'
 import { acentoDe, sincronizarAcento, usarColores, variables } from './componentes/colores.ts'
 import Central from './Central.tsx'
@@ -97,12 +97,12 @@ export default function Marco() {
   useEffect(() => sincronizarAcento(colores), [])
   useEffect(() => setMenu(false), [modo, activa])
   // La bienvenida de la primera vez (o el paso de Claude, si la cuenta ha caducado): lo decide el servidor.
-  const [bienvenida, setBienvenida] = useState<{ modo: Modo; nombre: string; cuentaConectada: boolean } | null>(null)
+  const [bienvenida, setBienvenida] = useState<{ modo: Modo; nombre: string; cuentaConectada: boolean; puedeConectar: boolean } | null>(null)
   const mirarBienvenida = useCallback(() => {
     verBienvenida()
       .then((e) => {
         const modo = modoDe(e)
-        if (modo) setBienvenida((abierta) => abierta ?? { modo, nombre: e.nombre, cuentaConectada: e.cuenta.conectada })
+        if (modo) setBienvenida((abierta) => abierta ?? { modo, nombre: e.nombre, cuentaConectada: e.cuenta.conectada, puedeConectar: puedeCambiarCuenta(e.cuenta) })
       })
       .catch(() => undefined)
   }, [])

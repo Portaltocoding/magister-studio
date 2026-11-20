@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as EventoPuntero } from 'react'
+import { t } from '../i18n/i18n.ts'
 import { tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import Volcado from '../componentes/Volcado.tsx'
 import Companera from '../componentes/Companera.tsx'
@@ -1865,10 +1866,10 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     return (
       <div className="panel">
         <Vacio
-          etiqueta="Tutor"
-          titulo="Aún no tienes un plan"
-          texto="El tutor te dice cada día qué toca y te lo explica idea a idea, en modo foco: pantalla completa, sin menús, con una comprobación al final de cada idea."
-          acciones={[{ texto: 'Crear mi plan', principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
+          etiqueta={t('vacio.tutor.etq')}
+          titulo={t('vacio.tutor.titulo')}
+          texto={t('vacio.tutor.texto')}
+          acciones={[{ texto: t('vacio.crearPlan'), principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
         />
       </div>
     )
@@ -1991,14 +1992,14 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
         </section>
       ) : (
         <Vacio
-          etiqueta="Hoy"
-          titulo={hoy.repasos ? 'Hoy toca repasar' : 'Hoy no te toca ninguna lección'}
+          etiqueta={t('vacio.hoy.etq')}
+          titulo={hoy.repasos ? t('vacio.hoy.repasar') : t('vacio.hoy.nada')}
           texto={
             hoy.repasos
-              ? `No hay lección prevista, pero ${hoy.repasos} conceptos esperan su repaso. También puedes estudiar cualquier lección de abajo.`
-              : 'Puedes estudiar cualquier lección preparada en modo foco, o descansar.'
+              ? t('vacio.hoy.textoRepasos', { n: hoy.repasos })
+              : t('vacio.hoy.textoNada')
           }
-          acciones={hoy.repasos ? [{ texto: 'Repasar', principal: true, alPulsar: () => irA('repaso') }] : []}
+          acciones={hoy.repasos ? [{ texto: t('vacio.hoy.accion'), principal: true, alPulsar: () => irA('repaso') }] : []}
         />
       )}
       {hoy.examen && examenDespues.length > 0 && <TarjetaExamen examen={hoy.examen} despues={examenDespues} />}
@@ -2029,10 +2030,10 @@ function ElegirFoco({ hoy, otras, empezar }: { hoy: Hoy; otras: Opcion[]; empeza
     return (
       <div className="panel">
         <Vacio
-          etiqueta="Modo foco"
-          titulo="Aún no hay lecciones"
-          texto="Crea tu plan y prepara una lección: aquí la estudiarás a pantalla completa, idea a idea, con una comprobación al final de cada una."
-          acciones={[{ texto: 'Crear mi plan', principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
+          etiqueta={t('vacio.foco.etq')}
+          titulo={t('vacio.foco.titulo')}
+          texto={t('vacio.foco.texto')}
+          acciones={[{ texto: t('vacio.crearPlan'), principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
         />
       </div>
     )

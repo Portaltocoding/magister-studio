@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { t } from '../i18n/i18n.ts'
 import { masReciente, olvidarPlan, planActivo, recordarPlan } from '../componentes/planActivo.ts'
 import { colorDeTema } from '../componentes/colorTema.ts'
 import { BotonLibro, guardarIndice, TituloEditable, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
@@ -375,15 +376,15 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       <div className="panel">
         <h1>Roadmap</h1>
         <Vacio
-          etiqueta="Sin plan todavía"
-          titulo="Tu camino, lección a lección"
-          texto="Un plan convierte «quiero aprender X» en lecciones ordenadas, con horas y fechas en tu calendario. Lo puedes cambiar cuando quieras."
+          etiqueta={t('vacio.plan.etq')}
+          titulo={t('vacio.plan.titulo')}
+          texto={t('vacio.plan.texto')}
           pasos={[
-            { titulo: 'Cuatro preguntas', texto: 'Qué, para qué, qué sabes ya y cuánto tiempo tienes.' },
-            { titulo: 'El tutor propone', texto: 'Lecciones, objetivos y calendario. Lo aceptas o lo cambias.' },
-            { titulo: 'A estudiar', texto: 'Cada día, el tutor te dice qué toca.' },
+            { titulo: t('vacio.plan.p1.t'), texto: t('vacio.plan.p1.x') },
+            { titulo: t('vacio.plan.p2.t'), texto: t('vacio.plan.p2.x') },
+            { titulo: t('vacio.plan.p3.t'), texto: t('vacio.plan.p3.x') },
           ]}
-          acciones={[{ texto: 'Crear mi plan', principal: true, alPulsar: alNuevoPlan }]}
+          acciones={[{ texto: t('vacio.crearPlan'), principal: true, alPulsar: alNuevoPlan }]}
         />
       </div>
     )

@@ -1,3 +1,5 @@
+import { t, type Clave } from './i18n/i18n.ts'
+
 // Los modos. La barra lateral enseña Estudio libre suelto y cinco entradas (Hoy, Lecciones, Practicar, Plan,
 // Biblioteca), cada una con sus subsecciones siempre a la vista. Dentro de la pantalla, las mismas subsecciones
 // salen como pestañas. Todos conservan su ruta (#/examen sigue valiendo).
@@ -142,3 +144,10 @@ export const familiaDe = (m: IdModo) => FAMILIAS.find((f) => f.some(([id]) => id
 export const grupoDe = (m: IdModo): string => GRUPOS.find((g) => g.modos.some((x) => x.id === m))?.nombre ?? (TALLER.some((x) => x.id === m) ? 'Taller' : '')
 // La primera subsección de la entrada en la que estás (en Examen, Repaso): sirve para iluminar la tira de iconos.
 export const padreDe = (m: IdModo): IdModo => familiaDe(m)?.[0][0] ?? m
+
+// Lo que se enseña en pantalla va por el diccionario (i18n/): `nombre` y `ayuda` de arriba son la versión en español y
+// la clave de la lógica (colores, plegado). Cada modo y cada entrada tienen su traducción.
+export const nombreModo = (m: IdModo): string => t(`modo.${m}`)
+export const ayudaModo = (m: IdModo): string => t(`modo.${m}.ayuda`)
+export const nombreGrupo = (nombre: string): string => (nombre ? t(`grupo.${nombre}` as Clave) : '')
+export const ayudaGrupo = (nombre: string): string => (nombre ? t(`grupo.${nombre}.ayuda` as Clave) : '')

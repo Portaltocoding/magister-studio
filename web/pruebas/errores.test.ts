@@ -114,3 +114,14 @@ test('con un prefijo legible se guarda el prefijo', () => {
     detalle: null,
   })
 })
+
+test('los errores comunes salen en inglés si el idioma es inglés', () => {
+  assert.match(errorLegible('freno: «apuntes» en pausa por demasiadas llamadas seguidas', 'en').mensaje, /too many model calls/)
+  assert.match(errorLegible('la cuenta de Claude no está conectada o ha caducado', 'en').mensaje, /Claude account is not connected/)
+  assert.match(errorLegible('No he podido cancelar: ErrorModelo: plazo agotado', 'en').mensaje, /^No he podido cancelar\. The model took too long/)
+  assert.equal(errorLegible('', 'en').mensaje, 'Something failed, but I don\'t know what. Try again.')
+  // El mensaje ya legible en español, visto desde el inglés, se enseña en inglés.
+  assert.equal(errorLegible(MENSAJE_FRENO, 'en').detalle, null)
+  assert.match(errorLegible(MENSAJE_FRENO, 'en').mensaje, /paused/)
+  assert.equal(textoValidacion([{ msg: 'String should have at most 5 characters', loc: ['body', 'x'] }], 'en'), 'The text is too long.')
+})

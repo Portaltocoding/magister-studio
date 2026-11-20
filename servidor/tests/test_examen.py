@@ -288,8 +288,8 @@ async def test_idioma_de_las_respuestas(cliente):
     assert (await cliente.put("/api/preferencias", json={"idioma": "fr"})).status_code == 422
     p = (await cliente.put("/api/preferencias", json={"idioma": "en"})).json()
     assert p["idioma"] == "en" and texto_preferencias(p).startswith("- " + IDIOMA_INGLES)
-    # El material y las correcciones siguen en español.
-    assert IDIOMA_INGLES not in await para_explicar()
+    # Las correcciones también salen en inglés.
+    assert IDIOMA_INGLES in await para_explicar()
 
 
 def test_el_render_del_pdf_no_hereda_secretos(monkeypatch):

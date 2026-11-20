@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { t } from '../i18n/i18n.ts'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import { avisoIncompleta } from '../componentes/bibliotecaLeccion.ts'
@@ -117,13 +118,13 @@ export default function PanelFuentes() {
 
       {fuentes.length === 0 && (
         <Vacio
-          etiqueta="Sin fuentes todavía"
-          titulo="Dale al tutor tus propios materiales"
-          texto="Una fuente es un sitio de donde sale lo que estudias: tus apuntes, un libro en PDF, una web. El tutor las lee, responde con ellas y cita de dónde sale cada cosa. Sin fuentes también funciona, pero con las tuyas se ciñe a tu temario."
+          etiqueta={t('vacio.fuentes.etq')}
+          titulo={t('vacio.fuentes.titulo')}
+          texto={t('vacio.fuentes.texto')}
           pasos={[
-            { titulo: 'Crea una fuente', texto: 'Ponle nombre abajo: «Apuntes de clase», «Libro de BD»...' },
-            { titulo: 'Sube ficheros o URLs', texto: 'PDF, Markdown, HTML o texto. Se indexan solos en segundos.' },
-            { titulo: 'Pregunta', texto: 'En Estudio libre o en el tutor verás las citas a tus documentos.' },
+            { titulo: t('vacio.fuentes.p1.t'), texto: t('vacio.fuentes.p1.x') },
+            { titulo: t('vacio.fuentes.p2.t'), texto: t('vacio.fuentes.p2.x') },
+            { titulo: t('vacio.fuentes.p3.t'), texto: t('vacio.fuentes.p3.x') },
           ]}
         />
       )}

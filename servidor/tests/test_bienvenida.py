@@ -185,7 +185,8 @@ async def test_sin_pty_el_mensaje_es_claro(cliente, monkeypatch):
 
     monkeypatch.setattr(cuenta, "SesionToken", SinPty)
     r = await cliente.post("/api/bienvenida/cuenta/iniciar")
-    assert r.status_code == 409 and "Docker" in r.json()["detail"]
+    # Sin jerga: no habla de Docker ni de terminales, solo de la cuenta con la que ya inició sesión.
+    assert r.status_code == 409 and "Docker" not in r.json()["detail"] and "cuenta de Claude" in r.json()["detail"]
 
 
 @pytest.mark.anyio

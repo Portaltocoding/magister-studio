@@ -72,6 +72,10 @@ async def alumno(plan_id: int) -> str:
         partes.append("Quiere que le expliquen desde cero.")
     elif p.get("nivel") == "experto":
         partes.append("Tiene nivel avanzado en general.")
+    if p.get("idioma") == "en":
+        from magister.material.preferencias import IDIOMA_INGLES
+
+        partes.append(IDIOMA_INGLES)
     partes += [f"Pide: {x}" for x in p.get("instrucciones") or []]
     return "\n".join(partes) or "Adulto con formación, sin conocimientos previos del tema."
 

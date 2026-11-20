@@ -13,6 +13,9 @@ PREGUNTAS = {
     "mezcla": "Una mezcla equilibrada de conceptuales, prácticas y de encontrar el fallo.",
 }
 CANTIDAD = {"pocas": (4, 6), "normal": (6, 10), "muchas": (10, 12)}
+# Lo que se pide cuando el alumno ha elegido inglés (preferencias del tutor, «idioma»); en español no hace falta: los prompts ya lo son.
+IDIOMA_INGLES = ("Escribe todo el contenido en inglés (lo ha elegido el alumno), aunque estas instrucciones y las fuentes estén en español: "
+                 "traduce lo que cites y deja en su idioma solo los títulos de las fuentes y las citas literales.")
 
 
 NIVEL = {
@@ -31,6 +34,8 @@ def texto(preferencias: dict | None) -> str:
     nivel = p.get("nivel_tutor") or p.get("nivel")
     if nivel in NIVEL:
         lineas.append(NIVEL[nivel])
+    if p.get("idioma") == "en":
+        lineas.append(IDIOMA_INGLES)
     for x in p.get("instrucciones") or []:
         lineas.append(f"El alumno pide: {x}")
     for x in p.get("aprendido") or []:
@@ -47,6 +52,8 @@ def texto_preguntas(preferencias: dict | None) -> str:
     p = preferencias or {}
     minimo, maximo = CANTIDAD.get(p.get("cantidad", "normal"), CANTIDAD["normal"])
     lineas = [f"Entre {minimo} y {maximo} preguntas.", PREGUNTAS.get(p.get("preguntas", "mezcla"), PREGUNTAS["mezcla"])]
+    if p.get("idioma") == "en":
+        lineas.append(IDIOMA_INGLES)
     if p.get("nivel") == "nada":
         lineas.append("Empieza de cero: preguntas sobre las ideas básicas, sin términos que los apuntes no hayan explicado.")
     if p.get("enfoque"):

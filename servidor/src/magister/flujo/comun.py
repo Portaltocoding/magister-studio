@@ -251,8 +251,6 @@ async def sistema_de_estudio(base: str, estado: dict) -> str:
         try:
             if estado.get("modo"):
                 p = {**p, "modo": None if estado["modo"] == "normal" else estado["modo"]}
-            if estado.get("voz") or estado.get("llamada") or estado.get("asesor"):
-                p = {**p, "idioma": "es"}  # las voces son españolas y el asesor habla de la app
             if estado.get("asesor"):
                 # La ventanita tiene su propia forma: el modo y la longitud del chat la estiraban. Nivel, estilo,
                 # instrucciones y lo aprendido siguen valiendo.
@@ -491,7 +489,7 @@ async def acciones_de_estudio(estado: dict, sin_fuentes: bool) -> None:
 # Lo que el alumno ajusta desde la mascota («Afina a tu tutor»).
 PREFERENCIAS_POR_DEFECTO = {"longitud": "normal", "nivel": "normal", "estilo": "directo",
                             "diagramas": True, "tests": True, "opciones": True,
-                            # En qué idioma contesta el chat escrito (la voz y el material siguen en español).
+                            # El idioma de toda la app: el de la pantalla, el de la voz y el de lo que contesta el tutor.
                             "idioma": "es",
                             # Cómo te llama la mascota en los saludos de la página (no entra en los prompts).
                             "nombre": "",
@@ -600,7 +598,7 @@ async def para_explicar() -> str:
     except Exception:  # noqa: BLE001
         return ""
     return texto_preferencias({**p, "modo": None, "longitud": "normal", "diagramas": True, "tests": True, "opciones": True,
-                               "idioma": None})  # el material y las correcciones ya van en español
+                               "idioma": "en" if p.get("idioma") == "en" else None})  # en español no hace falta decirlo: los prompts ya lo están
 
 
 

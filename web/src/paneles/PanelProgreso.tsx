@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { t } from '../i18n/i18n.ts'
 import { listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
 import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
 import { colorDeTema } from '../componentes/colorTema.ts'
@@ -398,15 +399,15 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
       <div className="panel">
         <h1>Progreso</h1>
         <Vacio
-          etiqueta="Aún no hay nada que medir"
-          titulo="Tu progreso aparece cuando tengas un plan"
-          texto="Aquí verás cuánto llevas de cada lección, qué conceptos ya dominas y qué repasos te esperan los próximos días."
+          etiqueta={t('vacio.progreso.etq')}
+          titulo={t('vacio.progreso.titulo')}
+          texto={t('vacio.progreso.texto')}
           pasos={[
-            { titulo: 'Crea un plan', texto: 'Cuatro preguntas y el tutor te propone lecciones y calendario.' },
-            { titulo: 'Estudia las lecciones', texto: 'Con el tutor, en modo foco, o leyendo sus apuntes.' },
-            { titulo: 'Repasa', texto: 'Cada respuesta mueve tus conceptos hacia «Dominado».' },
+            { titulo: t('vacio.progreso.p1.t'), texto: t('vacio.progreso.p1.x') },
+            { titulo: t('vacio.progreso.p2.t'), texto: t('vacio.progreso.p2.x') },
+            { titulo: t('vacio.progreso.p3.t'), texto: t('vacio.progreso.p3.x') },
           ]}
-          acciones={[{ texto: 'Crear mi primer plan', principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
+          acciones={[{ texto: t('vacio.progreso.crear'), principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
         />
       </div>
     )

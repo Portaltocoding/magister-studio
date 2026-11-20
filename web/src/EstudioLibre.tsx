@@ -1,4 +1,5 @@
 import { usarAdjuntos } from './componentes/usarAdjuntos.ts'
+import { t } from './i18n/i18n.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   crearConversacion,
@@ -19,7 +20,7 @@ import Vacio, { irARuta } from './componentes/Vacio.tsx'
 import { TextoError } from './componentes/Cargando.tsx'
 import { cortarTitulo } from './componentes/formato.ts'
 import { recordarPlan } from './componentes/planActivo.ts'
-import { MENSAJE_SIN_CONEXION } from './componentes/errores.ts'
+import { mensajeSinConexion } from './componentes/errores.ts'
 import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
 import { usarConversacion } from './componentes/usarConversacion.ts'
@@ -154,7 +155,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
         setPendiente(texto)
         alCrear(c.id)
       } catch (e) {
-        setError(e instanceof ErrorApi && e.codigo === 0 ? MENSAJE_SIN_CONEXION : String((e as Error).message))
+        setError(e instanceof ErrorApi && e.codigo === 0 ? mensajeSinConexion() : String((e as Error).message))
         escribirEnChat(texto) // lo que escribiste vuelve a la caja
       }
       return
@@ -262,10 +263,10 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     return (
       <div className="libre">
         <Vacio
-          etiqueta="Estudio libre"
-          titulo="Esta conversación no existe"
-          texto="Puede que la borraras o que el enlace esté mal. Tus conversaciones están en la barra lateral."
-          acciones={[{ texto: 'Empezar una nueva', principal: true, alPulsar: () => irARuta('#/libre') }]}
+          etiqueta={t('vacio.libre.etq')}
+          titulo={t('vacio.libre.titulo')}
+          texto={t('vacio.libre.texto')}
+          acciones={[{ texto: t('vacio.libre.nueva'), principal: true, alPulsar: () => irARuta('#/libre') }]}
         />
         <Hilo burbujas={[]} escribiendo={false} alEnviar={() => undefined} alParar={parar} placeholder="Esta conversación no existe" deshabilitado />
       </div>
