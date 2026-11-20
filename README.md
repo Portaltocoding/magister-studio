@@ -33,7 +33,7 @@ The launcher installs Docker if it is missing, downloads Magister (about 2 GB th
 - **Notes in blocks** of 250–450 words with definitions, formulas, a diagram per section and a "recall without looking" box, plus flashcards and a concept map.
 - **Your sources.** Upload PDFs, Markdown, text or web pages. Answers cite them with `[n]` marks you can open to see the exact passage; citations are checked without the model, and doubtful ones are flagged. When a lesson has no material, Magister can research sources on the web and asks you before adding them.
 - **Formats.** Diagrams, slides, a PDF "book" of the topic, read-aloud, and short narrated animated videos for the hardest lessons (local voice, exportable to MP4).
-- **A tutor that knows where you are.** Ask anything in *Free study*; the tutor sees the lesson, your weak and mastered concepts and your recent history.
+- **A tutor that knows where you are.** Ask anything in *Study chat*; the tutor sees the lesson, your weak and mastered concepts and your recent history.
 
 **It checks that you really learned it**
 - **Questions of several kinds:** conceptual, calculation, spot-the-mistake, scenario, spoken and multiple choice, plus exams.
