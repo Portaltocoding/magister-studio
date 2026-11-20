@@ -80,11 +80,15 @@ export function usarForma(): FormaMascota {
 export type GestoMascota = 'normal' | 'pensando' | 'escuchando' | 'hablando'
 
 // Ojos como los de la primera mascota: blancos, alargados y sin pupila; se mueven enteros hacia donde miras.
-function Ojos({ izq, der, ancho, alto, m }: { izq: Punto; der: Punto; ancho: number; alto: number; m: Punto }) {
+// `giro` inclina los dos ojos hacia fuera (grados): el izquierdo hacia la izquierda y el derecho hacia la derecha. El
+// giro va en un <g> aparte para que el parpadeo (un transform de CSS en el ojo) no lo pise.
+function Ojos({ izq, der, ancho, alto, m, giro = 0 }: { izq: Punto; der: Punto; ancho: number; alto: number; m: Punto; giro?: number }) {
   return (
     <g className="mascota-ojos" style={{ transform: `translate(${m.x}px, ${m.y}px)` }}>
       {[izq, der].map((o, k) => (
-        <ellipse key={k} className="mascota-ojo mascota-blanco" cx={o.x} cy={o.y} rx={ancho} ry={alto} style={{ transformOrigin: `${o.x}px ${o.y}px` }} />
+        <g key={k} transform={`rotate(${k === 0 ? -giro : giro} ${o.x} ${o.y})`}>
+          <ellipse className="mascota-ojo mascota-blanco" cx={o.x} cy={o.y} rx={ancho} ry={alto} style={{ transformOrigin: `${o.x}px ${o.y}px` }} />
+        </g>
       ))}
     </g>
   )
@@ -291,7 +295,7 @@ export default function Mascota({
         {forma === 'sencilla' && (
           <>
             <circle className="mascota-cuerpo" cx="60" cy="62" r="54" />
-            <Ojos izq={{ x: 42, y: 58 }} der={{ x: 78, y: 58 }} ancho={7.5} alto={19} m={m} />
+            <Ojos izq={{ x: 42, y: 58 }} der={{ x: 78, y: 58 }} ancho={7.5} alto={17.8} giro={28} m={m} />
           </>
         )}
       </g>
