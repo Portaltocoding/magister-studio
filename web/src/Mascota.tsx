@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { estaDormida, EVENTO_REACCION, EVENTO_SUENO, vigilarSueno, type Reaccion } from './componentes/animo.ts'
 
-// La mascota de Magister, a elegir en «Afina a tu tutor»: el búho (por defecto) o la sencilla. Las dos en el estilo de
-// la primera: silueta negra y plana con dos ojos blancos alargados, sin pupila, que miran hacia el cursor y parpadean.
+// La mascota de Magister, a elegir en Ajustes: la sencilla (por defecto), el cerebro con gafas o el planeta. Estilo
+// plano, con ojos que miran hacia el cursor y parpadean.
 // Es decorativa: no recibe foco ni la leen los lectores de pantalla.
 
-export type FormaMascota = 'buho' | 'sencilla' | 'cerebro' | 'planeta'
+export type FormaMascota = 'sencilla' | 'cerebro' | 'planeta'
 export const FORMAS: { id: FormaMascota; nombre: string }[] = [
-  { id: 'buho', nombre: 'Búho' },
   { id: 'sencilla', nombre: 'Sencilla' },
   { id: 'cerebro', nombre: 'Cerebro' },
   { id: 'planeta', nombre: 'Planeta' },
@@ -23,9 +22,10 @@ const EVENTO = 'magister-mascota'
 export function formaGuardada(): FormaMascota {
   try {
     const f = localStorage.getItem(CLAVE)
-    return FORMAS.some((x) => x.id === f) ? (f as FormaMascota) : 'buho'
+    // Quien tenía el búho (ya no existe) pasa a la sencilla.
+    return FORMAS.some((x) => x.id === f) ? (f as FormaMascota) : 'sencilla'
   } catch {
-    return 'buho'
+    return 'sencilla'
   }
 }
 
@@ -280,25 +280,6 @@ export default function Mascota({
       focusable="false"
     >
       <g className="mascota-figura">
-        {forma === 'buho' && (
-          <>
-            {/* Búho plano: cuerpo de huevo, penachos cortos que se abren hacia fuera (no cuernos), disco facial más
-                claro con ojos redondos, pico ámbar, alas, plumas en el pecho y patitas. */}
-            {/* Una sola silueta (cuerpo y penachos), para que el contorno del modo oscuro no deje costuras. */}
-            <path
-              className="mascota-cuerpo"
-              d="M16 68 C16 50 21 40 30 34 C22 28 16 21 15 13 C25 16 34 21 42 27 C47 24 53 22 60 22 C67 22 73 24 78 27 C86 21 95 16 105 13 C104 21 98 28 90 34 C99 40 104 50 104 68 C104 98 86 112 60 112 C34 112 16 98 16 68 Z"
-            />
-            <path className="mascota-ala" d="M22 62 C16 80 22 96 38 104" />
-            <path className="mascota-ala" d="M98 62 C104 80 98 96 82 104" />
-            <circle className="mascota-disco" cx="43" cy="58" r="19" />
-            <circle className="mascota-disco" cx="77" cy="58" r="19" />
-            <path className="mascota-pluma" d="M50 90 l5 4 l5 -4 M60 90 l5 4 l5 -4 M55 98 l5 4 l5 -4" />
-            <Ojos izq={{ x: 43, y: 58 }} der={{ x: 77, y: 58 }} ancho={8} alto={14} m={m} />
-            <path className="mascota-pico" d="M54.5 69 Q60 66 65.5 69 L60 79 Z" />
-            <path className="mascota-pata" d="M44 111 q2 4 4 0 q2 4 4 0 M68 111 q2 4 4 0 q2 4 4 0" />
-          </>
-        )}
         {forma === 'sencilla' && (
           <>
             <circle className="mascota-cuerpo" cx="60" cy="62" r="54" />
