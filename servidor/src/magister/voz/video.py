@@ -129,7 +129,9 @@ def _colocar_subtitulos(por_escena: list[tuple[list[tuple[float, float]], list[s
 def _fuente(tam: int, negrita: bool = False):
     from PIL import ImageFont
 
-    for nombre in (("segoeuib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf") if negrita else ("segoeui.ttf", "arial.ttf", "DejaVuSans.ttf")):
+    # Los mismos tipos que FUENTE_TEXTO (config.py), como ficheros: PIL no entiende pilas de CSS.
+    for nombre in (("segoeuib.ttf", "NotoSans-Bold.ttf", "DejaVuSans-Bold.ttf", "arialbd.ttf") if negrita
+               else ("segoeui.ttf", "NotoSans-Regular.ttf", "DejaVuSans.ttf", "arial.ttf")):
         try:
             return ImageFont.truetype(nombre, tam)
         except OSError:

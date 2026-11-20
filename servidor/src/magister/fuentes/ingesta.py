@@ -342,8 +342,35 @@ async def indexar_version(version_id: int, nombre_config: str | None = None) -> 
 # Lo que se queda a medias: qué pasó, dicho en claro, y si «Reintentar» puede arreglarlo.
 
 
+# Lo que se enseña de cada problema, en inglés (la clave es la frase en español).
+_EN = {
+    "Está guardado pero sin ningún trozo indexado: el tutor no lo encuentra.": "It is saved but has no indexed chunks: the tutor cannot find it.",
+    "El fichero está vacío: no hay nada que leer. Sube uno con texto.": "The file is empty: there is nothing to read. Upload one with text.",
+    "Se descargó y se leyó, pero falló al trocearlo e indexarlo.": "It was downloaded and read, but splitting and indexing it failed.",
+    "No se pudo sacar el texto (el fichero puede estar dañado).": "The text could not be extracted (the file may be damaged).",
+    "Casi no tiene texto: no hay bastante para buscar en él.": "It has almost no text: there is not enough to search in.",
+    "Casi no tiene texto: la página se carga con JavaScript o pide registrarse.": "It has almost no text: the page loads with JavaScript or asks you to sign up.",
+    "Parece un PDF escaneado, sin texto. Sube una copia con texto.": "It looks like a scanned PDF with no text. Upload a copy with text.",
+    "El texto sale con muchos caracteres raros (la codificación o el PDF están mal).": "The text comes out with many odd characters (the encoding or the PDF is broken).",
+    "Se apartó al leerlo.": "It was set aside while reading it.",
+}
+
+
 def explicar_problema(estado: str, motivo: str | None, con_texto: bool, fragmentos: int,
-                      uri: str | None = None) -> tuple[str, str | None]:
+                      uri: str | None = None, idioma: str = "es") -> tuple[str, str | None]:
+    """Lo mismo en el idioma del alumno («en» o «es»)."""
+    claro, destino = _explicar_problema(estado, motivo, con_texto, fragmentos, uri)
+    if idioma == "en":
+        if claro.startswith("El fichero ") and " Guárdalo con su formato de verdad y súbelo otra vez." in claro:
+            claro = ("The file " + claro.removeprefix("El fichero ").removesuffix(" Guárdalo con su formato de verdad y súbelo otra vez.")
+                     + " Save it with its real format and upload it again.")
+        else:
+            claro = _EN.get(claro, claro)
+    return claro, destino
+
+
+def _explicar_problema(estado: str, motivo: str | None, con_texto: bool, fragmentos: int,
+                       uri: str | None = None) -> tuple[str, str | None]:
     """(qué pasó, a qué estado vuelve con Reintentar; None si reintentar no lo arregla). ("", None) si no hay problema.
     `uri` dice si era una página web (http) o un fichero: «se carga con JavaScript» solo vale para una página (sin
     `uri`, como el trabajo de incorporar, que solo trae páginas, se supone web)."""

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { t } from '../i18n/i18n.ts'
+import { idiomaActual, t, type Clave } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { masReciente, olvidarPlan, planActivo, recordarPlan } from '../componentes/planActivo.ts'
 import { colorDeTema } from '../componentes/colorTema.ts'
 import { BotonLibro, guardarIndice, TituloEditable, tituloSencillo, usarIndice, type IndicePlan } from '../componentes/indice.tsx'
@@ -8,7 +9,7 @@ import VideosDelPlan from '../componentes/VideosDelPlan.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import BarraCuota from '../componentes/BarraCuota.tsx'
-import { plural } from '../componentes/formato.ts'
+import { localeActual, pluralT } from '../componentes/formato.ts'
 import { NIVELES_FUENTES, etiquetaFuentes } from '../PropuestaPlan.tsx'
 import {
   algunaBuscando,
@@ -63,8 +64,8 @@ function ChipFuentes({ leccion, alCambiar }: { leccion: LeccionVista; alCambiar:
       className="chip chip-fuentes"
       value={valor}
       disabled={guardando}
-      title={leccion.fuentes_por_que || 'Si hace falta buscar fuentes para esta lección'}
-      aria-label={`${leccion.clave}: ¿hace falta buscar fuentes?`}
+      title={leccion.fuentes_por_que || t('plan.fuentesTitulo')}
+      aria-label={t('plan.fuentesAria', { clave: leccion.clave })}
       onChange={async (e) => {
         setGuardando(true)
         try {
@@ -111,7 +112,7 @@ function BibliotecaDeLeccion({
   return (
     <details className="biblioteca-leccion" onToggle={(e) => setAbierta(e.currentTarget.open)}>
       <summary>
-        <span className="biblioteca-leccion-titulo">Fuentes de esta lección</span>{' '}
+        <span className="biblioteca-leccion-titulo">{t('plan.fuentesDeLeccion')}</span>{' '}
         <span className="nota-linea">{resumenBiblioteca(b, leccion.objetivos.length)}</span>
       </summary>
       {b.fuentes.length > 0 && (
@@ -126,7 +127,7 @@ function BibliotecaDeLeccion({
                   {avisoIncompleta(f.incompleta)}{' '}
                   {f.fuente_id != null && (
                     <button className="boton-mini" onClick={() => irARuta(`#/temas/${f.fuente_id}`)}>
-                      Subir el PDF
+                      {t('biblioteca.subirPdf')}
                     </button>
                   )}
                 </span>
@@ -136,7 +137,7 @@ function BibliotecaDeLeccion({
           {!todas && b.fuentes.length > MAX_A_LA_VISTA && (
             <li>
               <button className="enlace" onClick={() => setTodas(true)}>
-                Ver {b.fuentes.length - MAX_A_LA_VISTA} más
+                {t('plan.verMas', { n: b.fuentes.length - MAX_A_LA_VISTA })}
               </button>
             </li>
           )}
@@ -152,7 +153,7 @@ function BibliotecaDeLeccion({
                 disabled={b.research === 'buscando'}
                 onClick={() => alBuscar([i]).catch((e) => alAvisar(mensajeDe(e)))}
               >
-                Buscar esto
+                {t('plan.buscarEsto')}
               </button>
             </li>
           ))}
@@ -163,14 +164,14 @@ function BibliotecaDeLeccion({
           {research}{' '}
           {b.research === 'cortada' && (
             <button className="boton-mini" onClick={() => alBuscar().catch((e) => alAvisar(mensajeDe(e)))}>
-              Reintentar
+              {t('plan.reintentar')}
             </button>
           )}
         </p>
       )}
       {abierta && cuesta && b.research !== 'buscando' && <BarraCuota accion={{ accion: 'research' }} compacta />}
       {!b.fuentes.length && !b.sin_fuente.length && !research && (
-        <p className="nota-linea">Aún no se han buscado fuentes para esta lección.</p>
+        <p className="nota-linea">{t('plan.sinBuscar')}</p>
       )}
     </details>
   )
@@ -199,7 +200,7 @@ function AvisoApuntes({ leccion, alRehacer }: { leccion: LeccionVista; alRehacer
           }
         }}
       >
-        Rehacerlos con ellas
+        {t('plan.rehacerConEllas')}
       </button>
       <BarraCuota accion={{ accion: 'material' }} compacta />
     </div>
@@ -207,10 +208,10 @@ function AvisoApuntes({ leccion, alRehacer }: { leccion: LeccionVista; alRehacer
 }
 
 // Lo mismo que en Progreso: «estudiada» es que hiciste sus sesiones; dominarla es otra cosa (eso lo dice Progreso).
-const ESTADO_LECCION: Record<string, string> = { hecha: 'estudiada', en_curso: 'empezada', pendiente: 'pendiente' }
+const estadoLeccion = (e: string): string => (['hecha', 'en_curso', 'pendiente'].includes(e) ? t(`plan.leccion.${e}` as Clave) : e)
 
-// Números a la española: coma decimal.
-const num = (n: number | null | undefined) => (n == null ? '0' : String(n).replace('.', ','))
+// Números según el idioma: coma decimal en español.
+const num = (n: number | null | undefined) => (n == null ? '0' : idiomaActual() === 'en' ? String(n) : String(n).replace('.', ','))
 
 interface Props {
   alNuevoPlan: () => void
@@ -219,15 +220,16 @@ interface Props {
 
 export const fechaCorta = (iso: string | null) =>
   iso
-    ? new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+    ? new Date(iso + 'T12:00:00').toLocaleDateString(localeActual(), { weekday: 'short', day: 'numeric', month: 'short' })
     : '·'
 
-const pct = (x: number) => `${Math.round(x * 100)} %`
+const pct = (x: number) => `${Math.round(x * 100)}${idiomaActual() === 'en' ? '%' : ' %'}`
 // Para el ancho de una barra: CSS no admite «0 %» (con espacio) y la barra salía llena.
 const anchoPct = (x: number) => `${Math.max(0, Math.min(100, Math.round(x * 100)))}%`
 
 // Roadmap: tus planes aceptados, sus lecciones con ideas clave y el calendario por semanas.
 export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
+  usarIdioma() // los textos siguen al idioma
   const [planes, setPlanes] = useState<ResumenPlan[] | null>(null)
   const [tema, setTema] = useState<number | null>(temaInicial ?? null)
   const [vista, setVista] = useState<VistaPlan | null>(null)
@@ -294,8 +296,8 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   const buscando = vista ? algunaBuscando(vista.lecciones) : false
   useEffect(() => {
     if (!buscando) return
-    const t = window.setInterval(cargar, 5000)
-    return () => window.clearInterval(t)
+    const i = window.setInterval(cargar, 5000)
+    return () => window.clearInterval(i)
   }, [buscando, cargar])
 
   // «Buscar fuentes» (toda la lección) o «Buscar esto» (un objetivo): dos llamadas al modelo, con su BarraCuota.
@@ -303,7 +305,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
     if (!vista) return
     // Pedido en su fila: busca aunque la lección esté marcada «no» («buscar igualmente»).
     await lanzarResearch(vista.plan_id, [clave], objetivos ? { objetivos, forzar: true } : { forzar: true })
-    setAviso(`Buscando fuentes para ${clave}. Entran solas; las verás en su lección.`)
+    setAviso(t('plan.buscandoPara', { clave }))
     cargar()
   }
 
@@ -323,7 +325,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
     if (!vista) return
     try {
       await pedir(`/api/planes/${vista.plan_id}/lecciones/${clave}/material`, enviarJson({ tipos: ['apuntes'] }))
-      setAviso(`Rehaciendo los apuntes de ${clave} con tus fuentes. Lo ves en Lecciones.`)
+      setAviso(t('plan.rehaciendo', { clave }))
       cargarMaterial()
     } catch (e) {
       setAviso(mensajeDe(e))
@@ -332,11 +334,8 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
 
   const borrarPlan = async () => {
     if (tema == null || !vista) return
-    const nombre = planes?.find((x) => x.tema_id === tema)?.tema ?? 'este plan'
-    const ok = confirm(
-      `¿Borrar el plan «${nombre}»?\n\nSe borran sus ${vista.lecciones.length} lecciones, el calendario, los apuntes, las fichas, ` +
-        'tus repasos de esos conceptos y sus exámenes. Las conversaciones se quedan. No se puede deshacer.',
-    )
+    const nombre = planes?.find((x) => x.tema_id === tema)?.tema ?? t('plan.estePlan')
+    const ok = confirm(t('plan.confirmarBorrar', { nombre, n: vista.lecciones.length }))
     if (!ok) return
     try {
       await pedir(`/api/temas/${tema}/plan`, { method: 'DELETE' })
@@ -352,7 +351,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       } else {
         olvidarPlan()
       }
-      setAviso(`Plan «${nombre}» borrado.`)
+      setAviso(t('plan.borrado', { nombre }))
     } catch (e) {
       setAviso(String((e as Error).message))
     }
@@ -362,7 +361,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
     if (tema == null) return
     try {
       setVista(await recalcularPlan(tema, hoyIso()))
-      setAviso('Calendario recalculado desde hoy. Lo hecho no se toca.')
+      setAviso(t('plan.recalculado'))
       recargarPlanes()
     } catch (e) {
       setAviso(String((e as Error).message))
@@ -374,7 +373,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   if (!planes.length)
     return (
       <div className="panel">
-        <h1>Roadmap</h1>
+        <h1>{t('plan.titulo')}</h1>
         <Vacio
           etiqueta={t('vacio.plan.etq')}
           titulo={t('vacio.plan.titulo')}
@@ -392,9 +391,9 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
   return (
     <div className="panel">
       <div className="cabecera-panel">
-        <h1>Roadmap</h1>
+        <h1>{t('plan.titulo')}</h1>
         <button className="boton" onClick={alNuevoPlan}>
-          Nuevo plan
+          {t('plan.nuevo')}
         </button>
       </div>
       <div className="tarjetas">
@@ -413,9 +412,9 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               {p.tema}
             </strong>
             <span className="nota">
-              {plural(p.lecciones, 'lección', 'lecciones')} · {num(p.total_horas)} h · acaba {fechaCorta(p.fin)}
+              {pluralT(p.lecciones, 'plan.leccion', 'plan.lecciones')} · {num(p.total_horas)} h · {t('plan.acaba', { fecha: fechaCorta(p.fin) })}
             </span>
-            <span className="barra" aria-label={`Progreso ${pct(p.progreso)}`}>
+            <span className="barra" aria-label={t('plan.progresoAria', { p: pct(p.progreso) })}>
               <span style={{ width: anchoPct(p.progreso) }} />
             </span>
           </button>
@@ -424,7 +423,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
       {reajuste && (
         <section className="propuesta">
-          <h2>Reajuste propuesto</h2>
+          <h2>{t('plan.reajustePropuesto')}</h2>
           {reajuste.texto && <p>{reajuste.texto}</p>}
           <ul className="nota">
             {[...reajuste.cambios, ...reajuste.avisos].map((c) => (
@@ -441,17 +440,17 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                 try {
                   setVista(await pedir<VistaPlan>(`/api/temas/${tema}/plan/reajuste/aceptar`, enviarJson({ sesiones })))
                   setReajuste(null)
-                  setAviso('Reajuste aplicado.')
+                  setAviso(t('plan.reajusteAplicado'))
                   recargarPlanes()
                 } catch (e) {
-                  setAviso(`No he podido aplicar el reajuste. ${mensajeDe(e)}`)
+                  setAviso(t('plan.noAplica', { motivo: mensajeDe(e) }))
                 }
               }}
             >
-              Aceptar
+              {t('plan.aceptar')}
             </button>
             <button className="boton" onClick={() => setReajuste(null)}>
-              Rechazar
+              {t('plan.rechazar')}
             </button>
           </div>
         </section>
@@ -459,28 +458,27 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
       {vista && (
         <>
           <p className="nota">
-            Versión {vista.version} · {num(vista.horas_hechas)} de {num(vista.total_horas)} h hechas ({pct(vista.progreso)}) ·
-            fin previsto {fechaCorta(vista.fin)}{' '}
+            {t('plan.resumen', { version: vista.version, hechas: num(vista.horas_hechas), total: num(vista.total_horas), p: pct(vista.progreso), fin: fechaCorta(vista.fin) })}{' '}
             <button className="boton-mini" onClick={() => setHorario(!horario)}>
-              Mi horario
+              {t('plan.miHorario')}
             </button>{' '}
             <button className="boton-mini peligro" onClick={borrarPlan}>
-              Borrar el plan
+              {t('plan.borrarPlan')}
             </button>{' '}
             <button className="boton-mini" onClick={atrasado}>
-              Me he atrasado
+              {t('plan.atrasado')}
             </button>{' '}
             <button
               className="boton-mini"
               onClick={async () => {
                 if (tema == null) return
-                setAviso('Calculando el reajuste…')
+                setAviso(t('plan.calculando'))
                 const r = await pedir<NonNullable<typeof reajuste>>(`/api/temas/${tema}/plan/reajuste`, { method: 'POST' })
-                setAviso(r.cambios.length ? null : 'Tu calendario ya cuadra con tus repasos.')
+                setAviso(r.cambios.length ? null : t('plan.yaCuadra'))
                 setReajuste(r.cambios.length ? r : null)
               }}
             >
-              Reajustar con mis repasos
+              {t('plan.reajustar')}
             </button>
           </p>
           {horario && tema != null && (
@@ -491,21 +489,21 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               alGuardar={(v) => {
                 setVista(v)
                 setHorario(false)
-                setAviso(`Horario guardado. Ahora acabas el ${fechaCorta(v.fin)}.`)
+                setAviso(t('plan.horarioGuardado', { fecha: fechaCorta(v.fin) }))
                 recargarPlanes()
               }}
             />
           )}
           <section className="indice-plan">
-            <h2>De qué va</h2>
+            <h2>{t('plan.deQueVa')}</h2>
             {indice ? (
               <div className="indice-temas">
-                {indice.temas.map((t) => (
-                  <div key={t.nombre} className="indice-tema">
-                    <strong>{t.nombre}</strong>
-                    <small>{t.lecciones.map((c) => tituloSencillo(indice, c, c)).join(' · ')}</small>
+                {indice.temas.map((tm) => (
+                  <div key={tm.nombre} className="indice-tema">
+                    <strong>{tm.nombre}</strong>
+                    <small>{tm.lecciones.map((c) => tituloSencillo(indice, c, c)).join(' · ')}</small>
                     <ul>
-                      {t.trata.map((x) => (
+                      {tm.trata.map((x) => (
                         <li key={x}>{x}</li>
                       ))}
                     </ul>
@@ -514,7 +512,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               </div>
             ) : (
               <p className="nota">
-                Un índice con pocos temas de nombre sencillo y de qué trata cada uno.{' '}
+                {t('plan.indiceIntro')}{' '}
                 <button
                   className="boton-mini"
                   disabled={haciendoIndice}
@@ -529,7 +527,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                     }
                   }}
                 >
-                  {haciendoIndice ? 'Haciéndolo…' : 'Hacer el índice'}
+                  {haciendoIndice ? t('plan.haciendo') : t('plan.hacerIndice')}
                 </button>
               </p>
             )}
@@ -537,7 +535,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
           </section>
           <div className="dos-columnas">
             <section>
-              <h2>Lecciones</h2>
+              <h2>{t('plan.lecciones.titulo')}</h2>
               <ol className="lecciones">
                 {vista.lecciones.map((l) => (
                   <li key={l.clave} className={`leccion-${l.estado}`}>
@@ -545,15 +543,15 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                       {l.clave} · <TituloEditable planId={vista.plan_id} clave={l.clave} largo={l.titulo} indice={indice} />
                     </strong>{' '}
                     <span className="nota-linea">
-                      {num(l.horas_hechas)}/{num(l.horas)} h · {ESTADO_LECCION[l.estado] ?? l.estado}
-                      {l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''} ·{' '}
+                      {num(l.horas_hechas)}/{num(l.horas)} h · {estadoLeccion(l.estado)}
+                      {l.depende_de.length ? t('plan.despuesDe', { lista: l.depende_de.join(', ') }) : ''} ·{' '}
                       {['listo', 'revisar'].includes(material[l.clave]?.tipos?.apuntes ?? '') ? (
-                        <a href={`#/fichas/${vista.tema_id}/${l.clave}`}>apuntes listos</a>
+                        <a href={`#/fichas/${vista.tema_id}/${l.clave}`}>{t('plan.apuntesListos')}</a>
                       ) : (
-                        'sin preparar'
+                        t('plan.sinPreparar')
                       )}
                       {' · '}
-                      {l.sin_material ? 'sin fuentes tuyas' : `${l.fuentes} fragmentos de tus fuentes`}
+                      {l.sin_material ? t('plan.sinFuentesTuyas') : t('plan.fragmentosDeFuentes', { n: l.fuentes })}
                     </span>{' '}
                     <ChipFuentes leccion={l} alCambiar={(v) => cambiarNecesidad(l.clave, v)} />{' '}
                     {l.sin_material && l.biblioteca?.research !== 'buscando' && (
@@ -562,7 +560,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                         className={l.necesita_fuentes === 'no' ? 'enlace' : 'boton-mini'}
                         onClick={() => buscarPara(l.clave).catch((e) => setAviso(mensajeDe(e)))}
                       >
-                        {l.necesita_fuentes === 'no' ? 'buscar igualmente' : 'Buscar fuentes'}
+                        {l.necesita_fuentes === 'no' ? t('plan.buscarIgualmente') : t('plan.buscarFuentes')}
                       </button>
                     )}
                     {l.research_auto && l.biblioteca?.research !== 'buscando' && (
@@ -592,14 +590,14 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               </ol>
               {ideasDeProyecto(vista.razonamiento ?? '').length > 0 && (
                 <>
-                  <h3>Ideas de proyecto</h3>
+                  <h3>{t('plan.ideasProyecto')}</h3>
                   <ul className="ideas-proyecto">
                     {ideasDeProyecto(vista.razonamiento ?? '').map((idea) => (
                       <li key={idea}>
                         {idea}{' '}
                         <button
                           className="boton-mini"
-                          title="Abre un proyecto nuevo con esta idea ya escrita: solo te falta ponerle nombre"
+                          title={t('plan.llevarTitulo')}
                           onClick={async () => {
                             try {
                               sessionStorage.setItem('magister-idea-proyecto', idea) // PanelProyectos rellena con ella el proyecto nuevo
@@ -610,7 +608,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                             irARuta('#/proyectos')
                           }}
                         >
-                          Llevar a Proyectos
+                          {t('plan.llevar')}
                         </button>
                       </li>
                     ))}
@@ -628,7 +626,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
               />
               {vista.examenes?.length > 0 && (
                 <>
-                  <h2>Exámenes</h2>
+                  <h2>{t('plan.examenes')}</h2>
                   <ul className="hitos-examen">
                     {vista.examenes.map((h) => (
                       <li key={h.id} className={`${h.hecho ? 'hecho' : ''} ${h.final ? 'final' : ''}`}>
@@ -636,22 +634,22 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                         <span className="hito-titulo">
                           <strong>{h.titulo}</strong>
                           <small>
-                            {h.preguntas} preguntas · {h.minutos} min
-                            {h.nota != null ? ` · ${h.hecho ? 'aprobado con' : 'mejor nota'} ${h.nota.toFixed(1).replace('.', ',')}` : ''}
+                            {t('plan.examenInfo', { n: h.preguntas, min: h.minutos })}
+                            {h.nota != null ? t(h.hecho ? 'plan.aprobadoCon' : 'plan.mejorNota', { nota: idiomaActual() === 'en' ? h.nota.toFixed(1) : h.nota.toFixed(1).replace('.', ',') }) : ''}
                           </small>
                         </span>
                         <button className="boton-mini" onClick={() => irARuta(rutaExamen(vista.plan_id, h))}>
-                          {h.hecho ? 'Repetir' : 'Hacerlo'}
+                          {h.hecho ? t('plan.repetir') : t('plan.hacerlo')}
                         </button>
                       </li>
                     ))}
                   </ul>
                 </>
               )}
-              <h2>Calendario</h2>
+              <h2>{t('plan.calendario')}</h2>
               {vista.semanas.map((s) => (
                 <div key={s.lunes} className="semana">
-                  <h3>Semana del {fechaCorta(s.lunes)}</h3>
+                  <h3>{t('plan.semanaDel', { fecha: fechaCorta(s.lunes) })}</h3>
                   {s.dias.map((d) => (
                     <div key={d.fecha} className={d.hoy ? 'dia dia-hoy' : 'dia'}>
                       <span className="dia-fecha">{fechaCorta(d.fecha)}</span>
@@ -660,7 +658,7 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                           <li key={x.id} className={`sesion-${x.estado}`}>
                             {x.inicio ?? ''} {x.clave} {x.titulo} · {num(x.horas)} h
                             <select
-                              aria-label={`Estado de ${x.clave} el ${d.fecha}`}
+                              aria-label={t('plan.estadoDe', { clave: x.clave, fecha: d.fecha })}
                               value={x.estado}
                               onChange={async (e) => {
                                 await marcarSesion(x.id, e.target.value as typeof x.estado)
@@ -668,9 +666,9 @@ export default function PanelPlan({ alNuevoPlan, temaInicial }: Props) {
                                 recargarPlanes() // el progreso de la tarjeta
                               }}
                             >
-                              <option value="pendiente">pendiente</option>
-                              <option value="hecha">hecha</option>
-                              <option value="saltada">saltada</option>
+                              <option value="pendiente">{t('plan.sesion.pendiente')}</option>
+                              <option value="hecha">{t('plan.sesion.hecha')}</option>
+                              <option value="saltada">{t('plan.sesion.saltada')}</option>
                             </select>
                           </li>
                         ))}

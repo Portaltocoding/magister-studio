@@ -22,6 +22,20 @@ PGVECTOR_VERSION=0.8.0
 PIPER_VERSION=2023.11.14-2
 PIPER_VOCES_REV=e7229f7d33a10e145e109b886d661984201ac3c4
 
+# SHA-256 de lo que se descarga (todo fijado a una versión). Todas son «calculadas»: ni GitHub ni Hugging Face
+# publican una suma para estos ficheros, así que se sacaron al descargarlos una vez; fijan la pieza, no la autentican.
+SHA_PGVECTOR=867a2c328d4928a5a9d6f052cd3bc78c7d60228a9b914ad32aa3db88e9de27b0   # tarball de pgvector v0.8.0
+SHA_PIPER_AARCH64=6b1eb03b3735946cb35216e063e7eebcc33a6bbf5dd96ec0217959bf1cdcb0cc
+SHA_PIPER_X64=ced85c0a3df13945b1e623b878a48fdc2854d5c485b4b67f62857cf551deaf8b
+SHA_VOZ_SHARVARD_ONNX=40febfb1679c69a4505ff311dc136e121e3419a13a290ef264fdf43ddedd0fb1
+SHA_VOZ_SHARVARD_JSON=7438c9b699c72b0c3388dae1b68d3f364dc66a2150fe554a1c11f03372957b2c
+SHA_VOZ_DAVEFX_ONNX=6658b03b1a6c316ee4c265a9896abc1393353c2d9e1bca7d66c2c442e222a917
+SHA_VOZ_DAVEFX_JSON=0e0dda87c732f6f38771ff274a6380d9252f327dca77aa2963d5fbdf9ec54842
+
+# Los instaladores oficiales de Homebrew (install.sh) y de Claude (claude.ai/install.sh) se descargan frescos a propósito:
+# están pensados para eso (cambian sin avisar, se firman o actualizan ellos mismos) y no se pueden fijar a una suma sin
+# dejar la instalación rota en cuanto el proveedor los actualice. Todo lo demás que se baja aquí sí lleva suma.
+
 decir() { printf '\n%s\n' "$*"; }
 
 salir() {
@@ -34,6 +48,16 @@ salir() {
 responde() { curl -fsS -m 3 -o /dev/null "$SALUD" 2>/dev/null; }
 
 aleatorio() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$1"; }
+
+# bajar URL DESTINO SHA256: descarga a un fichero y comprueba la suma; si no coincide, borra el fichero y devuelve 42.
+bajar() {
+  curl -fsSL -o "$2" "$1" || return 1
+  if ! echo "$3  $2" | shasum -a 256 -c - >/dev/null 2>&1; then
+    echo "La suma SHA-256 de $1 no coincide con la esperada ($3). No se usa." >&2
+    rm -f "$2"
+    return 42
+  fi
+}
 
 puerto_ocupado() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
 
@@ -97,11 +121,18 @@ if [ ! -f "$("$PGBIN/pg_config" --sharedir)/extension/vector.control" ]; then
   decir "Preparando la búsqueda en tus apuntes (un minuto)..."
   TMP="$(mktemp -d)" || salir "No he podido preparar la búsqueda en tus apuntes."
   ( set -e
-    curl -fsSL "https://github.com/pgvector/pgvector/archive/refs/tags/v$PGVECTOR_VERSION.tar.gz" | tar -xz -C "$TMP"
+    bajar "https://github.com/pgvector/pgvector/archive/refs/tags/v$PGVECTOR_VERSION.tar.gz" "$TMP/pgvector.tar.gz" "$SHA_PGVECTOR"
+    tar -xzf "$TMP/pgvector.tar.gz" -C "$TMP"
     cd "$TMP/pgvector-$PGVECTOR_VERSION"
     make OPTFLAGS="" PG_CONFIG="$PGBIN/pg_config"
-    make OPTFLAGS="" PG_CONFIG="$PGBIN/pg_config" install ) >"$REGISTROS/pgvector.log" 2>&1 \
-    || { rm -rf "$TMP"; salir "No he podido preparar la búsqueda en tus apuntes. Hay más detalles en $REGISTROS/pgvector.log"; }
+    make OPTFLAGS="" PG_CONFIG="$PGBIN/pg_config" install ) >"$REGISTROS/pgvector.log" 2>&1
+  RC=$?
+  rm -rf "$TMP"
+  if [ "$RC" = 42 ]; then
+    salir "Lo que he descargado para la búsqueda en tus apuntes no es lo que esperaba (no coincide su huella de seguridad), así que no lo uso y paro aquí. Prueba otra vez en unos minutos; si sigue igual, abre una issue en GitHub."
+  elif [ "$RC" != 0 ]; then
+    salir "No he podido preparar la búsqueda en tus apuntes. Hay más detalles en $REGISTROS/pgvector.log"
+  fi
   rm -rf "$TMP"
 fi
 
@@ -134,16 +165,23 @@ PIPER_DIR="$DATOS/piper"
 if [ ! -x "$PIPER_DIR/piper/piper" ]; then
   decir "Descargando la voz de Magister (unos 150 MB)..."
   ( set -e
-    case "$(uname -m)" in arm64) arq=aarch64 ;; *) arq=x64 ;; esac
+    case "$(uname -m)" in arm64) arq=aarch64; sha_piper="$SHA_PIPER_AARCH64" ;; *) arq=x64; sha_piper="$SHA_PIPER_X64" ;; esac
     voces="https://huggingface.co/rhasspy/piper-voices/resolve/$PIPER_VOCES_REV/es/es_ES"
     rm -rf "$PIPER_DIR"; mkdir -p "$PIPER_DIR/voces"
-    curl -fsSL "https://github.com/rhasspy/piper/releases/download/$PIPER_VERSION/piper_macos_$arq.tar.gz" | tar -xz -C "$PIPER_DIR"
-    for v in sharvard davefx; do for ext in onnx onnx.json; do
-      curl -fsSL -o "$PIPER_DIR/voces/es_ES-$v-medium.$ext" "$voces/$v/medium/es_ES-$v-medium.$ext"
-    done; done
+    bajar "https://github.com/rhasspy/piper/releases/download/$PIPER_VERSION/piper_macos_$arq.tar.gz" "$PIPER_DIR/piper.tar.gz" "$sha_piper"
+    tar -xzf "$PIPER_DIR/piper.tar.gz" -C "$PIPER_DIR"; rm -f "$PIPER_DIR/piper.tar.gz"
+    bajar "$voces/sharvard/medium/es_ES-sharvard-medium.onnx" "$PIPER_DIR/voces/es_ES-sharvard-medium.onnx" "$SHA_VOZ_SHARVARD_ONNX"
+    bajar "$voces/sharvard/medium/es_ES-sharvard-medium.onnx.json" "$PIPER_DIR/voces/es_ES-sharvard-medium.onnx.json" "$SHA_VOZ_SHARVARD_JSON"
+    bajar "$voces/davefx/medium/es_ES-davefx-medium.onnx" "$PIPER_DIR/voces/es_ES-davefx-medium.onnx" "$SHA_VOZ_DAVEFX_ONNX"
+    bajar "$voces/davefx/medium/es_ES-davefx-medium.onnx.json" "$PIPER_DIR/voces/es_ES-davefx-medium.onnx.json" "$SHA_VOZ_DAVEFX_JSON"
     echo Hola | "$PIPER_DIR/piper/piper" -q --model "$PIPER_DIR/voces/es_ES-sharvard-medium.onnx" --output_file "$PIPER_DIR/prueba.wav"
-    test -s "$PIPER_DIR/prueba.wav"; rm -f "$PIPER_DIR/prueba.wav" ) >"$REGISTROS/piper.log" 2>&1 \
-    || { rm -rf "$PIPER_DIR"; decir "No he podido preparar la voz: Magister funcionará sin ella."; }
+    test -s "$PIPER_DIR/prueba.wav"; rm -f "$PIPER_DIR/prueba.wav" ) >"$REGISTROS/piper.log" 2>&1
+  RC=$?
+  if [ "$RC" = 42 ]; then
+    rm -rf "$PIPER_DIR"; decir "Lo que he descargado para la voz no es lo que esperaba (no coincide su huella de seguridad), así que no lo uso: Magister funcionará sin voz."
+  elif [ "$RC" != 0 ]; then
+    rm -rf "$PIPER_DIR"; decir "No he podido preparar la voz: Magister funcionará sin ella."
+  fi
 fi
 
 # 6. La base: contraseña generada la primera vez, en secretos/

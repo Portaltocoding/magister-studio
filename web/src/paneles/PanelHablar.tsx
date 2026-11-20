@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { crearConversacion, enviar } from '../api.ts'
 import Pensando from '../componentes/Pensando.tsx'
 import Mascota from '../Mascota.tsx'
-import { Locutor } from '../componentes/voz.ts'
+import { LENGUA, Locutor, paraLeer, Reconocedor, type Reconocimiento } from '../componentes/voz.ts'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import ControlVoz from '../componentes/ControlVoz.tsx'
 import { TextoError } from '../componentes/Cargando.tsx'
 
@@ -16,40 +18,8 @@ interface Turno {
   texto: string
 }
 
-interface Reconocimiento {
-  lang: string
-  interimResults: boolean
-  continuous: boolean
-  start: () => void
-  stop: () => void
-  abort: () => void
-  onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null
-  onend: (() => void) | null
-  onerror: ((e: { error: string }) => void) | null
-}
-
-const Reconocedor = (window as unknown as { SpeechRecognition?: new () => Reconocimiento; webkitSpeechRecognition?: new () => Reconocimiento })
-  .SpeechRecognition ??
-  (window as unknown as { webkitSpeechRecognition?: new () => Reconocimiento }).webkitSpeechRecognition
-
-function vozLocal(): SpeechSynthesisVoice | null {
-  const es = (window.speechSynthesis?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().startsWith('es'))
-  return es.find((v) => v.localService && v.lang === 'es-ES') ?? es.find((v) => v.localService) ?? null
-}
-
-// Lo que se lee: sin bloques, sin marcas de Markdown y con las fórmulas avisadas.
-export function paraLeer(t: string): string {
-  return t
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/\$\$[\s\S]*?\$\$/g, ' (fórmula en pantalla) ')
-    .replace(/\$([^$\n]+)\$/g, '$1')
-    .replace(/\[(\d+)\]/g, '')
-    .replace(/[#*_`>|]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
 export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
+  const { idioma } = usarIdioma() // los textos y la voz siguen al idioma
   const [estado, setEstado] = useState<Estado>('quieto')
   const [turnos, setTurnos] = useState<Turno[]>([])
   const [parcial, setParcial] = useState('')
@@ -58,16 +28,11 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const cid = useRef<number | null>(null)
   const rec = useRef<Reconocimiento | null>(null)
-  const voz = useRef<SpeechSynthesisVoice | null>(null)
   const control = useRef<AbortController | null>(null)
   const locutor = useRef(new Locutor())
 
   useEffect(() => {
-    const cargar = () => (voz.current = vozLocal())
-    cargar()
-    window.speechSynthesis?.addEventListener('voiceschanged', cargar)
     return () => {
-      window.speechSynthesis?.removeEventListener('voiceschanged', cargar)
       window.speechSynthesis?.cancel()
       rec.current?.abort()
       control.current?.abort()
@@ -76,13 +41,13 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
 
   const escuchar = useCallback(() => {
     if (!Reconocedor) {
-      setError('Este navegador no tiene dictado por voz. Escribe abajo y te contesto en voz alta.')
+      setError(t('llamada.hablar.sinDictado'))
       return
     }
     setError(null)
     setParcial('')
     const r = new Reconocedor()
-    r.lang = 'es-ES'
+    r.lang = LENGUA[idioma]
     r.interimResults = true
     r.continuous = false
     let final = ''
@@ -96,7 +61,7 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
       setParcial(final + provisional)
     }
     r.onerror = (e) => {
-      if (e.error !== 'no-speech' && e.error !== 'aborted') setError(`El dictado falló (${e.error}).`)
+      if (e.error !== 'no-speech' && e.error !== 'aborted') setError(t('llamada.hablar.dictadoFalla', { error: e.error }))
     }
     r.onend = () => {
       rec.current = null
@@ -108,7 +73,7 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
     r.start()
     // mandar se define abajo; se usa al acabar de escuchar
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [idioma])
 
   const mandar = async (texto: string) => {
     setParcial('')
@@ -116,7 +81,7 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
     setEstado('pensando')
     try {
       if (cid.current == null) {
-        const c = await crearConversacion(`Hablar: ${texto.slice(0, 40)}`)
+        const c = await crearConversacion(`${t('llamada.hablar.titulo')}: ${texto.slice(0, 40)}`)
         cid.current = c.id
         alCambiar?.()
       }
@@ -158,23 +123,23 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
   return (
     <div className="hablar">
       <Mascota lugar="hablar" />
-      <h1>Hablar</h1>
+      <h1>{t('llamada.hablar.titulo')}</h1>
       <p className="nota">
-        Pulsa el micrófono, pregunta en voz alta y escucha la respuesta. Cuando acaba, te vuelve a escuchar.
+        {t('llamada.hablar.intro')}
       </p>
 
       <button
         className={`hablar-micro ${estado}`}
         onClick={estado === 'quieto' ? escuchar : parar}
-        aria-label={estado === 'quieto' ? 'Empezar a hablar' : 'Parar'}
+        aria-label={estado === 'quieto' ? t('llamada.hablar.empezar') : t('llamada.hablar.parar')}
       >
         {estado === 'quieto' ? '🎙' : estado === 'escuchando' ? '●' : '■'}
       </button>
       <p className="hablar-estado" aria-live="polite">
-        {estado === 'escuchando' && (parcial || 'Te escucho…')}
-        {estado === 'pensando' && <Pensando texto="Pensando…" />}
-        {estado === 'hablando' && 'Hablando… (pulsa para cortar)'}
-        {estado === 'quieto' && (turnos.length ? 'Pulsa para seguir hablando' : 'Pulsa para empezar')}
+        {estado === 'escuchando' && (parcial || t('llamada.hablar.teEscucho'))}
+        {estado === 'pensando' && <Pensando texto={t('llamada.hablar.pensando')} />}
+        {estado === 'hablando' && t('llamada.hablar.hablando')}
+        {estado === 'quieto' && (turnos.length ? t('llamada.hablar.seguir') : t('llamada.hablar.empezarPulsa'))}
       </p>
 
       {ultimo && <p className="hablar-respuesta">{paraLeer(ultimo.texto)}</p>}
@@ -189,30 +154,29 @@ export default function PanelHablar({ alCambiar }: { alCambiar?: () => void }) {
           }
         }}
       >
-        <input value={escrito} onChange={(e) => setEscrito(e.target.value)} placeholder="O escríbelo y te contesto en voz alta" aria-label="Pregunta escrita" />
+        <input value={escrito} onChange={(e) => setEscrito(e.target.value)} placeholder={t('llamada.hablar.escribelo')} aria-label={t('llamada.hablar.preguntaEscrita')} />
         <button className="boton" disabled={!escrito.trim() || estado !== 'quieto'}>
-          Enviar
+          {t('llamada.hablar.enviar')}
         </button>
       </form>
 
       <div className="hablar-ajustes">
         <label>
-          <input type="checkbox" checked={seguido} onChange={(e) => setSeguido(e.target.checked)} /> Volver a escuchar al acabar
+          <input type="checkbox" checked={seguido} onChange={(e) => setSeguido(e.target.checked)} /> {t('llamada.hablar.volverEscuchar')}
         </label>
         <ControlVoz />
       </div>
       {error && <TextoError texto={error} />}
       <p className="nota hablar-aviso">
-        La respuesta se lee con una voz instalada en tu equipo. El dictado es el de tu navegador: en Chrome, el audio se envía a
-        Google para pasarlo a texto. Si prefieres que no salga de tu equipo, escribe la pregunta.
+        {t('llamada.hablar.aviso')}
       </p>
 
       {turnos.length > 0 && (
         <details className="hablar-transcripcion">
-          <summary>Ver la conversación escrita</summary>
-          {turnos.map((t, i) => (
-            <p key={i} className={t.rol}>
-              <strong>{t.rol === 'usuario' ? 'Tú' : 'Tutor'}:</strong> {paraLeer(t.texto)}
+          <summary>{t('llamada.hablar.verEscrita')}</summary>
+          {turnos.map((x, i) => (
+            <p key={i} className={x.rol}>
+              <strong>{x.rol === 'usuario' ? t('llamada.hablar.tu') : t('llamada.hablar.tutor')}:</strong> {paraLeer(x.texto)}
             </p>
           ))}
         </details>

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { t } from './i18n/i18n.ts'
+import { usarIdioma } from './i18n/usarIdioma.ts'
 import { hoyIso, listarConversaciones, verBienvenida, type Conversacion } from './api.ts'
 import BarraLateral from './BarraLateral.tsx'
 import BarraSesion from './BarraSesion.tsx'
@@ -28,6 +30,7 @@ function escribirRuta(ruta: string, apilar: boolean) {
 // Tres zonas: la barra lateral y la barra de sesión no cambian;
 // la zona central recibe el modo activo y pinta lo suyo.
 export default function Marco() {
+  usarIdioma() // el enlace de saltar al contenido sigue al idioma
   const inicial = leerRuta(window.location.hash)
   const [modo, setModo] = useState<IdModo>(inicial.modo)
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([])
@@ -176,7 +179,7 @@ export default function Marco() {
         className="saltar-contenido"
         onClick={() => document.querySelector<HTMLElement>('main.central')?.focus()}
       >
-        Saltar al contenido
+        {t('marco.saltar')}
       </button>
       <div className="velo-menu" onClick={() => setMenu(false)} aria-hidden />
       <Riel modo={modo} hoy={hoy} alAbrir={() => setMenu(true)} alIr={irA} />

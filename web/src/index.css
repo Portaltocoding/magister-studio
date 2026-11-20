@@ -6,7 +6,10 @@
   --suave: #75726c;
   --activo: #e4e2de;
   --ok: #5f8a63;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Tipografía única de la app (diagramas, vídeos, diapositivas y PDF la comparten: servidor/src/magister/config.py). */
+  --fuente-texto: system-ui, -apple-system, 'Segoe UI', 'Noto Sans', 'DejaVu Sans', Arial, sans-serif;
+  --fuente-mono: ui-monospace, 'Cascadia Code', Consolas, 'DejaVu Sans Mono', monospace;
+  font-family: var(--fuente-texto);
   color: var(--texto);
   background: var(--fondo);
 }

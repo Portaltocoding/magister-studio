@@ -148,7 +148,8 @@ def test_los_diagramas_de_los_apuntes_pasan_limpios_al_pdf():
     md = "Antes.\n\n```svg\n<svg viewBox=\"0 0 10 10\">\n  <script>alert(1)</script>\n  <rect onclick=\"x()\" width=\"5\" height=\"5\"/>\n" \
          "  <image href=\"http://x/y.png\"/>\n  <path marker-end=\"url(#a)\"/>\n</svg>\n```\n\nDespués."
     salida = svg_en_linea(md)
-    assert '<figure class="diagrama"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">' in salida
+    assert '<figure class="diagrama"><svg font-family="system-ui' in salida   # la tipografía única de la app (config.py)
+    assert 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">' in salida
     assert "script" not in salida and "onclick" not in salida and "image" not in salida
     assert 'url(#a)' in salida and "\n" not in salida.split("<figure")[1].split("</figure>")[0]
     assert limpiar_svg("no es un svg") is None
@@ -303,4 +304,5 @@ def test_el_render_del_pdf_no_hereda_secretos(monkeypatch):
     assert not any(k.startswith(("PG", "CLAUDE", "ANTHROPIC", "MAGISTER")) for k in entorno)
     assert "clave" not in str(entorno) and "/run/secrets" not in str(entorno)
     assert entorno["HOME"] == "/home/magister" and entorno["LANG"] == "C.UTF-8" and entorno["FICHA_ACENTO"] == "#112233"
-    assert set(entorno) <= set(render._HEREDA) | {"PYTHONUTF8", "FICHA_CSS", "FICHA_CHROME", "FICHA_CHROME_ARGS", "FICHA_ACENTO"}
+    assert set(entorno) <= set(render._HEREDA) | {"PYTHONUTF8", "FICHA_CSS", "FICHA_CHROME", "FICHA_CHROME_ARGS", "FICHA_ACENTO",
+                                                   "FICHA_FUENTE_TEXTO", "FICHA_FUENTE_MONO"}

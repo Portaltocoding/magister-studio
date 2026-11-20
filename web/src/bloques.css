@@ -84,7 +84,7 @@
 .lector-texto h3 { font-size: 1.04em; font-weight: 700; letter-spacing: -0.005em; margin: 24px 0 8px; text-transform: none; text-align: left; }
 .lector-texto a { color: inherit; text-decoration-color: var(--suave); text-underline-offset: 0.18em; }
 .lector-texto a:hover { text-decoration-color: currentColor; }
-.lector-texto code { font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; font-size: 0.86em; background: color-mix(in srgb, var(--texto) 7%, transparent); color: inherit; padding: 1px 5px; border-radius: 5px; }
+.lector-texto code { font-family: var(--fuente-mono); font-size: 0.86em; background: color-mix(in srgb, var(--texto) 7%, transparent); color: inherit; padding: 1px 5px; border-radius: 5px; }
 .lector-texto pre { background: var(--lb-codigo); color: inherit; border-radius: 14px; padding: 18px 20px; overflow-x: auto; font-size: 0.82em; line-height: 1.6; margin: 0 0 16px; }
 .lector-texto pre code { background: none; color: inherit; padding: 0; font-size: 1em; }
 .lector-texto table { border-collapse: collapse; width: 100%; font-size: 0.87em; line-height: 1.5; margin: 4px 0 18px; }

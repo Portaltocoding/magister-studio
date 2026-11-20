@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { t, type Clave } from '../i18n/i18n.ts'
 import { ErrorApi, EVENTO_NOTAS, type EventoTutor, type Mensaje, type Propuesta } from '../api.ts'
 import type { Burbuja } from './Hilo.tsx'
 import { errorLegible, esSinConexion, mensajeSinConexion } from './errores.ts'
@@ -6,7 +7,7 @@ import { escribirEnChat } from './preferencias.ts'
 import { crearTurnos, trasFalloAlEnviar, trasFalloSinConexion } from './turnos.ts'
 
 // Aceptar un plan que ya estaba aceptado (dos clics, dos pestañas): lo que se dice en vez de un error.
-export const MENSAJE_YA_ACEPTADO = 'Este plan ya estaba aceptado. Te llevo al Roadmap.'
+export const mensajeYaAceptado = () => t('pensando.yaAceptado')
 
 let contador = 0
 const claveNueva = () => `tmp-${++contador}`
@@ -28,24 +29,9 @@ export const respuestasDelUltimo = (ms: Mensaje[]): { valor: string; etiqueta: s
   return u && u.rol === 'tutor' ? (u.respuestas_rapidas?.opciones ?? []) : []
 }
 
-export const NOMBRE_FASE: Record<string, string> = {
-  extraer: 'Entendiendo lo que quieres',
-  a_diagnostico: 'Pasando a preparar tu plan',
-  preguntar: 'Pensando la siguiente pregunta',
-  planificar: 'Preparando el plan',
-  calendarizar: 'Montando el calendario',
-  negociar: 'Viendo si cabe',
-  explicar_fallo: 'Revisando el plan',
-  guardar: 'Guardando',
-  buscar: 'Buscando en tus fuentes',
-  recuperar: 'Buscando en tus fuentes',
-  reescribir: 'Entendiendo tu pregunta',
-  responder: 'Preparando la respuesta',
-  aclarar: 'Pensando qué preguntarte',
-  preparar: 'Preparando la lección',
-  comprobar: 'Comprobando tu respuesta',
-  corregir: 'Corrigiendo',
-}
+// Lo que se enseña de cada nodo del grafo mientras trabaja; el diccionario (pensando.fase.<nodo>) lo da en el idioma de ahora.
+const NODOS_FASE = ['extraer', 'a_diagnostico', 'preguntar', 'planificar', 'calendarizar', 'negociar', 'explicar_fallo', 'guardar', 'buscar', 'recuperar', 'reescribir', 'responder', 'aclarar', 'preparar', 'comprobar', 'corregir']
+export const nombreFase = (nodo: string): string => (NODOS_FASE.includes(nodo) ? t(`pensando.fase.${nodo}` as Clave) : nodo)
 
 // Lo que se ve mientras llega la respuesta: los pasos hechos, el pulso del modelo (cada señal mientras razona) y, si
 // tarda, el guion de por dónde irá y frases con gracia sobre el tema.
@@ -110,7 +96,7 @@ export function usarConversacion(
               actualizarUltima((b) => ({ ...b, contenido: b.contenido + ev.t }))
               break
             case 'fase': {
-              const nombre = NOMBRE_FASE[ev.nodo] ?? ev.nodo
+              const nombre = nombreFase(ev.nodo)
               setFase(nombre)
               setEspera((e) => (e.pasos[e.pasos.length - 1] === nombre ? e : { ...e, pasos: [...e.pasos, nombre] }))
               break
@@ -151,7 +137,7 @@ export function usarConversacion(
             case 'error':
               if (ev.ya_decidido) {
                 // La decisión ya estaba tomada (aceptaste dos veces): no es un fallo.
-                actualizarUltima((b) => ({ ...b, contenido: MENSAJE_YA_ACEPTADO, estado: 'completo' }))
+                actualizarUltima((b) => ({ ...b, contenido: mensajeYaAceptado(), estado: 'completo' }))
                 alYaDecidido?.(ev.plan_id ?? null)
                 break
               }

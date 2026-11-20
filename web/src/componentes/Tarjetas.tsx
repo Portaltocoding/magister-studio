@@ -3,6 +3,9 @@ import Markdown from './Markdown.tsx'
 import { enviarJson, pedir } from '../api.ts'
 import { reaccionar } from './animo.ts'
 import { barajar } from '../barajar.ts'
+import { t, type Clave } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
+import { localeActual } from './formato.ts'
 
 export interface Ficha {
   id: string
@@ -13,19 +16,14 @@ export interface Ficha {
   opciones?: { texto: string; buena: boolean }[] | null
 }
 
-const TIPOS: Record<string, string> = {
-  conceptual: 'Conceptual',
-  calculo: 'Cálculo',
-  fallo: 'Encuentra el fallo',
-  escenario: 'Escenario',
-  hablada: 'En voz alta',
-  test: 'Tipo test',
-}
+const TIPOS = ['conceptual', 'calculo', 'fallo', 'escenario', 'hablada', 'test']
+const nombreTipo = (tipo: string): string => (TIPOS.includes(tipo) ? t(`tarjetas.tipo.${tipo}` as Clave) : tipo)
 
 type Resultado = 'sabia' | 'no'
 
 // Fichas de una en una: lees, contestas de memoria, giras y te marcas. Teclado: espacio gira, flechas mueven, 1 y 2 marcan.
 export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques: Record<string, string> }) {
+  usarIdioma() // los textos siguen al idioma
   const [solo, setSolo] = useState<string[] | null>(null)
   const lista = useMemo(() => (solo ? fichas.filter((f) => solo.includes(f.id)) : fichas), [fichas, solo])
   const [i, setI] = useState(0)
@@ -60,11 +58,11 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
           .then((x) =>
             setAviso(
               x.proxima_fecha
-                ? `Anotado en tu repaso: vuelve el ${new Date(x.proxima_fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}.`
-                : 'Anotado en tu repaso.',
+                ? t('tarjetas.anotadoVuelve', { fecha: new Date(x.proxima_fecha).toLocaleDateString(localeActual(), { day: 'numeric', month: 'short' }) })
+                : t('tarjetas.anotado'),
             ),
           )
-          .catch(() => setAviso('No se pudo anotar en el repaso.'))
+          .catch(() => setAviso(t('tarjetas.noAnota')))
       }
       const siguiente = lista.findIndex((x, k) => k > i && !res[x.id])
       if (siguiente >= 0) {
@@ -91,7 +89,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
     return () => window.removeEventListener('keydown', tecla)
   }, [ir, marcar, girada, todas])
 
-  if (!fichas.length) return <p className="vacio">Esta lección aún no tiene fichas. Genera el material con fichas de repaso.</p>
+  if (!fichas.length) return <p className="vacio">{t('tarjetas.sinFichas')}</p>
 
   const sabidas = lista.filter((x) => res[x.id] === 'sabia').length
   const falladas = lista.filter((x) => res[x.id] === 'no').map((x) => x.id)
@@ -99,13 +97,13 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
   return (
     <div className="tarjetas">
       <div className="tarjetas-barra">
-        <div className="puntos-fichas" role="tablist" aria-label="Fichas">
+        <div className="puntos-fichas" role="tablist" aria-label={t('tarjetas.fichas')}>
           {lista.map((x, k) => (
             <button
               key={x.id}
               role="tab"
               aria-selected={k === i}
-              aria-label={`Ficha ${k + 1}`}
+              aria-label={t('tarjetas.fichaN', { n: k + 1 })}
               className={`punto-ficha ${k === i ? 'actual' : ''} ${res[x.id] ?? ''}`}
               onClick={() => {
                 setGirada(false)
@@ -115,11 +113,11 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
           ))}
         </div>
         <span className="nota">
-          {sabidas} sabidas · {falladas.length} por repasar · {lista.length - hechas} sin hacer
+          {t('tarjetas.resumen', { sabidas, falladas: falladas.length, sin: lista.length - hechas })}
         </span>
         {aviso && <span className="nota tarjetas-aviso">{aviso}</span>}
         <button className="boton-mini" onClick={() => setTodas(!todas)}>
-          {todas ? 'Una a una' : 'Ver todas'}
+          {todas ? t('tarjetas.unaAUna') : t('tarjetas.verTodas')}
         </button>
       </div>
 
@@ -127,7 +125,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
         <ol className="fichas-lista">
           {lista.map((x) => (
             <li key={x.id}>
-              <span className="chip">{TIPOS[x.tipo] ?? x.tipo}</span>
+              <span className="chip">{nombreTipo(x.tipo)}</span>
               <div className="ficha-enunciado">
                 <Markdown>{x.enunciado}</Markdown>
               </div>
@@ -139,7 +137,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
                 </ol>
               )}
               <details>
-                <summary>Ver la respuesta</summary>
+                <summary>{t('tarjetas.verRespuesta')}</summary>
                 <div className="ficha-respuesta">
                   <Markdown>{x.fantasma}</Markdown>
                 </div>
@@ -149,11 +147,9 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
         </ol>
       ) : fin ? (
         <div className="ficha ficha-fin">
-          <p className="ficha-num">Hecho</p>
-          <h2>
-            {sabidas} de {lista.length} a la primera
-          </h2>
-          <p>{falladas.length ? 'Repite las que fallaste ahora que las tienes frescas.' : 'Todas bien. Mañana te tocará repasarlas en Repaso.'}</p>
+          <p className="ficha-num">{t('tarjetas.hecho')}</p>
+          <h2>{t('tarjetas.alaPrimera', { sabidas, total: lista.length })}</h2>
+          <p>{falladas.length ? t('tarjetas.repiteFalladas') : t('tarjetas.todasBien')}</p>
           <div className="botones">
             {falladas.length > 0 && (
               <button
@@ -165,7 +161,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
                   setGirada(false)
                 }}
               >
-                Repetir las {falladas.length} falladas
+                {t('tarjetas.repetirFalladas', { n: falladas.length })}
               </button>
             )}
             <button
@@ -177,7 +173,7 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
                 setGirada(false)
               }}
             >
-              Empezar de nuevo
+              {t('tarjetas.empezarNuevo')}
             </button>
           </div>
         </div>
@@ -189,13 +185,13 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
               onClick={() => setGirada(!girada)}
               role="button"
               tabIndex={0}
-              aria-label={girada ? 'Respuesta' : 'Pregunta: pulsa para ver la respuesta'}
+              aria-label={girada ? t('tarjetas.respuesta') : t('tarjetas.preguntaAria')}
             >
               <div className="ficha-cabecera">
                 <span className="ficha-num">
                   {i + 1} / {lista.length}
                 </span>
-                <span className="chip">{TIPOS[f.tipo] ?? f.tipo}</span>
+                <span className="chip">{nombreTipo(f.tipo)}</span>
               </div>
               <div className="ficha-enunciado">
                 <Markdown>{f.enunciado}</Markdown>
@@ -212,31 +208,31 @@ export default function Tarjetas({ fichas, bloques }: { fichas: Ficha[]; bloques
               {girada ? (
                 <div className="ficha-respuesta">
                   <Markdown>{f.fantasma}</Markdown>
-                  {f.donde && bloques[f.donde] && <p className="nota">Está en «{bloques[f.donde]}».</p>}
+                  {f.donde && bloques[f.donde] && <p className="nota">{t('tarjetas.estaEn', { bloque: bloques[f.donde] })}</p>}
                 </div>
               ) : (
-                <p className="ficha-pista">Contéstala de memoria, en voz alta o por escrito, y pulsa para girarla.</p>
+                <p className="ficha-pista">{t('tarjetas.pista')}</p>
               )}
             </div>
             <div className="ficha-acciones">
-              <button className="boton" disabled={i === 0} onClick={() => ir(-1)} aria-label="Anterior">
+              <button className="boton" disabled={i === 0} onClick={() => ir(-1)} aria-label={t('tarjetas.anterior')}>
                 ←
               </button>
               {girada ? (
                 <>
                   <button className="voto voto-bien grande" onClick={() => marcar('sabia')}>
-                    ✓ Me la sabía <kbd>1</kbd>
+                    {t('tarjetas.sabia')} <kbd>1</kbd>
                   </button>
                   <button className="voto voto-mal grande" onClick={() => marcar('no')}>
-                    ✗ No me la sabía <kbd>2</kbd>
+                    {t('tarjetas.noSabia')} <kbd>2</kbd>
                   </button>
                 </>
               ) : (
                 <button className="boton boton-principal" onClick={() => setGirada(true)}>
-                  Ver la respuesta <kbd>espacio</kbd>
+                  {t('tarjetas.verRespuesta')} <kbd>{t('tarjetas.espacio')}</kbd>
                 </button>
               )}
-              <button className="boton" disabled={i >= lista.length - 1} onClick={() => ir(1)} aria-label="Siguiente">
+              <button className="boton" disabled={i >= lista.length - 1} onClick={() => ir(1)} aria-label={t('tarjetas.siguiente')}>
                 →
               </button>
             </div>

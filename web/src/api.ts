@@ -1,5 +1,6 @@
 // El único fichero de la página que sabe cómo habla la API.
 // Todas las URL son relativas: el proxy (Vite, Caddy o Electron) las lleva a la API.
+import { DICCIONARIOS, t } from './i18n/i18n.ts'
 import { textoValidacion } from './componentes/errores.ts'
 import { esErrorDeCuenta, EVENTO_CUENTA_CAIDA, type EstadoBienvenida } from './componentes/bienvenida.ts'
 
@@ -174,9 +175,9 @@ async function leerUnaVez(ruta: string, opciones: RequestInit): Promise<Response
     return await fetch(ruta, { ...opciones, signal: senal })
   } catch (e) {
     if (opciones.signal?.aborted) throw e
-    if (corte.signal.aborted) throw new ErrorApi(0, 'El servidor tarda demasiado en contestar.')
+    if (corte.signal.aborted) throw new ErrorApi(0, t('api.tarda'))
     if (ruta !== '/api/salud') avisarSinRespuesta()
-    throw new ErrorApi(0, 'No hay conexión con Magister: ¿está en marcha el servidor?')
+    throw new ErrorApi(0, t('api.sinConexion'))
   } finally {
     clearTimeout(reloj)
   }
@@ -189,7 +190,7 @@ async function leer<T>(ruta: string, opciones: RequestInit): Promise<T> {
       r = await leerUnaVez(ruta, opciones)
     } catch (e) {
       // Sin conexión: el servidor puede estar arrancando. Un corte por tiempo no se repite (volvería a tardar).
-      const reintentable = e instanceof ErrorApi && e.message.startsWith('No hay conexión')
+      const reintentable = e instanceof ErrorApi && Object.values(DICCIONARIOS).some((d) => d['api.sinConexion'] === (e as ErrorApi).message)
       if (!reintentable || intento >= ESPERAS_REINTENTO_MS.length) throw e
       await espera(ESPERAS_REINTENTO_MS[intento])
       continue
@@ -225,7 +226,7 @@ export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promis
   } catch (e) {
     if (opciones.signal?.aborted) throw e
     avisarSinRespuesta()
-    throw new ErrorApi(0, 'No hay conexión con Magister: ¿está en marcha el servidor?')
+    throw new ErrorApi(0, t('api.sinConexion'))
   }
   if (!r.ok) throw new ErrorApi(r.status, await detalleDe(r))
   if (r.status === 204) return undefined as T
@@ -282,7 +283,7 @@ export async function* flujo<E extends { tipo: string }>(
     // Parar no es un fallo; sin red, un ErrorApi con código 0 (el chat devuelve el texto a la caja).
     if (signal?.aborted) throw e
     avisarSinRespuesta()
-    throw new ErrorApi(0, 'No hay conexión con Magister.')
+    throw new ErrorApi(0, t('api.sinConexionCorta'))
   }
   yield* leerSSE<E>(r)
 }
@@ -666,7 +667,7 @@ export async function descargarMisDatos(): Promise<{ datos: Blob; cabecera: stri
   try {
     r = await fetch('/api/datos/exportar')
   } catch {
-    throw new ErrorApi(0, 'No hay conexión con Magister: ¿está en marcha el servidor?')
+    throw new ErrorApi(0, t('api.sinConexion'))
   }
   if (!r.ok) throw new ErrorApi(r.status, await detalleDe(r))
   return { datos: await r.blob(), cabecera: r.headers.get('Content-Disposition') }

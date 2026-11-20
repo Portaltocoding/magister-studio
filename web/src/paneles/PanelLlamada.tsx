@@ -11,6 +11,8 @@ import Diagrama from '../componentes/Diagrama.tsx'
 import MapaConceptos, { type Mapa } from '../componentes/MapaConceptos.tsx'
 import { TextoLibro } from '../componentes/LectorLibro.tsx'
 import { escenas } from './PanelVideo.tsx'
+import { idiomaActual, t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 // La llamada: hablas con tu tutor como por teléfono, sin pulsar nada.
 // - Clase: te explica una lección en voz (con su guion o sus apuntes); le interrumpes cuando quieras, contesta tu duda
@@ -48,11 +50,11 @@ interface EventoRegistro {
   d?: Record<string, unknown>
 }
 const corto = (t: string, n = 140) => (t.length > n ? `${t.slice(0, n)}…` : t)
-const SALTAR_PREGUNTA = /^(paso|s[aá]ltala|siguiente|otra|no quiero|mejor sigue)\b/i
+const SALTAR_PREGUNTA = /^(paso|s[aá]ltala|siguiente|otra|no quiero|mejor sigue|pass|skip( it)?|next|another( one)?|i don'?t want to|just (go on|continue|carry on))\b/i
 
 // «Sí», «vale», «sigue»... como respuesta entera: «sí, sigue» es seguir; «sí, pero no entiendo X» es una duda.
-const SIGUE = /^(s[ií]|sigue|seguimos|sigamos|vale|venga|adelante|ok|okey|dale|perfecto|contin[uú]a|entendido|ya est[aá])(?=[\s,.!]|$)/i
-const DUDA = /\b(pero|no|por qu[eé]|porque|c[oó]mo|qu[eé]|cu[aá]l|otro|otra|repite|espera|antes)\b/i
+const SIGUE = /^(s[ií]|sigue|seguimos|sigamos|vale|venga|adelante|ok|okey|dale|perfecto|contin[uú]a|entendido|ya est[aá]|yes|yeah|yep|go on|go ahead|continue|carry on|keep going|sure|alright|got it|understood|next)(?=[\s,.!]|$)/i
+const DUDA = /\b(pero|no|por qu[eé]|porque|c[oó]mo|qu[eé]|cu[aá]l|otro|otra|repite|espera|antes|but|why|how|what|which|another|repeat|wait|before)\b/i
 export function esSeguir(texto: string): boolean {
   const x = texto.trim().toLowerCase()
   if (/[¿?]/.test(x)) return false
@@ -62,36 +64,31 @@ export function esSeguir(texto: string): boolean {
   if (!resto) return true
   return resto.split(' ').length <= 3 && !DUDA.test(resto) && SIGUE.test(resto)
 }
-const REPITE = /^(rep[ií]te(lo|me)?|otra vez|qu[eé] has dicho|no te he o[ií]do|no te oigo|perd[oó]n,? qu[eé])\b/i
-const DESPACIO = /\b(m[aá]s despacio|m[aá]s lento|habla m[aá]s despacio|ve m[aá]s despacio)\b/i
-const DEPRISA = /\b(m[aá]s r[aá]pido|m[aá]s deprisa|ve m[aá]s r[aá]pido)\b/i
-const RELLENOS = ['A ver.', 'Vale.', 'Mmm.', 'Déjame pensar.']
+const REPITE = /^(rep[ií]te(lo|me)?|otra vez|qu[eé] has dicho|no te he o[ií]do|no te oigo|perd[oó]n,? qu[eé]|repeat( that| it)?|say that again|again|what did you say|i can'?t hear you|sorry,? what|pardon)\b/i
+const DESPACIO = /\b(m[aá]s despacio|m[aá]s lento|habla m[aá]s despacio|ve m[aá]s despacio|slower|more slowly|slow down|speak slower)\b/i
+const DEPRISA = /\b(m[aá]s r[aá]pido|m[aá]s deprisa|ve m[aá]s r[aá]pido|faster|more quickly|speed up|speak faster)\b/i
+const rellenos = () => [t('llamada.relleno1'), t('llamada.relleno2'), t('llamada.relleno3'), t('llamada.relleno4')]
 const ESPERA_RELLENO = 4500 // el primer trozo del modelo suele llegar a los 3 o 4 s: antes, el relleno sobra
 const ESPERA_SEGUNDO = 12000
 const VENTANA_ECO = 3000 // Chrome entrega el eco de la última frase hasta 3 s después de que calle
-const MARCAS: Record<string, string> = { intuicion: 'la intuición', choque: 'el choque', nombre: 'el nombre', teoria: 'la teoría' }
+const marcaDe = (m: string): string =>
+  (['intuicion', 'choque', 'nombre', 'teoria'].includes(m) ? t(`llamada.marca.${m}` as 'llamada.marca.teoria') : null) ?? t('llamada.marca.parte', { titulo: m })
 
 // Las reglas del examen oral (del prompt del vídeo, parte VIII), con el banco delante.
 function contextoOral(b: { panoramica: string[]; secciones: string[]; profundizacion: string[] }): string {
-  const lista = (t: string, xs: string[]) => `${t}:\n${xs.map((x, i) => `${i + 1}. ${x}`).join('\n')}`
+  const lista = (titulo: string, xs: string[]) => `${titulo}:\n${xs.map((x, i) => `${i + 1}. ${x}`).join('\n')}`
   return (
-    'Examen oral por llamada. Actúas como tutor universitario y examinador oral, basándote estricta y exclusivamente en los apuntes. ' +
-    'Haz las preguntas del banco una a una y en orden (primero el bloque 1, luego el 2 y después el 3); no leas la lista ni des las respuestas antes de tiempo. ' +
-    'Lleva la cuenta de en qué pregunta vas (bloque y número) y no pases a otra hasta cerrar la actual. Si responde otra pregunta del banco, dala por hecha y vuelve a la pendiente. ' +
-    'Tras cada respuesta: si está bien, dilo en una frase concreta y pasa a la siguiente. Si falta algo o falla, no digas qué falta: di que le falta algo, da UNA pista y pídele un segundo intento; ' +
-    'la respuesta, solo tras el segundo fallo o si dice que no la sabe, en dos frases. ' +
-    'Si te pregunta una duda, resuélvela y luego sigue por donde ibas. Si es el primer turno, saluda en una frase corta y haz la primera pregunta.\n\n' +
-    [lista('Bloque 1, visión panorámica', b.panoramica), lista('Bloque 2, sección a sección', b.secciones), lista('Bloque 3, profundización y debate', b.profundizacion)].join('\n\n')
+    t('llamada.ctx.oral') +
+    '\n\n' +
+    [lista(t('llamada.ctx.bloque1'), b.panoramica), lista(t('llamada.ctx.bloque2'), b.secciones), lista(t('llamada.ctx.bloque3'), b.profundizacion)].join('\n\n')
   )
 }
 
 function contextoEntrevista(clave: string, titulo: string): string {
   return (
     (clave
-      ? `Entrevista técnica oral por llamada SOLO sobre la lección ${clave} «${titulo}» (sus apuntes van arriba): todas las preguntas salen de ahí; no menciones otras lecciones. `
-      : 'Entrevista técnica oral por llamada sobre las lecciones que el alumno ya tiene preparadas. ') +
-    'Si es el primer turno, preséntate en una sola frase y haz la primera pregunta, fácil. Tras cada respuesta: «Un N sobre 10» en una frase, lo que faltó en otra (una sola cosa) y la siguiente pregunta, un poco más difícil. ' +
-    'Si no responde a lo que preguntaste, dilo y repite la pregunta en otras palabras. Si dice que no lo sabe, la respuesta en dos frases, un 0 sin comentarios y la siguiente.'
+      ? t('llamada.ctx.entrevistaLeccion', { clave, titulo })
+      : t('llamada.ctx.entrevistaPlan')) + t('llamada.ctx.entrevistaReglas')
   )
 }
 
@@ -100,7 +97,7 @@ function notasDichas(turnos: Turno[]): number[] {
   const salida: number[] = []
   for (const t of turnos) {
     if (t.rol !== 'tutor') continue
-    const m = t.texto.match(/\b(\d{1,2}(?:[.,]\d)?)\s*(?:sobre|de)\s*(?:10|diez)\b/i)
+    const m = t.texto.match(/\b(\d{1,2}(?:[.,]\d)?)\s*(?:sobre|de|out of)\s*(?:10|diez|ten)\b/i)
     const n = m ? Number(m[1].replace(',', '.')) : NaN
     if (n >= 0 && n <= 10) salida.push(n)
   }
@@ -137,6 +134,7 @@ const normalizar = (t: string) =>
 const reloj = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
 export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) {
+  usarIdioma() // los textos siguen al idioma
   const prefs = usarPreferencias()
   const [plan, setPlan] = useState<VistaPlan | null>(null)
   const [preparadas, setPreparadas] = useState<Record<string, { apuntes?: number; guion?: number }>>({})
@@ -352,7 +350,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
 
   // ---- Silencio: si le cortaste (o te preguntó) y no dices nada, te lo recuerda una vez ----
   const vigilarSilencio = useCallback(
-    (frase = '¿Sigo con la clase?', ms = 8000) => {
+    (frase = t('llamada.sigoClase'), ms = 8000) => {
       window.clearTimeout(silencio.current)
       silencio.current = window.setTimeout(() => {
         if (!vivo.current || estadoRef.current !== 'escuchando' || buffer.current) return
@@ -414,11 +412,11 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       if (x?.pregunta) {
         // La pregunta, también escrita: por voz sola cuesta retenerla.
         bloqueEnPizarra.current = null
-        setPizarra({ tipo: 'ficha', texto: `**${x.pregunta}**`, titulo: 'Te pregunta' })
+        setPizarra({ tipo: 'ficha', texto: `**${x.pregunta}**`, titulo: t('llamada.tePregunta') })
         apuntar('pregunta', { bloque: x.bloque, texto: corto(x.pregunta) })
-      } else if (x?.marca === 'el mapa' && mapaRef.current) {
+      } else if (x?.marca === t('llamada.marca.mapa') && mapaRef.current) {
         bloqueEnPizarra.current = null
-        setPizarra({ tipo: 'mapa', mapa: mapaRef.current, titulo: 'El mapa de la lección' })
+        setPizarra({ tipo: 'mapa', mapa: mapaRef.current, titulo: t('llamada.mapaLeccion') })
       } else if (x?.bloque) {
         const siguiente = n.lista.slice(k + 1).find((y) => y.bloque && y.bloque !== x.bloque)?.bloque
         void pizarraDeBloque(x.bloque, siguiente)
@@ -435,7 +433,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       preguntaPendiente.current = { enunciado: enPregunta.pregunta, bloque: enPregunta.bloque }
       finHabla.current = Date.now()
       setEstado('escuchando')
-      vigilarSilencio('Tómate tu tiempo. Si prefieres seguir sin contestar, di «sigue».', 15000)
+      vigilarSilencio(t('llamada.tomateTiempo'), 15000)
       return
     }
     n.activa = false
@@ -444,7 +442,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     finHabla.current = Date.now()
     l.nueva()
     l.alFrase = (f) => setSubtitulo(f)
-    l.decir('Hasta aquí la clase. ¿Te queda alguna duda? Si no, puedes colgar cuando quieras.')
+    l.decir(t('llamada.finClase'))
     l.cerrar()
     await l.terminado()
     if (gen !== n.gen) return
@@ -482,7 +480,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       l.nueva()
       l.alFrase = (f) => {
         setSubtitulo(f)
-        const relleno = RELLENOS.includes(f) || f === 'Sigo con ello, un momento.'
+        const relleno = rellenos().includes(f) || f === t('llamada.sigoConEllo')
         if (relleno) apuntar('relleno', { texto: f, ms: Date.now() - t0 })
         else if (!sonando) {
           sonando = true
@@ -505,7 +503,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
             d.tipo === 'oral' && bancoRef.current ? contextoOral(bancoRef.current) : null,
             d.tipo === 'entrevista' ? contextoEntrevista(d.clave, d.titulo) : null,
             leccionRef.current?.bloques.length
-              ? `Apartados de sus apuntes para la pizarra: ${leccionRef.current.bloques.map((b) => `${b.clave} «${b.titulo}»`).join(', ')}.`
+              ? t('llamada.ctx.apartados', { lista: leccionRef.current.bloques.map((b) => `${b.clave} «${b.titulo}»`).join(', ') })
               : null,
           ]
             .filter(Boolean)
@@ -514,10 +512,10 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       // Si tarda en arrancar, una palabra para que se note que te ha oído; y otra si tarda mucho.
       let algo = false
       const relleno = window.setTimeout(() => {
-        if (visible && !algo && estadoRef.current === 'pensando') l.decir(RELLENOS[Math.floor(Math.random() * RELLENOS.length)])
+        if (visible && !algo && estadoRef.current === 'pensando') l.decir(rellenos()[Math.floor(Math.random() * rellenos().length)])
       }, ESPERA_RELLENO)
       const segundo = window.setTimeout(() => {
-        if (!algo && estadoRef.current === 'pensando') l.decir('Sigo con ello, un momento.')
+        if (!algo && estadoRef.current === 'pensando') l.decir(t('llamada.sigoConEllo'))
       }, ESPERA_SEGUNDO)
       control.current = new AbortController()
       let acumulado = ''
@@ -535,7 +533,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
             if (b.svg && (b.svg.codigo !== svgVisto || b.svg.completo)) {
               svgVisto = b.svg.codigo
               bloqueEnPizarra.current = null
-              setPizarra({ tipo: 'svg', svg: b.svg.codigo, completo: b.svg.completo, titulo: 'Lo dibuja tu tutor' })
+              setPizarra({ tipo: 'svg', svg: b.svg.codigo, completo: b.svg.completo, titulo: t('llamada.loDibuja') })
             }
             if (b.ficha && b.ficha !== fichaVista) {
               fichaVista = b.ficha
@@ -575,8 +573,8 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           apuntar('error', { ms: Date.now() - t0, detalle: corto(String((e as Error).message)) })
           // Se dice en voz (por teléfono no se mira la pantalla) y el turno vacío no se queda en la transcripción.
           ponerTurnos((t) => (t.length && t[t.length - 1].rol === 'tutor' && !t[t.length - 1].texto ? t.slice(0, -1) : t))
-          setError('No he podido contestar. Vuelve a decirlo o prueba en un momento.')
-          if (vivo.current) await decirSuelto('Perdona, se me ha cortado. ¿Me lo repites?')
+          setError(t('llamada.errorContestar'))
+          if (vivo.current) await decirSuelto(t('llamada.perdona'))
         }
       }
     },
@@ -608,7 +606,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         guardarAjustesVoz({ ...a, velocidad: VELOCIDADES[i] })
         ponerTurnos((t) => [...t, { rol: 'tu', texto }])
         if (enClase && !pregunta) narrar()
-        else void decirSuelto(cambio < 0 ? 'Vale, más despacio.' : 'Vale, más rápido.')
+        else void decirSuelto(cambio < 0 ? t('llamada.masDespacio') : t('llamada.masRapido'))
         return
       }
       // «Repite»: la pregunta que te ha hecho; en la clase, la frase en la que ibas; si no, su última respuesta tal cual.
@@ -633,21 +631,17 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         como('respuesta')
         preguntaPendiente.current = null
         contexto =
-          `Es una clase por voz de la lección ${datos.current.clave} «${datos.current.titulo}». Acabas de preguntarle: «${pregunta.enunciado}». ` +
-          'Lo que dice ahora es su respuesta. Corrígela según sus apuntes en una o dos frases: si está bien, díselo con algo concreto; ' +
-          'si falta algo o se equivoca, qué falta o dónde está el fallo, sin sermón. Si dice que no lo sabe, la respuesta en dos frases. ' +
-          'No hagas otra pregunta: termina con «¿sigo?».'
+          t('llamada.ctx.claseRespuesta', { clave: datos.current.clave, titulo: datos.current.titulo, pregunta: pregunta.enunciado })
         esperandoSeguir.current = false
       } else if (enClase) {
         como('duda')
         const aqui = n.lista[Math.min(n.pos, n.lista.length - 1)]
         contexto =
-          `Es una clase por voz de la lección ${datos.current.clave} «${datos.current.titulo}». Ahora ibas por ${aqui.marca} y estabas ` +
-          `diciendo: «${aqui.texto}» (manda sobre dónde ibas en turnos anteriores). El alumno te ha interrumpido: contesta a lo que dice y termina con «¿sigo?».`
+          t('llamada.ctx.claseDuda', { clave: datos.current.clave, titulo: datos.current.titulo, marca: aqui.marca, texto: aqui.texto })
         esperandoSeguir.current = false
       } else {
         como('turno')
-        if (cortado) contexto = `Te ha cortado mientras decías: «${cortado}». Lo que venía después no lo ha oído.`
+        if (cortado) contexto = t('llamada.ctx.cortado', { texto: cortado })
       }
       preguntaEnCurso.current = pregunta
       turno(texto, contexto, true, !!pregunta)
@@ -751,7 +745,15 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     apuntar('llamar', { tipo, leccion: clave || null, voz: nombreVozActual(), velocidad: leerAjustesVoz().velocidad, micro: !mudo, dictado: oido.current.disponible() })
     try {
       const titulo =
-        tipo === 'oral' ? `Charla: examen oral de ${clave}` : tipo === 'clase' ? `Charla: clase de ${clave}` : tipo === 'entrevista' ? `Charla: entrevista${clave ? ` de ${clave}` : ''}` : 'Charla'
+        tipo === 'oral'
+          ? t('llamada.conv.oral', { clave })
+          : tipo === 'clase'
+            ? t('llamada.conv.clase', { clave })
+            : tipo === 'entrevista'
+              ? clave
+                ? t('llamada.conv.entrevistaDe', { clave })
+                : t('llamada.conv.entrevista')
+              : t('llamada.conv.charla')
       cid.current = (await crearConversacion(titulo)).id
       alCambiar?.()
     } catch (e) {
@@ -778,8 +780,8 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       try {
         if (p?.guion) {
           const g = await pedir<{ texto: string }>(`/api/materiales/${p.guion}`)
-          for (const e of escenas(g.texto)) for (const f of e.frases) lista.push({ marca: MARCAS[e.marca] ?? `la parte «${e.marca}»`, texto: paraLeer(f) })
-          lista = [{ marca: 'el principio', texto: `Hola. Vamos con ${clave}: ${leccion?.titulo ?? ''}.` }, ...lista]
+          for (const e of escenas(g.texto)) for (const f of e.frases) lista.push({ marca: marcaDe(e.marca), texto: paraLeer(f) })
+          lista = [{ marca: t('llamada.marca.principio'), texto: t('llamada.hola', { clave, titulo: leccion?.titulo ?? '' }) }, ...lista]
         } else if (p?.apuntes) {
           const a = await pedir<{ texto: string; contrato?: { bloques?: { clave: string; titulo: string }[] } }>(`/api/materiales/${p.apuntes}`)
           lista = narrarApuntes(a.texto, a.contrato?.bloques ?? [], clave, leccion?.titulo ?? '')
@@ -789,12 +791,12 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           lista = conPreguntas(lista, preguntas)
         }
       } catch (e) {
-        setError(`No he podido preparar la clase: ${(e as Error).message}`)
+        setError(t('llamada.noPreparoClase', { motivo: (e as Error).message }))
         setEstado('escuchando')
         return
       }
       if (!lista.length) {
-        setError('Esta lección no tiene nada que contar todavía.')
+        setError(t('llamada.nadaQueContar'))
         setEstado('escuchando')
         return
       }
@@ -811,18 +813,18 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         bancoRef.current = b
         setBanco(b)
       } catch (e) {
-        setError(`No he podido preparar el examen: ${(e as Error).message}`)
+        setError(t('llamada.noPreparoExamen', { motivo: (e as Error).message }))
         setEstado('escuchando')
         return
       }
-      turno('Listo para empezar la discusión.', undefined, false)
+      turno(t('llamada.listoDiscusion'), undefined, false)
     } else if (tipo === 'entrevista') {
-      turno('Empecemos la entrevista.', undefined, false)
+      turno(t('llamada.empecemosEntrevista'), undefined, false)
     } else {
       l.nueva()
       l.alFrase = (f) => setSubtitulo(f)
       setEstado('hablando')
-      l.decir('Hola. ¿De qué quieres que hablemos?')
+      l.decir(t('llamada.holaCharla'))
       l.cerrar()
       await l.terminado()
       finHabla.current = Date.now()
@@ -853,7 +855,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       try {
         for await (const ev of enviar(
           cid.current,
-          'Hemos terminado. Dame tu valoración final.',
+          t('llamada.finPide'),
           new AbortController().signal,
           !datos.current.noCuenta,
           true,
@@ -863,10 +865,9 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
             plan_id: datos.current.clave && plan ? plan.plan_id : null,
             leccion_clave: datos.current.clave || null,
             contexto:
-              'La entrevista ha terminado. ' +
-              (media != null ? `Su nota media es ${String(media).replace('.', ',')} sobre 10 (ya calculada: dila tal cual, sin enseñar cuentas). ` : 'Da una sola nota media de 0 a 10. ') +
-              'Después, una frase con lo mejor de sus respuestas y dos frases con lo que más debe repasar. Máximo 5 frases, sin listas ni bloques, sin mencionar otras lecciones. ' +
-              'No hagas más preguntas: la llamada ha terminado.',
+              t('llamada.ctx.fin') +
+              (media != null ? t('llamada.ctx.finMedia', { media: idiomaActual() === 'en' ? String(media) : String(media).replace('.', ',') }) : t('llamada.ctx.finSinMedia')) +
+              t('llamada.ctx.finResto'),
           },
         )) {
           if (ev.tipo === 'delta') {
@@ -885,8 +886,14 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     if (!notasRef.current.length) return
     setNotasGuardadas('guardando')
     const cabeza =
-      datos.current.tipo === 'clase' ? `Clase de ${datos.current.clave}` : datos.current.tipo === 'oral' ? `Examen oral de ${datos.current.clave}` : datos.current.tipo === 'entrevista' ? 'Entrevista' : 'Charla'
-    const texto = `**Notas de la llamada · ${cabeza}${datos.current.titulo ? ` «${datos.current.titulo}»` : ''}**\n\n${notasRef.current.map((n) => `- **${n.termino}**: ${n.definicion}`).join('\n')}`
+      datos.current.tipo === 'clase'
+        ? t('llamada.notas.clase', { clave: datos.current.clave })
+        : datos.current.tipo === 'oral'
+          ? t('llamada.notas.oral', { clave: datos.current.clave })
+          : datos.current.tipo === 'entrevista'
+            ? t('llamada.notas.entrevista')
+            : t('llamada.notas.charla')
+    const texto = `${t('llamada.notas.texto', { cabeza, titulo: datos.current.titulo ? ` «${datos.current.titulo}»` : '' })}\n\n${notasRef.current.map((n) => `- **${n.termino}**: ${n.definicion}`).join('\n')}`
     try {
       await pedir('/api/notas', enviarJson({ texto }))
       setNotasGuardadas('si')
@@ -916,8 +923,8 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
   }, [fase, interrumpir])
 
   const listaNotas = notas.length > 0 && (
-    <section className="llamada-notas" aria-label="Tus notas de la llamada">
-      <h2>Tus notas</h2>
+    <section className="llamada-notas" aria-label={t('llamada.notas.aria')}>
+      <h2>{t('llamada.notas.titulo')}</h2>
       <dl>
         {notas.map((n) => (
           <div key={n.termino}>
@@ -935,15 +942,15 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     const modos = prefs ? todosLosModos(prefs) : []
     return (
       <div className="panel llamada-preparar">
-        <h1>Charla</h1>
-        <p className="nota">Habla con tu tutor como por teléfono: sin pulsar nada, interrumpiéndole cuando quieras.</p>
-        <div className="llamada-tipos" role="radiogroup" aria-label="Tipo de llamada">
+        <h1>{t('llamada.charla')}</h1>
+        <p className="nota">{t('llamada.intro')}</p>
+        <div className="llamada-tipos" role="radiogroup" aria-label={t('llamada.tipoAria')}>
           {(
             [
-              ['clase', 'Clase', 'Te explica una lección en voz, con la pizarra delante. Le cortas con tus dudas y sigue.'],
-              ['oral', 'Examen oral', 'Visión general, sección a sección y debate a fondo, con pistas antes de la respuesta.'],
-              ['entrevista', 'Entrevista', 'Preguntas de entrevista técnica, nota en cada respuesta y al final.'],
-              ['charla', 'Charla', 'Hablas de lo que quieras, con el modo que elijas.'],
+              ['clase', t('llamada.tipo.clase'), t('llamada.tipo.clase.desc')],
+              ['oral', t('llamada.tipo.oral'), t('llamada.tipo.oral.desc')],
+              ['entrevista', t('llamada.tipo.entrevista'), t('llamada.tipo.entrevista.desc')],
+              ['charla', t('llamada.tipo.charla'), t('llamada.tipo.charla.desc')],
             ] as const
           ).map(([id, nombre, desc]) => (
             <button key={id} type="button" role="radio" aria-checked={tipo === id} className={`opcion ${tipo === id ? 'elegida' : ''}`} onClick={() => setTipo(id)}>
@@ -954,15 +961,15 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         </div>
         {tipo !== 'charla' && (
           <label className="llamada-campo">
-            Lección
+            {t('llamada.leccion')}
             <select value={clave} onChange={(e) => setClave(e.target.value)}>
-              {tipo === 'entrevista' && <option value="">Todo el plan</option>}
+              {tipo === 'entrevista' && <option value="">{t('llamada.todoElPlan')}</option>}
               {plan?.lecciones
                 .filter((l) => preparadas[l.clave])
                 .map((l) => (
                   <option key={l.clave} value={l.clave}>
                     {l.clave} · {l.titulo}
-                    {tipo === 'clase' ? (preparadas[l.clave].guion ? ' (con guion)' : ' (de sus apuntes)') : ''}
+                    {tipo === 'clase' ? (preparadas[l.clave].guion ? t('llamada.conGuion') : t('llamada.deApuntes')) : ''}
                   </option>
                 ))}
             </select>
@@ -970,10 +977,10 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
         )}
         {tipo === 'charla' && (
           <label className="llamada-campo">
-            Modo
+            {t('llamada.modo')}
             <select value={modo} onChange={(e) => setModo(e.target.value)}>
-              <option value="">El de siempre</option>
-              <option value="normal">Normal</option>
+              <option value="">{t('llamada.modoSiempre')}</option>
+              <option value="normal">{t('llamada.modoNormal')}</option>
               {modos.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.nombre}
@@ -986,18 +993,17 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           <ControlVoz />
           <label>
             <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} />{' '}
-            <span title="Para practicar o equivocarte a propósito: la llamada queda marcada y no entra en tu perfil">Esto no cuenta para el tutor</span>
+            <span title={t('llamada.noCuentaAyuda')}>{t('llamada.noCuenta')}</span>
           </label>
         </div>
         <button className="boton boton-principal llamada-llamar" onClick={llamar} disabled={(tipo === 'clase' || tipo === 'oral') && !clave}>
-          Llamar
+          {t('llamada.llamar')}
         </button>
         {falloLecciones && <Cargando error={falloLecciones} reintentar={cargarLecciones} />}
-        {tipo === 'clase' && !falloLecciones && !Object.keys(preparadas).length && <p className="nota">Para una clase, primero prepara alguna lección en Lecciones.</p>}
-        {sinOido && <p className="nota">Este navegador no tiene dictado por voz: podrás escribir y te contestará en voz alta.</p>}
+        {tipo === 'clase' && !falloLecciones && !Object.keys(preparadas).length && <p className="nota">{t('llamada.prepararLeccion')}</p>}
+        {sinOido && <p className="nota">{t('llamada.sinDictado')}</p>}
         <p className="nota llamada-aviso">
-          Mejor con auriculares: así no se oye a sí mismo. La voz del tutor es la de tu equipo; el dictado es el de tu navegador
-          (en Chrome, el audio va a Google para pasarlo a texto). La conversación se guarda como las demás.
+          {t('llamada.aviso')}
         </p>
         {error && <TextoError texto={error} />}
       </div>
@@ -1008,43 +1014,43 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     return (
       <div className="panel llamada-colgada">
         <Mascota />
-        <h1>Charla terminada</h1>
+        <h1>{t('llamada.terminada')}</h1>
         <p className="nota">
-          {reloj(segundos)} · {turnos.filter((t) => t.rol === 'tu').length} intervenciones tuyas
+          {t('llamada.intervenciones', { reloj: reloj(segundos), n: turnos.filter((x) => x.rol === 'tu').length })}
         </p>
         {(cerrando || resumen) && (
           <section className="llamada-resumen">
-            <h2>Tu valoración</h2>
-            <p>{resumen ? paraLeer(resumen) : 'Preparando la nota…'}</p>
+            <h2>{t('llamada.valoracion')}</h2>
+            <p>{resumen ? paraLeer(resumen) : t('llamada.preparandoNota')}</p>
           </section>
         )}
         {listaNotas}
         <div className="botones">
           <button className="boton boton-principal" onClick={() => setFase('preparar')}>
-            Otra llamada
+            {t('llamada.otra')}
           </button>
           {notas.length > 0 && (
             <button className="boton" onClick={guardarNotas} disabled={notasGuardadas === 'guardando' || notasGuardadas === 'si'}>
-              {notasGuardadas === 'si' ? 'Guardadas en Mis notas' : notasGuardadas === 'guardando' ? 'Guardando…' : 'Guardar en Mis notas'}
+              {notasGuardadas === 'si' ? t('llamada.guardadas') : notasGuardadas === 'guardando' ? t('llamada.guardando') : t('llamada.guardar')}
             </button>
           )}
           {cid.current != null && (
             <a className="boton" href={`#/conversacion/${cid.current}`}>
-              Ver la conversación escrita
+              {t('llamada.verEscrita')}
             </a>
           )}
         </div>
-        {notasGuardadas === 'error' && <p className="nota">No he podido guardar las notas. Prueba otra vez.</p>}
+        {notasGuardadas === 'error' && <p className="nota">{t('llamada.noGuardoNotas')}</p>}
       </div>
     )
   }
 
   const textoEstado = {
-    conectando: 'Conectando…',
-    escuchando: mudo ? 'Micro silenciado: escribe abajo' : 'Te escucho…',
-    pensando: 'Pensando…',
-    hablando: 'Hablando · interrúmpele cuando quieras',
-    narrando: 'Explicando · interrúmpele cuando quieras',
+    conectando: t('llamada.estado.conectando'),
+    escuchando: mudo ? t('llamada.estado.mudo') : t('llamada.estado.escuchando'),
+    pensando: t('llamada.estado.pensando'),
+    hablando: t('llamada.estado.hablando'),
+    narrando: t('llamada.estado.narrando'),
   }[estado]
   const gesto = estado === 'pensando' ? 'pensando' : estado === 'escuchando' ? 'escuchando' : estado === 'hablando' || estado === 'narrando' ? 'hablando' : 'normal'
   const textoSubtitulo = estado === 'escuchando' || estado === 'pensando' ? '' : subtitulo
@@ -1053,7 +1059,15 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
     <div className={`llamada en-${estado} ${pizarra ? 'con-pizarra' : ''}`}>
       <div className="llamada-cabeza">
         <span className="llamada-titulo">
-          {tipo === 'oral' ? `Examen oral · ${clave}` : tipo === 'clase' ? `Clase · ${clave}` : tipo === 'entrevista' ? `Entrevista${clave ? ` · ${clave}` : ''}` : 'Charla'}
+          {tipo === 'oral'
+            ? t('llamada.cabeza.oral', { clave })
+            : tipo === 'clase'
+              ? t('llamada.cabeza.clase', { clave })
+              : tipo === 'entrevista'
+                ? clave
+                  ? t('llamada.cabeza.entrevistaDe', { clave })
+                  : t('llamada.cabeza.entrevista')
+                : t('llamada.charla')}
         </span>
         <span className="llamada-reloj">{reloj(segundos)}</span>
       </div>
@@ -1071,7 +1085,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
               <p className="llamada-subtitulo">{textoSubtitulo}</p>
             </div>
           </div>
-          <section className="llamada-pizarra" aria-label="Pizarra">
+          <section className="llamada-pizarra" aria-label={t('llamada.pizarra')}>
             <header className="llamada-pizarra-titulo">{pizarra.titulo}</header>
             {pizarra.tipo === 'svg' ? (
               <Diagrama key={pizarra.svg.slice(0, 80)} svg={pizarra.svg} completo={pizarra.completo} />
@@ -1094,7 +1108,7 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
           <p className="llamada-subtitulo">{textoSubtitulo}</p>
         </>
       )}
-      {parcial && <p className="llamada-parcial">Tú: {parcial}</p>}
+      {parcial && <p className="llamada-parcial">{t('llamada.tuParcial', { texto: parcial })}</p>}
       {(mudo || !oido.current.disponible()) && (
         <form
           className="llamada-escribir"
@@ -1106,19 +1120,19 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
             setEscrito('')
           }}
         >
-          <input value={escrito} onChange={(e) => setEscrito(e.target.value)} placeholder="Escríbele y te contesta en voz alta" aria-label="Mensaje escrito" />
-          <button className="boton">Enviar</button>
+          <input value={escrito} onChange={(e) => setEscrito(e.target.value)} placeholder={t('llamada.escribele')} aria-label={t('llamada.mensajeEscrito')} />
+          <button className="boton">{t('llamada.enviar')}</button>
         </form>
       )}
       <ControlVoz compacto />
       <div className="llamada-botones">
-        <button className={`llamada-boton ${mudo ? 'activo' : ''}`} onClick={alternarMudo} aria-pressed={mudo} title={mudo ? 'Activar el micro' : 'Silenciar el micro'}>
+        <button className={`llamada-boton ${mudo ? 'activo' : ''}`} onClick={alternarMudo} aria-pressed={mudo} title={mudo ? t('llamada.activarMicro') : t('llamada.silenciarMicro')}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
             <rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.7" />
             <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
             {mudo && <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />}
           </svg>
-          <small>{mudo ? 'Silenciado' : 'Micro'}</small>
+          <small>{mudo ? t('llamada.silenciado') : t('llamada.micro')}</small>
         </button>
         {tipo === 'clase' && estado === 'escuchando' && narracion.current.lista.length > 0 && !narracion.current.acabada ? (
           <button
@@ -1127,38 +1141,38 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
               apuntar('entregar', { como: 'boton-seguir' })
               narrar()
             }}
-            title="Seguir con la clase"
+            title={t('llamada.seguirClase')}
           >
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
               <path d="M8 5.5v13l10-6.5z" fill="currentColor" />
             </svg>
-            <small>Seguir</small>
+            <small>{t('llamada.seguir')}</small>
           </button>
         ) : (
-          <button className="llamada-boton" onClick={() => interrumpir('boton')} disabled={estado === 'escuchando'} title="Cortarle para preguntar (espacio)">
+          <button className="llamada-boton" onClick={() => interrumpir('boton')} disabled={estado === 'escuchando'} title={t('llamada.cortarle')}>
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
               <path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-.5a6 6 0 0 1-4.6-2.2L4 15.5a1.6 1.6 0 0 1 2.3-2.2L8 15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <small>Una duda</small>
+            <small>{t('llamada.unaDuda')}</small>
           </button>
         )}
-        <button className="llamada-boton colgar" onClick={colgar} title="Colgar">
+        <button className="llamada-boton colgar" onClick={colgar} title={t('llamada.colgar')}>
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
             <path d="M3 14.5c5-4.5 13-4.5 18 0l-2.2 2.6-3.6-1.4v-2.4a12 12 0 0 0-6.4 0v2.4l-3.6 1.4z" fill="currentColor" />
           </svg>
-          <small>Colgar</small>
+          <small>{t('llamada.colgar')}</small>
         </button>
       </div>
       {error && <TextoError texto={error} className="nota" />}
       {listaNotas}
       {banco && (
         <details className="llamada-transcripcion">
-          <summary>Las preguntas del examen oral</summary>
+          <summary>{t('llamada.preguntasExamen')}</summary>
           {(
             [
-              ['Visión panorámica', banco.panoramica],
-              ['Sección a sección', banco.secciones],
-              ['Profundización y debate', banco.profundizacion],
+              [t('llamada.banco1'), banco.panoramica],
+              [t('llamada.banco2'), banco.secciones],
+              [t('llamada.banco3'), banco.profundizacion],
             ] as const
           ).map(([nombre, lista]) => (
             <div key={nombre}>
@@ -1176,12 +1190,12 @@ export default function PanelLlamada({ alCambiar }: { alCambiar?: () => void }) 
       )}
       {turnos.length > 0 && (
         <details className="llamada-transcripcion">
-          <summary>Lo que lleváis dicho</summary>
+          <summary>{t('llamada.llevaisDicho')}</summary>
           {turnos
-            .filter((t) => t.texto)
-            .map((t, i) => (
-              <p key={i} className={t.rol}>
-                <strong>{t.rol === 'tu' ? 'Tú' : 'Tutor'}:</strong> {paraLeer(t.texto)}
+            .filter((x) => x.texto)
+            .map((x, i) => (
+              <p key={i} className={x.rol}>
+                <strong>{x.rol === 'tu' ? t('llamada.tu') : t('llamada.tutor')}:</strong> {paraLeer(x.texto)}
               </p>
             ))}
         </details>

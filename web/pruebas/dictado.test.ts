@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 ;(globalThis as unknown as { window: unknown }).window = { addEventListener() {}, dispatchEvent() {} }
-const { AVISO_DICTADO, enVivo, guardarPermisoDictado, leerPermisoDictado, unirDictado } = await import('../src/componentes/dictado.ts')
+const { avisoDictado, enVivo, guardarPermisoDictado, leerPermisoDictado, unirDictado } = await import('../src/componentes/dictado.ts')
 
 const almacen = () => {
   const m = new Map<string, string>()
@@ -31,8 +31,8 @@ test('un almacén que falla no rompe nada', () => {
 })
 
 test('el aviso dice a dónde va el audio, en una frase', () => {
-  assert.match(AVISO_DICTADO, /sale de tu ordenador hacia el servicio de voz del navegador/)
-  assert.equal(AVISO_DICTADO.split(/[.!?](\s|$)/).filter((x) => x && x.trim()).length, 1)
+  assert.match(avisoDictado(), /sale de tu ordenador hacia el servicio de voz del navegador/)
+  assert.equal(avisoDictado().split(/[.!?](\s|$)/).filter((x) => x && x.trim()).length, 1)
 })
 
 test('lo dictado se suma a lo escrito con un espacio; lo provisional se ve detrás', () => {

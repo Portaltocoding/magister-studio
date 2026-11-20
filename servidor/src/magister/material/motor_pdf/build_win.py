@@ -105,6 +105,11 @@ def to_html(md, m):
     body = body.replace("<p>[[INDICE]]</p>", index(body))
     body = body.replace('<input type="checkbox" disabled="" />', '<span class="chk"></span>')
     css = open(os.path.join(MOTOR, os.environ.get("FICHA_CSS", "ficha.css")), encoding="utf8").read()
+    # La tipografía única de la app (magister.config): llega por el entorno y se declara aquí para los dos CSS.
+    css += (f"
+:root {{ --fuente-texto: {os.environ.get('FICHA_FUENTE_TEXTO', 'system-ui, sans-serif')};"
+            f" --fuente-mono: {os.environ.get('FICHA_FUENTE_MONO', 'monospace')}; }}
+")
     acento = os.environ.get("FICHA_ACENTO", "")
     if re.fullmatch(r"#[0-9a-fA-F]{6}", acento):
         # El acento que elegiste en la app: números, etiquetas y resaltes del PDF.

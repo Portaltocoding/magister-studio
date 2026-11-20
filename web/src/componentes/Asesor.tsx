@@ -4,7 +4,9 @@ import { EVENTO_CAMBIO_APLICADO, cambiosDe, crearConversacion, decidirCambio, en
 import { mensajeDe } from './Cargando.tsx'
 import BarraCuota from './BarraCuota.tsx'
 import Mascota from '../Mascota.tsx'
-import { MODOS } from '../modos.ts'
+import { MODOS, nombreModo } from '../modos.ts'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { EVENTO_SUENO } from './animo.ts'
 import { buscarFaq, esPantallaDePlan, ofreceCambio, sugerenciasDe } from './faqs.ts'
 import { planQueToca, temaActivo } from './planActivo.ts'
@@ -89,7 +91,7 @@ const dentro = (x: number, y: number) => ({
 function seccionActual(): { clave: string; nombre: string } {
   const partes = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean)
   const modo = MODOS.find((m) => m.id === partes[0])
-  const base = partes[0] === 'conversacion' ? 'Estudio libre' : (modo?.nombre ?? 'Hoy')
+  const base = partes[0] === 'conversacion' ? nombreModo('libre') : nombreModo(modo?.id ?? 'hoy')
   const titulo = document.querySelector('main.central h1')?.textContent?.trim()
   const concreto = partes.length > 1 && titulo && titulo !== base ? titulo : null
   return {
@@ -178,7 +180,7 @@ function esquemaProyecto(): string {
       })
       return [`  Bloque ${b.dataset.titulo ?? b.querySelector('h3')?.textContent?.trim() ?? ''}`, ...pasos].join('\n')
     })
-    return [`${cabeza.replace(/^el nivel/, 'Nivel')}${esbozado}`, ...bloques].join('\n')
+    return [`${cabeza.replace(/^(el nivel|level)/i, 'Nivel')}${esbozado}`, ...bloques].join('\n')
   })
   return `<roadmap_entero>\n${lineas.join('\n').slice(0, 5000)}\n</roadmap_entero>\n`
 }
@@ -192,6 +194,7 @@ function textoPantalla(): string {
 }
 
 export default function Asesor() {
+  usarIdioma() // los textos siguen al idioma
   const [sitio, setSitio] = useState<Sitio>(() => leer<Sitio>(CLAVE, { activo: false, x: 0, y: 0 }))
   const [cogida, setCogida] = useState(false)
   const [iman, setIman] = useState(false)
@@ -330,8 +333,8 @@ export default function Asesor() {
         className="asesor-mascota"
         role="button"
         tabIndex={0}
-        aria-label={abierto ? 'Cerrar el asesor' : 'Abrir el asesor'}
-        title="Tu asesor · clic: hablar · mantener: mover · doble clic: devolverlo a la barra"
+        aria-label={abierto ? t('asesor.cerrar') : t('asesor.abrir')}
+        title={t('asesor.ayudaMascota')}
         onPointerDown={alBajar}
         onPointerMove={alMover}
         onPointerUp={alSubir}
@@ -354,16 +357,16 @@ export default function Asesor() {
             <button
               type="button"
               onClick={() => {
-                setTextoInicial(aviso.paso ? `Me he atascado en «${aviso.paso}»: ` : 'Me he atascado: ')
+                setTextoInicial(aviso.paso ? t('asesor.atascoPaso', { paso: aviso.paso }) : t('asesor.atasco'))
                 aviso.cerrar()
                 setAbrioAhora(true)
                 setAbierto(true)
               }}
             >
-              Me he atascado
+              {t('asesor.meAtasque')}
             </button>
             <button type="button" className="suave" onClick={aviso.cerrar}>
-              Va bien
+              {t('asesor.vaBien')}
             </button>
           </div>
         </div>
@@ -419,7 +422,7 @@ function usarAvisoAtasco(activo: boolean): { texto: string | null; paso: string 
           .flatMap((n) => n.bloques.flatMap((b) => b.pasos))
           .find((x) => !hechos.has(x.id))
         if (!siguiente) return
-        setAviso({ texto: `¿Qué tal con «${siguiente.titulo}»? Si te has atascado, cuéntamelo.`, paso: siguiente.titulo })
+        setAviso({ texto: t('asesor.quetal', { titulo: siguiente.titulo }), paso: siguiente.titulo })
       } catch {
         /* sin red: otra vez será */
       }
@@ -431,12 +434,12 @@ function usarAvisoAtasco(activo: boolean): { texto: string | null; paso: string 
       alEntrar()
       void revisar()
     }
-    const t = window.setInterval(() => void revisar(), 5 * 60 * 1000)
+    const intervalo = window.setInterval(() => void revisar(), 5 * 60 * 1000)
     window.addEventListener('hashchange', cambiar)
     document.addEventListener('visibilitychange', alVolver)
     window.addEventListener(EVENTO_SUENO, alDespertar)
     return () => {
-      window.clearInterval(t)
+      window.clearInterval(intervalo)
       window.removeEventListener('hashchange', cambiar)
       document.removeEventListener('visibilitychange', alVolver)
       window.removeEventListener(EVENTO_SUENO, alDespertar)
@@ -461,7 +464,7 @@ function RespuestaAsesor({ m, alCambiar, alRepetir, enfocarCambio = false }: {
   alRepetir: () => void
   enfocarCambio?: boolean
 }) {
-  if (!m.texto) return <div className="asesor-tutor"><span className="asesor-escribiendo" aria-label="Pensando" /></div>
+  if (!m.texto) return <div className="asesor-tutor"><span className="asesor-escribiendo" aria-label={t('asesor.pensando')} /></div>
   // Con la tarjeta (o el porqué de que no salió) ya aquí, la frase con la que lo prometió sobra: la tarjeta dice lo que
   // de verdad se preparó.
   const { cuerpo, acciones } = separarAcciones(m.cambio || m.fallo || m.aviso ? sinPromesa(m.texto) : m.texto)
@@ -474,7 +477,7 @@ function RespuestaAsesor({ m, alCambiar, alRepetir, enfocarCambio = false }: {
     <div className="asesor-tutor">
       <Markdown>{limpio}</Markdown>
       {m.preparando && <Preparando texto={m.preparando} />}
-      {m.fallo && <p className="nota">No he podido preparar el cambio: {m.fallo}.</p>}
+      {m.fallo && <p className="nota">{t('asesor.noPudePreparar', { motivo: m.fallo })}</p>}
       {m.aviso && <p className="asesor-cambio-aviso">{m.aviso}</p>}
       {m.cambio && <TarjetaCambio cambio={m.cambio} alCambiar={alCambiar} alRepetir={alRepetir} enfocar={enfocarCambio} />}
       {acciones.length > 0 && (
@@ -503,18 +506,12 @@ function Preparando({ texto }: { texto: string }) {
       <p className="asesor-cambio-preparando">
         <span className="asesor-escribiendo" aria-hidden="true" /> {texto}
       </p>
-      {lento && <p className="asesor-cambio-lento">Está escribiendo los pasos: puede tardar medio minuto. Puedes pararlo.</p>}
+      {lento && <p className="asesor-cambio-lento">{t('asesor.lento')}</p>}
     </div>
   )
 }
 
-const TITULO_CAMBIO: Record<CambioAsesor['estado'], string> = {
-  propuesta: 'Te propongo este cambio',
-  aplicada: 'Hecho',
-  descartada: 'Descartado',
-  deshecha: 'Deshecho',
-  caducada: 'Ya no se puede aplicar',
-}
+const tituloCambio = (estado: CambioAsesor['estado']): string => t(`asesor.cambio.${estado}`)
 
 // El cambio que ofreció el asesor: nada se toca hasta que pulsas «Aplicar», y lo aplicado se puede deshacer.
 function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
@@ -564,10 +561,10 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
     }
   }
   return (
-    <div ref={caja} tabIndex={-1} className={`asesor-cambio ${cambio.estado}`} role="group" aria-label={TITULO_CAMBIO[cambio.estado]}>
+    <div ref={caja} tabIndex={-1} className={`asesor-cambio ${cambio.estado}`} role="group" aria-label={tituloCambio(cambio.estado)}>
       <p className="asesor-cambio-etq" role="status">
         {cambio.estado === 'aplicada' ? '✓ ' : ''}
-        {TITULO_CAMBIO[cambio.estado]}
+        {tituloCambio(cambio.estado)}
       </p>
       {/* Lo que hace, contado por el código a partir de las acciones validadas (no lo que el asesor prometió antes). */}
       {cambio.en_breve && <p className="asesor-cambio-breve">{cambio.en_breve}</p>}
@@ -576,17 +573,17 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
           <li key={i}>
             {l.texto}
             {l.motivo && <small>{l.motivo}</small>}
-            {l.deshace === false && <small>Esto no se deshace.</small>}
+            {l.deshace === false && <small>{t('asesor.noSeDeshace')}</small>}
           </li>
         ))}
       </ul>
-      {cambio.pendiente && <p className="asesor-cambio-aviso">Se queda fuera: {cambio.pendiente}</p>}
-      {cambio.consultado.length > 0 && <p className="asesor-cambio-consultado">He mirado {cambio.consultado.join(' y ')}.</p>}
+      {cambio.pendiente && <p className="asesor-cambio-aviso">{t('asesor.seQuedaFuera', { texto: cambio.pendiente })}</p>}
+      {cambio.consultado.length > 0 && <p className="asesor-cambio-consultado">{t('asesor.heMirado', { lista: cambio.consultado.join(t('asesor.y')) })}</p>}
       {cambio.estado === 'caducada' && cambio.motivo_estado && <p className="nota">{cambio.motivo_estado}</p>}
       {cambio.estado === 'caducada' && (
         <div className="asesor-cambio-botones">
           <button type="button" className="suave" onClick={alRepetir}>
-            Prepararlo otra vez
+            {t('asesor.otraVez')}
           </button>
         </div>
       )}
@@ -599,15 +596,15 @@ function TarjetaCambio({ cambio, alCambiar, alRepetir, enfocar = false }: {
           {cambio.estado === 'propuesta' ? (
             <>
               <button ref={aplicar} type="button" disabled={ocupado} onClick={() => void hacer('aplicar')}>
-                {ocupado ? 'Aplicando…' : 'Aplicar'}
+                {ocupado ? t('asesor.aplicando') : t('asesor.aplicar')}
               </button>
               <button type="button" className="suave" disabled={ocupado} onClick={() => void hacer('descartar')}>
-                Descartar
+                {t('asesor.descartar')}
               </button>
             </>
           ) : (
             <button type="button" className="suave" disabled={ocupado} onClick={() => void hacer('deshacer')}>
-              {ocupado ? 'Deshaciendo…' : 'Deshacer'}
+              {ocupado ? t('asesor.deshaciendo') : t('asesor.deshacer')}
             </button>
           )}
         </div>
@@ -626,6 +623,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   // Solo coge el foco si lo acabas de abrir tú (no cuando se restaura al cargar la página).
   enfocar?: boolean
 }) {
+  usarIdioma() // los textos siguen al idioma
   const [aqui, setAqui] = useState(seccionActual)
   const [hilos, setHilos] = useState<Record<string, Hilo>>(() => leer<Record<string, Hilo>>(CLAVE_HILOS, {}))
   const [viendo, setViendo] = useState<string>(() => seccionActual().clave)
@@ -699,7 +697,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
     try {
       let h = hilos[s.clave]
       if (!h) {
-        const c = await crearConversacion(`Asesor · ${s.nombre}`.slice(0, 200), null, 'asesor')
+        const c = await crearConversacion(t('asesor.convTitulo', { nombre: s.nombre }).slice(0, 200), null, 'asesor')
         recien.current = c.id
         h = { cid: c.id, nombre: s.nombre, usado: Date.now() }
       }
@@ -722,7 +720,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
           acumulado += ev.t
           alUltimo({ rol: 'tutor', texto: acumulado })
         } else if (ev.tipo === 'fin') alUltimo({ id: ev.mensaje_id ?? undefined })
-        else if (ev.tipo === 'fase' && ev.nodo === 'preparar_cambio') alUltimo({ preparando: ev.detalle ?? 'Preparando el cambio…' })
+        else if (ev.tipo === 'fase' && ev.nodo === 'preparar_cambio') alUltimo({ preparando: ev.detalle ?? t('asesor.preparandoCambio') })
         else if (ev.tipo === 'cambio') {
           const { tipo: _tipo, ...cambio } = ev
           cambioVivo.current = cambio.id
@@ -737,7 +735,7 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
         if (!u || u.rol !== 'tutor') return m
         return u.texto ? [...m.slice(0, -1), { ...u, preparando: null }] : m.slice(0, -1)
       })
-      if (!(e instanceof DOMException && e.name === 'AbortError')) setError('No he podido contestar. Prueba otra vez en un momento.')
+      if (!(e instanceof DOMException && e.name === 'AbortError')) setError(t('asesor.noContestar'))
     } finally {
       // Si la respuesta acaba sin cambio ni fallo, que no se quede «Preparando el cambio…» para siempre.
       setMensajes((m) => {
@@ -752,16 +750,16 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
   const sugerencias = sugerenciasDe(aqui.clave, proyectoEnPantalla() != null, hayPlan)
 
   return (
-    <section className={`asesor-chat ${lado} ${vertical}`} role="dialog" aria-label={`Tu asesor · ${aqui.nombre}`}>
+    <section className={`asesor-chat ${lado} ${vertical}`} role="dialog" aria-label={t('asesor.tuAsesorEn', { nombre: aqui.nombre })}>
       <header className="asesor-cabeza">
         <div>
-          <span className="asesor-etq">Tu asesor</span>
+          <span className="asesor-etq">{t('asesor.tuAsesor')}</span>
           <strong>{aqui.nombre}</strong>
         </div>
-        <button type="button" className="asesor-x" onClick={alDevolver} title="Devolver la mascota a la barra" aria-label="Devolver la mascota a la barra">
+        <button type="button" className="asesor-x" onClick={alDevolver} title={t('asesor.devolverMascota')} aria-label={t('asesor.devolverMascota')}>
           ⤴
         </button>
-        <button type="button" className="asesor-x" onClick={alCerrar} title="Cerrar" aria-label="Cerrar">
+        <button type="button" className="asesor-x" onClick={alCerrar} title={t('asesor.cerrarBtn')} aria-label={t('asesor.cerrarBtn')}>
           ×
         </button>
       </header>
@@ -770,10 +768,10 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
           <div className="asesor-vacio">
             <p>
               {proyectoEnPantalla()
-                ? 'Te explico lo que ves y, si me lo pides, cambio este proyecto contigo: añadir pasos o niveles, reordenar, partir bloques… Tú apruebas cada cambio.'
+                ? t('asesor.vacioProyecto')
                 : hayPlan && esPantallaDePlan(aqui.clave)
-                  ? 'Te explico lo que ves y, si me lo pides, cambio tu plan contigo: mover una sesión, marcar una lección, preparar sus apuntes o apuntarte un examen. Tú apruebas cada cambio.'
-                  : 'Estoy aquí para lo que tienes delante. ¿En qué te ayudo?'}
+                  ? t('asesor.vacioPlan')
+                  : t('asesor.vacio')}
             </p>
             <div className="asesor-sugerencias">
               {sugerencias.map((s) => (
@@ -794,17 +792,17 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
               <RespuestaAsesor
                 m={m}
                 alCambiar={(c) => setMensajes((ms) => ms.map((x) => (x.cambio?.id === c.id ? { ...x, cambio: c } : x)))}
-                alRepetir={() => void preguntar('Prepáralo otra vez sobre el proyecto como está ahora.')}
+                alRepetir={() => void preguntar(t('asesor.repetir'))}
                 enfocarCambio={m.cambio != null && m.cambio.id === cambioVivo.current}
               />
               {/* Ofreció un cambio sin prepararlo («¿Lo añado al nivel 1?»): contestar es un clic. */}
               {i === mensajes.length - 1 && !pensando && !m.cambio && !m.fallo && !m.aviso && ofreceCambio(m.texto) && (
                 <div className="asesor-si-no">
-                  <button type="button" onClick={() => void preguntar('Sí, prepáralo')}>
-                    Sí, prepáralo
+                  <button type="button" onClick={() => void preguntar(t('asesor.siPreparalo'))}>
+                    {t('asesor.siPreparalo')}
                   </button>
-                  <button type="button" className="suave" onClick={() => void preguntar('No, déjalo')}>
-                    No, déjalo
+                  <button type="button" className="suave" onClick={() => void preguntar(t('asesor.noDejalo'))}>
+                    {t('asesor.noDejalo')}
                   </button>
                 </div>
               )}
@@ -820,14 +818,14 @@ function ChatAsesor({ lado, vertical, alCerrar, alDevolver, alPensar, textoInici
           void preguntar(texto)
         }}
       >
-        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="O escríbeme tu pregunta" aria-label="Tu pregunta" autoFocus={enfocar} />
+        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={t('asesor.escribeme')} aria-label={t('asesor.tuPregunta')} autoFocus={enfocar} />
         {pensando ? (
-          <button type="button" className="boton-mini" onClick={() => control.current?.abort()} title="Dejar de contestar o de preparar el cambio">
-            Parar
+          <button type="button" className="boton-mini" onClick={() => control.current?.abort()} title={t('asesor.pararAyuda')}>
+            {t('asesor.parar')}
           </button>
         ) : (
           <button className="boton-mini" disabled={!texto.trim()}>
-            Enviar
+            {t('asesor.enviar')}
           </button>
         )}
       </form>

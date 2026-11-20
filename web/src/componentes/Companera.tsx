@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { enviarJson, pedir } from '../api.ts'
 import { mensajeDe } from './Cargando.tsx'
 import { errorLegible } from './errores.ts'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 // El tope del servidor para la pregunta (rutas_estudio.Parrafo.pregunta): el campo no deja escribir más.
 const MAX_PREGUNTA = 500
@@ -15,11 +17,11 @@ import Mascota, { type GestoMascota } from '../Mascota.tsx'
 
 export type Accion = 'facil' | 'ejemplo' | 'porque' | 'clave' | 'codigo' | 'pregunta'
 
-const ACCIONES: [Accion, string][] = [
-  ['facil', 'Más fácil'],
-  ['ejemplo', 'Un ejemplo'],
-  ['porque', '¿Por qué?'],
-  ['clave', 'Palabras clave'],
+const acciones = (): [Accion, string][] => [
+  ['facil', t('companera.facil')],
+  ['ejemplo', t('companera.ejemplo')],
+  ['porque', t('companera.porque')],
+  ['clave', t('companera.clave')],
 ]
 
 const CODIGO_TRAS_S = 45
@@ -54,6 +56,7 @@ interface Props {
 }
 
 export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalabras, enMapa = [], abrir = 0, desplazadoHace, esDuda, alDuda, alRespuesta }: Props) {
+  usarIdioma() // los textos siguen al idioma
   const [abierta, setAbierta] = useState(false)
   const [respuesta, setRespuesta] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
@@ -97,23 +100,23 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
   // Se esconde sola a los 8 s.
   useEffect(() => {
     if (!globo) return
-    const t = window.setTimeout(() => setGlobo(null), GLOBO_S * 1000)
-    return () => window.clearTimeout(t)
+    const id = window.setTimeout(() => setGlobo(null), GLOBO_S * 1000)
+    return () => window.clearTimeout(id)
   }, [globo])
 
   // El único globo: delante de un bloque de código, si llevas 45 s en la idea, sin desplazar en el último segundo y
   // medio y sin estar escribiendo. Uno por idea como mucho.
   useEffect(() => {
     if (yaDijo.current || abierta || parrafo?.tagName !== 'PRE') return
-    const t = window.setInterval(() => {
+    const id = window.setInterval(() => {
       if (yaDijo.current || document.visibilityState !== 'visible') return
       if (Date.now() - desde.current < CODIGO_TRAS_S * 1000) return
       if (desplazadoHace && desplazadoHace() < SIN_SCROLL_S * 1000) return
       if ((document.activeElement as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]')) return
       yaDijo.current = true
-      setGlobo({ texto: '¿Te explico este código línea a línea?', boton: 'Sí', hacer: () => pedirAyuda('codigo') })
+      setGlobo({ texto: t('companera.globoCodigo'), boton: t('companera.si'), hacer: () => pedirAyuda('codigo') })
     }, 1000)
-    return () => window.clearInterval(t)
+    return () => window.clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parrafo, abierta])
 
@@ -137,7 +140,7 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
       setPregunta('')
     } catch (e) {
       // Nunca el texto técnico en inglés («String should have at most 500 characters»).
-      setRespuesta(`No he podido: ${errorLegible(mensajeDe(e)).mensaje}`)
+      setRespuesta(t('companera.noPude', { motivo: errorLegible(mensajeDe(e)).mensaje }))
     } finally {
       setCargando(false)
       // El botón pulsado se desactiva mientras piensa y el foco del teclado se cae al cuerpo: se devuelve al
@@ -154,7 +157,7 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
   const termino = alPalabras
     ? Array.from(parrafo.querySelectorAll('strong, b'))
         .map((x) => x.textContent?.trim() ?? '')
-        .find((t) => t.length > 2 && t.length < 40 && !enMapa.some((m) => m.toLowerCase() === t.toLowerCase()))
+        .find((x) => x.length > 2 && x.length < 40 && !enMapa.some((m) => m.toLowerCase() === x.toLowerCase()))
     : undefined
   const gesto: GestoMascota = cargando ? 'pensando' : abierta ? 'escuchando' : 'normal'
 
@@ -180,8 +183,8 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
             setAbierta(!abierta)
           }}
           aria-expanded={abierta}
-          aria-label="Pedir ayuda con este párrafo (A)"
-          title="¿Te ayudo con este párrafo? (A)"
+          aria-label={t('companera.pedirAyuda')}
+          title={t('companera.teAyudo')}
         >
           <Mascota gesto={gesto} lugar="companera" quieta={!abierta && !cargando} />
           {termino && !abierta && <span className="companera-punto" aria-hidden="true" />}
@@ -205,35 +208,35 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
           </div>
         )}
         {abierta && (
-          <div className="companera-bocadillo" role="dialog" aria-label="Ayuda con el párrafo" ref={bocadillo} tabIndex={-1}>
+          <div className="companera-bocadillo" role="dialog" aria-label={t('companera.ayudaAria')} ref={bocadillo} tabIndex={-1}>
             {termino && alPalabras && !cargando && !respuesta && (
               <p className="companera-mapa">
-                <span>¿Añado «{termino}» a tu mapa?</span>
+                <span>{t('companera.anadirMapa', { termino })}</span>
                 <button type="button" className="boton-mini" onClick={() => alPalabras([termino])}>
-                  Añadir
+                  {t('companera.anadir')}
                 </button>
               </p>
             )}
-            {cargando && <p className="companera-pensando">Déjame pensar…</p>}
+            {cargando && <p className="companera-pensando">{t('companera.pensando')}</p>}
             {respuesta && <p className="companera-respuesta">{respuesta.replace(/\*\*/g, '')}</p>}
-            {respuesta && alRespuesta && <p className="companera-guardada">Te lo dejo guardado debajo del párrafo.</p>}
+            {respuesta && alRespuesta && <p className="companera-guardada">{t('companera.guardada')}</p>}
             {esDuda && !cargando && !respuesta && (
-              <p className="companera-guardada">Marcado como duda: te lo recuerdo antes de la comprobación y al acabar. ¿Te lo explico más fácil?</p>
+              <p className="companera-guardada">{t('companera.duda')}</p>
             )}
             <div className="companera-acciones">
               {alDuda && (
-                <button type="button" className="opcion opcion-chip" aria-pressed={!!esDuda} disabled={cargando} onClick={alDuda} title="Marcar este párrafo como duda (N)">
-                  {esDuda ? 'Ya lo entiendo' : 'No lo entiendo (N)'}
+                <button type="button" className="opcion opcion-chip" aria-pressed={!!esDuda} disabled={cargando} onClick={alDuda} title={t('companera.marcarDuda')}>
+                  {esDuda ? t('companera.yaLoEntiendo') : t('companera.noLoEntiendo')}
                 </button>
               )}
-              {ACCIONES.map(([a, t]) => (
+              {acciones().map(([a, nombre]) => (
                 <button key={a} type="button" className="opcion opcion-chip" disabled={cargando} onClick={() => pedirAyuda(a)}>
-                  {t}
+                  {nombre}
                 </button>
               ))}
               {parrafo.tagName === 'PRE' && (
                 <button type="button" className="opcion opcion-chip" disabled={cargando} onClick={() => pedirAyuda('codigo')}>
-                  El código, línea a línea
+                  {t('companera.codigoLinea')}
                 </button>
               )}
             </div>
@@ -242,7 +245,7 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
                 e.preventDefault()
                 if (cargando) return
                 // Vacía, Intro no se queda mudo con el error de antes delante: lo quita y dice qué falta.
-                if (!pregunta.trim()) return setRespuesta('Escribe tu pregunta y pulsa Intro, o elige una de las opciones de arriba.')
+                if (!pregunta.trim()) return setRespuesta(t('companera.escribe'))
                 pedirAyuda('pregunta', pregunta.slice(0, MAX_PREGUNTA))
               }}
             >
@@ -250,13 +253,13 @@ export default function Companera({ mid, claveBloque, parrafo, estrecho, alPalab
                 value={pregunta}
                 maxLength={MAX_PREGUNTA}
                 onChange={(e) => setPregunta(e.target.value.slice(0, MAX_PREGUNTA))}
-                placeholder="Pregúntame sobre este párrafo"
-                aria-label="Tu pregunta sobre el párrafo"
+                placeholder={t('companera.pregunta')}
+                aria-label={t('companera.preguntaAria')}
                 aria-describedby={pregunta.length > MAX_PREGUNTA - 80 ? 'companera-cuenta' : undefined}
               />
               {pregunta.length > MAX_PREGUNTA - 80 && (
                 <small id="companera-cuenta" className="companera-cuenta" aria-live="polite">
-                  {pregunta.length} de {MAX_PREGUNTA} caracteres
+                  {t('companera.caracteres', { n: pregunta.length, max: MAX_PREGUNTA })}
                 </small>
               )}
             </form>

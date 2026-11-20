@@ -1,7 +1,8 @@
 // Las preguntas frecuentes del asesor: reconocer las suyas y dejar pasar al modelo las demás.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buscarFaq, esPantallaDePlan, ofreceCambio, sugerenciasDe, SUGERENCIAS_PLAN, SUGERENCIAS_PROYECTO } from '../src/componentes/faqs.ts'
+import { buscarFaq, esPantallaDePlan, faqs, ofreceCambio, sugerenciasDe, sugerenciasPlan, sugerenciasProyecto } from '../src/componentes/faqs.ts'
+import { fijarIdioma } from '../src/i18n/i18n.ts'
 
 const casos: [string, string | null][] = [
   ['como creo un plan', 'plan'],
@@ -19,7 +20,7 @@ const casos: [string, string | null][] = [
 for (const [pregunta, id] of casos) test(`«${pregunta}» → ${id}`, () => assert.equal(buscarFaq(pregunta)?.id ?? null, id))
 
 // Lo que se pulsa en el chat (sugerencias y respuestas rápidas) va al modelo: no debe confundirse con una frecuente.
-for (const pregunta of [...SUGERENCIAS_PROYECTO, 'Sí, prepáralo', 'No, déjalo'])
+for (const pregunta of [...sugerenciasProyecto(), 'Sí, prepáralo', 'No, déjalo'])
   test(`«${pregunta}» no es una frecuente`, () => assert.equal(buscarFaq(pregunta), null))
 
 // ===== Sugerencias del chat vacío =====
@@ -49,16 +50,16 @@ test('una sección con subruta usa la de arriba', () => {
 test('en las pantallas del plan, con plan, sugiere pedirle cambios del plan', () => {
   assert.deepEqual(sugerenciasDe('hoy', false, true), ['Explícame esta pantalla', 'Mueve la sesión de hoy a mañana', 'Marca esta lección como hecha'])
   assert.ok(sugerenciasDe('calendario', false, true).includes('Mueve la sesión de hoy a mañana'))
-  assert.deepEqual(sugerenciasDe('fichas/3/L2', false, true), SUGERENCIAS_PLAN.fichas)
+  assert.deepEqual(sugerenciasDe('fichas/3/L2', false, true), sugerenciasPlan().fichas)
   // Sin plan, las frecuentes de siempre; y en un proyecto mandan las del proyecto.
   assert.deepEqual(sugerenciasDe('hoy', false), sugerenciasDe('hoy', false, false))
   assert.ok(!sugerenciasDe('hoy', false).includes('Mueve la sesión de hoy a mañana'))
-  assert.deepEqual(sugerenciasDe('proyectos/12', true, true), SUGERENCIAS_PROYECTO)
+  assert.deepEqual(sugerenciasDe('proyectos/12', true, true), sugerenciasProyecto())
   assert.ok(esPantallaDePlan('roadmap') && !esPantallaDePlan('repaso'))
 })
 
 // Las del plan también van al modelo: tampoco son frecuentes.
-for (const pregunta of new Set(Object.values(SUGERENCIAS_PLAN).flat().filter((x) => x !== 'Explícame esta pantalla')))
+for (const pregunta of new Set(Object.values(sugerenciasPlan()).flat().filter((x) => x !== 'Explícame esta pantalla')))
   test(`«${pregunta}» no es una frecuente`, () => assert.equal(buscarFaq(pregunta), null))
 
 // ===== ¿Ha ofrecido un cambio sin prepararlo? =====
@@ -98,3 +99,39 @@ const ofertas: [string, boolean][] = [
 ]
 for (const [texto, esperado] of ofertas)
   test(`ofrece cambio: «${texto.slice(0, 50).replace(/\n/g, ' ')}» → ${esperado}`, () => assert.equal(ofreceCambio(texto), esperado))
+
+// ===== En inglés =====
+
+const enIngles = (f: () => void) => {
+  fijarIdioma('en')
+  try {
+    f()
+  } finally {
+    fijarIdioma('es')
+  }
+}
+
+test('en inglés, las frecuentes se reconocen y las sugerencias salen en inglés', () =>
+  enIngles(() => {
+    assert.equal(buscarFaq('how do I create a study plan')?.id, 'plan')
+    assert.equal(buscarFaq('where are my saved notes')?.id, 'notas')
+    assert.equal(buscarFaq('bars')?.id, 'barras')
+    assert.equal(buscarFaq('what is idempotence'), null)
+    assert.deepEqual(sugerenciasDe('repaso', false), ['Explain this screen to me', 'How do I review?', 'How do I take an exam?'])
+    assert.ok(faqs().find((f) => f.id === 'plan')!.respuesta.includes('Go to the Roadmap | #/roadmap'))
+  }))
+
+test('en inglés, ofrece cambio con «Shall I…?» y no con alternativas ni con otras preguntas', () =>
+  enIngles(() => {
+    assert.equal(ofreceCambio('It is missing tests. Shall I add it to level 1?'), true)
+    assert.equal(ofreceCambio('Do you want me to move it to Monday?'), true)
+    assert.equal(ofreceCambio('Shall I add it to level 1 or level 2?'), false)
+    assert.equal(ofreceCambio('If you like, shall I add it?'), false)
+    assert.equal(ofreceCambio('Do you want me to explain level 2?'), false)
+  }))
+
+test('el español y el inglés tienen sus frecuentes completas', () => {
+  const es = faqs()
+  enIngles(() => assert.equal(faqs().length, es.length))
+  assert.ok(es.every((f) => f.pregunta && f.respuesta && f.claves.length >= 3))
+})

@@ -11,34 +11,69 @@
   backdrop-filter: blur(4px);
 }
 .bienvenida {
-  width: min(520px, 100%);
+  width: min(480px, 100%);
   max-height: 100%;
   overflow-y: auto;
-  padding: 24px 26px;
+  padding: 28px 36px 24px;
   text-align: center;
   border: 1px solid var(--borde);
-  border-radius: var(--radio-grande, 16px);
+  border-radius: 20px;
   background: var(--tarjeta, var(--fondo));
-  box-shadow: var(--sombra-suave);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 18px 48px -12px rgb(0 0 0 / 0.28);
   outline: none;
+  animation: bienvenida-entra 260ms cubic-bezier(.2, .8, .2, 1) both;
 }
-.bienvenida h2 { margin: 4px 0 14px; font-size: 1.25rem; text-transform: none; letter-spacing: 0; }
-.bienvenida-habla { margin: 4px 0 6px; font-size: 1rem; line-height: 1.45; }
-.bienvenida-paso { margin: 0 0 4px; color: var(--suave); font-size: 0.78rem; }
-.bienvenida-botones { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0 4px; }
-/* El paso del idioma: dos botones grandes, uno al lado del otro. */
-.bienvenida-idiomas { gap: 14px; }
-.bienvenida-idioma { flex: 1 1 140px; max-width: 220px; padding: 18px 20px; font-size: 1.25rem; }
-.bienvenida-campo { flex: 1 1 220px; min-width: 0; font: inherit; padding: 8px 12px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); }
+@keyframes bienvenida-entra { from { opacity: 0; transform: translateY(10px) scale(0.985); } }
+@media (prefers-reduced-motion: reduce) { .bienvenida { animation: none; } .bienvenida-punto, .bienvenida-idioma { transition: none; } }
+.bienvenida .mascota { width: 96px; height: 96px; margin: 0 auto 14px; }
+/* El progreso: una fila de puntos (el actual se alarga) y, debajo, el texto «Paso n de m». */
+.bienvenida-progreso { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0 0 18px; }
+.bienvenida-puntos { display: flex; gap: 6px; align-items: center; height: 8px; }
+.bienvenida-punto { width: 8px; height: 8px; border-radius: 999px; background: var(--borde); transition: width 220ms ease, background 220ms ease; }
+.bienvenida-punto.hecho { background: color-mix(in srgb, var(--acento) 45%, var(--borde)); }
+.bienvenida-punto.actual { width: 26px; background: var(--acento); }
+.bienvenida h2 { margin: 0 0 8px; font-size: 1.4rem; font-weight: 650; line-height: 1.25; text-transform: none; letter-spacing: -0.01em; color: var(--texto); text-wrap: balance; }
+.bienvenida-habla { margin: 0 auto 6px; max-width: 36ch; font-size: 0.98rem; line-height: 1.55; color: var(--suave); text-wrap: pretty; }
+.bienvenida-paso { margin: 0; color: var(--suave); font-size: 0.75rem; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.bienvenida-botones { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 18px 0 4px; }
+.bienvenida .boton { min-height: 44px; padding: 10px 22px; border-radius: 12px; font-size: 0.95rem; font-weight: 550; }
+.bienvenida .boton-principal { box-shadow: 0 1px 2px rgb(0 0 0 / 0.18); }
+.bienvenida .boton:focus-visible, .bienvenida-campo:focus-visible, .bienvenida-saltar:focus-visible { outline: 3px solid color-mix(in srgb, var(--acento) 55%, transparent); outline-offset: 2px; }
+/* El paso del idioma: dos elecciones grandes, una al lado de la otra, con su sigla en un círculo. */
+.bienvenida-idiomas { gap: 14px; margin-top: 20px; }
+.bienvenida .bienvenida-idioma {
+  flex: 1 1 150px; max-width: 200px; min-height: 112px; padding: 16px 14px; border-radius: 16px; border-width: 1.5px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  font-size: 1.2rem; font-weight: 600; background: var(--fondo);
+  transition: border-color 140ms, background 140ms, transform 140ms, box-shadow 140ms;
+}
+.bienvenida .bienvenida-idioma:hover { border-color: var(--acento); background: var(--acento-suave, var(--panel)); transform: translateY(-2px); box-shadow: 0 8px 20px -10px rgb(0 0 0 / 0.35); }
+.bienvenida .bienvenida-idioma:active { transform: translateY(0); }
+.bienvenida-sigla {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px;
+  background: var(--acento); color: var(--fondo); font-size: 0.85rem; font-weight: 700; letter-spacing: 0.04em;
+}
+.bienvenida-campo { flex: 1 1 220px; min-width: 0; min-height: 44px; box-sizing: border-box; font: inherit; padding: 10px 14px; border: 1px solid var(--borde); border-radius: 12px; background: var(--fondo); color: var(--texto); }
 .bienvenida-codigo { text-align: left; }
 .bienvenida-pasos { margin: 0 0 12px; padding-left: 20px; line-height: 1.5; }
 .bienvenida-codigo .bienvenida-campo { width: 100%; box-sizing: border-box; }
 .bienvenida-error { margin: 8px 0; color: #b4544a; }
 .bienvenida-ok { margin: 8px 0; color: var(--ok); }
-.bienvenida-saltar { margin-top: 14px; border: 0; background: transparent; color: var(--suave); font: inherit; font-size: 0.85rem; text-decoration: underline; cursor: pointer; }
+.bienvenida-saltar { margin-top: 18px; padding: 6px 8px; border-radius: 8px; border: 0; background: transparent; color: var(--suave); font: inherit; font-size: 0.85rem; text-decoration: underline; cursor: pointer; }
 .bienvenida-saltar:hover { color: var(--texto); }
 .bienvenida .boton-discreto { border-color: transparent; background: transparent; color: var(--suave); font-size: 0.85rem; text-decoration: underline; }
 .bienvenida .boton-discreto:hover { color: var(--texto); }
 ul.bienvenida-pasos { list-style: none; padding-left: 0; }
 ul.bienvenida-pasos li { margin: 4px 0; }
-.bienvenida-nota { font-size: 0.75rem; opacity: 0.7; margin: 8px 0 0; }
+.bienvenida-nota { font-size: 0.75rem; color: var(--suave); margin: 14px 0 0; }
+
+@media (max-width: 480px) {
+  .bienvenida-velo { padding: 10px; align-items: flex-end; }
+  .bienvenida { padding: 22px 20px 18px; border-radius: 20px; }
+  .bienvenida .mascota { width: 80px; height: 80px; }
+  .bienvenida h2 { font-size: 1.25rem; }
+  .bienvenida-botones { flex-direction: column; align-items: stretch; }
+  .bienvenida .boton, .bienvenida-campo { width: 100%; flex: none; }
+  .bienvenida-idiomas { flex-direction: row; }
+  .bienvenida .bienvenida-idioma { flex: 1 1 0; min-width: 0; min-height: 96px; width: auto; }
+}

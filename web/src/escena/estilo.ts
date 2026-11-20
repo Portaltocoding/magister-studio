@@ -23,11 +23,11 @@ export const C = {
 }
 
 export const F = {
-  // Georgia: serif de remates redondeados; la Palatino de Windows quedaba demasiado afilada.
-  serif: "Georgia, 'Iowan Old Style', 'Source Serif 4', serif",
-  // Solo las del sistema: lo declarado es lo que se pinta (Inter y JetBrains Mono no se cargan en ningún sitio).
-  mono: "'Cascadia Code', Consolas, monospace",
-  sans: "'Segoe UI', system-ui, sans-serif",
+  // Una sola tipografía en toda la app: las pilas viven en index.css (--fuente-texto, --fuente-mono) y aquí solo se
+  // leen. `serif` y `sans` se mantienen como nombres de las escenas, pero son la misma familia.
+  serif: 'var(--fuente-texto)',
+  mono: 'var(--fuente-mono)',
+  sans: 'var(--fuente-texto)',
 }
 
 export const colorDe = (e?: Estado) =>

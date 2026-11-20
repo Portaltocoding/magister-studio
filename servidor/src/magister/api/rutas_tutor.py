@@ -18,6 +18,7 @@ from magister.aprender import practica
 from magister.datos.aprender import Servida
 from magister.datos.material import Material, Pregunta, PreguntaConcepto
 from magister.datos.sesion import nueva_sesion, sesion_por_peticion
+from magister.flujo.comun import idioma_del_alumno
 from magister.material import almacen
 
 rutas = APIRouter(prefix="/api")
@@ -98,10 +99,20 @@ async def _temas_vencidos() -> list[dict]:
     return [t for t in await repasos_de_tema() if t["vencido"]]
 
 
+def razon_de_hoy(fecha: date, hoy_: date, en: bool = False) -> str:
+    """Por qué sale esa sesión hoy, en el idioma del alumno. Puro."""
+    if fecha == hoy_:
+        return "It is due today according to your calendar." if en else "Toca hoy según tu calendario."
+    if fecha < hoy_:
+        return "You are behind: it is the first pending session." if en else "Vas con retraso: es la primera sesión pendiente."
+    return f"Next on your calendar is {fecha:%d-%m}." if en else f"Lo siguiente de tu calendario es el {fecha:%d-%m}."
+
+
 @rutas.get("/hoy")
 async def hoy() -> dict:
     # Las cinco piezas no dependen unas de otras: van a la vez, cada una con su conexión.
     hoy_ = date.today()
+    en = await idioma_del_alumno() == "en"
     fila, repasos, examen, temas, dia = await asyncio.gather(
         _sesion_que_toca(hoy_), practica.cola(datetime.now(timezone.utc)), examen_pendiente(hoy_), _temas_vencidos(),
         _sesiones_del_dia(hoy_))
@@ -114,9 +125,7 @@ async def hoy() -> dict:
     return {"estado": estado, "sesion_id": sid, "plan_id": plan_id, "tema_id": tema_id, "tema": tema, "leccion_clave": clave,
             "titulo": titulo, "fecha": fecha.isoformat(), "inicio": inicio.strftime("%H:%M") if inicio else None, "horas": horas, "material_id": material_id,
             "repasos": len(repasos), "nuevos": sum(1 for r in repasos if r["nuevo"]), "examen": examen, "dia": dia, "temas": temas,
-            "razon": ("Toca hoy según tu calendario." if fecha == hoy_ else
-                      "Vas con retraso: es la primera sesión pendiente." if fecha < hoy_ else
-                      f"Lo siguiente de tu calendario es el {fecha:%d-%m}.")}
+            "razon": razon_de_hoy(fecha, hoy_, en)}
 
 
 def colocar_preguntas(preguntas, bloques_contrato: list[dict]) -> dict[str, dict]:
@@ -265,9 +274,10 @@ class PreferenciasTutor(BaseModel):
 
 @rutas.get("/preferencias")
 async def ver_preferencias() -> dict:
-    from magister.flujo.comun import MODOS_DE_SERIE, preferencias_tutor
+    from magister.flujo.comun import modos_de_serie, preferencias_tutor
 
-    return {**await preferencias_tutor(), "modos_de_serie": MODOS_DE_SERIE}
+    p = await preferencias_tutor()
+    return {**p, "modos_de_serie": modos_de_serie(p.get("idioma"))}
 
 
 @rutas.put("/preferencias")
@@ -277,14 +287,14 @@ async def guardar_preferencias(cuerpo: PreferenciasTutor) -> dict:
 
     from magister.datos.produccion import Ajuste
 
-    from magister.flujo.comun import MODOS_DE_SERIE, preferencias_tutor
+    from magister.flujo.comun import modos_de_serie, preferencias_tutor
 
     # Se mezcla con lo guardado: quien solo cambia la longitud no borra tus instrucciones ni tus modos.
     valor = {**await preferencias_tutor(), **cuerpo.model_dump(exclude_unset=True)}
     async with nueva_sesion() as s, s.begin():
         await s.execute(insert(Ajuste).values(clave="tutor", valor=valor)
                         .on_conflict_do_update(index_elements=[Ajuste.clave], set_={"valor": valor}))
-    return {**valor, "modos_de_serie": MODOS_DE_SERIE}
+    return {**valor, "modos_de_serie": modos_de_serie(valor.get("idioma"))}
 
 
 

@@ -36,7 +36,7 @@ async def test_un_dibujo_grande_se_da_y_se_avisa(monkeypatch, caplog) -> None:
 
     monkeypatch.setattr(dg, "estructurar", estructurar_falso)
     with caplog.at_level("WARNING", logger="magister.diagramas"):
-        assert await dg._llamar("Mapa de ideas del tema", "texto") == grande
+        assert await dg._llamar("Mapa de ideas del tema", "texto") == dg.normalizar_fuente(grande)
     assert llamadas == [1] and "más grande de lo pedido" in caplog.text
 
 
@@ -63,7 +63,7 @@ async def test_la_ruta_dibuja_el_encargo(cliente) -> None:
     eco.encolar(dg.Dibujo, [{"svg": SVG}, {"svg": "no es un svg"}, {"svg": "tampoco"}, {"svg": "nada"}, {"svg": "x"}])
     r = await cliente.post("/api/diagramas", json={"encargo": "Mapa de argumentos: ¿son creencias los delirios?",
                                                    "contexto": "Bortolotti defiende que sí."})
-    assert r.status_code == 200 and r.json()["svg"] == SVG
+    assert r.status_code == 200 and r.json()["svg"] == dg.normalizar_fuente(SVG)
     # Si el modelo no da un SVG válido tras sus intentos, null: la web enseña el encargo como texto.
     r = await cliente.post("/api/diagramas", json={"encargo": "Otro mapa, que no saldrá bien", "contexto": ""})
     assert r.json()["svg"] is None
@@ -200,3 +200,15 @@ def test_trozos_del_mismo_encargo_no_se_dibujan() -> None:
     assert not dg._repetido("Otro mapa", "otro texto de antes", 103.0)  # otro diagrama de la respuesta
     assert not dg._repetido("Algo distinto", "texto de antes", 200.0)  # pasado el minuto, vale
     dg._recientes.clear()
+
+
+def test_normalizar_fuente_pisa_cualquier_font_family() -> None:
+    from magister.config import FUENTE_TEXTO
+
+    svg = ('<svg viewBox="0 0 9 9" font-family="Comic Sans MS"><style>.t{font-family:\'Courier New\', monospace;font-size:12px}</style>'
+           '<text style="font-family: Papyrus, fantasy" font-family=\'Impact\'>x</text></svg>')
+    salida = dg.normalizar_fuente(svg)
+    assert salida.count("font-family") == 1
+    assert FUENTE_TEXTO.replace('"', "'") in salida
+    assert "Comic" not in salida and "Courier" not in salida and "Papyrus" not in salida and "Impact" not in salida
+    assert "font-size:12px" in salida

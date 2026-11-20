@@ -11,7 +11,7 @@ const ETIQUETAS = new Set([
 const ATRIBUTOS = new Set([
   'viewBox', 'width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'd', 'points', 'transform',
   'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'opacity', 'fill-opacity',
-  'stroke-opacity', 'font-size', 'font-weight', 'font-family', 'font-style', 'text-anchor', 'dominant-baseline', 'dx', 'dy',
+  'stroke-opacity', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline', 'dx', 'dy',
   'marker-end', 'marker-start', 'marker-mid', 'markerWidth', 'markerHeight', 'refX', 'refY', 'orient', 'markerUnits', 'id', 'class',
 ])
 const FORMAS = 'path, rect, circle, ellipse, line, polyline, polygon'

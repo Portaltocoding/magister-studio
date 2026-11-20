@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import Colores from './Colores.tsx'
 import { acentoDe, usarColores, variables } from './colores.ts'
 import { barraAsoma, CINTA_MS, OCULTAR_BARRA_MS } from './zen.ts'
@@ -124,6 +126,7 @@ const ENFOCABLES =
 // Modo foco: pantalla completa, sin menús, con atenuado y colores. Vale para una lección, el repaso o un examen.
 // Se pinta fuera de la app (en <body>) y la app de detrás queda inerte: el Tab no se escapa.
 export default function MarcoFoco(p: Props) {
+  usarIdioma() // los textos siguen al idioma
   const [atenuar, setAtenuar] = usarAtenuar()
   const [pantalla, setPantalla] = useState(!!document.fullscreenElement)
   const [ajuste] = usarColores()
@@ -245,13 +248,13 @@ export default function MarcoFoco(p: Props) {
       style={variables(acentoDe(ajuste, p.leccion))}
       role="dialog"
       aria-modal="true"
-      aria-label={`Modo foco: ${p.titulo}`}
+      aria-label={t('foco.marco.aria', { titulo: p.titulo })}
     >
       {zen && (
         <div
           className="foco-zen-linea"
           role="progressbar"
-          aria-label="Avance de la lección"
+          aria-label={t('foco.marco.avance')}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round((p.progreso ?? 0) * 100)}
@@ -270,24 +273,24 @@ export default function MarcoFoco(p: Props) {
           {p.herramientas}
           {/* Lo de estudiar, a la vista; lo de ajustar la pantalla, en un menú. */}
           <span className="foco-ajustes" ref={caja}>
-            <button ref={botonAjustes} className="foco-boton" aria-expanded={menu} onClick={() => setMenu(!menu)} title="Atenuar, colores, ritmo y pantalla completa">
-              Ajustes ▾
+            <button ref={botonAjustes} className="foco-boton" aria-expanded={menu} onClick={() => setMenu(!menu)} title={t('foco.marco.ajustesTitulo')}>
+              {t('foco.marco.ajustes')}
             </button>
             {menu && (
               <span className="foco-ajustes-caja">
-                <button className="foco-boton" aria-pressed={atenuar} onClick={() => setAtenuar(!atenuar)} title="Atenuar los párrafos que no estás leyendo (L)">
-                  {atenuar ? '✓ ' : ''}Atenuar lo demás (L)
+                <button className="foco-boton" aria-pressed={atenuar} onClick={() => setAtenuar(!atenuar)} title={t('foco.marco.atenuarTitulo')}>
+                  {atenuar ? '✓ ' : ''}{t('foco.marco.atenuar')}
                 </button>
                 <Colores leccion={p.leccion} clase="foco-boton" />
                 <button className="foco-boton" onClick={pantallaCompleta}>
-                  {pantalla ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                  {pantalla ? t('foco.marco.salirPantalla') : t('foco.marco.pantalla')}
                 </button>
                 {p.ajustes}
               </span>
             )}
           </span>
-          <button className="foco-boton foco-salir" onClick={salir} title="Salir (Esc)">
-            Salir
+          <button className="foco-boton foco-salir" onClick={salir} title={t('foco.marco.salirTitulo')}>
+            {t('foco.marco.salir')}
           </button>
         </div>
       </header>
@@ -299,7 +302,7 @@ export default function MarcoFoco(p: Props) {
       {p.lateral}
       {cinta && (
         <span className="foco-zen-cinta" role="status">
-          Modo zen · Z o Esc para salir
+          {t('foco.marco.cinta')}
         </span>
       )}
     </div>,

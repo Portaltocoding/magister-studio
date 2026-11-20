@@ -1,6 +1,8 @@
 // Proyectos: las referencias agrupadas por el bloque del nivel 1 que cubren, el título de un paso del diario (aunque
 // ya no esté en el roadmap) y la idea que llega desde el plan. Lógica pura, con test en pruebas/referenciasProyecto.test.ts.
 
+import { t as tr } from '../i18n/i18n.ts'
+
 export interface Referencia {
   url: string
   titulo: string
@@ -17,7 +19,7 @@ export interface GrupoReferencias {
   referencias: Referencia[]
 }
 
-export const PARECIDOS = 'Proyectos parecidos'
+export const PARECIDOS = 'Proyectos parecidos' // la marca interna del grupo; la pantalla lo traduce
 
 // Primero los proyectos parecidos y luego cada bloque en su orden; el título del bloque sale del roadmap (por su id) y,
 // si ya no está, «Bloque n».
@@ -30,7 +32,7 @@ export function agruparReferencias(refs: Referencia[], bloquesNivel1: { id: stri
   for (const [n, lista] of [...porBloque].sort((a, b) => a[0] - b[0])) {
     const id = lista.find((r) => r.bloque_id)?.bloque_id
     const b = bloquesNivel1.find((x) => x.id === id) ?? (id ? undefined : bloquesNivel1[n - 1])
-    grupos.push({ titulo: b ? b.titulo : `Bloque ${n}`, referencias: lista })
+    grupos.push({ titulo: b ? b.titulo : tr('proyectos.bloqueN', { n }), referencias: lista })
   }
   return grupos
 }

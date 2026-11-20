@@ -1,11 +1,11 @@
 @page { size: A4; margin: 13mm 30mm 15mm 14mm; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-body { font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 10pt; line-height: 1.42; color: #15181d; background: #fff; }
+body { font-family: var(--fuente-texto); font-size: 10pt; line-height: 1.42; color: #15181d; background: #fff; }
 p { margin: 3px 0 6px; orphans: 3; widows: 3; }
 b, strong { color: #0b1a33; }
-code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.6pt; background: #eef1f5; padding: 0 2px; border-radius: 2px; overflow-wrap: anywhere; }
-pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8.2pt; line-height: 1.32; background: #f1f3f6; border-left: 3px solid #8a96a8; padding: 5px 8px; white-space: pre-wrap; margin: 5px 0 8px; break-inside: avoid; }
+code { font-family: var(--fuente-mono); font-size: 8.6pt; background: #eef1f5; padding: 0 2px; border-radius: 2px; overflow-wrap: anywhere; }
+pre { font-family: var(--fuente-mono); font-size: 8.2pt; line-height: 1.32; background: #f1f3f6; border-left: 3px solid #8a96a8; padding: 5px 8px; white-space: pre-wrap; margin: 5px 0 8px; break-inside: avoid; }
 pre code { background: none; padding: 0; font-size: inherit; }
 ul, ol { margin: 3px 0 6px; padding-left: 18px; }
 li { margin: 2px 0; break-inside: avoid; }

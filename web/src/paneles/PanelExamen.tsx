@@ -12,6 +12,8 @@ import { errorLegible } from '../componentes/errores.ts'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import type { IdModo } from '../modos.ts'
 import { barajar } from '../barajar.ts'
+import { idiomaActual, t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { borrarExamen, claveExamen, contador, guardarExamen, leerExamen, MAX_RESPUESTA } from '../componentes/repaso.ts'
 
 type Modo = 'examen' | 'evaluacion'
@@ -69,26 +71,23 @@ interface Resumen {
   detalle?: Detalle[]
 }
 
-const CONFIANZAS: [number, string][] = [
-  [0.25, 'No lo sé'],
-  [0.5, 'Dudo'],
-  [0.75, 'Bastante seguro'],
-  [0.95, 'Seguro'],
+const confianzas = (): [number, string][] => [
+  [0.25, t('examen.conf.025')],
+  [0.5, t('examen.conf.05')],
+  [0.75, t('examen.conf.075')],
+  [0.95, t('examen.conf.095')],
 ]
-const NOTA: Record<string, string> = { perfecta: 'Perfecta', bien: 'Bien', parcial: 'A medias', fallo: 'Fallada' }
+const nombreNota = (n: Nota): string => t(`examen.nota.${n}`)
 const PUNTOS: Record<string, number> = { perfecta: 10, bien: 8, parcial: 5, fallo: 0 }
-const TIPOS: Record<string, string> = {
-  conceptual: 'Conceptual',
-  calculo: 'Cálculo',
-  fallo: 'Encuentra el fallo',
-  escenario: 'Escenario',
-  hablada: 'En voz alta',
-  test: 'Tipo test',
-}
+const TIPOS_CONOCIDOS = ['conceptual', 'calculo', 'fallo', 'escenario', 'hablada', 'test']
+const nombreTipo = (k: string): string => (TIPOS_CONOCIDOS.includes(k) ? t(`examen.tipo.${k}` as 'examen.tipo.test') : k)
+const lengua = () => (idiomaActual() === 'en' ? 'en-GB' : 'es-ES')
+// Un decimal, con la coma o el punto de cada idioma.
+const decimal = (n: number) => (idiomaActual() === 'en' ? n.toFixed(1) : n.toFixed(1).replace('.', ','))
 const conMates = { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }
 const color = (n: number) => (n >= 8 ? 'nota-alta' : n >= 5 ? 'nota-media' : 'nota-baja')
 const fecha = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  new Date(iso).toLocaleDateString(lengua(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // Corrige una respuesta con el mismo corrector del repaso. Devuelve la nota y la explicación.
 // Las tipo test se comparan con la opción buena, sin modelo. Si el corrector falla, lanza: quien llama
@@ -98,11 +97,11 @@ const fecha = (iso: string) =>
 async function corregir(examenId: number, p: PreguntaExamen, r: Respuesta, alTrozo?: (t: string) => void) {
   const clave = claveExamen(examenId, p.pregunta_id)
   if (p.opciones?.length) {
-    const t = await pedir<{ acierto: boolean; porque: string }>(
+    const res = await pedir<{ acierto: boolean; porque: string }>(
       '/api/practica/test',
       enviarJson({ pregunta_id: p.pregunta_id, opcion: r.texto, confianza: r.confianza, clave }),
     )
-    return { nota: (t.acierto ? 'bien' : 'fallo') as Nota, explicacion: t.porque, intento_id: undefined }
+    return { nota: (res.acierto ? 'bien' : 'fallo') as Nota, explicacion: res.porque, intento_id: undefined }
   }
   let nota: Nota | null = null
   let explicacion = ''
@@ -122,15 +121,16 @@ async function corregir(examenId: number, p: PreguntaExamen, r: Respuesta, alTro
       explicacion += ev.t
       alTrozo?.(ev.t)
     } else if (ev.tipo === 'fin') intento_id = ev.intento_id
-    else if (ev.tipo === 'error') throw new Error(ev.detalle || 'No se pudo corregir')
+    else if (ev.tipo === 'error') throw new Error(ev.detalle || t('examen.noCorregir'))
   }
-  if (nota === null) throw new Error('No se pudo corregir')
+  if (nota === null) throw new Error(t('examen.noCorregir'))
   return { nota, explicacion, intento_id }
 }
 
 // ---------- Preparar ----------
 
 function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m: IdModo) => void }) {
+  usarIdioma() // los textos siguen al idioma
   const [planes, setPlanes] = useState<ResumenPlan[] | null>(null)
   const [plan, setPlan] = useState<ResumenPlan | null>(null)
   const [opciones, setOpciones] = useState<OpcionLeccion[]>([])
@@ -208,16 +208,16 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
     }
   }, [plan, planes, opciones, opcionesDe])
 
-  if (planes == null) return falloCarga ? <Cargando error={falloCarga} reintentar={reintentar} /> : <Pensando texto="Cargando…" />
+  if (planes == null) return falloCarga ? <Cargando error={falloCarga} reintentar={reintentar} /> : <Pensando texto={t('examen.cargando')} />
   if (!plan)
     return (
       <div className="panel">
-        <h1>Examen</h1>
+        <h1>{t('examen.titulo')}</h1>
         <Vacio
-          etiqueta="Sin plan todavía"
-          titulo="Para examinarte hace falta un plan con lecciones"
-          texto="Los exámenes salen de las preguntas de tus lecciones preparadas."
-          acciones={[{ texto: 'Crear un plan', principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
+          etiqueta={t('examen.sinPlan')}
+          titulo={t('examen.sinPlanTitulo')}
+          texto={t('examen.sinPlanTexto')}
+          acciones={[{ texto: t('examen.crearPlan'), principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
         />
       </div>
     )
@@ -242,11 +242,11 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
   return (
     <div className="panel examen-panel">
       <div className="cabecera-panel">
-        <h1>Examen</h1>
+        <h1>{t('examen.titulo')}</h1>
         {planes.length > 1 && (
           <span className="selector-tema">
           <span className="punto-tema" style={colorDeTema(plan.tema_id, planes)?.estilo} aria-hidden="true" />
-          <select aria-label="Plan" value={plan.plan_id} onChange={(e) => {
+          <select aria-label={t('examen.planAria')} value={plan.plan_id} onChange={(e) => {
               const p = planes.find((x) => x.plan_id === Number(e.target.value)) ?? null
               recordarPlan(p?.tema_id)
               setPlan(p)
@@ -263,16 +263,13 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
 
       {conPreguntas.length === 0 ? (
         <Vacio
-          etiqueta={`«${plan.tema}» aún no tiene preguntas`}
-          titulo="Prepara alguna lección de este plan y podrás examinarte"
-          texto={
-            'Cada lección preparada trae su banco de preguntas: de ahí salen los exámenes.' +
-            (otros.length ? ` Tus otros planes sí tienen: ${otros.map((o) => `«${o.tema}»`).join(', ')}.` : '')
-          }
+          etiqueta={t('examen.sinPreguntas', { tema: plan.tema })}
+          titulo={t('examen.preparaAlguna')}
+          texto={t('examen.bancoTexto') + (otros.length ? t('examen.otrosPlanes', { lista: otros.map((o) => `«${o.tema}»`).join(', ') }) : '')}
           acciones={[
-            { texto: 'Preparar una lección', principal: true, alPulsar: () => irA('fichas') },
+            { texto: t('examen.prepararLeccion'), principal: true, alPulsar: () => irA('fichas') },
             ...otros.slice(0, 3).map((o) => ({
-              texto: `Examinarme de «${o.tema}»`,
+              texto: t('examen.examinarmeDe', { tema: o.tema }),
               alPulsar: () => {
                 recordarPlan(o.tema_id)
                 setPlan(o)
@@ -284,16 +281,16 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
         <section className="examen-preparar">
           <div className="examen-modos">
             <button className={`opcion ${modo === 'examen' ? 'elegida' : ''}`} onClick={() => setModo('examen')}>
-              <strong>Examen</strong>
-              <small>Con reloj, sin ayudas. Corriges al entregar y sacas nota.</small>
+              <strong>{t('examen.modoExamen')}</strong>
+              <small>{t('examen.modoExamenDesc')}</small>
             </button>
             <button className={`opcion ${modo === 'evaluacion' ? 'elegida' : ''}`} onClick={() => setModo('evaluacion')}>
-              <strong>Evaluación</strong>
-              <small>Sin prisa: cada respuesta se corrige al momento y te explica lo que falló.</small>
+              <strong>{t('examen.modoEval')}</strong>
+              <small>{t('examen.modoEvalDesc')}</small>
             </button>
           </div>
 
-          <h2>¿De qué lecciones?</h2>
+          <h2>{t('examen.deQueLecciones')}</h2>
           <div className="examen-lecciones">
             {opciones.map((o) => (
               <button
@@ -301,18 +298,18 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
                 className={`examen-leccion ${elegidas.includes(o.clave) ? 'elegida' : ''}`}
                 disabled={o.preguntas === 0}
                 onClick={() => setElegidas((x) => (x.includes(o.clave) ? x.filter((c) => c !== o.clave) : [...x, o.clave]))}
-                title={o.preguntas ? `${o.preguntas} preguntas` : 'Sin preparar: no tiene preguntas'}
+                title={o.preguntas ? t('examen.nPreguntas', { n: o.preguntas }) : t('examen.sinPrepararAyuda')}
               >
                 <span className="bloques-clave">{o.clave}</span>
                 <span>{o.titulo}</span>
-                <small>{o.preguntas ? `${o.preguntas} preg.` : 'sin preparar'}</small>
+                <small>{o.preguntas ? t('examen.nPreg', { n: o.preguntas }) : t('examen.sinPreparar')}</small>
               </button>
             ))}
           </div>
 
           <div className="examen-ajustes">
             <div>
-              <h2>¿Cuántas preguntas?</h2>
+              <h2>{t('examen.cuantas')}</h2>
               <div className="respuestas-rapidas">
                 {[...new Set([5, 10, 15, 20, cantidad])].sort((a, b) => a - b).map((n) => (
                   <button key={n} className={`opcion opcion-chip ${cantidad === n ? 'elegida' : ''}`} disabled={n > disponibles && n !== 5} onClick={() => setCantidad(n)}>
@@ -320,19 +317,19 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
                   </button>
                 ))}
               </div>
-              <p className="nota">Hay {disponibles} en las lecciones elegidas.</p>
+              <p className="nota">{t('examen.hay', { n: disponibles })}</p>
             </div>
             {modo === 'examen' && (
               <div>
-                <h2>¿Cuánto tiempo?</h2>
+                <h2>{t('examen.cuantoTiempo')}</h2>
                 <div className="respuestas-rapidas">
                   {[...new Set([10, 20, 30, 45, ...(minutos && ![10, 20, 30, 45].includes(minutos) ? [minutos] : [])])].sort((a, b) => a - b).map((m) => (
                     <button key={m} className={`opcion opcion-chip ${minutos === m ? 'elegida' : ''}`} onClick={() => setMinutos(m)}>
-                      {m} min
+                      {t('examen.min', { m })}
                     </button>
                   ))}
                   <button className={`opcion opcion-chip ${minutos == null ? 'elegida' : ''}`} onClick={() => setMinutos(null)}>
-                    Sin límite
+                    {t('examen.sinLimite')}
                   </button>
                 </div>
               </div>
@@ -341,16 +338,16 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
           {error && <TextoError texto={error} />}
           <div className="vacio-acciones">
             <button className="boton boton-principal" disabled={!elegidas.length || !disponibles} onClick={empezar}>
-              {modo === 'examen' ? 'Empezar el examen' : 'Empezar la evaluación'}
+              {modo === 'examen' ? t('examen.empezarExamen') : t('examen.empezarEval')}
             </button>
-            <span className="nota">Se abre en modo foco. Lo que respondas cuenta para tu repaso.</span>
+            <span className="nota">{t('examen.seAbre')}</span>
           </div>
         </section>
       )}
 
       {historial.length > 0 && (
         <section className="pg-seccion">
-          <h2>Tus exámenes</h2>
+          <h2>{t('examen.tusExamenes')}</h2>
           <ol className="examen-historial">
             {historial.map((h) => (
               <li key={h.id}>
@@ -358,12 +355,12 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
                   onClick={() =>
                     pedir<Resumen>(`/api/examenes/${h.id}`)
                       .then(setViendo)
-                      .catch((e) => setError(`No he podido abrir ese examen: ${(e as Error).message}`))
+                      .catch((e) => setError(t('examen.noAbrir', { motivo: (e as Error).message })))
                   }
                 >
-                  <strong className={`examen-nota-mini ${color(h.nota ?? 0)}`}>{(h.nota ?? 0).toFixed(1).replace('.', ',')}</strong>
+                  <strong className={`examen-nota-mini ${color(h.nota ?? 0)}`}>{decimal(h.nota ?? 0)}</strong>
                   <span>
-                    {h.modo === 'examen' ? 'Examen' : 'Evaluación'} · {h.lecciones.join(', ')} · {h.preguntas} preguntas
+                    {t('examen.preguntasN', { modo: h.modo === 'examen' ? t('examen.modoExamen') : t('examen.modoEval'), lecciones: h.lecciones.join(', '), n: h.preguntas })}
                   </span>
                   <small>
                     {fecha(h.creado)}
@@ -372,10 +369,10 @@ function Preparar({ alEmpezar, irA }: { alEmpezar: (e: Examen) => void; irA: (m:
                 </button>
                 <button
                   className="borrar"
-                  aria-label="Quitar del historial"
-                  title="Quitar del historial (lo que respondiste sigue contando para tu repaso)"
+                  aria-label={t('examen.quitarAria')}
+                  title={t('examen.quitarAyuda')}
                   onClick={async () => {
-                    if (!confirm('¿Quitar este examen del historial? Lo que respondiste sigue contando para tu repaso.')) return
+                    if (!confirm(t('examen.quitarConfirmar'))) return
                     await pedir(`/api/examenes/${h.id}`, { method: 'DELETE' })
                     setHistorial((x) => x.filter((y) => y.id !== h.id))
                   }}
@@ -404,6 +401,7 @@ function Haciendo({
   alSalir: () => void
   guardado?: { respuestas: Record<string, Respuesta>; i: number; inicio: number } | null
 }) {
+  usarIdioma() // los textos siguen al idioma
   const { preguntas } = examen
   const evaluacion = examen.modo === 'evaluacion'
   const [i, setI] = useState(() => Math.min(Math.max(0, guardado?.i ?? 0), preguntas.length - 1))
@@ -488,7 +486,7 @@ function Haciendo({
           const c = await corregir(examen.id, q, finales[q.pregunta_id])
           finales[q.pregunta_id] = { ...finales[q.pregunta_id], ...c }
         } catch {
-          finales[q.pregunta_id] = { ...finales[q.pregunta_id], nota: null, explicacion: 'No se pudo corregir.' }
+          finales[q.pregunta_id] = { ...finales[q.pregunta_id], nota: null, explicacion: t('examen.noCorregirPunto') }
         }
         setCorrigiendo((c) => c && { ...c, hechas: c.hechas + 1 })
       }
@@ -529,7 +527,7 @@ function Haciendo({
       setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: c.nota, intento_id: c.intento_id, explicacion: c.explicacion } }))
     } catch (e) {
       // Sin esto se quedaba en «Corrigiendo…» para siempre; así se puede volver a comprobar.
-      setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: null, explicacion: `No he podido corregirla. ${errorLegible(mensajeDe(e)).mensaje} Pulsa «Comprobar» otra vez.` } }))
+      setResp((x) => ({ ...x, [p.pregunta_id]: { ...x[p.pregunta_id], nota: null, explicacion: t('examen.noCorregirla', { motivo: errorLegible(mensajeDe(e)).mensaje }) } }))
     } finally {
       setCorrigiendoUna(false)
     }
@@ -557,21 +555,21 @@ function Haciendo({
 
   return (
     <MarcoFoco
-      titulo={evaluacion ? 'Evaluación' : 'Examen'}
+      titulo={evaluacion ? t('examen.modoEval') : t('examen.modoExamen')}
       placa={evaluacion ? 'EV' : 'EX'}
       alSalir={() => {
-        if (corrigiendo || confirm('¿Salir? Lo que llevas no se guarda.')) alSalir()
+        if (corrigiendo || confirm(t('examen.salirConfirmar'))) alSalir()
       }}
       teclas={teclas}
       pasos={
-        <ol className="foco-pasos" aria-label="Preguntas">
+        <ol className="foco-pasos" aria-label={t('examen.preguntasAria')}>
           {preguntas.map((q, k) => {
             const x = resp[q.pregunta_id]
             return (
               <li key={q.pregunta_id}>
                 <button
                   className={`foco-paso corto ${k === i ? 'actual' : ''} ${x?.nota ? `nota-${x.nota}` : x?.texto.trim() ? 'vista' : ''} ${x?.marcada ? 'marcada' : ''}`}
-                  aria-label={`Pregunta ${k + 1}`}
+                  aria-label={t('examen.preguntaN', { n: k + 1 })}
                   disabled={!!corrigiendo}
                   onClick={() => setI(k)}
                 />
@@ -581,7 +579,7 @@ function Haciendo({
         </ol>
       }
       reloj={
-        <span className={`foco-reloj ${queda != null && queda < 60 ? 'pausado' : ''}`} title={queda != null ? 'Tiempo que queda' : 'Tiempo'}>
+        <span className={`foco-reloj ${queda != null && queda < 60 ? 'pausado' : ''}`} title={queda != null ? t('examen.tiempoQueda') : t('examen.tiempo')}>
           {queda != null ? `⏳ ${reloj(queda)}` : reloj(segundos)}
         </span>
       }
@@ -589,24 +587,24 @@ function Haciendo({
         !corrigiendo && (
           <>
             <button className="boton" disabled={i === 0} onClick={() => setI(i - 1)}>
-              ← Anterior
+              {t('examen.anterior')}
             </button>
             <span className="foco-atajos">
-              {contestadas} de {preguntas.length} contestadas · ← → para moverte (fuera de la caja de texto)
+              {t('examen.contestadas', { n: contestadas, total: preguntas.length })}
             </span>
             {!evaluacion && (
               <button className="boton-mini" aria-pressed={r.marcada} onClick={() => poner({ marcada: !r.marcada })}>
-                {r.marcada ? '★ Marcada' : '☆ Marcar para revisar'}
+                {r.marcada ? t('examen.marcada') : t('examen.marcar')}
               </button>
             )}
             {!ultimo && (
               <button className={`boton ${evaluacion && !corregida ? '' : 'boton-principal'}`} onClick={() => setI(i + 1)}>
-                Siguiente →
+                {t('examen.siguiente')}
               </button>
             )}
             {(ultimo || !evaluacion) && (
               <button className={`boton ${ultimo ? 'boton-principal' : ''}`} onClick={() => (contestadas < preguntas.length ? setConfirmar(true) : entregar())}>
-                {evaluacion ? 'Terminar' : 'Entregar'}
+                {evaluacion ? t('examen.terminar') : t('examen.entregar')}
               </button>
             )}
           </>
@@ -615,20 +613,20 @@ function Haciendo({
     >
       {corrigiendo ? (
         <section className="foco-descanso">
-          <span className="foco-etq">Corrigiendo</span>
+          <span className="foco-etq">{t('examen.corrigiendo')}</span>
           <div className="examen-corrigiendo">
             <Pensando />
           </div>
           <p>
             {corrigiendo.deUnaVez
-              ? `Corrigiendo tus ${corrigiendo.total} respuestas de una vez contra las respuestas de referencia. Los tipo test ya están corregidos.`
-              : `${corrigiendo.hechas} de ${corrigiendo.total} respuestas corregidas. El corrector lee cada una contra la respuesta de referencia y tus fuentes.`}
+              ? t('examen.corrigiendoVez', { n: corrigiendo.total })
+              : t('examen.corrigiendoUna', { hechas: corrigiendo.hechas, total: corrigiendo.total })}
           </p>
         </section>
       ) : (
         <article className="foco-idea examen-pregunta">
           <span className="foco-etq">
-            Pregunta {i + 1} de {preguntas.length} · {p.leccion_clave} · {TIPOS[p.tipo] ?? p.tipo}
+            {t('examen.preguntaDe', { i: i + 1, total: preguntas.length, leccion: p.leccion_clave, tipo: nombreTipo(p.tipo) })}
           </span>
           <div className="examen-enunciado">
             <Markdown {...conMates}>{p.enunciado}</Markdown>
@@ -656,22 +654,22 @@ function Haciendo({
             disabled={corregida || corrigiendoUna}
             maxLength={MAX_RESPUESTA}
             onChange={(e) => poner({ texto: e.target.value })}
-            placeholder="Tu respuesta, con tus palabras"
-            aria-label="Tu respuesta"
+            placeholder={t('examen.tuRespuestaPh')}
+            aria-label={t('examen.tuRespuesta')}
             autoFocus
           />
           {!corregida && contador(r.texto.length).visible && (
             <p className="nota" aria-live="polite">
-              {contador(r.texto.length).texto} caracteres
+              {t('examen.caracteres', { texto: contador(r.texto.length).texto })}
             </p>
           )}
           </>
           )}
           <div className="foco-confianza">
-            <span>¿Cómo de seguro estás?</span>
-            {CONFIANZAS.map(([v, t]) => (
+            <span>{t('examen.comoSeguro')}</span>
+            {confianzas().map(([v, nombre]) => (
               <button key={v} className="opcion opcion-chip" data-elegida={r.confianza === v} disabled={corregida} onClick={() => poner({ confianza: v })}>
-                {t}
+                {nombre}
               </button>
             ))}
             {evaluacion && !corregida && (
@@ -680,25 +678,25 @@ function Haciendo({
                 disabled={!r.texto.trim() || r.texto.trim().length > MAX_RESPUESTA || corrigiendoUna}
                 onClick={comprobarAhora}
               >
-                {corrigiendoUna ? 'Corrigiendo…' : 'Comprobar'}
+                {corrigiendoUna ? t('examen.corrigiendoPunto') : t('examen.comprobar')}
               </button>
             )}
           </div>
           {evaluacion && (corrigiendoUna || r.explicacion) && (
             <div className={`correccion nota-${r.nota ?? ''}`}>
               {/* «Leyendo…» solo mientras se corrige: si falló, se queda el motivo y se puede volver a comprobar. */}
-              {r.nota ? <strong>{NOTA[r.nota]}</strong> : corrigiendoUna ? <Pensando texto="Leyendo tu respuesta…" /> : null}
+              {r.nota ? <strong>{nombreNota(r.nota)}</strong> : corrigiendoUna ? <Pensando texto={t('examen.leyendo')} /> : null}
               <Markdown {...conMates}>{r.explicacion ?? ''}</Markdown>
             </div>
           )}
           {confirmar && (
             <div className="foco-aviso examen-confirmar" role="alertdialog">
-              Te quedan {preguntas.length - contestadas} sin contestar: cuentan como falladas.
+              {t('examen.sinContestar', { n: preguntas.length - contestadas })}
               <button className="boton boton-principal" onClick={entregar}>
-                Entregar igualmente
+                {t('examen.entregarIgual')}
               </button>
               <button className="boton" onClick={() => setConfirmar(false)}>
-                Seguir
+                {t('examen.seguir')}
               </button>
             </div>
           )}
@@ -711,6 +709,7 @@ function Haciendo({
 // ---------- Resultado ----------
 
 function Resultado({ resumen, alVolver, irA }: { resumen: Resumen; alVolver: () => void; irA: (m: IdModo) => void }) {
+  usarIdioma() // los textos siguen al idioma
   const detalle = resumen.detalle ?? []
   const nota = resumen.nota ?? 0
   const porLeccion = useMemo(() => {
@@ -724,9 +723,9 @@ function Resultado({ resumen, alVolver, irA }: { resumen: Resumen; alVolver: () 
     <div className="panel examen-panel">
       <section className={`examen-nota ${color(nota)}`}>
         <div>
-          <span className="pg-etq">{resumen.modo === 'examen' ? 'Examen' : 'Evaluación'} · {fecha(resumen.creado)}</span>
-          <strong>{nota.toFixed(1).replace('.', ',')}</strong>
-          <span>sobre 10{resumen.segundos ? ` · en ${reloj(resumen.segundos)}` : ''}</span>
+          <span className="pg-etq">{resumen.modo === 'examen' ? t('examen.modoExamen') : t('examen.modoEval')} · {fecha(resumen.creado)}</span>
+          <strong>{decimal(nota)}</strong>
+          <span>{t('examen.sobre10')}{resumen.segundos ? t('examen.enTiempo', { reloj: reloj(resumen.segundos) }) : ''}</span>
         </div>
         <ul className="examen-por-leccion">
           {porLeccion.map((l) => (
@@ -735,18 +734,18 @@ function Resultado({ resumen, alVolver, irA }: { resumen: Resumen; alVolver: () 
               <span className="barra">
                 <span style={{ width: `${l.nota * 10}%` }} />
               </span>
-              <small>{l.nota.toFixed(1).replace('.', ',')}</small>
+              <small>{decimal(l.nota)}</small>
             </li>
           ))}
         </ul>
         <div className="botones">
           {falladas > 0 && (
             <button className="boton boton-principal" onClick={() => irA('repaso')}>
-              Repasar las {falladas} que fallaste
+              {t('examen.repasar', { n: falladas })}
             </button>
           )}
           <button className="boton" onClick={alVolver}>
-            Otro examen
+            {t('examen.otro')}
           </button>
         </div>
       </section>
@@ -756,16 +755,16 @@ function Resultado({ resumen, alVolver, irA }: { resumen: Resumen; alVolver: () 
           <li key={d.pregunta_id} className={`nota-borde-${d.nota ?? 'fallo'}`}>
             <div className="examen-revision-cabecera">
               <span className="foco-etq">
-                {k + 1} · {d.leccion_clave} · {TIPOS[d.tipo] ?? d.tipo}
+                {k + 1} · {d.leccion_clave} · {nombreTipo(d.tipo)}
               </span>
-              <span className={`chip nota-${d.nota ?? 'fallo'}`}>{d.nota ? NOTA[d.nota] : 'Sin responder'}</span>
+              <span className={`chip nota-${d.nota ?? 'fallo'}`}>{d.nota ? nombreNota(d.nota) : t('examen.sinResponder')}</span>
             </div>
             <div className="examen-enunciado">
               <Markdown {...conMates}>{d.enunciado}</Markdown>
             </div>
             <p className="examen-tuya">
-              <small>Tu respuesta</small>
-              {d.respuesta || <em>Sin responder</em>}
+              <small>{t('examen.tuResp')}</small>
+              {d.respuesta || <em>{t('examen.sinResponder')}</em>}
             </p>
             {d.explicacion && (
               <div className="examen-correccion">
@@ -774,7 +773,7 @@ function Resultado({ resumen, alVolver, irA }: { resumen: Resumen; alVolver: () 
             )}
             {d.referencia && (
               <details>
-                <summary>Ver la respuesta de referencia</summary>
+                <summary>{t('examen.verReferencia')}</summary>
                 <Markdown {...conMates}>{d.referencia}</Markdown>
               </details>
             )}

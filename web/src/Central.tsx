@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import Pensando, { NOMBRES, VARIANTES } from './componentes/Pensando.tsx'
+import Pensando, { nombreVariante, VARIANTES } from './componentes/Pensando.tsx'
 import FalloPantalla from './componentes/FalloPantalla.tsx'
 import EstudioLibre from './EstudioLibre.tsx'
 import { familiaDe, nombreModo, type IdModo } from './modos.ts'
@@ -142,7 +142,7 @@ function Panel({
             {VARIANTES.map((v) => (
               <figure key={v}>
                 <Pensando variante={v} />
-                <figcaption>{NOMBRES[v]}</figcaption>
+                <figcaption>{nombreVariante(v)}</figcaption>
               </figure>
             ))}
           </div>

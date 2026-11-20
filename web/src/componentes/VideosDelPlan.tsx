@@ -7,6 +7,8 @@ import { enviarJson, ErrorApi, leerSSE, pedir } from '../api.ts'
 import BarraCuota from './BarraCuota.tsx'
 import { irARuta } from './Vacio.tsx'
 import { mensajeDe, TextoError } from './Cargando.tsx'
+import { t as tr } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 interface Recomendados {
   cuantos: 'ninguno' | 'pocos' | 'normal' | 'muchos'
@@ -35,12 +37,7 @@ type EventoTrabajo =
   | { tipo: 'fin' }
   | { tipo: 'error'; detalle: string }
 
-const CUANTOS: Record<Recomendados['cuantos'], string> = {
-  ninguno: 'Sin vídeos',
-  pocos: 'Pocos vídeos',
-  normal: 'Algunos vídeos',
-  muchos: 'Muchos vídeos',
-}
+const cuantosTexto = (c: Recomendados['cuantos']): string => tr(`video.plan.cuantos.${c}`)
 
 // Las fases de los apuntes (las mismas que nombra Lecciones).
 const FASES_APUNTES = new Set(['entrada', 'contrato', 'escribir', 'lint', 'juez', 'refinar', 'aceptar', 'montar', 'completitud', 'ampliar', 'preguntas', 'pintar'])
@@ -51,13 +48,13 @@ const MAX_CORTES = 6
 const ESPERA_CORTE_MS = 4000
 
 function etiqueta(t: Seguimiento): string {
-  if (t.estado === 'comprobando') return 'Listo. Comprobando el vídeo…'
-  if (t.estado === 'hecho') return 'Listo'
-  if (t.nodo === 'guion') return 'Haciendo el vídeo…'
-  if (t.nodo === 'diapositivas') return 'Haciendo las diapositivas…'
+  if (t.estado === 'comprobando') return tr('video.plan.comprobando')
+  if (t.estado === 'hecho') return tr('video.plan.listo')
+  if (t.nodo === 'guion') return tr('video.plan.haciendoVideo')
+  if (t.nodo === 'diapositivas') return tr('video.plan.haciendoDiapos')
   if (t.nodo && FASES_APUNTES.has(t.nodo))
-    return t.conApuntes ? `Preparando los apuntes…${t.total > 1 ? ` (bloque ${t.paso + 1} de ${t.total})` : ''}` : 'Empezando…'
-  return t.estado === 'en_curso' ? 'Empezando…' : 'En cola…'
+    return t.conApuntes ? `${tr('video.plan.preparando')}${t.total > 1 ? tr('video.plan.bloque', { paso: t.paso + 1, total: t.total }) : ''}` : tr('video.plan.empezando')
+  return t.estado === 'en_curso' ? tr('video.plan.empezando') : tr('video.plan.enCola')
 }
 
 const esperar = (ms: number, signal: AbortSignal) =>
@@ -85,6 +82,7 @@ export default function VideosDelPlan({
   // Al acabar un trabajo: Roadmap vuelve a leer qué tiene cada lección (apuntes listos).
   alAcabar?: () => void
 }) {
+  usarIdioma() // los textos siguen al idioma
   const [r, setR] = useState<Recomendados | null>(null)
   const [pidiendo, setPidiendo] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -155,7 +153,7 @@ export default function VideosDelPlan({
             if (c.signal.aborted) break
             if (e instanceof ErrorApi && e.codigo === 404) {
               final = 'fallido'
-              poner({ estado: 'fallido', error: 'Ya no encuentro ese trabajo.' })
+              poner({ estado: 'fallido', error: tr('video.plan.noTrabajo') })
             }
           }
         }
@@ -209,7 +207,7 @@ export default function VideosDelPlan({
         const t = d.ultimo_trabajo
         if (t && EN_MARCHA.includes(t.estado)) {
           setElegida(null)
-          setAviso(`${clave} ya se estaba preparando: te enseño cómo va. Si al acabar falta el vídeo, pídelo entonces.`)
+          setAviso(tr('video.plan.yaPreparando', { clave }))
           seguir(clave, t.id, conApuntes, false)
           return
         }
@@ -234,28 +232,30 @@ export default function VideosDelPlan({
   const todos = r.lecciones.length > 0 && hechos === r.lecciones.length
   return (
     <section className="videos-plan">
-      <h2>Vídeos de este plan</h2>
+      <h2>{tr('video.plan.titulo')}</h2>
       <p className="nota">
         {r.cuantos === 'ninguno'
-          ? 'No te propongo vídeos. Si un tema se te atraganta, pide más.'
+          ? tr('video.plan.ninguno')
           : r.lecciones.length === 0
-            ? 'Este plan aún no tiene lecciones para proponerte vídeos.'
+            ? tr('video.plan.sinLecciones')
             : todos
-              ? `Ya tienes ${hechos === 1 ? 'el vídeo que te propongo' : `los ${hechos} vídeos que te propongo`}. Si quieres más, pulsa Más.`
-              : 'Para las lecciones más duras (o las que más fallas), un vídeo animado antes de estudiarlas. Sale de los apuntes: si la lección aún no los tiene, se preparan antes.'}
+              ? hechos === 1
+                ? tr('video.plan.yaTienes1')
+                : tr('video.plan.yaTienesN', { n: hechos })
+              : tr('video.plan.intro')}
       </p>
       <div className="videos-plan-ajustes">
-        <span className="chip">{CUANTOS[r.cuantos]}</span>
+        <span className="chip">{cuantosTexto(r.cuantos)}</span>
         <button className="boton-mini" disabled={r.cuantos === 'ninguno'} onClick={() => cambiar({ hacia: 'menos' })}>
-          Menos
+          {tr('video.plan.menos')}
         </button>
         <button className="boton-mini" disabled={r.cuantos === 'muchos'} onClick={() => cambiar({ hacia: 'mas' })}>
-          Más
+          {tr('video.plan.mas')}
         </button>
-        <span className="videos-plan-duracion" role="radiogroup" aria-label="Duración de cada vídeo">
+        <span className="videos-plan-duracion" role="radiogroup" aria-label={tr('video.plan.duracionAria')}>
           {[3, 6, 10].map((m) => (
             <button key={m} role="radio" aria-checked={r.minutos === m} className={`boton-mini ${r.minutos === m ? 'elegido' : ''}`} onClick={() => cambiar({ minutos: m })}>
-              {m} min
+              {tr('video.min', { m })}
             </button>
           ))}
         </span>
@@ -279,9 +279,9 @@ export default function VideosDelPlan({
                 </span>
                 {l.con_video ? (
                   <span className="videos-plan-accion">
-                    {t?.estado === 'hecho' && <small role="status">Listo</small>}
+                    {t?.estado === 'hecho' && <small role="status">{tr('video.plan.listo')}</small>}
                     <button className="boton-mini" onClick={() => irARuta(temaId ? `#/video/${temaId}` : '#/video')}>
-                      ▶ Ver
+                      {tr('video.plan.ver')}
                     </button>
                   </span>
                 ) : enCurso ? (
@@ -290,25 +290,25 @@ export default function VideosDelPlan({
                   </small>
                 ) : (
                   <button className="boton-mini" disabled={pidiendo === l.clave} aria-expanded={elegida === l.clave} onClick={abrirConfirmar}>
-                    {fallo ? 'Reintentar' : conApuntes ? 'Preparar y hacer vídeo' : 'Hacer vídeo'}
+                    {fallo ? tr('video.plan.reintentar') : conApuntes ? tr('video.plan.prepararHacer') : tr('video.plan.hacerVideo')}
                   </button>
                 )}
                 {!l.con_video && t && (fallo || t.estado === 'cortado') && (
                   <div className="videos-plan-fallo">
                     {t.estado === 'fallido' ? (
-                      <TextoError texto={t.error} antes="No ha salido. " rol="status" className="nota" />
+                      <TextoError texto={t.error} antes={tr('video.plan.noSalio')} rol="status" className="nota" />
                     ) : t.estado === 'cancelado' ? (
-                      <p className="nota" role="status">Cancelado.</p>
+                      <p className="nota" role="status">{tr('video.plan.cancelado')}</p>
                     ) : t.estado === 'cortado' ? (
                       <p className="nota" role="status">
-                        Sigue en marcha, pero he dejado de mirarlo.{' '}
+                        {tr('video.plan.cortado')}{' '}
                         <button className="boton-mini" onClick={() => seguir(l.clave, t.id, t.conApuntes, t.propio)}>
-                          Volver a mirar
+                          {tr('video.plan.volverMirar')}
                         </button>
                       </p>
                     ) : (
                       <p className="nota" role="status">
-                        Ha acabado, pero el vídeo no ha pasado la revisión. Puedes mirar la lección en Lecciones o reintentarlo.
+                        {tr('video.plan.sinRevision')}
                       </p>
                     )}
                   </div>
@@ -318,12 +318,11 @@ export default function VideosDelPlan({
                     {conApuntes ? (
                       <>
                         <p className="nota">
-                          Prepara los apuntes de {l.clave} (con sus fichas) y después hace el vídeo de {r.minutos} min. Tarda unos minutos y
-                          puedes seguir usando la app.
+                          {tr('video.plan.confirmaApuntes', { clave: l.clave, min: r.minutos })}
                         </p>
-                        <small className="videos-plan-cuota">Los apuntes</small>
+                        <small className="videos-plan-cuota">{tr('video.plan.losApuntes')}</small>
                         <BarraCuota accion={{ accion: 'material' }} />
-                        <small className="videos-plan-cuota">El vídeo de {r.minutos} min</small>
+                        <small className="videos-plan-cuota">{tr('video.plan.elVideo', { min: r.minutos })}</small>
                         <BarraCuota accion={{ accion: 'video', minutos: r.minutos }} />
                       </>
                     ) : (
@@ -331,10 +330,10 @@ export default function VideosDelPlan({
                     )}
                     <button className="boton boton-principal" disabled={pidiendo === l.clave} onClick={() => hacer(l.clave, conApuntes)}>
                       {pidiendo === l.clave
-                        ? 'Pidiéndolo…'
+                        ? tr('video.plan.pidiendolo')
                         : conApuntes
-                          ? `Preparar los apuntes y hacer el vídeo de ${r.minutos} min`
-                          : `Hacer el vídeo de ${r.minutos} min`}
+                          ? tr('video.plan.prepararYHacer', { min: r.minutos })
+                          : tr('video.plan.hacerDe', { min: r.minutos })}
                     </button>
                   </div>
                 )}

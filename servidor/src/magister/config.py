@@ -6,6 +6,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _archivo_env = Path(__file__).resolve().parents[2] / ".env"
 RAIZ_SERVIDOR = Path(__file__).resolve().parents[2]
 
+# Tipografía única: la misma familia en la web, los diagramas, los vídeos, las diapositivas y los PDF. Son fuentes del
+# sistema, sin descargar nada (la CSP solo admite font-src 'self' data:). En la web los mismos valores están en
+# web/src/index.css (--fuente-texto, --fuente-mono); web/pruebas/tipografia.test.ts vigila que no se separen.
+FUENTE_TEXTO = "system-ui, -apple-system, 'Segoe UI', 'Noto Sans', 'DejaVu Sans', Arial, sans-serif"
+FUENTE_MONO = "ui-monospace, 'Cascadia Code', Consolas, 'DejaVu Sans Mono', monospace"
+
 # Lo que depende del sistema: el ejecutable de Piper y el Chrome con el que se pinta el PDF (en Docker, Chromium).
 _PIPER = "piper.exe" if sys.platform == "win32" else "piper"
 _CHROME = {

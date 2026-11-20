@@ -61,3 +61,6 @@ export function cortarTitulo(texto: string, max: number): string {
   if (corte < hueco / 2) corte = hueco
   return `${limpio.slice(0, corte).replace(/[\s,.;:–-]+$/, '')}…`
 }
+
+// El «locale» de las fechas y los números según el idioma de ahora.
+export const localeActual = () => (idiomaActual() === 'en' ? 'en-GB' : 'es-ES')

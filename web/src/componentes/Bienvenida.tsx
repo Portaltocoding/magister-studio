@@ -81,14 +81,21 @@ export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectad
   return (
     <div className="bienvenida-velo">
       <div className="bienvenida" role="dialog" aria-modal="true" aria-labelledby="bienvenida-titulo" tabIndex={-1} ref={caja}>
+        <div className="bienvenida-progreso">
+          <div className="bienvenida-puntos" aria-hidden="true">
+            {pasos.map((p, i) => (
+              <span key={p} className={`bienvenida-punto${i + 1 < n ? ' hecho' : i + 1 === n ? ' actual' : ''}`} />
+            ))}
+          </div>
+          <p className="bienvenida-paso">
+            {paso === 'idioma' ? traducir('es', 'bienvenida.paso', { n, de }) : t('bienvenida.paso', { n, de })}
+          </p>
+        </div>
         <Mascota gesto={gesto} />
+        <h2 id="bienvenida-titulo">{tituloDe(paso, idioma)}</h2>
         <p className="bienvenida-habla" aria-live="polite">
           {textoMascota(paso, nombre, modo, idioma)}
         </p>
-        <p className="bienvenida-paso">
-          {paso === 'idioma' ? traducir('es', 'bienvenida.paso', { n, de }) : t('bienvenida.paso', { n, de })}
-        </p>
-        <h2 id="bienvenida-titulo">{tituloDe(paso, idioma)}</h2>
 
         {paso === 'idioma' && <PasoIdioma alSeguir={avanzar} />}
         {paso === 'nombre' && (
@@ -165,6 +172,9 @@ function PasoIdioma({ alSeguir }: { alSeguir: () => void }) {
             className="boton bienvenida-idioma"
             onClick={() => elegir(i.id)}
           >
+            <span className="bienvenida-sigla" aria-hidden="true">
+              {i.id.toUpperCase()}
+            </span>
             {i.nombre}
           </button>
         ))}

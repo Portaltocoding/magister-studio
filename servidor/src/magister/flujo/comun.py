@@ -88,7 +88,8 @@ class _Espera:
     async def _adelantar(self) -> None:
         latido_actual.set(None)  # el guion no tiene latido propio ni pide otro guion
         try:
-            a = await estructurar(cargar("adelanto").rellenar(), self.pregunta[:4000], Adelanto, cachear=True)
+            sistema = await con_idioma_del_alumno(cargar("adelanto").rellenar())  # las frases salen en su idioma
+            a = await estructurar(sistema, self.pregunta[:4000], Adelanto, cachear=True)
         except Exception:  # noqa: BLE001  (sin guion ni frases, se espera igual)
             return
         if not self.cerrada:
@@ -463,6 +464,7 @@ async def acciones_de_estudio(estado: dict, sin_fuentes: bool) -> None:
     mensaje = estado.get("mensaje", "")
     consulta = estado.get("consulta") or mensaje
     acciones: list[dict] = []
+    en = await idioma_del_alumno() == "en"  # las etiquetas de los botones, en su idioma
     # En una conversación sobre un proyecto, las lecciones de sus planes (y «Hacer un plan») no vienen a cuento.
     proyecto = de_proyecto(estado)
     try:
@@ -472,16 +474,19 @@ async def acciones_de_estudio(estado: dict, sin_fuentes: bool) -> None:
     if leccion:
         c = leccion["clave"]
         if leccion["apuntes_id"]:
-            acciones.append({"tipo": "ir", "etiqueta": f"Estudiar {c} en modo foco", "ruta": f"#/tutor/foco/{leccion['apuntes_id']}"})
+            acciones.append({"tipo": "ir", "etiqueta": f"Study {c} in focus mode" if en else f"Estudiar {c} en modo foco",
+                             "ruta": f"#/tutor/foco/{leccion['apuntes_id']}"})
         else:
-            acciones.append({"tipo": "ir", "etiqueta": f"Preparar {c}: {leccion['titulo']}", "ruta": f"#/fichas/{leccion['tema_id']}/{c}"})
+            acciones.append({"tipo": "ir", "etiqueta": f"Prepare {c}: {leccion['titulo']}" if en else f"Preparar {c}: {leccion['titulo']}",
+                             "ruta": f"#/fichas/{leccion['tema_id']}/{c}"})
         if leccion["preguntas"]:
-            acciones.append({"tipo": "ir", "etiqueta": f"Test rápido de {c}",
+            acciones.append({"tipo": "ir", "etiqueta": f"Quick quiz on {c}" if en else f"Test rápido de {c}",
                              "ruta": f"#/examen/{leccion['plan_id']}/{c}/5/10"})
     if sin_fuentes:
-        acciones.append({"tipo": "buscar", "etiqueta": "Buscar documentos sobre esto", "consulta": consulta[:200]})
+        acciones.append({"tipo": "buscar", "etiqueta": "Find documents about this" if en else "Buscar documentos sobre esto",
+                         "consulta": consulta[:200]})
     if not leccion and not proyecto:
-        acciones.append({"tipo": "ir", "etiqueta": "Hacer un plan de este tema", "ruta": "#/nuevo-plan"})
+        acciones.append({"tipo": "ir", "etiqueta": "Make a plan for this topic" if en else "Hacer un plan de este tema", "ruta": "#/nuevo-plan"})
     if acciones:
         escribir(acciones=acciones[:3])
 
@@ -535,6 +540,25 @@ def modo_activo(p: dict) -> dict | None:
     return next((x for x in [*MODOS_DE_SERIE, *(p.get("modos") or [])] if x.get("id") == p.get("modo")), None)
 
 
+# El nombre y la descripción de los modos de serie, tal como se enseñan en inglés (las reglas son del prompt y se quedan).
+MODOS_EN = {
+    "socratico": ("Socratic", "Learn by thinking: I ask you questions instead of explaining."),
+    "feynman": ("You explain it", "You explain, I look for the gaps (Feynman technique)."),
+    "entrevista": ("Technical interview", "I interview you like a senior engineer and grade you."),
+    "desde_cero": ("From scratch", "Taking nothing for granted, step by step."),
+    "practica": ("Coding practice", "Exercises with starter code and tests, as in TDD."),
+    "repaso": ("Quick review", "Short questions to recall things, no lectures."),
+}
+
+
+def modos_de_serie(idioma: str | None) -> list[dict]:
+    """Los modos de serie para enseñar: con el nombre y la descripción en el idioma del alumno. Puro."""
+    if idioma != "en":
+        return MODOS_DE_SERIE
+    return [{**m, "nombre": MODOS_EN[m["id"]][0], "para": MODOS_EN[m["id"]][1]} if m["id"] in MODOS_EN else m
+            for m in MODOS_DE_SERIE]
+
+
 async def preferencias_tutor() -> dict:
     from magister.datos.produccion import Ajuste
     from magister.datos.sesion import nueva_sesion
@@ -570,6 +594,14 @@ IDIOMA_INGLES_PLAN = ("The student chose English. Write everything the student w
 def con_idioma(sistema: str, p: dict) -> str:
     """El prompt con la orden de idioma si el alumno ha elegido inglés. Puro: las preferencias entran como argumento."""
     return f"{sistema}\n\n{IDIOMA_INGLES_PLAN}" if p.get("idioma") == "en" else sistema
+
+
+async def idioma_del_alumno() -> str:
+    """«en» o «es» según sus preferencias; si no se pueden leer, «es» (el de partida)."""
+    try:
+        return "en" if (await preferencias_tutor()).get("idioma") == "en" else "es"
+    except Exception:  # noqa: BLE001  (las preferencias no pueden romper lo que se está sirviendo)
+        return "es"
 
 
 async def con_idioma_del_alumno(sistema: str) -> str:

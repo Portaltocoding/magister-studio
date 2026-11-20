@@ -155,7 +155,19 @@ export function SelectorModo() {
   const p = usarPreferencias()
   usarIdioma()
   const [abierto, setAbierto] = useState(false)
+  // Hacia dónde se abre y cuánto cabe: hacia abajo si hay más sitio debajo (la portada de Estudio libre), hacia arriba
+  // si no (la caja de un chat, abajo del todo). La lista se desplaza por dentro si no caben todos.
+  const [hueco, setHueco] = useState<{ abajo: boolean; alto: number }>({ abajo: false, alto: 360 })
   const caja = useRef<HTMLDivElement | null>(null)
+  const abrir = () => {
+    if (!abierto && caja.current) {
+      const r = caja.current.getBoundingClientRect()
+      const debajo = window.innerHeight - r.bottom - 16
+      const encima = r.top - 16
+      setHueco({ abajo: debajo >= encima, alto: Math.max(160, Math.min(480, Math.max(debajo, encima) - 8)) })
+    }
+    setAbierto(!abierto)
+  }
   useEffect(() => {
     if (!abierto) return
     const fuera = (e: MouseEvent) => caja.current && !caja.current.contains(e.target as Node) && setAbierto(false)
@@ -176,11 +188,11 @@ export function SelectorModo() {
   }
   return (
     <div className="selector-modo" ref={caja}>
-      <button type="button" className={`boton-mini ${actual ? 'activo' : ''}`} aria-expanded={abierto} onClick={() => setAbierto(!abierto)} title={actual?.para}>
+      <button type="button" className={`boton-mini ${actual ? 'activo' : ''}`} aria-expanded={abierto} onClick={abrir} title={actual?.para ?? t('modo.selectorTitulo')}>
         {t('modo.selector', { nombre: actual?.nombre ?? t('modo.normal') })}
       </button>
       {abierto && (
-        <div className="selector-modo-lista" role="menu">
+        <div className={`selector-modo-lista ${hueco.abajo ? 'abajo' : ''}`} role="menu" style={{ maxHeight: hueco.alto }}>
           <button role="menuitemradio" aria-checked={!actual} onClick={() => elegir(null)}>
             <strong>{t('modo.normal')}</strong>
             <small>{t('modo.normalAyuda')}</small>

@@ -77,8 +77,8 @@ export default function Afinar() {
         type="button"
         className={`afinar-boton ${fuera ? 'fuera' : ''}`}
         aria-expanded={abierto}
-        aria-label="Afina a tu tutor"
-        title="Afina a tu tutor · mantén pulsada la mascota para sacarla como asesor"
+        aria-label={t('afinar.titulo')}
+        title={t('afinar.ayudaBoton')}
         onClick={() => setAbierto(!abierto)}
         onPointerDown={(e) => {
           if (e.button !== 0) return
@@ -102,14 +102,14 @@ export default function Afinar() {
         <Mascota mini quieta />
       </button>
       {abierto && (
-        <div className="afinar-caja" role="dialog" aria-label="Afina a tu tutor">
+        <div className="afinar-caja" role="dialog" aria-label={t('afinar.titulo')}>
           <div className="afinar-cabecera">
-            <strong>Afina a tu tutor</strong>
-            <small className={guardado ? 'visible' : ''}>✓ Guardado</small>
+            <strong>{t('afinar.titulo')}</strong>
+            <small className={guardado ? 'visible' : ''}>{t('afinar.guardado')}</small>
           </div>
-          <p className="nota">Se aplica desde tu próximo mensaje.</p>
+          <p className="nota">{t('afinar.seAplica')}</p>
           {!p ? (
-            <p className="nota">Cargando…</p>
+            <p className="nota">{t('afinar.cargando')}</p>
           ) : (
             <>
               {grupos().map((g) => (
@@ -139,9 +139,9 @@ export default function Afinar() {
                 ))}
               </div>
               <div className="afinar-grupo">
-                <span>Modo</span>
-                <select value={p.modo ?? ''} onChange={(e) => cambiar({ modo: e.target.value || null })} aria-label="Modo de aprendizaje">
-                  <option value="">Normal</option>
+                <span>{t('afinar.modo')}</span>
+                <select value={p.modo ?? ''} onChange={(e) => cambiar({ modo: e.target.value || null })} aria-label={t('afinar.modoAria')}>
+                  <option value="">{t('afinar.normal')}</option>
                   {todosLosModos(p).map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.nombre}
@@ -160,7 +160,7 @@ export default function Afinar() {
                 abrirAsesor()
               }}
             >
-              Pregúntame sobre esta pantalla
+              {t('afinar.preguntame')}
             </button>
             <button
               type="button"
@@ -170,7 +170,7 @@ export default function Afinar() {
                 window.location.hash = '#/ajustes'
               }}
             >
-              Todos los ajustes →
+              {t('afinar.todosAjustes')}
             </button>
           </div>
         </div>

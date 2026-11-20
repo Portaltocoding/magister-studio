@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { t, type Clave } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { ACENTOS, acentoDe, usarColores } from './colores.ts'
 
 // El botón «Acento»: unos pocos colores para elegir, o uno distinto por lección.
 export default function Colores({ leccion, clase = 'boton' }: { leccion?: string | null; clase?: string }) {
+  usarIdioma() // los textos siguen al idioma
   const [ajuste, guardar] = usarColores()
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
@@ -20,11 +23,11 @@ export default function Colores({ leccion, clase = 'boton' }: { leccion?: string
   return (
     <div className="colores" ref={caja}>
       <button type="button" className={clase} aria-expanded={abierto} onClick={() => setAbierto(!abierto)}>
-        <span className="colores-muestra" style={{ background: actual.color }} /> Acento
+        <span className="colores-muestra" style={{ background: actual.color }} /> {t('colores.acento')}
       </button>
       {abierto && (
-        <div className="colores-caja" role="dialog" aria-label="Color de acento">
-          <div className="colores-acentos" role="radiogroup" aria-label="Acento">
+        <div className="colores-caja" role="dialog" aria-label={t('colores.colorAcento')}>
+          <div className="colores-acentos" role="radiogroup" aria-label={t('colores.acento')}>
             {ACENTOS.map((a) => (
               <button
                 key={a.id}
@@ -33,8 +36,8 @@ export default function Colores({ leccion, clase = 'boton' }: { leccion?: string
                 aria-checked={ajuste.modo === 'fijo' && ajuste.acento === a.id}
                 className="colores-acento"
                 style={{ background: a.color }}
-                title={a.nombre}
-                aria-label={a.nombre}
+                title={t(`colores.${a.id}` as Clave)}
+                aria-label={t(`colores.${a.id}` as Clave)}
                 onClick={() => guardar({ modo: 'fijo', acento: a.id })}
               />
             ))}
@@ -45,7 +48,7 @@ export default function Colores({ leccion, clase = 'boton' }: { leccion?: string
               checked={ajuste.modo === 'auto'}
               onChange={(e) => guardar({ ...ajuste, modo: e.target.checked ? 'auto' : 'fijo' })}
             />
-            Uno distinto en cada lección
+            {t('colores.distinto')}
           </label>
         </div>
       )}

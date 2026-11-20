@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts'
 // Lógica pura de la pantalla Lecciones (PanelMaterial): la ruta, el estado de cada lección en la lista, la barra de
 // progreso de un trabajo y su sitio en la cola. Sin React, para probarla con el corredor de Node.
 
@@ -37,28 +38,28 @@ export interface EstadoLeccion {
   trabajo?: { id: number; estado: 'pendiente' | 'en_curso'; tipos: string[] } | null
 }
 
-const EXTRAS: Record<string, string> = { diapositivas: 'diapositivas', guion: 'guion' }
+const EXTRAS: Record<string, 'material.est.diapositivas' | 'material.est.guion'> = { diapositivas: 'material.est.diapositivas', guion: 'material.est.guion' }
 
 export function estadoLeccion(e: EstadoLeccion | undefined): { clase: string; texto: string } {
-  if (!e) return { clase: 'sin', texto: 'Sin material' }
-  const t = e.trabajo ?? (e.en_marcha ? { id: 0, estado: 'en_curso' as const, tipos: ['apuntes'] } : null)
+  if (!e) return { clase: 'sin', texto: t('material.est.sin') }
+  const trab = e.trabajo ?? (e.en_marcha ? { id: 0, estado: 'en_curso' as const, tipos: ['apuntes'] } : null)
   const base =
     e.tipos.apuntes === 'listo'
-      ? { clase: 'listo', texto: `Listo · ${e.fichas} fichas` }
+      ? { clase: 'listo', texto: t('material.est.listo', { n: e.fichas }) }
       : e.tipos.apuntes === 'revisar'
-        ? { clase: 'revisar', texto: `Por revisar · ${e.fichas} fichas` }
+        ? { clase: 'revisar', texto: t('material.est.revisar', { n: e.fichas }) }
         : e.tipos.apuntes === 'bloqueado'
-          ? { clase: 'revisar', texto: 'Bloqueado' }
+          ? { clase: 'revisar', texto: t('material.est.bloqueado') }
           : null
-  if (t) {
-    const soloExtras = t.tipos.length > 0 && t.tipos.every((x) => x in EXTRAS)
+  if (trab) {
+    const soloExtras = trab.tipos.length > 0 && trab.tipos.every((x) => x in EXTRAS)
     if (soloExtras && base) {
-      const que = t.tipos.map((x) => EXTRAS[x]).join(' y ')
-      return { clase: base.clase, texto: `${base.texto} · ${t.estado === 'pendiente' ? `${que} en cola` : `haciendo ${que}`}` }
+      const que = trab.tipos.map((x) => t(EXTRAS[x])).join(t('material.est.y'))
+      return { clase: base.clase, texto: `${base.texto} · ${trab.estado === 'pendiente' ? t('material.est.enCola', { que }) : t('material.est.haciendo', { que })}` }
     }
-    return t.estado === 'pendiente' ? { clase: 'cola', texto: 'En cola' } : { clase: 'marcha', texto: 'Generando' }
+    return trab.estado === 'pendiente' ? { clase: 'cola', texto: t('material.est.cola') } : { clase: 'marcha', texto: t('material.est.generando') }
   }
-  return base ?? { clase: 'sin', texto: 'Sin material' }
+  return base ?? { clase: 'sin', texto: t('material.est.sin') }
 }
 
 // La barra de un trabajo de material, de 0 a 100, por fases: el trabajo pasa por varias y cada una trae su propio
@@ -100,9 +101,9 @@ export interface Cola {
 }
 
 export function textoCola(c: Cola | null | undefined): string {
-  if (!c) return 'En cola'
-  if (c.reintento_desde) return 'En cola: lo vuelvo a intentar en unos segundos'
-  if (c.por_delante > 0) return `En cola: ${c.por_delante} por delante`
-  if (c.en_marcha >= c.a_la_vez) return 'En cola: empieza en cuanto acabe uno de los trabajos en marcha'
-  return 'En cola: empieza enseguida'
+  if (!c) return t('material.est.cola')
+  if (c.reintento_desde) return t('material.cola.reintento')
+  if (c.por_delante > 0) return t('material.cola.delante', { n: c.por_delante })
+  if (c.en_marcha >= c.a_la_vez) return t('material.cola.espera')
+  return t('material.cola.enseguida')
 }

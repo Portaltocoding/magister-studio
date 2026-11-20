@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { t } from '../i18n/i18n.ts'
 import { describir, elegirVoz, frasesDe, LectorFoco, PAUSA_MS, queDecir } from './lecturaVoz.ts'
 
 // Leer en voz alta en el modo foco: lee el párrafo activo y, al acabar, espera un momento y pasa al siguiente (la
@@ -29,10 +30,10 @@ export function usarLeerEnVoz(c: {
 
   const alternar = useCallback(async () => {
     if (leyendo) return parar()
-    setEstado('Preparando la voz…')
+    setEstado(t('foco.voz.preparando'))
     const voz = await elegirVoz()
     if (!voz) {
-      setEstado('No hay voz local: instala las voces de Magister (Piper) o una voz en español en el sistema.')
+      setEstado(t('foco.voz.sinVoz'))
       return
     }
     lector.current?.cerrar()
@@ -53,7 +54,7 @@ export function usarLeerEnVoz(c: {
       if (!vivo || !acabo) return
       espera = window.setTimeout(() => {
         if (!vivo) return
-        if (u >= lista.length - 1) parar(alFinal.current?.() ?? 'Fin de la idea')
+        if (u >= lista.length - 1) parar(alFinal.current?.() ?? t('foco.finIdea'))
         else mover(1)
       }, PAUSA_MS)
     })
@@ -75,9 +76,9 @@ export function usarLeerEnVoz(c: {
   useEffect(() => () => lector.current?.cerrar(), [])
   // Lo que dice al parar se queda un momento y se va.
   useEffect(() => {
-    if (leyendo || !estado || estado === 'Preparando la voz…') return
-    const t = window.setTimeout(() => setEstado(''), 5000)
-    return () => window.clearTimeout(t)
+    if (leyendo || !estado || estado === t('foco.voz.preparando')) return
+    const tm = window.setTimeout(() => setEstado(''), 5000)
+    return () => window.clearTimeout(tm)
   }, [leyendo, estado])
 
   return { leyendo, estado, alternar, parar }

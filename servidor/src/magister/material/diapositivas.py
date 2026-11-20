@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from magister.cerebro.estructura import estructurar
 from magister.cerebro.prompts import cargar
-from magister.config import ajustes
+from magister.config import FUENTE_MONO, FUENTE_TEXTO, ajustes
 from magister.material.almacen import carpeta_salidas
 from magister.material.render import entorno_minimo
 from magister.tono.hallazgo import Hallazgo
@@ -46,7 +46,7 @@ section.densa h2 { font-size: 38px; margin-bottom: 20px; }
 section.densa li { margin-bottom: 10px; }
 section.densa pre { font-size: 17px; padding: 12px 18px; }
 section.densa blockquote { font-size: 21px; padding: 12px 20px; }
-section { font-family: Inter, "Segoe UI", Arial, sans-serif; background: #f8f5ee; color: #161616;
+section { font-family: __TEXTO__; background: #f8f5ee; color: #161616;
   padding: 70px 84px 60px; font-size: 27px; line-height: 1.4; justify-content: flex-start; }
 header { left: 84px; top: 30px; font-size: 15px; font-weight: 700; color: #8a6d00; text-transform: uppercase; letter-spacing: .06em; }
 section::after { color: #8b867b; font-size: 15px; right: 40px; bottom: 26px; }
@@ -57,7 +57,7 @@ ul { list-style: none; padding: 0; margin: 0 0 18px; }
 li { position: relative; padding-left: 36px; margin: 0 0 16px; }
 li::before { content: ""; position: absolute; left: 0; top: .42em; width: 14px; height: 14px; background: #f2c200; border-radius: 3px; }
 strong { font-weight: 800; color: #161616; }
-code { font-family: "JetBrains Mono", Consolas, monospace; background: #fff2b3; color: #161616; padding: 1px 7px; border-radius: 4px; font-size: .86em; }
+code { font-family: __MONO__; background: #fff2b3; color: #161616; padding: 1px 7px; border-radius: 4px; font-size: .86em; }
 pre { background: #141414; border-radius: 8px; padding: 18px 24px; font-size: 21px; line-height: 1.45; margin: 4px 0 18px; }
 pre code { background: none; color: #ecebe6; padding: 0; font-size: inherit; }
 table { border-collapse: collapse; width: 100%; font-size: 22px; margin: 4px 0 18px; }
@@ -97,7 +97,8 @@ def _yaml(texto: str) -> str:
 
 def montar_marp(p: Presentacion, titulo: str, clave: str = "", tema: str = "") -> str:
     """Portada y paginación las pone el código; el modelo da el contenido de cada diapositiva."""
-    estilo = "\n".join("  " + x for x in ESTILO.strip().splitlines())
+    css = ESTILO.replace("__TEXTO__", FUENTE_TEXTO).replace("__MONO__", FUENTE_MONO)
+    estilo = "\n".join("  " + x for x in css.strip().splitlines())
     cabecera = f"{clave} · {titulo}" if clave else titulo
     frente = f"---\nmarp: true\npaginate: true\ntheme: default\nheader: {_yaml(cabecera)}\nstyle: |\n{estilo}\n---"
     numero = "".join(ch for ch in clave if ch.isdigit())

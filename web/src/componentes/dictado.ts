@@ -2,9 +2,10 @@
 // reconocimiento del navegador, que en Chrome manda el audio a los servidores de Google. Por eso viene apagado y la
 // primera vez se pregunta; la respuesta se recuerda. Lo de arriba es puro (pruebas en web/pruebas/dictado.test.ts).
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { t } from '../i18n/i18n.ts'
 import { Reconocedor, type Reconocimiento } from './voz.ts'
 
-export const AVISO_DICTADO = 'Para dictar, el audio sale de tu ordenador hacia el servicio de voz del navegador (en Chrome, los servidores de Google).'
+export const avisoDictado = () => t('foco.dictado.aviso')
 
 const CLAVE = 'magister-dictado'
 type Permiso = 'si' | 'no' | null
@@ -77,8 +78,8 @@ export function usarDictado(alFinal: (t: string) => void) {
       if (e.error === 'no-speech' || e.error === 'aborted') return
       setError(
         e.error === 'not-allowed' || e.error === 'service-not-allowed'
-          ? 'No tengo permiso para usar el micrófono: dáselo en el candado de la barra de direcciones, o escribe.'
-          : `El dictado falló (${e.error}). Puedes escribir la respuesta.`,
+          ? t('foco.dictado.sinPermiso')
+          : t('foco.dictado.fallo', { error: e.error }),
       )
     }
     r.onend = () => {

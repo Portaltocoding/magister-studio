@@ -6,7 +6,7 @@ import Aprendido from '../componentes/Aprendido.tsx'
 import Colores from '../componentes/Colores.tsx'
 import ControlVoz from '../componentes/ControlVoz.tsx'
 import { avisosActivos, extras, grupos } from '../componentes/Afinar.tsx'
-import { IDIOMAS } from '../i18n/i18n.ts'
+import { IDIOMAS, t as tt } from '../i18n/i18n.ts'
 import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { cambiarPreferencias, todosLosModos, usarPreferencias, type PreferenciasTutor } from '../componentes/preferencias.ts'
 import { elegirTema, temaGuardado, TEMAS, type Tema } from '../componentes/tema.ts'
@@ -283,10 +283,11 @@ export default function PanelAjustes() {
   )
 }
 
-const mensajeDe = (e: unknown) => (e instanceof Error ? e.message : 'Algo ha fallado.')
+const mensajeDe = (e: unknown) => (e instanceof Error ? e.message : tt('ajustes.datos.fallo'))
 
 // Descargar todo lo tuyo y las copias de seguridad de la base (las diarias del script y las que hagas aquí).
 function TusDatos() {
+  const { t } = usarIdioma() // los textos siguen al idioma
   const [preparando, setPreparando] = useState(false)
   const [estadoDescarga, setEstadoDescarga] = useState('')
   const [copias, setCopias] = useState<CopiaBase[] | null>(null)
@@ -312,7 +313,7 @@ function TusDatos() {
 
   const descargar = async () => {
     setPreparando(true)
-    setEstadoDescarga('Preparando el paquete…')
+    setEstadoDescarga(t('ajustes.datos.preparandoPaquete'))
     try {
       const { datos, cabecera } = await descargarMisDatos()
       const url = URL.createObjectURL(datos)
@@ -321,9 +322,9 @@ function TusDatos() {
       a.download = nombreDescarga(cabecera, new Date())
       a.click()
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-      setEstadoDescarga(`Listo (${tamano(datos.size)}).`)
+      setEstadoDescarga(t('ajustes.datos.listo', { tamano: tamano(datos.size) }))
     } catch (e) {
-      setEstadoDescarga(`No se ha podido preparar: ${mensajeDe(e)}`)
+      setEstadoDescarga(t('ajustes.datos.noPrepara', { motivo: mensajeDe(e) }))
     } finally {
       setPreparando(false)
     }
@@ -331,10 +332,10 @@ function TusDatos() {
 
   const copiar = async () => {
     setCopiando(true)
-    setEstadoCopia('Haciendo la copia…')
+    setEstadoCopia(t('ajustes.datos.haciendoCopia'))
     try {
       const c = await hacerCopia()
-      setEstadoCopia(`Copia hecha (${tamano(c.bytes)}).`)
+      setEstadoCopia(t('ajustes.datos.copiaHecha', { tamano: tamano(c.bytes) }))
       await cargar()
     } catch (e) {
       setEstadoCopia(mensajeDe(e))
@@ -346,13 +347,10 @@ function TusDatos() {
   const restaurar = async () => {
     if (!elegida || !confirmaRestaurar(palabra)) return
     setRestaurando(true)
-    setEstadoRestaurar('Restaurando… no cierres Magister.')
+    setEstadoRestaurar(t('ajustes.datos.restaurando'))
     try {
       await restaurarCopia(elegida.id, palabra.trim())
-      setEstadoRestaurar(
-        'Hecho. Antes he guardado una copia de cómo estaba todo (la tienes en la lista como «Antes de restaurar»). ' +
-          'Cierra Magister y vuelve a abrirlo para que todo cargue los datos restaurados.',
-      )
+      setEstadoRestaurar(t('ajustes.datos.restaurado'))
       setElegida(null)
       setPalabra('')
       await cargar()
@@ -368,14 +366,11 @@ function TusDatos() {
   return (
     <>
       <section className="ajustes-seccion">
-        <h2>Tus datos</h2>
-        <p className="nota">
-          Un ZIP con todo lo tuyo: un fichero por tabla (conversaciones, planes, repasos, notas…), los PDF y diapositivas
-          generados y los originales de tus fuentes. El LEEME explica qué es cada cosa.
-        </p>
+        <h2>{t('ajustes.datos.titulo')}</h2>
+        <p className="nota">{t('ajustes.datos.intro')}</p>
         <div className="ajustes-fila-botones">
           <button type="button" className="boton" onClick={descargar} disabled={preparando}>
-            {preparando ? 'Preparando…' : 'Descargar mis datos'}
+            {preparando ? t('ajustes.datos.preparando') : t('ajustes.datos.descargar')}
           </button>
         </div>
         <p className="nota ajustes-datos-estado" role="status">
@@ -384,11 +379,11 @@ function TusDatos() {
       </section>
 
       <section className="ajustes-seccion">
-        <h2>Copias de seguridad</h2>
-        <p className="nota">Copias de la base en la carpeta copias/. Se hace una cada día y puedes hacer otra cuando quieras.</p>
+        <h2>{t('ajustes.datos.copias')}</h2>
+        <p className="nota">{t('ajustes.datos.copiasIntro')}</p>
         <div className="ajustes-fila-botones">
           <button type="button" className="boton" onClick={copiar} disabled={ocupado}>
-            {copiando ? 'Haciendo la copia…' : 'Hacer una copia ahora'}
+            {copiando ? t('ajustes.datos.haciendoCopia') : t('ajustes.datos.hacerCopia')}
           </button>
         </div>
         <p className="nota ajustes-datos-estado" role="status">
@@ -396,12 +391,12 @@ function TusDatos() {
         </p>
         {errorLista ? (
           <p role="alert" className="nota">
-            No he podido ver las copias: {errorLista}
+            {t('ajustes.datos.noVeCopias', { motivo: errorLista })}
           </p>
         ) : !copias ? (
           <Cargando />
         ) : !copias.length ? (
-          <p className="nota">Aún no hay ninguna copia.</p>
+          <p className="nota">{t('ajustes.datos.sinCopias')}</p>
         ) : (
           <ul className="ajustes-copias">
             {copias.map((c) => (
@@ -424,7 +419,7 @@ function TusDatos() {
                       setEstadoRestaurar('')
                     }}
                   >
-                    Restaurar
+                    {t('ajustes.datos.restaurar')}
                   </button>
                 </div>
                 {elegida?.id === c.id && (
@@ -437,7 +432,7 @@ function TusDatos() {
                   >
                     <p>{avisoRestaurar(c.fecha)}</p>
                     <label htmlFor="ajustes-palabra">
-                      Escribe <b>{PALABRA_RESTAURAR}</b> para confirmar
+                      {t('ajustes.datos.escribeAntes')} <b>{PALABRA_RESTAURAR}</b> {t('ajustes.datos.escribeDespues')}
                     </label>
                     <div className="ajustes-fila-botones">
                       <input
@@ -449,10 +444,10 @@ function TusDatos() {
                         autoFocus
                       />
                       <button className="boton peligro" disabled={!confirmaRestaurar(palabra) || restaurando}>
-                        {restaurando ? 'Restaurando…' : 'Restaurar esta copia'}
+                        {restaurando ? t('ajustes.datos.restaurandoCorto') : t('ajustes.datos.restaurarEsta')}
                       </button>
                       <button type="button" className="boton" disabled={restaurando} onClick={() => setElegida(null)}>
-                        Cancelar
+                        {t('ajustes.datos.cancelar')}
                       </button>
                     </div>
                   </form>

@@ -1,16 +1,15 @@
 /* Estilo «ficha práctica» (como la E12 de evals) para el libro del deep tutor.
    Convenciones en GUIA-PRACTICA.md. Se activa con FICHA_CSS=practica.css en build_win.py. */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap");
 :root { --tinta:#161616; --gris:#6b6b6b; --linea:#d8d3c8; --amarillo:#f2c200; --amarillo-claro:#fff2b3; --negro:#141414; --crema:#f8f5ee; }
 @page { size: A4; margin: 15mm 17mm 16mm 17mm; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-body { font-family: Inter, "Segoe UI", Arial, sans-serif; font-size: 9.7pt; line-height: 1.5; color: var(--tinta); background: #fff; }
+body { font-family: var(--fuente-texto); font-size: 9.7pt; line-height: 1.5; color: var(--tinta); background: #fff; }
 p { margin: 0 0 2.6mm; orphans: 3; widows: 3; }
 b, strong { font-weight: 700; color: var(--tinta); }
 a { color: inherit; }
-code { font-family: "JetBrains Mono", Consolas, monospace; font-size: 8.2pt; background: var(--amarillo-claro); padding: 0 3px; border-radius: 2px; overflow-wrap: anywhere; }
-pre { font-family: "JetBrains Mono", Consolas, monospace; font-size: 8pt; line-height: 1.38; background: #f3f1ec; border: 0.6px solid var(--linea); padding: 3mm 3.5mm; white-space: pre-wrap; margin: 2mm 0 3.5mm; break-inside: avoid; border-radius: 2px; }
+code { font-family: var(--fuente-mono); font-size: 8.2pt; background: var(--amarillo-claro); padding: 0 3px; border-radius: 2px; overflow-wrap: anywhere; }
+pre { font-family: var(--fuente-mono); font-size: 8pt; line-height: 1.38; background: #f3f1ec; border: 0.6px solid var(--linea); padding: 3mm 3.5mm; white-space: pre-wrap; margin: 2mm 0 3.5mm; break-inside: avoid; border-radius: 2px; }
 pre code { background: none; padding: 0; font-size: inherit; }
 ul, ol { margin: 1mm 0 3mm; padding-left: 5.5mm; }
 li { margin: 0 0 1.6mm; break-inside: avoid; }

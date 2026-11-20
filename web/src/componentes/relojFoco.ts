@@ -2,6 +2,7 @@
 // marcha, el foco enseña su cuenta atrás y su descanso abre la pantalla de descanso del foco; si no, el ajuste
 // «Pausa» crea uno. Con «sin pausa» y sin pomodoro, el reloj cuenta lo que llevas, como antes.
 // Solo reglas, sin React (pruebas en web/pruebas/relojFoco.test.ts).
+import { t } from '../i18n/i18n.ts'
 import type { Fase } from './pomodoro.ts'
 import { relojZen } from './zen.ts'
 
@@ -26,7 +27,7 @@ export const mmssDe = (ms: number) => {
 export function textoReloj(c: { p: EstadoPomodoro; quedan: number | null; segundos: number; zen: boolean }): { tiempo: string; fase: string | null } {
   if (c.p.fase) {
     const ms = Math.max(0, c.quedan ?? 0)
-    return { tiempo: c.zen ? relojZen(Math.ceil(ms / 60_000) * 60) : mmssDe(ms), fase: c.p.fase === 'foco' ? 'pomodoro' : 'descanso' }
+    return { tiempo: c.zen ? relojZen(Math.ceil(ms / 60_000) * 60) : mmssDe(ms), fase: c.p.fase === 'foco' ? t('foco.reloj.pomodoro') : t('foco.reloj.descanso') }
   }
   const s = Math.max(0, c.segundos)
   const h = Math.floor(s / 3600)

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { t } from '../i18n/i18n.ts'
+import { idiomaActual, t, type Clave } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
+import { localeActual, numero, pluralT } from '../componentes/formato.ts'
 import { listarPlanes, pedir, verPlan, type ResumenPlan, type VistaPlan } from '../api.ts'
 import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
 import { colorDeTema } from '../componentes/colorTema.ts'
@@ -48,27 +50,22 @@ interface EstadoMaterial {
 type Tramo = { predicho: number; observado: number; n: number }
 
 // De más a menos sabido: así se leen las barras de izquierda a derecha.
-const ESTADOS: { id: EstadoConcepto; nombre: string; desc: string }[] = [
-  { id: 'dominado', nombre: 'Dominado', desc: 'Lo recuerdas aunque pasen días' },
-  { id: 'aprendiendo', nombre: 'Aprendiendo', desc: 'Lo vas fijando con repasos' },
-  { id: 'flojo', nombre: 'Flojo', desc: 'Lo fallaste hace poco' },
-  { id: 'nuevo', nombre: 'Sin practicar', desc: 'Aún no lo has repasado' },
-]
-const NOMBRE_ESTADO = Object.fromEntries(ESTADOS.map((e) => [e.id, e.nombre])) as Record<EstadoConcepto, string>
+const ESTADOS: { id: EstadoConcepto }[] = [{ id: 'dominado' }, { id: 'aprendiendo' }, { id: 'flojo' }, { id: 'nuevo' }]
+const nombreEstado = (id: EstadoConcepto) => t(`progreso.est.${id}` as Clave)
+const descEstado = (id: EstadoConcepto) => t(`progreso.est.${id}.d` as Clave)
 
-const LECCION: Record<string, string> = { hecha: 'Estudiada', empezada: 'Empezada', pendiente: 'Pendiente' }
+const nombreLeccion = (estado: string) => (['hecha', 'empezada', 'pendiente'].includes(estado) ? t(`progreso.leccion.${estado}` as Clave) : estado)
 
-const pct = (x: number) => `${Math.round(x * 100)} %`
-const horas = (h: number) => `${Number.isInteger(h) ? h : h.toFixed(1).replace('.', ',')} h`
-const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+const pct = (x: number) => `${Math.round(x * 100)}${idiomaActual() === 'en' ? '%' : ' %'}`
+const horas = (h: number) => `${numero(h)} h`
 const fechaCorta = (iso: string) =>
-  new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+  new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString(localeActual(), { weekday: 'short', day: 'numeric', month: 'short' })
 
 function material(e: EstadoMaterial | undefined): string {
-  if (!e) return 'sin material'
-  if (e.en_marcha) return 'generando material'
-  if (e.tipos.apuntes) return `material listo · ${plural(e.fichas, 'ficha', 'fichas')}`
-  return 'sin material'
+  if (!e) return t('progreso.sinMaterial')
+  if (e.en_marcha) return t('progreso.generando')
+  if (e.tipos.apuntes) return t('progreso.listo', { fichas: pluralT(e.fichas, 'progreso.ficha', 'progreso.fichas') })
+  return t('progreso.sinMaterial')
 }
 
 type Sobre = ReturnType<typeof usarAviso>['sobre']
@@ -77,7 +74,7 @@ type Sobre = ReturnType<typeof usarAviso>['sobre']
 function BarraDominio({ conceptos, sobre }: { conceptos: Concepto[]; sobre: Sobre }) {
   if (!conceptos.length) return <span className="pg-dominio" />
   return (
-    <span className="pg-dominio" role="group" aria-label="Dominio de los conceptos">
+    <span className="pg-dominio" role="group" aria-label={t('progreso.dominioAria')}>
       {ESTADOS.map((e) => {
         const n = conceptos.filter((c) => c.estado === e.id).length
         return n ? (
@@ -85,7 +82,7 @@ function BarraDominio({ conceptos, sobre }: { conceptos: Concepto[]; sobre: Sobr
             key={e.id}
             className={`pg-seg pg-${e.id}`}
             style={{ flexGrow: n }}
-            {...sobre({ valor: plural(n, 'concepto', 'conceptos'), etiqueta: e.nombre.toLowerCase() })}
+            {...sobre({ valor: pluralT(n, 'progreso.concepto', 'progreso.conceptos'), etiqueta: nombreEstado(e.id).toLowerCase() })}
           />
         ) : null
       })}
@@ -104,34 +101,37 @@ function Fiabilidad({ titulo, tramos, sobre }: { titulo: string; tramos: Tramo[]
     <figure className="fiabilidad">
       <figcaption>{titulo}</figcaption>
       <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} role="group" aria-label={titulo}>
-        {[0, 0.5, 1].map((t) => (
-          <g key={t}>
-            <line className="viz-rejilla" x1={px(0)} x2={px(1)} y1={py(t)} y2={py(t)} />
-            <text className="viz-tick" x={px(0) - 6} y={py(t) + 4} textAnchor="end">
-              {pct(t)}
+        {[0, 0.5, 1].map((v) => (
+          <g key={v}>
+            <line className="viz-rejilla" x1={px(0)} x2={px(1)} y1={py(v)} y2={py(v)} />
+            <text className="viz-tick" x={px(0) - 6} y={py(v) + 4} textAnchor="end">
+              {pct(v)}
             </text>
-            <text className="viz-tick" x={px(t)} y={py(0) + 16} textAnchor="middle">
-              {pct(t)}
+            <text className="viz-tick" x={px(v)} y={py(0) + 16} textAnchor="middle">
+              {pct(v)}
             </text>
           </g>
         ))}
         <line className="viz-referencia" x1={px(0)} y1={py(0)} x2={px(1)} y2={py(1)} />
         <text className="viz-nota-ref" x={px(0.56)} y={py(0.56) - 8} transform={`rotate(-41 ${px(0.56)} ${py(0.56) - 8})`}>
-          calibración perfecta
+          {t('progreso.calPerfecta')}
         </text>
         <text className="viz-eje" x={(px(0) + px(1)) / 2} y={ALTO - 4} textAnchor="middle">
-          Lo seguro que estabas
+          {t('progreso.ejeSeguro')}
         </text>
         <text className="viz-eje" transform={`translate(11 ${(py(0) + py(1)) / 2}) rotate(-90)`} textAnchor="middle">
-          Lo que acertaste
+          {t('progreso.ejeAcierto')}
         </text>
-        {tramos.map((t, i) => (
+        {tramos.map((tr, i) => (
           <g
             key={i}
-            {...sobre({ valor: `acertaste ${pct(t.observado)}`, etiqueta: `cuando decías ${pct(t.predicho)} · ${plural(t.n, 'respuesta', 'respuestas')}` })}
+            {...sobre({
+              valor: t('progreso.acertaste', { p: pct(tr.observado) }),
+              etiqueta: t('progreso.cuandoDecias', { p: pct(tr.predicho), n: pluralT(tr.n, 'progreso.respuesta', 'progreso.respuestas') }),
+            })}
           >
-            <circle className="viz-punto" cx={px(t.predicho)} cy={py(t.observado)} r={Math.min(7, 4 + Math.sqrt(t.n) / 2)} />
-            <circle className="viz-zona" cx={px(t.predicho)} cy={py(t.observado)} r={12} />
+            <circle className="viz-punto" cx={px(tr.predicho)} cy={py(tr.observado)} r={Math.min(7, 4 + Math.sqrt(tr.n) / 2)} />
+            <circle className="viz-zona" cx={px(tr.predicho)} cy={py(tr.observado)} r={12} />
           </g>
         ))}
       </svg>
@@ -142,23 +142,23 @@ function Fiabilidad({ titulo, tramos, sobre }: { titulo: string; tramos: Tramo[]
 function TablaCalibracion({ tuya, modelo }: { tuya: Tramo[]; modelo: Tramo[] }) {
   return (
     <details className="viz-tabla">
-      <summary>Ver como tabla</summary>
+      <summary>{t('progreso.verTabla')}</summary>
       <table>
         <thead>
           <tr>
-            <th>Quién</th>
-            <th>Seguridad</th>
-            <th>Aciertos</th>
-            <th>Respuestas</th>
+            <th>{t('progreso.col.quien')}</th>
+            <th>{t('progreso.col.seguridad')}</th>
+            <th>{t('progreso.col.aciertos')}</th>
+            <th>{t('progreso.col.respuestas')}</th>
           </tr>
         </thead>
         <tbody>
-          {[...tuya.map((t) => ['Tú', t] as const), ...modelo.map((t) => ['Tutor', t] as const)].map(([q, t], i) => (
+          {[...tuya.map((tr) => [t('progreso.tu'), tr] as const), ...modelo.map((tr) => [t('progreso.tutor'), tr] as const)].map(([q, tr], i) => (
             <tr key={i}>
               <td>{q}</td>
-              <td>{pct(t.predicho)}</td>
-              <td>{pct(t.observado)}</td>
-              <td>{t.n}</td>
+              <td>{pct(tr.predicho)}</td>
+              <td>{pct(tr.observado)}</td>
+              <td>{tr.n}</td>
             </tr>
           ))}
         </tbody>
@@ -188,7 +188,7 @@ interface EstadoModelo {
   resumen?: { capa: 'estandar' | 'inicial' | 'completo'; faltan: number | null; red: string; lineas: string[] }
 }
 
-const coma = (n?: number) => (n == null ? '·' : String(n).replace('.', ','))
+const coma = (n?: number) => (n == null ? '·' : idiomaActual() === 'en' ? String(n) : String(n).replace('.', ','))
 
 // «Tu modelo»: cuándo olvidas tú, no la media. FSRS ajustado a tus repasos, por escalones y solo si mejora.
 function TuModelo() {
@@ -199,7 +199,7 @@ function TuModelo() {
     pedir<EstadoModelo>('/api/progreso/modelo').then(setE).catch(() => undefined)
   }, [])
   if (!e) return null
-  const etapa = e.activo ? (e.activo.etapa === 'completo' ? 'Ajustado entero a ti' : 'Ajustado a ti (estabilidad inicial)') : 'Por defecto'
+  const etapa = e.activo ? (e.activo.etapa === 'completo' ? t('progreso.modelo.entero') : t('progreso.modelo.inicial')) : t('progreso.modelo.defecto')
   const siguiente = e.conceptos_con_dos < e.umbral_inicial ? e.umbral_inicial : e.umbral_completo
   const ajustar = async () => {
     setHaciendo(true)
@@ -211,44 +211,42 @@ function TuModelo() {
       setE(r.estado)
       setAviso(
         r.hecho
-          ? `Hecho: ahora predice tus aciertos mejor (pérdida ${String(r.perdida_antes).replace('.', ',')} → ${String(r.perdida_despues).replace('.', ',')}).`
-          : (r.motivo ?? 'Sin cambios.'),
+          ? t('progreso.modelo.hecho', { antes: coma(r.perdida_antes), despues: coma(r.perdida_despues) })
+          : (r.motivo ?? t('progreso.modelo.sinCambios')),
       )
     } catch (err) {
-      setAviso(`No he podido ajustarlo: ${mensajeDe(err)}`)
+      setAviso(t('progreso.modelo.noAjusta', { motivo: mensajeDe(err) }))
     } finally {
       setHaciendo(false)
     }
   }
   return (
     <section className="pg-seccion tu-modelo">
-      <h2>Tu modelo de olvido</h2>
+      <h2>{t('progreso.modelo.titulo')}</h2>
       {e.resumen && (
-        <div className="tu-modelo-capa" aria-label="En qué capa vas">
+        <div className="tu-modelo-capa" aria-label={t('progreso.modelo.capaAria')}>
           {e.resumen.lineas.map((l, i) => (
             <p key={i}>{l}</p>
           ))}
         </div>
       )}
       <p className="pg-explica">
-        Magister decide cuándo repasas con FSRS. Con tus repasos, aprende cuánto aguantas tú cada concepto y se reajusta solo una vez al
-        día, solo si predice tus aciertos mejor que antes. Lo que fallas vuelve en la misma sesión, y lo recién aprendido vuelve
-        pronto (a los 3 y a los 9 días como mucho).
+        {t('progreso.modelo.explica')}
       </p>
       <div className="tu-modelo-cifras">
         <div>
           <strong>{etapa}</strong>
-          <small>{e.activo ? `desde el ${new Date(e.activo.fecha).toLocaleDateString('es-ES')}` : 'aún sin datos tuyos'}</small>
+          <small>{e.activo ? t('progreso.modelo.desde', { fecha: new Date(e.activo.fecha).toLocaleDateString(localeActual()) }) : t('progreso.modelo.sinDatos')}</small>
         </div>
         <div>
           <strong>
-            {e.conceptos_con_dos} <small>de {siguiente}</small>
+            {e.conceptos_con_dos} <small>{t('progreso.de', { n: siguiente })}</small>
           </strong>
-          <small>conceptos con dos repasos o más</small>
+          <small>{t('progreso.modelo.conDos')}</small>
         </div>
         <div>
           <strong>{e.repasos}</strong>
-          <small>repasos tuyos</small>
+          <small>{t('progreso.modelo.repasosTuyos')}</small>
         </div>
       </div>
       <span className="barra">
@@ -256,31 +254,28 @@ function TuModelo() {
       </span>
       <p className="nota">
         <button className="boton-mini" onClick={ajustar} disabled={haciendo}>
-          {haciendo ? 'Ajustando…' : 'Ajustar ahora'}
+          {haciendo ? t('progreso.modelo.ajustando') : t('progreso.modelo.ajustar')}
         </button>
       </p>
       {e.red && (
         <div className="tu-modelo-red">
-          <h3>Red neuronal</h3>
+          <h3>{t('progreso.red.titulo')}</h3>
           <p className="pg-explica">
-            Encima de FSRS, una red pequeña aprende de lo que FSRS no ve: tu seguridad al responder, lo que tardas, la hora, tu
-            racha y si te pasaste de seguro. Recién creada es igual que FSRS; se entrena cada día y solo decide cuando acierta más
-            que FSRS con tus repasos más recientes, que no ha visto, en {e.red.racha_necesaria ?? 2} entrenamientos seguidos y con
-            repasos nuevos entre uno y otro. Si luego pierde, vuelve a decidir FSRS.
+            {t('progreso.red.explica', { n: e.red.racha_necesaria ?? 2 })}
           </p>
           <p>
             <strong>
               {e.red.estado === 'activa'
-                ? 'Activa: decide ella'
+                ? t('progreso.red.activa')
                 : e.red.estado === 'sombra'
                   ? e.red.racha
-                    ? `En sombra: ha ganado ${e.red.racha} de ${e.red.racha_necesaria ?? 2} entrenamientos seguidos`
-                    : 'En sombra: entrenada, aún no gana a FSRS'
-                  : 'Esperando datos'}
+                    ? t('progreso.red.sombraGana', { racha: e.red.racha, n: e.red.racha_necesaria ?? 2 })
+                    : t('progreso.red.sombra')
+                  : t('progreso.red.espera')}
             </strong>
             {e.red.estado === 'sin_datos'
-              ? ` · ${e.red.repasos} de ${e.red.minimo} repasos para empezar a entrenarse`
-              : ` · error en lo no visto: FSRS ${coma(e.red.perdida_fsrs)}, red ${coma(e.red.perdida_red)} (menos es mejor)`}
+              ? t('progreso.red.faltan', { repasos: e.red.repasos, minimo: e.red.minimo })
+              : t('progreso.red.error', { fsrs: coma(e.red.perdida_fsrs), red: coma(e.red.perdida_red) })}
           </p>
           {e.red.estado === 'sin_datos' && (
             <span className="barra">
@@ -300,6 +295,7 @@ function TuModelo() {
 
 // Progreso: dónde estás en el plan, lección a lección, y qué toca ahora.
 export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
+  usarIdioma() // los textos siguen al idioma
   const [planes, setPlanes] = useState<ResumenPlan[] | null>(null)
   const [plan, setPlan] = useState<VistaPlan | null>(null)
   const [nombre, setNombre] = useState('')
@@ -384,20 +380,20 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
   if (planes == null)
     return fallo ? (
       <div className="panel">
-        <h1>Progreso</h1>
-        <p role="alert" className="nota">No he podido cargar tu progreso. Comprueba que Magister sigue en marcha.</p>
+        <h1>{t('progreso.titulo')}</h1>
+        <p role="alert" className="nota">{t('progreso.noCarga')}</p>
         <button className="boton" onClick={() => setIntento((x) => x + 1)}>
-          Reintentar
+          {t('progreso.reintentar')}
         </button>
       </div>
     ) : (
-      <Pensando texto="Cargando tu progreso…" />
+      <Pensando texto={t('progreso.cargando')} />
     )
 
   if (!planes.length)
     return (
       <div className="panel">
-        <h1>Progreso</h1>
+        <h1>{t('progreso.titulo')}</h1>
         <Vacio
           etiqueta={t('vacio.progreso.etq')}
           titulo={t('vacio.progreso.titulo')}
@@ -427,12 +423,12 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
   return (
     <div className="panel progreso-panel">
       <div className="cabecera-panel">
-        <h1>Progreso</h1>
+        <h1>{t('progreso.titulo')}</h1>
         {planes.length > 1 && (
           <span className="selector-tema">
           <span className="punto-tema" style={colorDeTema(plan?.tema_id, planes)?.estilo} aria-hidden="true" />
           <select
-            aria-label="Plan"
+            aria-label={t('progreso.plan')}
             value={plan?.plan_id ?? ''}
             onChange={(e) => {
               const p = planes.find((x) => x.plan_id === Number(e.target.value))
@@ -450,9 +446,9 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
       </div>
       {falloPlan && (
         <p className="nota" role="alert">
-          No he podido abrir «{falloPlan.tema}».{' '}
+          {t('progreso.noAbre', { tema: falloPlan.tema })}{' '}
           <button type="button" className="boton-mini" onClick={() => elegirPlan(falloPlan)}>
-            Reintentar
+            {t('progreso.reintentar')}
           </button>
         </p>
       )}
@@ -461,18 +457,18 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
         <section className="pg-hero">
           <div className="pg-hero-cifra">
             <strong>{pct(plan.progreso)}</strong>
-            <span>del plan</span>
+            <span>{t('progreso.delPlan')}</span>
           </div>
           <div className="pg-hero-cuerpo">
             <p className="pg-etq">{nombre}</p>
-            <div className="pg-tramos" role="img" aria-label={`${hechas} de ${lecciones.length} lecciones hechas`}>
+            <div className="pg-tramos" role="img" aria-label={t('progreso.leccionesHechasAria', { hechas, n: lecciones.length })}>
               {lecciones.map((l) => (
                 <button
                   key={l.clave}
                   className={`pg-tramo ${l.estado}`}
                   style={{ flexGrow: l.horas }}
                   onClick={() => setAbierta(l.clave)}
-                  {...sobre({ valor: `${horas(l.horas_hechas)} de ${horas(l.horas)}`, etiqueta: `${l.clave} · ${l.titulo}` })}
+                  {...sobre({ valor: t('progreso.horasDe', { a: horas(l.horas_hechas), b: horas(l.horas) }), etiqueta: `${l.clave} · ${l.titulo}` })}
                 >
                   <span className="pg-tramo-relleno" style={{ width: `${Math.min(1, l.horas_hechas / (l.horas || 1)) * 100}%` }} />
                   <small>{l.clave}</small>
@@ -480,26 +476,26 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
               ))}
             </div>
             <p className="nota">
-              {horas(plan.horas_hechas)} de {horas(plan.total_horas)} · {hechas} de {lecciones.length} lecciones hechas
-              {plan.fin ? ` · acabas el ${fechaCorta(plan.fin)}` : ''}
+              {t('progreso.horasDe', { a: horas(plan.horas_hechas), b: horas(plan.total_horas) })} · {t('progreso.leccionesHechas', { hechas, n: lecciones.length })}
+              {plan.fin ? t('progreso.acabas', { fecha: fechaCorta(plan.fin) }) : ''}
             </p>
           </div>
           {(proxima || repasosPlan > 0) && (
             <div className="pg-siguiente">
-              <span className="pg-etq">Lo siguiente</span>
+              <span className="pg-etq">{t('progreso.siguiente')}</span>
               {proxima && (
                 <>
                   <strong>
                     {proxima.clave} · {proxima.titulo}
                   </strong>
                   <button className="boton boton-principal" onClick={() => irARuta(`#/fichas/${plan.tema_id}/${proxima.clave}`)}>
-                    {conMaterial(proxima.clave) ? 'Estudiarla' : 'Prepararla'}
+                    {conMaterial(proxima.clave) ? t('progreso.estudiarla') : t('progreso.prepararla')}
                   </button>
                 </>
               )}
               {repasosPlan > 0 && (
-                <button className="boton" onClick={() => irA('repaso')} title="En Repaso salen junto a los de tus otros planes">
-                  {plural(repasosPlan, 'repaso pendiente', 'repasos pendientes')} de este plan
+                <button className="boton" onClick={() => irA('repaso')} title={t('progreso.repasoTitulo')}>
+                  {t('progreso.repasosDeEstePlan', { n: pluralT(repasosPlan, 'progreso.repasoPend', 'progreso.repasosPend') })}
                 </button>
               )}
             </div>
@@ -511,50 +507,49 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
         <div className="pg-cifras">
           <div className="pg-cifra">
             <strong>
-              {hechas} <small>de {lecciones.length}</small>
+              {hechas} <small>{t('progreso.de', { n: lecciones.length })}</small>
             </strong>
-            <span>lecciones hechas</span>
+            <span>{t('progreso.leccionesHechasEtq')}</span>
           </div>
           <div className="pg-cifra">
             <strong>
-              {dominados} <small>de {delPlan.length}</small>
+              {dominados} <small>{t('progreso.de', { n: delPlan.length })}</small>
             </strong>
-            <span>conceptos dominados</span>
-            {dominados === 0 && <em>Se dominan acertándolos en repasos separados en el tiempo.</em>}
+            <span>{t('progreso.conceptosDominados')}</span>
+            {dominados === 0 && <em>{t('progreso.dominarSeguidos')}</em>}
           </div>
           <div className="pg-cifra">
-            <strong>{plural(resumen.racha, 'día', 'días')}</strong>
+            <strong>{pluralT(resumen.racha, 'progreso.dia', 'progreso.dias')}</strong>
             <span>
-              seguidos estudiando{plan ? ' (cualquier plan)' : ''} · {plural(resumen.dias_estudiados, 'día', 'días')}
-              {plan ? ' con este plan' : ' en total'}
+              {t('progreso.seguidos')}{plan ? t('progreso.cualquierPlan') : ''} · {pluralT(resumen.dias_estudiados, 'progreso.dia', 'progreso.dias')}
+              {plan ? t('progreso.conEstePlan') : t('progreso.enTotal')}
             </span>
           </div>
           <div className="pg-cifra">
             <strong>{resumen.minutos_practica} min</strong>
             <span>
-              de repaso{plan ? ' en este plan' : ''}
-              {resumen.intentos ? ` · ${plural(resumen.intentos, 'respuesta', 'respuestas')}` : ''}
+              {t('progreso.deRepaso')}{plan ? t('progreso.enEstePlan') : ''}
+              {resumen.intentos ? ` · ${pluralT(resumen.intentos, 'progreso.respuesta', 'progreso.respuestas')}` : ''}
             </span>
-            {resumen.minutos_practica === 0 && <em>Aún no has repasado. Diez minutos al día bastan.</em>}
+            {resumen.minutos_practica === 0 && <em>{t('progreso.sinRepasar')}</em>}
           </div>
         </div>
       )}
 
       <section className="pg-seccion">
         <div className="pg-seccion-cabecera">
-          <h2>Lección a lección</h2>
+          <h2>{t('progreso.leccionALeccion')}</h2>
           <ul className="pg-leyenda">
             {ESTADOS.map((e) => (
-              <li key={e.id} title={e.desc}>
+              <li key={e.id} title={descEstado(e.id)}>
                 <span className={`pg-punto pg-${e.id}`} />
-                {e.nombre}
+                {nombreEstado(e.id)}
               </li>
             ))}
           </ul>
         </div>
         <p className="pg-explica">
-          Los aciertos y fallos de cada concepto cuentan un repaso por día: el primer intento del día. Lo que repites ese mismo
-          día, los reintentos y las vueltas de «otra vez» no suman, aunque sí los veas en Repaso.
+          {t('progreso.unRepasoPorDia')}
         </p>
         <ol className="pg-lecciones">
           {lecciones.map((l) => {
@@ -568,7 +563,7 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
                   <span className="pg-fila-titulo">
                     <strong>{l.titulo}</strong>
                     <small>
-                      <span className={`pg-estado ${l.estado}`}>{LECCION[l.estado]}</span> · {material(materiales[l.clave])}
+                      <span className={`pg-estado ${l.estado}`}>{nombreLeccion(l.estado)}</span> · {material(materiales[l.clave])}
                     </small>
                   </span>
                   <span className="pg-fila-horas">
@@ -582,7 +577,7 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
                   <span className="pg-fila-dominio">
                     <BarraDominio conceptos={suyos} sobre={sobre} />
                     <small>
-                      {dom} de {suyos.length} dominados
+                      {t('progreso.dominadosDe', { dom, n: suyos.length })}
                     </small>
                   </span>
                   <span className="pg-flecha" aria-hidden>
@@ -605,20 +600,24 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
                     </div>
                     {elegido && elegido.leccion_clave === l.clave && (
                       <p className="pg-concepto-info">
-                        <strong>{elegido.nombre}</strong>: {NOMBRE_ESTADO[elegido.estado].toLowerCase()}, {pct(elegido.p)} de
-                        probabilidad de recordarlo ahora · {plural(elegido.aciertos, 'acierto', 'aciertos')},{' '}
-                        {plural(elegido.fallos, 'fallo', 'fallos')} (un repaso por día)
-                        {elegido.proxima ? ` · próximo repaso el ${fechaCorta(elegido.proxima)}` : ''}
+                        <strong>{elegido.nombre}</strong>:{' '}
+                        {t('progreso.conceptoInfo', {
+                          estado: nombreEstado(elegido.estado).toLowerCase(),
+                          p: pct(elegido.p),
+                          aciertos: pluralT(elegido.aciertos, 'progreso.acierto', 'progreso.aciertos'),
+                          fallos: pluralT(elegido.fallos, 'progreso.fallo', 'progreso.fallos'),
+                        })}
+                        {elegido.proxima ? t('progreso.proximoRepaso', { fecha: fechaCorta(elegido.proxima) }) : ''}
                         {conMaterial(l.clave) && elegido.preguntas === 0
-                          ? ' · no tiene preguntas, así que no entra en el repaso: regenera el material de la lección'
+                          ? t('progreso.sinPreguntas')
                           : conMaterial(l.clave) && elegido.preguntas === 1
-                            ? ' · solo tiene una pregunta: si la fallas, vuelve la misma'
+                            ? t('progreso.unaPregunta')
                             : ''}
                       </p>
                     )}
                     <div className="botones">
                       <button className="boton" onClick={() => plan && irARuta(`#/fichas/${plan.tema_id}/${l.clave}`)}>
-                        {materiales[l.clave]?.tipos.apuntes ? 'Abrir sus apuntes y fichas' : 'Preparar su material'}
+                        {materiales[l.clave]?.tipos.apuntes ? t('progreso.abrirApuntes') : t('progreso.prepararMaterial')}
                       </button>
                     </div>
                   </div>
@@ -631,22 +630,21 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
 
       <div className="pg-dos">
         <section className="pg-seccion">
-          <h2>Repasos de las próximas dos semanas</h2>
+          <h2>{t('progreso.proximasDos')}</h2>
           {totalCarga === 0 ? (
             <p className="pg-explica">
-              No tienes repasos programados. Cada vez que respondes en Repaso o en el tutor, el concepto vuelve justo antes de
-              que lo olvides: aquí verás cuántos te tocan cada día.
+              {t('progreso.sinProgramados')}
             </p>
           ) : (
             <>
-              <div className="viz-columnas" role="group" aria-label="Repasos previstos por día">
+              <div className="viz-columnas" role="group" aria-label={t('progreso.previstosAria')}>
                 {carga.map((c) => {
                   const destacar = c.repasos > 0 && (c.fecha === hoyIso || c.repasos === maxCarga)
                   return (
                     <div
                       key={c.fecha}
                       className={`viz-columna ${c.fecha === hoyIso ? 'hoy' : ''}`}
-                      {...sobre({ valor: plural(c.repasos, 'repaso', 'repasos'), etiqueta: `${fechaCorta(c.fecha)} · unos ${Math.round(c.minutos)} min` })}
+                      {...sobre({ valor: pluralT(c.repasos, 'progreso.repaso', 'progreso.repasos'), etiqueta: t('progreso.unosMin', { fecha: fechaCorta(c.fecha), min: Math.round(c.minutos) }) })}
                     >
                       <span className="viz-valor">{destacar ? c.repasos : ''}</span>
                       {c.repasos > 0 && <span className="viz-barra" style={{ height: `${(c.repasos / maxCarga) * 100}%` }} />}
@@ -657,18 +655,18 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
               <div className="viz-dias" aria-hidden>
                 {carga.map((c) => (
                   <small key={c.fecha} className={c.fecha === hoyIso ? 'hoy' : ''}>
-                    {c.fecha === hoyIso ? 'hoy' : new Date(c.fecha + 'T12:00:00').getDate()}
+                    {c.fecha === hoyIso ? t('progreso.hoy') : new Date(c.fecha + 'T12:00:00').getDate()}
                   </small>
                 ))}
               </div>
               <details className="viz-tabla">
-                <summary>Ver como tabla</summary>
+                <summary>{t('progreso.verTabla')}</summary>
                 <table>
                   <thead>
                     <tr>
-                      <th>Día</th>
-                      <th>Repasos</th>
-                      <th>Minutos</th>
+                      <th>{t('progreso.col.dia')}</th>
+                      <th>{t('progreso.col.repasos')}</th>
+                      <th>{t('progreso.col.minutos')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -683,7 +681,7 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
                 </table>
               </details>
               <p className="nota">
-                {plural(totalCarga, 'repaso', 'repasos')} en 14 días · unos {Math.round(carga.reduce((a, c) => a + c.minutos, 0))} min
+                {t('progreso.en14', { n: pluralT(totalCarga, 'progreso.repaso', 'progreso.repasos'), min: Math.round(carga.reduce((a, c) => a + c.minutos, 0)) })}
               </p>
             </>
           )}
@@ -692,24 +690,23 @@ export default function PanelProgreso({ irA }: { irA: (m: IdModo) => void }) {
         <TuModelo />
 
         <section className="pg-seccion">
-          <h2>¿Aciertas tanto como crees?</h2>
+          <h2>{t('progreso.aciertas')}</h2>
           {respuestas < 10 ? (
             <>
               <p className="pg-explica">
-                Al responder en Repaso dices lo seguro que estás. Con diez respuestas, aquí verás si tu seguridad cuadra con tus
-                aciertos: es la mejor alarma contra el «me lo sé» que no es verdad.
+                {t('progreso.aciertasExplica')}
               </p>
               <span className="barra">
                 <span style={{ width: `${(respuestas / 10) * 100}%` }} />
               </span>
-              <p className="nota">Llevas {respuestas} de 10.</p>
+              <p className="nota">{t('progreso.llevas', { n: respuestas })}</p>
             </>
           ) : (
             <>
-              <p className="pg-explica">Cada punto compara lo seguro que estabas con lo que acertaste. Sobre la diagonal, bien calibrado.</p>
+              <p className="pg-explica">{t('progreso.cadaPunto')}</p>
               <div className="dos-columnas">
-                <Fiabilidad titulo="Tu seguridad" tramos={tuya} sobre={sobre} />
-                <Fiabilidad titulo="La apuesta del tutor" tramos={modelo} sobre={sobre} />
+                <Fiabilidad titulo={t('progreso.tuSeguridad')} tramos={tuya} sobre={sobre} />
+                <Fiabilidad titulo={t('progreso.apuestaTutor')} tramos={modelo} sobre={sobre} />
               </div>
               <TablaCalibracion tuya={tuya} modelo={modelo} />
             </>

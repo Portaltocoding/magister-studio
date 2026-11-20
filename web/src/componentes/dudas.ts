@@ -2,6 +2,7 @@
 // de cada párrafo, guardado debajo de él. Se guarda en el navegador, por lección (magister-dudas-<apuntes> y
 // magister-notas-<apuntes>), aparte del avance: sobrevive al cierre de la sesión para el «Te quedaron estas dudas» de
 // otro día. Marcar, guardar y enseñar no llama al modelo. Lo de arriba es puro (pruebas en web/pruebas/dudas.test.ts).
+import { t } from '../i18n/i18n.ts'
 import { cuando } from './aMedias.ts'
 
 export interface Duda {
@@ -64,7 +65,7 @@ export const sinExplicar =(dudas: readonly Duda[], notas: readonly Nota[]) => du
 
 // «Te quedaron 2 dudas aquí: ¿te las explico más fácil?»
 export function textoAvisoDudas(n: number): string {
-  return n === 1 ? 'Te quedó 1 duda aquí: ¿te la explico más fácil?' : `Te quedaron ${n} dudas aquí: ¿te las explico más fácil?`
+  return t(n === 1 ? 'foco.avisoDudas1' : 'foco.avisoDudasN', { n })
 }
 
 // Lo que flojeó en la sesión: las dudas (por párrafo), lo fallado y lo que salió a medias, en el orden de la lección.

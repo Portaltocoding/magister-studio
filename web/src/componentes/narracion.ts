@@ -1,4 +1,5 @@
 import { frases, paraLeer } from './voz.ts'
+import { t as tr } from '../i18n/i18n.ts'
 
 // La clase por voz a partir de los apuntes. No se leen enteros (secciones de 30 frases con código, tablas y fórmulas
 // no se entienden de oído): por apartado se dice el arranque, una idea por subtítulo, el aviso («ojo con esto») y la
@@ -23,7 +24,7 @@ export function conPreguntas(lista: FraseClase[], preguntas: Record<string, stri
     const fin = x.bloque && toca.has(x.bloque) && lista[i + 1]?.bloque !== x.bloque
     if (fin && x.bloque) {
       const enunciado = preguntas[x.bloque].trim()
-      salida.push({ marca: x.marca, bloque: x.bloque, pregunta: enunciado, texto: `Antes de seguir, te pregunto una cosa. ${enunciado}` })
+      salida.push({ marca: x.marca, bloque: x.bloque, pregunta: enunciado, texto: `${tr('llamada.narr.antes')} ${enunciado}` })
     }
   })
   return salida
@@ -111,7 +112,7 @@ export function decible(t: string): string[] {
     t
       .replace(/^\*\*(.+?)\*\*\s*$/gm, '$1:')
       // Código en línea con llaves, comillas o etiquetas no se entiende de oído: se ve en la pizarra.
-      .replace(/`[^`]*[{}"=<>][^`]*`/g, 'lo que tienes en la pizarra'),
+      .replace(/`[^`]*[{}"=<>][^`]*`/g, tr('llamada.narr.pizarra')),
   )
   const salida: string[] = []
   for (const f of frases(limpio)) {
@@ -127,11 +128,11 @@ export function decible(t: string): string[] {
 // Las frases de un apartado: arranque (hasta 3), y por cada subtítulo, su nombre y su primera idea (hasta 2 frases);
 // después el aviso y la idea con la que quedarse.
 export function narrarApartado(seccion: string, bloque: string | undefined, titulo: string, n: number, total: number): FraseClase[] {
-  const marca = `la parte «${titulo}»`
+  const marca = tr('llamada.marca.parte', { titulo })
   const p = partir(seccion.replace(/^##\s.*\n?/, ''))
   // «El estado…» tras dos puntos sigue la frase: en minúscula (salvo siglas como REST).
   const seguir = (f: string) => (/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/.test(f) ? f[0].toLowerCase() + f.slice(1) : f)
-  const salida: FraseClase[] = [{ marca, bloque, texto: n === 1 ? `Empezamos con ${titulo}.` : n === total ? `Y por último, ${titulo}.` : `Pasamos a ${titulo}.` }]
+  const salida: FraseClase[] = [{ marca, bloque, texto: n === 1 ? tr('llamada.narr.empezamos', { titulo }) : n === total ? tr('llamada.narr.porUltimo', { titulo }) : tr('llamada.narr.pasamos', { titulo }) }]
   const decir = (xs: string[]) => xs.forEach((texto) => salida.push({ marca, bloque, texto }))
   let i = 0
   const arranque: string[] = []
@@ -150,12 +151,12 @@ export function narrarApartado(seccion: string, bloque: string | undefined, titu
   for (const a of p.avisos.slice(0, 1)) {
     const fs = decible(a).slice(0, 3)
     if (!fs.length) continue
-    const tipico = fs[0].match(/^El error típico:\s*(.+)$/i)
-    decir([tipico ? `Ojo, el error típico: ${seguir(tipico[1])}` : `Ojo con esto: ${seguir(fs[0])}`, ...fs.slice(1)])
+    const tipico = fs[0].match(/^(?:El error típico|The typical mistake):\s*(.+)$/i)
+    decir([tipico ? tr('llamada.narr.errorTipico', { texto: seguir(tipico[1]) }) : tr('llamada.narr.ojo', { texto: seguir(fs[0]) }), ...fs.slice(1)])
   }
   for (const idea of p.ideas.slice(0, 1)) {
     const fs = decible(idea).slice(0, 2)
-    if (fs.length) decir([`Si te quedas con una idea: ${seguir(fs[0])}`, ...fs.slice(1)])
+    if (fs.length) decir([tr('llamada.narr.unaIdea', { texto: seguir(fs[0]) }), ...fs.slice(1)])
   }
   return salida
 }
@@ -171,14 +172,14 @@ export function narrarApuntes(texto: string, bloques: BloqueContrato[], clave: s
     .filter((x) => !x.saltar && x.titulo)
   const n = clave.match(/^L(\d+)$/i)?.[1]
   const salida: FraseClase[] = [
-    { marca: 'el principio', texto: `Hola. Vamos con ${n ? `la lección ${numero(Number(n))}` : 'la lección'}: ${tituloLeccion}.` },
+    { marca: tr('llamada.marca.principio'), texto: tr('llamada.narr.hola', { leccion: n ? tr('llamada.narr.leccionN', { n: numero(Number(n)) }) : tr('llamada.narr.leccion'), titulo: tituloLeccion }) },
   ]
   if (secciones.length > 1) {
-    salida.push({ marca: 'el mapa', texto: `Primero, el mapa: son ${numero(secciones.length)} partes.` })
-    secciones.forEach((x, k) => salida.push({ marca: 'el mapa', texto: `${numero(k + 1).replace(/^./, (c) => c.toUpperCase())}: ${x.titulo}.` }))
-    salida.push({ marca: 'el mapa', texto: 'Ve pensando cómo se conectan.' })
+    salida.push({ marca: tr('llamada.marca.mapa'), texto: tr('llamada.narr.mapa', { n: numero(secciones.length) }) })
+    secciones.forEach((x, k) => salida.push({ marca: tr('llamada.marca.mapa'), texto: `${numero(k + 1).replace(/^./, (c) => c.toUpperCase())}: ${x.titulo}.` }))
+    salida.push({ marca: tr('llamada.marca.mapa'), texto: tr('llamada.narr.conectan') })
   }
-  salida.push({ marca: 'el principio', texto: 'Si te surge una duda, interrúmpeme cuando quieras, hablando sin más.' })
+  salida.push({ marca: tr('llamada.marca.principio'), texto: tr('llamada.narr.duda') })
   secciones.forEach((x, k) => {
     salida.push(...narrarApartado(x.s, porTitulo.get(x.titulo.toLowerCase()), x.titulo, k + 1, secciones.length))
   })

@@ -11,8 +11,9 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from magister.config import ajustes
+from magister.config import FUENTE_MONO, FUENTE_TEXTO, ajustes
 from magister.material.almacen import carpeta_salidas
+from magister.material.diagramas import normalizar_fuente
 from magister.material.plantillas import ESTILOS
 
 MOTOR = Path(__file__).parent / "motor_pdf"
@@ -71,7 +72,7 @@ def _entorno(estilo: str = "libro", acento: str | None = None) -> dict:
     extra = [ajustes.pandoc, str(GIT_BIN)]
     # La maqueta del libro (practica.css), no la de las fichas generales.
     entorno = {**entorno_minimo(), "PATH": os.pathsep.join([*extra, os.environ.get("PATH", "")]), "PYTHONUTF8": "1",
-               "FICHA_CSS": ESTILOS.get(estilo, "practica.css"),
+               "FICHA_CSS": ESTILOS.get(estilo, "practica.css"), "FICHA_FUENTE_TEXTO": FUENTE_TEXTO, "FICHA_FUENTE_MONO": FUENTE_MONO,
                "FICHA_CHROME": ajustes.chrome, "FICHA_CHROME_ARGS": ajustes.chrome_args}
     if acento and _HEX.fullmatch(acento):
         entorno["FICHA_ACENTO"] = acento
@@ -104,7 +105,7 @@ def limpiar_svg(svg: str) -> str | None:
     if "xmlns=" not in svg:
         svg = svg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"', 1)
     # En una sola línea: así el motor lo trata como un bloque HTML y no lo parte.
-    return " ".join(svg.split())
+    return " ".join(normalizar_fuente(svg).split())
 
 
 def svg_en_linea(markdown: str) -> str:

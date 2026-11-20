@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
+import { pluralT } from '../componentes/formato.ts'
 import {
   cancelarTrabajo,
   crearFuente,
@@ -41,7 +44,7 @@ function AvisoIncompleta({ motivo, fuenteId }: { motivo: string | null | undefin
       {avisoIncompleta(motivo)}{' '}
       {fuenteId != null && (
         <button className="boton-mini" onClick={() => irARuta(`#/temas/${fuenteId}`)}>
-          Subir el PDF
+          {t('biblioteca.subirPdf')}
         </button>
       )}
     </span>
@@ -50,11 +53,11 @@ function AvisoIncompleta({ motivo, fuenteId }: { motivo: string | null | undefin
 
 // Cada grupo de lo que entró, con el punto de color de su tema y su nombre (el color nunca va solo).
 function NombreTema({ temaId, nombre, temas }: { temaId: number | null; nombre: string | null | undefined; temas: readonly number[] }) {
-  if (temaId == null) return <span className="tema-etiqueta">Sin tema (vale para todos)</span>
+  if (temaId == null) return <span className="tema-etiqueta">{t('biblioteca.sinTema')}</span>
   return (
     <span className="tema-etiqueta">
       <span className="punto-tema" style={colorDeTema(temaId, temas)?.estilo} aria-hidden="true" />
-      {nombre ?? `Tema ${temaId}`}
+      {nombre ?? t('biblioteca.temaN', { id: temaId })}
     </span>
   )
 }
@@ -73,34 +76,31 @@ function usarTemasDePlanes(): number[] {
 // La Biblioteca, más allá de tus fuentes: rastrear la web en busca de buenas fuentes y guardar páginas o PDF
 // desde un enlace (se descargan, se limpian y se indexan para que el tutor las cite).
 
-const ESTADOS: Record<string, string> = {
-  recibida: 'recibida, en cola',
-  pendiente: 'texto listo, indexando',
-  lista: 'guardada',
-  cuarentena: 'en cuarentena',
-  retirada: 'retirada',
-}
-
-const NOMBRE_WEB = 'Webs guardadas'
+const textoEstado = (e: string, corto = false): string =>
+  e === 'lista' && corto
+    ? t('biblioteca.estado.listaCitar')
+    : ['recibida', 'pendiente', 'lista', 'cuarentena', 'retirada'].includes(e)
+      ? t(`biblioteca.estado.${e}` as 'biblioteca.estado.lista')
+      : e
 
 // La fuente donde van las webs: la que elijas o, si no, la de tipo web (se crea la primera vez).
 async function fuenteWeb(fuentes: Fuente[], elegida: number | null): Promise<number> {
   if (elegida != null) return elegida
   const web = fuentes.find((f) => f.tipo === 'web')
   if (web) return web.id
-  return (await crearFuente(NOMBRE_WEB, 'web', 1)).id
+  return (await crearFuente(t('biblioteca.nombreWeb'), 'web', 1)).id
 }
-
-const QUE_HACER = 'Vuelve a lanzarla o sube tú un PDF o una URL.'
 
 // Cómo terminó la búsqueda de una lección, con qué hacer si no salió nada.
 function comoAcabo(clave: string, estado: string, motivo: string | null, solas = false): string {
-  if (estado === 'cortada') return `La búsqueda para ${clave} se cortó (${motivo ?? 'sin motivo'}). ${QUE_HACER}`
+  const sinMotivo = t('biblioteca.sinMotivo')
+  const hacer = t('biblioteca.queHacer')
+  if (estado === 'cortada') return t('biblioteca.cortada', { clave, motivo: motivo ?? sinMotivo, hacer })
   const n = /^(\d+) propuestas/.exec(motivo ?? '')
   if (n && Number(n[1]) > 0)
-    return `Búsqueda para ${clave} acabada: ${n[1]} ${n[1] === '1' ? 'propuesta' : 'propuestas'}${solas ? ', que entran solas en tus fuentes.' : ', abajo.'}`
-  if (n) return `La búsqueda para ${clave} acabó sin propuestas. ${QUE_HACER}`
-  return `La búsqueda para ${clave} no salió bien (${motivo ?? 'sin motivo'}). ${QUE_HACER}`
+    return t(solas ? 'biblioteca.acabadaSolas' : 'biblioteca.acabada', { clave, n: pluralT(Number(n[1]), 'biblioteca.propuesta', 'biblioteca.propuestas') })
+  if (n) return t('biblioteca.sinPropuestas', { clave, hacer })
+  return t('biblioteca.noSalio', { clave, motivo: motivo ?? sinMotivo, hacer })
 }
 
 interface Encontrada {
@@ -110,6 +110,7 @@ interface Encontrada {
 }
 
 function Buscar() {
+  usarIdioma() // los textos siguen al idioma
   const [consulta, setConsulta] = useState('')
   const [buscando, setBuscando] = useState(false)
   const [encontradas, setEncontradas] = useState<Encontrada[] | null>(null)
@@ -132,7 +133,7 @@ function Buscar() {
     listarPlanes()
       .then((ps) => Promise.all(ps.map((p) => verPlan(p.tema_id).then((v) => ({ p, v })))))
       .then((vs) => setLecciones(vs.flatMap(({ p, v }) => v.lecciones.map((l) => ({ plan_id: p.plan_id, clave: l.clave, titulo: l.titulo })))))
-      .catch((e) => setAviso(`No he podido cargar tus lecciones: ${mensajeDe(e)}`))
+      .catch((e) => setAviso(t('biblioteca.noLecciones', { motivo: mensajeDe(e) })))
   }, [cargarPropuestas])
 
   // Mientras busca para una lección, las propuestas van llegando y se mira cada tarea hasta que acaba.
@@ -143,18 +144,18 @@ function Buscar() {
     const mirar = async () => {
       cargarPropuestas()
       const estados = await Promise.all(
-        enMarcha.map((t) =>
-          verResearch(t.id).then(
-            (r) => ({ t, r }),
-            () => ({ t, r: null }),
+        enMarcha.map((tarea) =>
+          verResearch(tarea.id).then(
+            (r) => ({ tarea, r }),
+            () => ({ tarea, r: null }),
           ),
         ),
       )
       if (!vivo) return
-      const acabadas = estados.flatMap(({ t, r }) => (r && r.estado !== 'en_curso' ? [{ t, r }] : []))
+      const acabadas = estados.flatMap(({ tarea, r }) => (r && r.estado !== 'en_curso' ? [{ tarea, r }] : []))
       if (!acabadas.length) return
-      setAviso(acabadas.map(({ t, r }) => comoAcabo(t.clave, r.estado, r.motivo_fin, r.incorporar)).join(' '))
-      const ids = new Set(acabadas.map(({ t }) => t.id))
+      setAviso(acabadas.map(({ tarea, r }) => comoAcabo(tarea.clave, r.estado, r.motivo_fin, r.incorporar)).join(' '))
+      const ids = new Set(acabadas.map(({ tarea }) => tarea.id))
       setEnMarcha((ts) => ts.filter((x) => !ids.has(x.id)))
       if (acabadas.some(({ r }) => r.incorporar)) setSenal((n) => n + 1)
     }
@@ -162,7 +163,7 @@ function Buscar() {
     // Tope de seguridad: si en 15 minutos no ha acabado, deja de mirar.
     const tope = window.setTimeout(() => {
       setEnMarcha([])
-      setAviso('La búsqueda sigue sin acabar. Vuelve en un rato: las propuestas aparecerán abajo.')
+      setAviso(t('biblioteca.sigueSinAcabar'))
     }, 15 * 60 * 1000)
     return () => {
       vivo = false
@@ -180,7 +181,7 @@ function Buscar() {
       const r = await pedir<{ propuestas: Encontrada[]; motivo_fin: string | null }>('/api/research/libre', enviarJson({ consulta: consulta.trim() }))
       setEncontradas(r.propuestas)
     } catch (e) {
-      setAviso(`No he podido buscar: ${(e as Error).message}`)
+      setAviso(t('biblioteca.noBusca', { motivo: (e as Error).message }))
     } finally {
       setBuscando(false)
     }
@@ -195,14 +196,14 @@ function Buscar() {
         .then(setFuentes)
         .catch(() => undefined)
     } catch (e) {
-      setAviso(`No se pudo guardar: ${(e as Error).message}`)
+      setAviso(t('biblioteca.noGuarda', { motivo: (e as Error).message }))
     }
   }
 
   const decidir = async (id: number, accion: 'aprobar' | 'rechazar') => {
     try {
       await decidirPropuesta(id, accion)
-      setAviso(accion === 'aprobar' ? 'Guardada en tus fuentes: se está indexando.' : 'Descartada.')
+      setAviso(accion === 'aprobar' ? t('biblioteca.guardadaIndexa') : t('biblioteca.descartada'))
       if (accion === 'aprobar') setSenal((n) => n + 1)
     } catch (e) {
       setAviso(String((e as Error).message))
@@ -218,13 +219,13 @@ function Buscar() {
 
   return (
     <div className="panel biblioteca">
-      <h1>Buscar fuentes</h1>
-      <p className="nota">Magister rastrea la web, lee las páginas y te propone las mejores, con el porqué.</p>
+      <h1>{t('biblioteca.buscarTitulo')}</h1>
+      <p className="nota">{t('biblioteca.buscarIntro')}</p>
       <EstadoFuentes senal={senal} />
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
 
       <section>
-        <h2>Sobre un tema</h2>
+        <h2>{t('biblioteca.sobreTema')}</h2>
         <form
           className="biblioteca-buscar"
           onSubmit={(e) => {
@@ -232,13 +233,13 @@ function Buscar() {
             buscar()
           }}
         >
-          <input value={consulta} onChange={(e) => setConsulta(e.target.value)} placeholder="Por ejemplo: niveles de aislamiento en Postgres" aria-label="Qué buscar" />
+          <input value={consulta} onChange={(e) => setConsulta(e.target.value)} placeholder={t('biblioteca.ejemplo')} aria-label={t('biblioteca.queBuscar')} />
           <button className="boton boton-principal" disabled={buscando || consulta.trim().length < 3}>
-            Buscar
+            {t('biblioteca.buscar')}
           </button>
         </form>
-        {buscando && <Pensando texto="Rastreando la web y leyendo páginas… (un minuto o dos)" />}
-        {encontradas && encontradas.length === 0 && <p className="vacio">No he encontrado nada que valga la pena. Prueba con otras palabras.</p>}
+        {buscando && <Pensando texto={t('biblioteca.rastreando')} />}
+        {encontradas && encontradas.length === 0 && <p className="vacio">{t('biblioteca.nadaValido')}</p>}
         {encontradas && encontradas.length > 0 && (
           <ul className="biblioteca-lista">
             {encontradas.map((p) => (
@@ -250,10 +251,10 @@ function Buscar() {
                   <small>{p.motivo}</small>
                 </div>
                 {guardadas.has(p.url) ? (
-                  <span className="nota">Guardada</span>
+                  <span className="nota">{t('biblioteca.guardada')}</span>
                 ) : (
                   <button className="boton-mini" onClick={() => guardar(p.url)}>
-                    Guardar
+                    {t('biblioteca.guardar')}
                   </button>
                 )}
               </li>
@@ -263,8 +264,8 @@ function Buscar() {
       </section>
 
       <section>
-        <h2>Para una lección de tu plan</h2>
-        <p className="nota">Busca fuentes que cubran lo que pide la lección. Las propuestas llegan abajo, para que las apruebes.</p>
+        <h2>{t('biblioteca.paraLeccion')}</h2>
+        <p className="nota">{t('biblioteca.paraLeccionIntro')}</p>
         <form
           className="biblioteca-buscar"
           onSubmit={async (e) => {
@@ -273,15 +274,15 @@ function Buscar() {
             if (!l) return
             try {
               const r = await lanzarResearch(l.plan_id, [l.clave], { forzar: true })
-              setAviso(`Buscando fuentes para ${l.clave}. Tarda unos minutos; las propuestas aparecerán abajo.`)
+              setAviso(t('biblioteca.buscandoPara', { clave: l.clave }))
               setEnMarcha((ts) => [...ts, ...r.tareas.map((id) => ({ id, clave: l.clave }))])
             } catch (err) {
               setAviso(String((err as Error).message))
             }
           }}
         >
-          <select value={leccion} onChange={(e) => setLeccion(e.target.value)} aria-label="Lección">
-            <option value="">Elige una lección…</option>
+          <select value={leccion} onChange={(e) => setLeccion(e.target.value)} aria-label={t('biblioteca.leccion')}>
+            <option value="">{t('biblioteca.eligeLeccion')}</option>
             {lecciones.map((l) => (
               <option key={`${l.plan_id}:${l.clave}`} value={`${l.plan_id}:${l.clave}`}>
                 {l.clave} · {l.titulo}
@@ -289,17 +290,17 @@ function Buscar() {
             ))}
           </select>
           <button className="boton" disabled={!leccion}>
-            Buscar para esta lección
+            {t('biblioteca.buscarParaLeccion')}
           </button>
         </form>
-        {enMarcha.length > 0 && <Pensando texto="Buscando… las propuestas irán apareciendo" />}
+        {enMarcha.length > 0 && <Pensando texto={t('biblioteca.buscandoEspera')} />}
       </section>
 
       <section>
-        <h2>Propuestas por revisar {propuestas.length ? `(${propuestas.length})` : ''}</h2>
+        <h2>{t('biblioteca.porRevisar')} {propuestas.length ? `(${propuestas.length})` : ''}</h2>
         <Incorporar propuestas={propuestas} leccion={elegida} senal={senal} alAcabar={alAcabarIncorporar} />
         {propuestas.length === 0 ? (
-          <p className="vacio">No hay propuestas pendientes.</p>
+          <p className="vacio">{t('biblioteca.sinPendientes')}</p>
         ) : (
           <ul className="biblioteca-lista">
             {propuestas.map((p) => (
@@ -314,10 +315,10 @@ function Buscar() {
                 </div>
                 <span className="biblioteca-botones">
                   <button className="boton-mini" onClick={() => decidir(p.id, 'aprobar')}>
-                    Guardar
+                    {t('biblioteca.guardar')}
                   </button>
                   <button className="boton-mini" onClick={() => decidir(p.id, 'rechazar')}>
-                    Descartar
+                    {t('biblioteca.descartar')}
                   </button>
                 </span>
               </li>
@@ -329,7 +330,7 @@ function Buscar() {
   )
 }
 
-const vivo = (t: Incorporacion | null) => !!t && (t.estado === 'pendiente' || t.estado === 'en_curso')
+const vivo = (x: Incorporacion | null) => !!x && (x.estado === 'pendiente' || x.estado === 'en_curso')
 
 // «Incorporar todas»: las propuestas pendientes entran en tus fuentes de una vez, por la cola y sin gastar cuota.
 // Si una no se puede (no existe, no es una página, está vacía), se dice por qué y se sigue con las demás.
@@ -344,27 +345,27 @@ function Incorporar({
   senal: number
   alAcabar: () => void
 }) {
-  const [t, setT] = useState<Incorporacion | null>(null)
+  const [inc, setInc] = useState<Incorporacion | null>(null)
   const [solas, setSolas] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
 
   useEffect(() => {
     ultimaIncorporacion()
       .then((r) => {
-        setT((previo) => (vivo(previo) ? previo : r.ultimo))
+        setInc((previo) => (vivo(previo) ? previo : r.ultimo))
         setSolas(r.solas)
       })
       .catch(() => undefined)
   }, [senal])
 
-  const id = t?.trabajo_id
-  const enMarcha = vivo(t)
+  const id = inc?.trabajo_id
+  const enMarcha = vivo(inc)
   useEffect(() => {
     if (id == null || !enMarcha) return
     const intervalo = window.setInterval(() => {
       verIncorporacion(id)
         .then((n) => {
-          setT(n)
+          setInc(n)
           if (!vivo(n)) alAcabar()
         })
         .catch(() => undefined)
@@ -377,59 +378,59 @@ function Incorporar({
     try {
       const r = await incorporarPropuestas(filtro)
       if (r.trabajo_id == null) {
-        setAviso('No hay propuestas pendientes.')
+        setAviso(t('biblioteca.sinPendientes'))
         return
       }
-      setT(await verIncorporacion(r.trabajo_id))
+      setInc(await verIncorporacion(r.trabajo_id))
     } catch (e) {
-      setAviso(`No he podido empezar: ${mensajeDe(e)}`)
+      setAviso(t('biblioteca.noEmpieza', { motivo: mensajeDe(e) }))
     }
   }
 
   const deLeccion = leccion ? propuestas.filter((p) => p.plan_id === leccion.plan_id && p.leccion_clave === leccion.clave).length : 0
-  const fallos = t?.fallidas.length ?? 0
+  const fallos = inc?.fallidas.length ?? 0
 
   return (
     <div className="biblioteca-incorporar">
-      {solas && <p className="nota">Lo que propone la búsqueda para una lección entra solo en tus fuentes, marcado como web. Puedes quitarlo arriba.</p>}
+      {solas && <p className="nota">{t('biblioteca.entraSolo')}</p>}
       {propuestas.length > 0 && (
         <span className="biblioteca-botones">
           <button className="boton boton-principal" disabled={enMarcha} onClick={() => lanzar({})}>
-            Incorporar todas ({propuestas.length})
+            {t('biblioteca.incorporarTodas', { n: propuestas.length })}
           </button>
           {leccion && deLeccion > 0 && (
             <button className="boton" disabled={enMarcha} onClick={() => lanzar({ plan_id: leccion.plan_id, leccion_clave: leccion.clave })}>
-              Solo las de {leccion.clave} ({deLeccion})
+              {t('biblioteca.soloDe', { clave: leccion.clave, n: deLeccion })}
             </button>
           )}
         </span>
       )}
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
-      {t && enMarcha && (
+      {inc && enMarcha && (
         <div role="status">
-          <Pensando texto={`Incorporando: van ${t.van} de ${t.total} (han entrado ${t.entradas}${fallos ? `, ${fallos} no` : ''}). No gasta cuota.`} />
+          <Pensando texto={t('biblioteca.incorporando', { van: inc.van, total: inc.total, entradas: inc.entradas, noEntran: fallos ? t('biblioteca.yNo', { n: fallos }) : '' })} />
           <button
             className="boton-mini"
-            onClick={() => cancelarTrabajo(t.trabajo_id).catch((e) => setAviso(`No he podido cancelar: ${mensajeDe(e)}`))}
+            onClick={() => cancelarTrabajo(inc.trabajo_id).catch((e) => setAviso(t('biblioteca.noCancela', { motivo: mensajeDe(e) })))}
           >
-            Cancelar
+            {t('biblioteca.cancelar')}
           </button>
         </div>
       )}
-      {t && !enMarcha && t.total > 0 && (
+      {inc && !enMarcha && inc.total > 0 && (
         <div role="status">
           <p className="nota">
-            {t.automatica ? 'Lo último que entró solo del research: han' : 'Han'} entrado {t.entradas} de {t.total}
-            {fallos ? `; ${fallos} no se ${fallos === 1 ? 'ha' : 'han'} podido.` : '.'}
-            {t.entradas > 0 ? ' Se están indexando: el tutor podrá citarlas en unos minutos.' : ''}
-            {t.estado === 'cancelado' ? ' Lo cancelaste: las que faltaban siguen pendientes.' : ''}
+            {t(inc.automatica ? 'biblioteca.entraronAuto' : 'biblioteca.entraron', { entradas: inc.entradas, total: inc.total })}
+            {fallos ? t(fallos === 1 ? 'biblioteca.noPudo1' : 'biblioteca.noPudoN', { n: fallos }) : '.'}
+            {inc.entradas > 0 ? t('biblioteca.seIndexan') : ''}
+            {inc.estado === 'cancelado' ? t('biblioteca.loCancelaste') : ''}
           </p>
-          {t.estado === 'fallido' && <TextoError texto={t.error} antes="El trabajo se paró: " className="nota" />}
+          {inc.estado === 'fallido' && <TextoError texto={inc.error} antes={t('biblioteca.seParo')} className="nota" />}
           {fallos > 0 && (
             <details>
-              <summary>Por qué no han entrado</summary>
+              <summary>{t('biblioteca.porQueNo')}</summary>
               <ul className="biblioteca-lista">
-                {t.fallidas.map((f) => (
+                {inc.fallidas.map((f) => (
                   <li key={f.propuesta_id}>
                     <div>
                       <a href={f.url} target="_blank" rel="noreferrer">
@@ -449,11 +450,10 @@ function Incorporar({
   )
 }
 
-const ESTADO_CORTO: Record<string, string> = { ...ESTADOS, lista: 'lista para citar' }
-
 // Arriba de la Biblioteca: cuántos documentos hay listos, indexándose y con problema; qué pasó con los que fallan, con
 // «Reintentar»; y lo que vino del research (lo que entró solo se ve aquí y se puede quitar).
 function EstadoFuentes({ senal }: { senal: number }) {
+  usarIdioma()
   const temas = usarTemasDePlanes()
   const [r, setR] = useState<ResumenFuentes | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -466,8 +466,8 @@ function EstadoFuentes({ senal }: { senal: number }) {
   const indexando = r?.indexando ?? 0
   useEffect(() => {
     if (!indexando) return
-    const t = window.setInterval(cargar, 4000)
-    return () => window.clearInterval(t)
+    const i = window.setInterval(cargar, 4000)
+    return () => window.clearInterval(i)
   }, [indexando, cargar])
 
   if (!r || r.listos + r.indexando + r.con_problema === 0) return null
@@ -475,18 +475,18 @@ function EstadoFuentes({ senal }: { senal: number }) {
   const reintentar = async (d: DocumentoResumen) => {
     try {
       await reintentarVersion(d.version_id)
-      setAviso(`«${d.titulo}» vuelve a indexarse.`)
+      setAviso(t('biblioteca.vuelveIndexar', { titulo: d.titulo }))
     } catch (e) {
-      setAviso(`No se pudo reintentar: ${mensajeDe(e)}`)
+      setAviso(t('biblioteca.noReintenta', { motivo: mensajeDe(e) }))
     }
     cargar()
   }
   const quitar = async (d: DocumentoResumen) => {
-    if (!confirm(`¿Quitar «${d.titulo}» de tus fuentes? El tutor dejará de citarlo.`)) return
+    if (!confirm(t('biblioteca.confirmarQuitar', { titulo: d.titulo }))) return
     try {
       await pedir(`/api/fuentes/${d.fuente_id}/documentos/${d.documento_id}`, { method: 'DELETE' })
     } catch (e) {
-      setAviso(`No he podido quitarlo: ${mensajeDe(e)}`)
+      setAviso(t('biblioteca.noQuita', { motivo: mensajeDe(e) }))
     }
     cargar()
   }
@@ -499,8 +499,12 @@ function EstadoFuentes({ senal }: { senal: number }) {
   return (
     <section className="biblioteca-estado">
       <p className="nota" role="status">
-        Tus fuentes: {r.listos} {r.listos === 1 ? 'documento listo' : 'documentos listos'} · {r.indexando} indexándose · {r.con_problema} con problema
-        {r.incompletas?.length ? ` · ${r.incompletas.length} solo en parte` : ''}
+        {t('biblioteca.tusFuentes', {
+          listos: pluralT(r.listos, 'biblioteca.docListo', 'biblioteca.docsListos'),
+          indexando: r.indexando,
+          problema: r.con_problema,
+        })}
+        {r.incompletas?.length ? t('biblioteca.soloEnParte', { n: r.incompletas.length }) : ''}
       </p>
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
       {r.problemas.length > 0 && (
@@ -519,7 +523,7 @@ function EstadoFuentes({ senal }: { senal: number }) {
               </div>
               {d.reintentable && (
                 <button className="boton-mini" onClick={() => reintentar(d)}>
-                  Reintentar
+                  {t('biblioteca.reintentar')}
                 </button>
               )}
             </li>
@@ -547,8 +551,8 @@ function EstadoFuentes({ senal }: { senal: number }) {
       {r.del_research.length > 0 && (
         <details>
           <summary>
-            Del research: {r.del_research.length} {r.del_research.length === 1 ? 'documento' : 'documentos'}
-            {solos ? ` (${solos} ${solos === 1 ? 'entró solo' : 'entraron solos'})` : ''}
+            {t('biblioteca.delResearch', { n: pluralT(r.del_research.length, 'biblioteca.documento', 'biblioteca.documentos') })}
+            {solos ? ` (${pluralT(solos, 'biblioteca.entroSolo', 'biblioteca.entraronSolos')})` : ''}
           </summary>
           {porTema.map((g) => (
             <div key={g.temaId ?? 'sin'} className="biblioteca-grupo-tema">
@@ -563,13 +567,13 @@ function EstadoFuentes({ senal }: { senal: number }) {
                         {d.titulo}
                       </a>
                       <small>
-                        {d.automatica ? 'entró solo' : 'lo guardaste tú'}
-                        {d.leccion_clave ? ` · para ${d.leccion_clave}` : ''} · {ESTADO_CORTO[d.estado] ?? d.estado}
-                        {d.fragmentos ? ` · ${d.fragmentos} fragmentos` : ''}
+                        {d.automatica ? t('biblioteca.entroSoloUno') : t('biblioteca.loGuardasteTu')}
+                        {d.leccion_clave ? t('biblioteca.para', { clave: d.leccion_clave }) : ''} · {textoEstado(d.estado, true)}
+                        {d.fragmentos ? t('biblioteca.fragmentos', { n: d.fragmentos }) : ''}
                       </small>
                       <AvisoIncompleta motivo={d.incompleta} fuenteId={d.fuente_id} />
                     </div>
-                    <button className="borrar" aria-label={`Quitar ${d.titulo}`} title="Quitar de tus fuentes" onClick={() => quitar(d)}>
+                    <button className="borrar" aria-label={t('biblioteca.quitar', { titulo: d.titulo })} title={t('biblioteca.quitarTitulo')} onClick={() => quitar(d)}>
                       ×
                     </button>
                   </li>
@@ -584,6 +588,7 @@ function EstadoFuentes({ senal }: { senal: number }) {
 }
 
 function GuardarWeb() {
+  usarIdioma()
   const temasPlanes = usarTemasDePlanes()
   const [texto, setTexto] = useState('')
   const [fuentes, setFuentes] = useState<Fuente[]>([])
@@ -622,8 +627,8 @@ function GuardarWeb() {
   useEffect(cargarDocs, [cargarDocs])
   useEffect(() => {
     if (!docs.some((d) => d.version && ['recibida', 'pendiente'].includes(d.version.estado))) return
-    const t = window.setInterval(cargarDocs, 3000)
-    return () => window.clearInterval(t)
+    const i = window.setInterval(cargarDocs, 3000)
+    return () => window.clearInterval(i)
   }, [docs, cargarDocs])
 
   const enlaces = texto
@@ -640,14 +645,14 @@ function GuardarWeb() {
       setDestino(fid)
       const r = await Promise.allSettled(enlaces.map((u) => subirUrl(fid, u, tema)))
       const mal = r.filter((x) => x.status === 'rejected').length
-      setAviso(`${enlaces.length - mal} ${enlaces.length - mal === 1 ? 'enlace en cola' : 'enlaces en cola'}: se descargan, se limpian y se indexan solos.${mal ? ` ${mal} no se pudieron añadir.` : ''}`)
+      setAviso(t('biblioteca.enlacesEnCola', { n: pluralT(enlaces.length - mal, 'biblioteca.enlaceCola', 'biblioteca.enlacesCola') }) + (mal ? t('biblioteca.noAnadidos', { n: mal }) : ''))
       setTexto('')
       listarFuentes()
         .then(setFuentes)
         .catch(() => undefined)
       cargarDocs()
     } catch (e) {
-      setAviso(`No se pudo guardar: ${(e as Error).message}`)
+      setAviso(t('biblioteca.noGuarda', { motivo: (e as Error).message }))
     } finally {
       setGuardando(false)
     }
@@ -655,23 +660,23 @@ function GuardarWeb() {
 
   return (
     <div className="panel biblioteca">
-      <h1>Guardar de la web</h1>
+      <h1>{t('biblioteca.webTitulo')}</h1>
       <p className="nota">
-        Pega uno o varios enlaces: páginas web o PDF. Magister descarga el texto, quita menús y anuncios, lo trocea y lo guarda en tus fuentes para que el tutor lo cite.
+        {t('biblioteca.webIntro')}
       </p>
       <textarea
         className="biblioteca-enlaces"
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
-        placeholder={'https://...\nhttps://... (uno por línea)'}
-        aria-label="Enlaces"
+        placeholder={t('biblioteca.enlacesPh')}
+        aria-label={t('biblioteca.enlaces')}
         rows={4}
       />
       <div className="fila biblioteca-opciones">
         <label>
-          Guardar en{' '}
+          {t('biblioteca.guardarEn')}{' '}
           <select value={destino ?? ''} onChange={(e) => setDestino(e.target.value ? Number(e.target.value) : null)}>
-            {!fuentes.some((f) => f.tipo === 'web') && <option value="">{NOMBRE_WEB} (nueva)</option>}
+            {!fuentes.some((f) => f.tipo === 'web') && <option value="">{t('biblioteca.nombreWebNueva')}</option>}
             {fuentes.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.nombre}
@@ -680,18 +685,18 @@ function GuardarWeb() {
           </select>
         </label>
         <label>
-          Tema{' '}
+          {t('biblioteca.tema')}{' '}
           <select value={tema ?? ''} onChange={(e) => setTema(e.target.value ? Number(e.target.value) : null)}>
-            <option value="">sin tema (vale para todos)</option>
-            {temas.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nombre}
+            <option value="">{t('biblioteca.sinTemaMin')}</option>
+            {temas.map((tm) => (
+              <option key={tm.id} value={tm.id}>
+                {tm.nombre}
               </option>
             ))}
           </select>
         </label>
         <button className="boton boton-principal" disabled={!enlaces.length || guardando || !fuentesListas} onClick={guardar}>
-          {enlaces.length > 1 ? `Guardar ${enlaces.length} enlaces` : 'Guardar'}
+          {enlaces.length > 1 ? t('biblioteca.guardarN', { n: enlaces.length }) : t('biblioteca.guardar')}
         </button>
       </div>
       <EstadoFuentes senal={docs.length} />
@@ -699,14 +704,14 @@ function GuardarWeb() {
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
       {destino != null && (
         <section>
-          <h2>Guardado en esta fuente</h2>
+          <h2>{t('biblioteca.guardadoEnFuente')}</h2>
           {docs.length === 0 ? (
-            <p className="vacio">Todavía nada.</p>
+            <p className="vacio">{t('biblioteca.todaviaNada')}</p>
           ) : (
             agruparPorTema(docs, temasPlanes).map((g) => (
               <div key={g.temaId ?? 'sin'} className="biblioteca-grupo-tema">
                 <h3 className="dia-tema-nombre">
-                  <NombreTema temaId={g.temaId} nombre={temas.find((t) => t.id === g.temaId)?.nombre} temas={temasPlanes} />
+                  <NombreTema temaId={g.temaId} nombre={temas.find((tm) => tm.id === g.temaId)?.nombre} temas={temasPlanes} />
                 </h3>
                 <ul className="biblioteca-lista">
                   {g.cosas.map((d) => (
@@ -716,9 +721,9 @@ function GuardarWeb() {
                           {d.titulo}
                         </a>
                         <small>
-                          {d.version ? ESTADOS[d.version.estado] ?? d.version.estado : '·'}
+                          {d.version ? textoEstado(d.version.estado) : '·'}
                           {d.version?.motivo ? ` · ${d.version.motivo}` : ''}
-                          {d.fragmentos ? ` · ${d.fragmentos} fragmentos` : ''}
+                          {d.fragmentos ? t('biblioteca.fragmentos', { n: d.fragmentos }) : ''}
                         </small>
                         <AvisoIncompleta motivo={d.incompleta ?? d.version?.incompleta} fuenteId={destino} />
                       </div>
@@ -735,5 +740,6 @@ function GuardarWeb() {
 }
 
 export default function PanelBiblioteca({ vista }: { vista: 'buscar' | 'web' }) {
+  usarIdioma()
   return vista === 'buscar' ? <Buscar /> : <GuardarWeb />
 }

@@ -13,9 +13,13 @@ import {
   pronunciar,
   vocesMagister,
   vocesMagisterListas,
+  LENGUA,
   vozElegida,
+  vozLocal,
   vozMagister,
 } from '../componentes/voz.ts'
+import { idiomaActual, t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import BarraCuota from '../componentes/BarraCuota.tsx'
 import { DEMO_IDEMPOTENCIA } from '../escena/demo.ts'
 import { DEMO_INDICES } from '../escena/indices.ts'
@@ -39,7 +43,7 @@ class FalloReproductor extends Component<{ children: ReactNode; alReintentar: ()
     if (!this.state.error) return this.props.children
     return (
       <Cargando
-        error={`No he podido cargar el vídeo: ${this.state.error.message}`}
+        error={t('video.noCargado', { motivo: this.state.error.message })}
         reintentar={() => {
           this.setState({ error: null })
           this.props.alReintentar()
@@ -100,16 +104,12 @@ interface Escena {
   frases: string[]
 }
 
-const ESTILOS: { id: string; nombre: string; desc: string }[] = [
-  { id: 'clase', nombre: 'Clase', desc: 'Razonado, con un ejemplo por idea' },
-  { id: 'resumen', nombre: 'Resumen rápido', desc: 'Lo esencial, para repasar' },
-  { id: 'analogias', nombre: 'Con analogías', desc: 'Comparaciones de la vida diaria' },
-  { id: 'examen', nombre: 'Para el examen', desc: 'Lo que suele caer y el error típico' },
-]
-const NOMBRE_ESTILO = Object.fromEntries(ESTILOS.map((e) => [e.id, e.nombre]))
+const ESTILOS_ID = ['clase', 'resumen', 'analogias', 'examen'] as const
+const estilos = () => ESTILOS_ID.map((id) => ({ id, nombre: t(`video.estilo.${id}`), desc: t(`video.estilo.${id}.desc`) }))
+const nombreEstilo = (id: string): string => (id in { clase: 1, resumen: 1, analogias: 1, examen: 1 } ? t(`video.estilo.${id}` as 'video.estilo.clase') : t('video.estilo.clase'))
 
-const MARCAS: Record<string, string> = { intuicion: 'Intuición', choque: 'Choque', nombre: 'Nombre', teoria: 'Teoría' }
-const nombreMarca = (m: string) => MARCAS[m] ?? m.charAt(0).toUpperCase() + m.slice(1)
+const nombreMarca = (m: string) =>
+  ['intuicion', 'choque', 'nombre', 'teoria'].includes(m) ? t(`video.marca.${m}` as 'video.marca.teoria') : m.charAt(0).toUpperCase() + m.slice(1)
 
 export function escenas(guion: string): Escena[] {
   const salida: Escena[] = []
@@ -123,15 +123,10 @@ export function escenas(guion: string): Escena[] {
   return salida
 }
 
-// Una voz en español instalada en el equipo (no de un servicio en la red).
-function vozLocal(): SpeechSynthesisVoice | null {
-  const es = (window.speechSynthesis?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().startsWith('es'))
-  return es.find((v) => v.localService && v.lang === 'es-ES') ?? es.find((v) => v.localService) ?? null
-}
-
 type EstadoVoz = 'parado' | 'sonando' | 'pausado'
 
 function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number }) {
+  const { idioma } = usarIdioma() // los textos y la voz siguen al idioma
   const [lista, setLista] = useState<Escena[] | null>(null)
   const [falloLista, setFalloLista] = useState<string | null>(null)
   const [intento, setIntento] = useState(0)
@@ -248,7 +243,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
       const conNavegador = () => {
         if (mio !== turno.current) return
         const u = new SpeechSynthesisUtterance(frase)
-        u.lang = 'es-ES'
+        u.lang = LENGUA[idiomaActual()]
         const elegida = vozElegida() ?? laVoz
         if (elegida) u.voice = elegida
         u.rate = velocidad
@@ -259,7 +254,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
       if (!magister) {
         // Elegiste una voz de Magister y no está (el servidor no la tiene): se dice, no se cambia en silencio.
         if (leerAjustesVoz().voz?.startsWith('piper:'))
-          setAvisoVoz('La voz de Magister que elegiste no está disponible ahora: suena la del navegador.')
+          setAvisoVoz(t('video.vozNoDisponible'))
         conNavegador()
         return
       }
@@ -267,7 +262,7 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
       const resto = lista.slice(ie).flatMap((x, k) => (k === 0 ? x.frases.slice(jf + 1) : x.frases))
       for (const x of resto.slice(0, 2)) void pedirAudio(x, magister)
       const caer = () => {
-        setAvisoVoz('No he podido usar la voz de Magister: suena la del navegador.')
+        setAvisoVoz(t('video.vozNoUsable'))
         conNavegador()
       }
       void pedirAudio(frase, magister).then((url) => {
@@ -346,16 +341,16 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
     return () => window.removeEventListener('keydown', tecla)
   })
 
-  if (!lista) return falloLista ? <Cargando error={falloLista} reintentar={() => setIntento((x) => x + 1)} /> : <Pensando texto="Cargando el vídeo…" />
+  if (!lista) return falloLista ? <Cargando error={falloLista} reintentar={() => setIntento((x) => x + 1)} /> : <Pensando texto={t('video.cargando')} />
   const escena = lista[e]
 
   return (
     <div className="video">
-      <div className={`video-pantalla ${voz}`} onClick={tocar} role="button" aria-label={voz === 'sonando' ? 'Pausar' : 'Reproducir'}>
+      <div className={`video-pantalla ${voz}`} onClick={tocar} role="button" aria-label={voz === 'sonando' ? t('video.pausar') : t('video.reproducir')}>
         {conDiapos ? (
           <iframe
             ref={marco}
-            title={`Diapositivas de ${video.clave}`}
+            title={t('video.diapositivasDe', { clave: video.clave })}
             tabIndex={-1}
             onLoad={(ev) => {
               // Mismo origen: se esconde el panel de navegación de Marp, que aquí manda el reproductor.
@@ -380,16 +375,16 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
         </div>
       </div>
       <div className="video-controles">
-        <button className="boton" onClick={() => irEscena(e - 1)} aria-label="Escena anterior">
+        <button className="boton" onClick={() => irEscena(e - 1)} aria-label={t('video.escenaAnterior')}>
           ⏮
         </button>
         <button className="boton boton-principal video-tocar" onClick={tocar}>
-          {voz === 'sonando' ? '❚❚ Pausa' : voz === 'pausado' ? '▶ Seguir' : '▶ Ver'}
+          {voz === 'sonando' ? t('video.pausa') : voz === 'pausado' ? t('video.seguir') : t('video.ver')}
         </button>
-        <button className="boton" onClick={parar} disabled={voz === 'parado' && hechas === 0} aria-label="Parar" title="Parar y volver al principio (S)">
+        <button className="boton" onClick={parar} disabled={voz === 'parado' && hechas === 0} aria-label={t('video.parar')} title={t('video.pararAyuda')}>
           ■
         </button>
-        <button className="boton" onClick={() => irEscena(e + 1)} aria-label="Escena siguiente">
+        <button className="boton" onClick={() => irEscena(e + 1)} aria-label={t('video.escenaSiguiente')}>
           ⏭
         </button>
         <span className="barra video-barra">
@@ -404,14 +399,14 @@ function Reproductor({ video, diaposId }: { video: VideoInfo; diaposId?: number 
         </p>
       )}
       {!laVoz && !vozMagister() && (
-        <p className="nota">No encuentro una voz en español instalada en tu equipo: se usará la que tenga el navegador.</p>
+        <p className="nota">{t('video.sinVoz', { idioma: t(`video.idioma.${idioma}`) })}</p>
       )}
       <div className="video-info">
         <h2>
           <span className="bloques-clave">{video.clave}</span> {video.concepto ?? video.titulo}
         </h2>
         <p className="nota">
-          {NOMBRE_ESTILO[video.estilo] ?? 'Clase'} · {lista.length} escenas · espacio pausa, S para, ← → escenas
+          {t('video.infoEscenas', { estilo: nombreEstilo(video.estilo), n: lista.length })}
         </p>
         <ol className="video-capitulos">
           {lista.map((x, k) => (
@@ -481,7 +476,8 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
     return () => clearInterval(t)
   }, [enMarcha, mirar])
 
-  const voz = vozMagister() ?? voces[0]?.id ?? null
+  const { idioma } = usarIdioma()
+  const voz = vozMagister() ?? voces.find((v) => (v.idioma ?? 'es') === idioma)?.id ?? null
   const pedirMp4 = async () => {
     if (!voz) return
     setFallo(null)
@@ -512,7 +508,7 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
       await pedir(`/api/trabajos/${estado.trabajo.id}/cancelar`, { method: 'POST' })
     } catch (e) {
       // Sin mirar() justo después, que borraría el aviso: el MP4 sigue y se sigue esperando.
-      setFallo(`No he podido cancelar: ${mensajeDe(e)}`)
+      setFallo(t('video.noCancelar', { motivo: mensajeDe(e) }))
       return
     }
     esperando.current = false
@@ -522,35 +518,35 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
   if (!voz)
     return (
       <p className="nota video-descargar">
-        Para descargar el vídeo en MP4 hace falta la voz de Magister (Piper) instalada en el servidor.
+        {t('video.hacePiper')}
       </p>
     )
-  const t = estado?.trabajo
+  const tb = estado?.trabajo
   return (
     <div className="video-descargar">
       {enMarcha ? (
         <>
           <span className="video-descargar-progreso">
-            <Pensando texto={t?.total ? `Montando el MP4: escena ${t.paso ?? 0} de ${t.total}` : 'Montando el MP4…'} />
+            <Pensando texto={tb?.total ? t('video.montandoEscena', { paso: tb.paso ?? 0, total: tb.total }) : t('video.montando')} />
           </span>
-          {t?.total ? (
+          {tb?.total ? (
             <span className="barra video-barra">
-              <span style={{ width: `${((t.paso ?? 0) / t.total) * 100}%` }} />
+              <span style={{ width: `${((tb.paso ?? 0) / tb.total) * 100}%` }} />
             </span>
           ) : null}
           <button type="button" className="boton-mini" onClick={() => void cancelar()}>
-            Cancelar
+            {t('video.cancelar')}
           </button>
-          {estado && !estado.trabajador && <small className="nota">No hay ningún trabajador en marcha: el MP4 no avanzará hasta que lo haya.</small>}
+          {estado && !estado.trabajador && <small className="nota">{t('video.sinTrabajador')}</small>}
         </>
       ) : estado?.listo ? (
         <>
           <a className="boton" href={`/api/materiales/${mid}/mp4/fichero`} download>
-            ⬇ Descargar MP4{estado.segundos ? ` (${Math.floor(estado.segundos / 60)}:${String(Math.round(estado.segundos % 60)).padStart(2, '0')})` : ''}
+            {t('video.descargarMp4')}{estado.segundos ? ` (${Math.floor(estado.segundos / 60)}:${String(Math.round(estado.segundos % 60)).padStart(2, '0')})` : ''}
           </a>
           {estado.voz !== voz && (
-            <button type="button" className="boton-mini" onClick={() => void pedirMp4()} title="El MP4 que hay se hizo con otra voz">
-              Rehacer con la voz actual
+            <button type="button" className="boton-mini" onClick={() => void pedirMp4()} title={t('video.rehacerAyuda')}>
+              {t('video.rehacer')}
             </button>
           )}
         </>
@@ -559,20 +555,20 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
           type="button"
           className="boton"
           onClick={() => void pedirMp4()}
-          title="Esta versión narrada en MP4: diapositivas o tarjetas, la voz de Magister y subtítulos (no la animación)"
+          title={t('video.mp4Ayuda')}
         >
-          ⬇ Descargar esta versión en MP4
+          {t('video.descargarVersion')}
         </button>
       )}
-      {t?.estado === 'fallido' && !enMarcha && (
+      {tb?.estado === 'fallido' && !enMarcha && (
         <>
           <span className="nota" role="alert">
-            No se pudo montar. {mayuscula(errorLegible(t.error).mensaje)}{' '}
+            {t('video.noMontar', { motivo: mayuscula(errorLegible(tb.error).mensaje) })}{' '}
             <button type="button" className="boton-mini" onClick={() => void pedirMp4()}>
-              Reintentar
+              {t('video.reintentar')}
             </button>
           </span>
-          <DetalleTecnico detalle={errorLegible(t.error).detalle} />
+          <DetalleTecnico detalle={errorLegible(tb.error).detalle} />
         </>
       )}
       {fallo && (
@@ -580,7 +576,7 @@ function DescargarVideo({ video, lista, paginas }: { video: VideoInfo; lista: Es
           <span className="nota" role="alert">
             {errorLegible(fallo).mensaje}{' '}
             <button type="button" className="boton-mini" onClick={() => void mirar()}>
-              Reintentar
+              {t('video.reintentar')}
             </button>
           </span>
           <DetalleTecnico detalle={errorLegible(fallo).detalle} />
@@ -608,13 +604,12 @@ function VistaVideo({ video, diaposId }: { video: VideoInfo; diaposId?: number }
   const cambiar = video.animado && !fallo && (
     <>
       <button className="boton boton-suave video-version" onClick={() => setSencilla((x) => !x)}>
-        {sencilla ? 'Ver animado' : 'Versión narrada (y descarga en MP4)'}
+        {sencilla ? t('video.verAnimado') : t('video.versionNarrada')}
       </button>
       {/* El MP4 se monta con las diapositivas (o tarjetas) y la voz: no es esta animación. Se dice aquí, donde se busca. */}
       {!sencilla && (
         <p className="nota">
-          Para descargar: el MP4 es la versión narrada (diapositivas o tarjetas con la voz de Magister y subtítulos), no
-          esta animación. Está en «Versión narrada».
+          {t('video.paraDescargar')}
         </p>
       )}
     </>
@@ -631,12 +626,12 @@ function VistaVideo({ video, diaposId }: { video: VideoInfo; diaposId?: number }
       {cambiar}
       {guion ? (
         <FalloReproductor alReintentar={() => setReproductorEscena(cargarEscena)}>
-          <Suspense fallback={<Pensando texto="Preparando la escena…" />}>
+          <Suspense fallback={<Pensando texto={t('video.preparandoEscena')} />}>
             <ReproductorEscena guion={guion} />
           </Suspense>
         </FalloReproductor>
       ) : (
-        <Pensando texto="Preparando la escena…" />
+        <Pensando texto={t('video.preparandoEscena')} />
       )}
     </>
   )
@@ -655,7 +650,7 @@ function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; e
   const ocupada = !!estados[clave]?.en_marcha
 
   if (!preparadas.length)
-    return <p className="nota">Para hacer un vídeo, primero prepara alguna lección en Lecciones: el guion sale de sus apuntes.</p>
+    return <p className="nota">{t('video.primeroLeccion')}</p>
 
   const hacer = async () => {
     if (enviando || ocupada) return
@@ -677,10 +672,10 @@ function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; e
 
   return (
     <section className="nuevo-video">
-      <h2>Nuevo vídeo</h2>
+      <h2>{t('video.nuevo')}</h2>
       <div className="nuevo-video-campos">
         <label>
-          Lección
+          {t('video.leccion')}
           <select value={clave} onChange={(e) => { setClave(e.target.value); setConcepto('') }}>
             {preparadas.map((l) => (
               <option key={l.clave} value={l.clave}>
@@ -690,49 +685,50 @@ function NuevoVideo({ plan, estados, alHecho, alCancelar }: { plan: VistaPlan; e
           </select>
         </label>
         <label>
-          Qué explica
+          {t('video.queExplica')}
           <select value={concepto} onChange={(e) => setConcepto(e.target.value)}>
-            <option value="">Toda la lección</option>
+            <option value="">{t('video.todaLeccion')}</option>
             {leccion?.conceptos.map((c) => (
               <option key={c.id} value={c.nombre}>
-                Solo «{c.nombre}»
+                {t('video.soloConcepto', { nombre: c.nombre })}
               </option>
             ))}
           </select>
         </label>
       </div>
-      <div className="nuevo-video-estilos" role="radiogroup" aria-label="Estilo">
-        {ESTILOS.map((x) => (
+      <div className="nuevo-video-estilos" role="radiogroup" aria-label={t('video.estiloAria')}>
+        {estilos().map((x) => (
           <button key={x.id} type="button" role="radio" aria-checked={estilo === x.id} className={`opcion ${estilo === x.id ? 'elegida' : ''}`} onClick={() => setEstilo(x.id)}>
             <strong>{x.nombre}</strong>
             <small>{x.desc}</small>
           </button>
         ))}
       </div>
-      <div className="respuestas-rapidas" role="radiogroup" aria-label="Duración">
+      <div className="respuestas-rapidas" role="radiogroup" aria-label={t('video.duracionAria')}>
         {[3, 6, 10].map((m) => (
           <button key={m} type="button" role="radio" aria-checked={minutos === m} className={`opcion opcion-chip ${minutos === m ? 'elegida' : ''}`} onClick={() => setMinutos(m)}>
-            {m} min
+            {t('video.min', { m })}
           </button>
         ))}
       </div>
       <BarraCuota accion={{ accion: 'video', minutos }} />
       {error && <TextoError texto={error} />}
-      {ocupada && <p className="nota">Ya se está preparando algo de {clave}: espera a que acabe para pedir otro vídeo.</p>}
+      {ocupada && <p className="nota">{t('video.ocupada', { clave })}</p>}
       <div className="botones">
         <button className="boton boton-principal" onClick={hacer} disabled={enviando || ocupada}>
-          {enviando ? 'Pidiendo…' : 'Hacer el vídeo'}
+          {enviando ? t('video.pidiendo') : t('video.hacer')}
         </button>
         <button className="boton" onClick={alCancelar}>
-          Cancelar
+          {t('video.cancelar')}
         </button>
       </div>
-      <p className="nota">Tarda un par de minutos; puedes seguir con otra cosa. Sale de los apuntes que ya tienes.</p>
+      <p className="nota">{t('video.tarda')}</p>
     </section>
   )
 }
 
 export default function PanelVideo() {
+  usarIdioma() // los textos siguen al idioma
   const [plan, setPlan] = useState<VistaPlan | null | undefined>(undefined)
   const [estados, setEstados] = useState<Estados>({})
   const [videos, setVideos] = useState<VideoInfo[]>([])
@@ -793,16 +789,16 @@ export default function PanelVideo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [haciendo, plan])
 
-  if (plan === undefined) return falloCarga ? <Cargando error={falloCarga} reintentar={reintentar} /> : <Pensando texto="Cargando…" />
+  if (plan === undefined) return falloCarga ? <Cargando error={falloCarga} reintentar={reintentar} /> : <Pensando texto={t('video.cargandoCorto')} />
   if (!plan)
     return (
       <div className="panel">
-        <h1>Vídeo</h1>
+        <h1>{t('video.titulo')}</h1>
         <Vacio
-          etiqueta="Sin plan todavía"
-          titulo="Vídeos para entender antes de estudiar"
-          texto="Cada lección con guion se ve aquí como un vídeo corto: diapositivas, voz y subtítulos, por escenas."
-          acciones={[{ texto: 'Crear un plan', principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
+          etiqueta={t('video.sinPlan')}
+          titulo={t('video.sinPlanTitulo')}
+          texto={t('video.sinPlanTexto')}
+          acciones={[{ texto: t('video.crearPlan'), principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
         />
       </div>
     )
@@ -813,7 +809,7 @@ export default function PanelVideo() {
     return (
       <div className="panel video-panel">
         <div className="cabecera-panel">
-          <h1>Vídeo animado</h1>
+          <h1>{t('video.animado')}</h1>
           <span style={{ display: 'flex', gap: 8 }}>
             {Object.entries(DEMOS).map(([id, g]) => (
               <button
@@ -835,12 +831,12 @@ export default function PanelVideo() {
                 setDemo({ abierta: false, nombre: 'indices', segundo: 0 })
               }}
             >
-              Volver a tus vídeos
+              {t('video.volver')}
             </button>
           </span>
         </div>
         <FalloReproductor alReintentar={() => setReproductorEscena(cargarEscena)}>
-          <Suspense fallback={<Pensando texto="Preparando la escena…" />}>
+          <Suspense fallback={<Pensando texto={t('video.preparandoEscena')} />}>
             <ReproductorEscena key={demo.nombre} guion={DEMOS[demo.nombre]} segundo={demo.segundo} />
           </Suspense>
         </FalloReproductor>
@@ -850,12 +846,12 @@ export default function PanelVideo() {
   return (
     <div className="panel video-panel">
       <div className="cabecera-panel">
-        <h1>Vídeo</h1>
+        <h1>{t('video.titulo')}</h1>
         {planes.length > 1 && plan && (
           <span className="selector-tema video-plan">
           <span className="punto-tema" style={colorDeTema(plan.tema_id, planes)?.estilo} aria-hidden="true" />
           <select
-            aria-label="Plan"
+            aria-label={t('video.planAria')}
             value={plan.tema_id}
             onChange={(e) =>
               verPlan(Number(e.target.value))
@@ -886,12 +882,12 @@ export default function PanelVideo() {
                 window.history.replaceState(null, '', '#/video/demo/indices')
                 setDemo({ abierta: true, nombre: 'indices', segundo: 0 })
               }}
-              title="Prototipo del vídeo animado: una lección hecha con el método del núcleo"
+              title={t('video.demoAyuda')}
             >
-              Vídeo animado (demo)
+              {t('video.demo')}
             </button>
             <button className="boton boton-principal" onClick={() => setNuevo(true)} disabled={!!haciendo}>
-              Nuevo vídeo
+              {t('video.nuevo')}
             </button>
           </span>
         )}
@@ -909,7 +905,7 @@ export default function PanelVideo() {
       )}
       {haciendo && (
         <p className="nota video-haciendo">
-          <Pensando texto={`Haciendo el vídeo de ${haciendo}. Tarda un par de minutos; puedes seguir con otra cosa.`} />
+          <Pensando texto={t('video.haciendo', { clave: haciendo })} />
         </p>
       )}
       {actual ? (
@@ -917,16 +913,16 @@ export default function PanelVideo() {
       ) : (
         !nuevo && !haciendo && (
           <Vacio
-            etiqueta="Aún no tienes vídeos"
-            titulo="Haz el primero"
-            texto="Elige una lección preparada (o un solo concepto), el estilo y la duración. Se ve aquí narrado, con subtítulos y sus diapositivas."
-            acciones={[{ texto: 'Nuevo vídeo', principal: true, alPulsar: () => setNuevo(true) }]}
+            etiqueta={t('video.aunNo')}
+            titulo={t('video.primero')}
+            texto={t('video.aunNoTexto')}
+            acciones={[{ texto: t('video.nuevo'), principal: true, alPulsar: () => setNuevo(true) }]}
           />
         )
       )}
       {videos.length > 0 && (
         <section className="pg-seccion">
-          <h2>Tus vídeos</h2>
+          <h2>{t('video.tusVideos')}</h2>
           <ul className="video-biblioteca">
             {videos.map((v) => (
               <li key={v.material_id} className="video-item">
@@ -935,18 +931,18 @@ export default function PanelVideo() {
                   <span>
                     {v.concepto ?? v.titulo}
                     <small className="video-meta">
-                      {NOMBRE_ESTILO[v.estilo] ?? 'Clase'}
-                      {v.minutos ? ` · ${v.minutos} min` : ''}
-                      {v.animado ? ' · animado' : ''}
+                      {nombreEstilo(v.estilo)}
+                      {v.minutos ? ` · ${t('video.min', { m: v.minutos })}` : ''}
+                      {v.animado ? t('video.animadoMeta') : ''}
                     </small>
                   </span>
                   <small>▶</small>
                 </button>
                 <button
                   className="borrar"
-                  aria-label="Borrar este vídeo"
+                  aria-label={t('video.borrarAria')}
                   onClick={async () => {
-                    if (!confirm('¿Borrar este vídeo? Podrás hacerlo de nuevo cuando quieras.')) return
+                    if (!confirm(t('video.confirmarBorrar'))) return
                     await pedir(`/api/materiales/${v.material_id}`, { method: 'DELETE' })
                     if (plan) cargar(plan)
                   }}

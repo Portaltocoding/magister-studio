@@ -553,15 +553,15 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 /* ===== Modos de aprendizaje y lo que el tutor recuerda ===== */
 /* Opciones del chat, debajo de la caja y discretas: lo principal es escribir. */
 .pie-chat { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 10px; padding: 0 4px; font-size: 0.85rem; color: var(--suave); }
-/* En la portada de Estudio libre todo va centrado: las opciones también, bajo la caja. */
-.libre .pie-chat { justify-content: center; }
+/* En la portada de Estudio libre, las opciones arrancan donde arranca la caja de escribir (tras el botón de adjuntar). */
+.libre .pie-chat { justify-content: flex-start; padding-left: 48px; }
 .selector-modo { position: relative; }
 .selector-idioma { display: inline-flex; border: 1px solid var(--borde); border-radius: 999px; overflow: hidden; }
 .selector-idioma button { font: inherit; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; padding: 3px 9px; border: 0; background: transparent; color: var(--suave); cursor: pointer; }
 .selector-idioma button[aria-checked='true'] { background: var(--texto); color: var(--fondo); }
 .selector-modo > .boton-mini.activo { background: var(--texto); color: var(--fondo); border-color: transparent; }
 .selector-modo-lista {
-  position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 40; width: 320px; max-height: calc(60vh / var(--zoom-ui, 1)); overflow-y: auto; padding: 6px;
+  position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 40; width: 340px; max-height: calc(60vh / var(--zoom-ui, 1)); overflow-y: auto; overscroll-behavior: contain; padding: 6px; text-align: left;
   background: color-mix(in srgb, var(--tarjeta) 92%, transparent); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
   border: 1px solid var(--borde); border-radius: var(--radio-grande, 16px); box-shadow: var(--sombra-suave); display: flex; flex-direction: column; gap: 2px;
 }
@@ -572,6 +572,7 @@ details.grupo-modos[open] > summary::after { content: " ▾"; }
 .selector-modo-lista button[role='menuitemradio'] small { color: var(--suave); font-size: 0.8rem; }
 .selector-modo-lista button[role='menuitemradio']:hover { background: color-mix(in srgb, var(--texto) 7%, transparent); }
 .selector-modo-lista button[aria-checked='true'] { background: color-mix(in srgb, var(--texto) 12%, transparent); }
+.selector-modo-lista.abajo { bottom: auto; top: calc(100% + 8px); }
 .selector-modo-fila { display: flex; align-items: center; }
 .selector-modo-fila .borrar { visibility: visible; opacity: 0.45; }
 .selector-modo-crear { font: inherit; text-align: left; color: var(--suave); background: transparent; border: 0; border-top: 1px solid var(--borde); padding: 10px; margin-top: 4px; cursor: pointer; }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as EventoPuntero } from 'react'
-import { t } from '../i18n/i18n.ts'
+import { t, type Clave } from '../i18n/i18n.ts'
 import { tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import Volcado from '../componentes/Volcado.tsx'
 import Companera from '../componentes/Companera.tsx'
@@ -35,7 +35,7 @@ import Mascota from '../Mascota.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import type { IdModo } from '../modos.ts'
 import { aCss } from '../componentes/escala.ts'
-import { AVISO_DICTADO, enVivo, leerPermisoDictado, olvidarPermisoDictado, unirDictado, usarDictado } from '../componentes/dictado.ts'
+import { avisoDictado, enVivo, leerPermisoDictado, olvidarPermisoDictado, unirDictado, usarDictado } from '../componentes/dictado.ts'
 import { debeIgnorar, desplazarA, usarParrafoActivo, type Pantalla } from '../componentes/parrafos.ts'
 import { guardarZen, leerZen, PIE_ASOMA_MS, pieVisible, progresoLeccion } from '../componentes/zen.ts'
 import { usarPomodoro } from '../componentes/pomodoro.ts'
@@ -168,11 +168,11 @@ interface Borrador {
   confianza: number | null
 }
 
-const CONFIANZAS: [number, string][] = [
-  [0.25, 'No lo sé'],
-  [0.5, 'Dudo'],
-  [0.75, 'Bastante seguro'],
-  [0.95, 'Seguro'],
+const CONFIANZAS: [number, Clave][] = [
+  [0.25, 'foco.conf.nolose'],
+  [0.5, 'foco.conf.dudo'],
+  [0.75, 'foco.conf.bastante'],
+  [0.95, 'foco.conf.seguro'],
 ]
 
 
@@ -199,10 +199,10 @@ function guardarRitmo(r: Ritmo) {
 
 // El ancho de la página del foco, en caracteres (ch de la letra del papel): lo eliges en Ajustes o arrastrando su
 // borde derecho. Una medida de 64 se lee cómoda.
-const ANCHOS: [number, string][] = [
-  [56, 'Estrecha'],
-  [64, 'Normal'],
-  [72, 'Ancha'],
+const ANCHOS: [number, Clave][] = [
+  [56, 'foco.ancho.estrecha'],
+  [64, 'foco.ancho.normal'],
+  [72, 'foco.ancho.ancha'],
 ]
 const ANCHO_NORMAL = 64
 const ANCHO_MIN = 40
@@ -282,10 +282,10 @@ function AsaAncho({ ancho, alCambiar, papel }: { ancho: number; alCambiar: (n: n
       className="foco-asa"
       role="separator"
       aria-orientation="vertical"
-      aria-label="Ancho de la página"
+      aria-label={t('foco.anchoAria')}
       aria-valuenow={Math.round(ancho)}
       tabIndex={0}
-      title="Arrastra para cambiar el ancho de la página (doble clic: la normal)"
+      title={t('foco.anchoTitulo')}
       onPointerDown={empezar}
       onDoubleClick={() => alCambiar(ANCHO_NORMAL)}
       onKeyDown={(e) => {
@@ -318,7 +318,8 @@ function guardarAvance(mid: number, a: Avance | null) {
   }
 }
 
-export const NOTA: Record<string, string> = { perfecta: 'Perfecta', bien: 'Bien', parcial: 'A medias', fallo: 'Fallada', saltada: 'Saltada' }
+// Cómo se llama cada nota de una comprobación, en el idioma de ahora.
+export const nombreNota = (n: string): string => (['perfecta', 'bien', 'parcial', 'fallo', 'saltada'].includes(n) ? t(`foco.nota.${n}` as Clave) : n)
 
 export async function cargarLeccion(mid: number): Promise<Leccion> {
   const l = await pedir<Omit<Leccion, 'material_id'>>(`/api/tutor/leccion/${mid}`)
@@ -393,7 +394,7 @@ function Comprobar({
           setNota(ev.nota)
           final = ev.nota
         } else if (ev.tipo === 'delta' && ev.t) setExplicacion((x) => x + ev.t)
-        else if (ev.tipo === 'error') setError(ev.detalle || 'No se pudo corregir.')
+        else if (ev.tipo === 'error') setError(ev.detalle || t('foco.noCorrige'))
       }
     } catch (e) {
       setError(mensajeDe(e))
@@ -406,14 +407,14 @@ function Comprobar({
   return (
     <div className="foco-comprobar">
       <div className="foco-comprobar-cabeza">
-        <span className="foco-etq">Comprueba que lo tienes</span>
+        <span className="foco-etq">{t('foco.comprueba')}</span>
         {hablada && !nota && (
           <>
             <span className={`foco-escuchando ${dictado.escuchando ? 'si' : ''}`} aria-live="polite">
               {dictado.escuchando && (
                 <>
                   <i aria-hidden="true" />
-                  Escuchando en español…
+                  {t('foco.escuchando')}
                 </>
               )}
             </span>
@@ -424,13 +425,13 @@ function Comprobar({
               aria-pressed={dictado.escuchando}
               disabled={enviando}
               onClick={dictado.alternar}
-              title="Dictar la respuesta en voz alta (D)"
+              title={t('foco.dictarTitulo')}
             >
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <rect x="5" y="1" width="6" height="9" rx="3" fill="currentColor" />
                 <path d="M3 7a5 5 0 0 0 10 0M8 12v3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
               </svg>
-              {dictado.escuchando ? 'Parar (D)' : 'Dictar (D)'}
+              {dictado.escuchando ? t('foco.pararD') : t('foco.dictarD')}
             </button>
           </>
         )}
@@ -439,13 +440,13 @@ function Comprobar({
         <Markdown>{pregunta.enunciado}</Markdown>
       </div>
       {hablada && dictado.preguntando && (
-        <div className="foco-dictado-aviso" role="group" aria-label="Permiso para dictar">
-          <span>{AVISO_DICTADO} ¿Lo activo?</span>
+        <div className="foco-dictado-aviso" role="group" aria-label={t('foco.permisoDictar')}>
+          <span>{avisoDictado()} {t('foco.loActivo')}</span>
           <button type="button" className="boton boton-principal" onClick={() => dictado.responder(true)} autoFocus>
-            Sí, dictar
+            {t('foco.siDictar')}
           </button>
           <button type="button" className="boton" onClick={() => dictado.responder(false)}>
-            No, escribo
+            {t('foco.noEscribo')}
           </button>
         </div>
       )}
@@ -462,12 +463,12 @@ function Comprobar({
           if (puedeEnviar) enviar()
           else if (confianza == null) chips.current?.querySelector<HTMLElement>('[role="radio"]')?.focus()
         }}
-        placeholder={hablada ? 'Pulsa «Dictar» (D) y explícalo en voz alta, o escríbelo' : 'Con tus palabras, sin mirar arriba'}
-        aria-label="Tu respuesta"
+        placeholder={hablada ? t('foco.phHablada') : t('foco.phEscrita')}
+        aria-label={t('foco.tuRespuesta')}
       />
       {!nota && (
         <div className="foco-confianza">
-          <span id="foco-confianza-etq">¿Cómo de seguro estás?</span>
+          <span id="foco-confianza-etq">{t('foco.comoSeguro')}</span>
           <div
             className="foco-confianza-chips"
             role="radiogroup"
@@ -483,7 +484,7 @@ function Comprobar({
               chips.current?.querySelectorAll<HTMLElement>('[role="radio"]')[n]?.focus()
             }}
           >
-            {CONFIANZAS.map(([v, t], k) => (
+            {CONFIANZAS.map(([v, clave], k) => (
               <button
                 key={v}
                 role="radio"
@@ -493,19 +494,19 @@ function Comprobar({
                 data-elegida={confianza === v}
                 onClick={() => setConfianza(v)}
               >
-                {t}
+                {t(clave)}
               </button>
             ))}
           </div>
           <button className="boton boton-principal" disabled={!puedeEnviar} onClick={enviar}>
-            {enviando ? 'Corrigiendo…' : 'Comprobar'}
+            {enviando ? t('foco.corrigiendo') : t('foco.comprobar')}
           </button>
         </div>
       )}
-      {error && <TextoError texto={error} antes="No he podido corregirla: " />}
+      {error && <TextoError texto={error} antes={t('foco.noPudeCorregir')} />}
       {(nota || explicacion) && (
         <div className={`correccion nota-${nota ?? ''}`}>
-          {nota && <strong>{NOTA[nota] ?? nota}</strong>}
+          {nota && <strong>{nombreNota(nota)}</strong>}
           <Markdown>{explicacion}</Markdown>
         </div>
       )}
@@ -517,22 +518,22 @@ function Comprobar({
 function Glosario({ leccion, alCerrar }: { leccion: Leccion; alCerrar: () => void }) {
   const [vista, setVista] = useState<'terminos' | 'formulas'>(leccion.definiciones.length ? 'terminos' : 'formulas')
   return (
-    <aside className="foco-glosario" aria-label="Términos y fórmulas">
+    <aside className="foco-glosario" aria-label={t('foco.terminosFormulas')}>
       <div className="foco-glosario-cabecera">
         <div className="foco-glosario-pestanas" role="tablist">
           {leccion.definiciones.length > 0 && (
             <button role="tab" aria-selected={vista === 'terminos'} onClick={() => setVista('terminos')}>
-              Términos <small>{leccion.definiciones.length}</small>
+              {t('foco.terminos')} <small>{leccion.definiciones.length}</small>
             </button>
           )}
           {leccion.formulas.length > 0 && (
             <button role="tab" aria-selected={vista === 'formulas'} onClick={() => setVista('formulas')}>
-              Fórmulas <small>{leccion.formulas.length}</small>
+              {t('foco.formulas')} <small>{leccion.formulas.length}</small>
             </button>
           )}
         </div>
         <button className="foco-boton" onClick={alCerrar}>
-          Cerrar
+          {t('foco.cerrar')}
         </button>
       </div>
       {vista === 'terminos' ? (
@@ -594,6 +595,7 @@ const SEGUIAS_MS = 4000
 
 // Una lección en modo foco: una idea cada vez, con su comprobación.
 export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSalir, irA }: PropsFoco) {
+  usarIdioma() // los textos siguen al idioma
   const { bloques } = leccion
   const mid = leccion.material_id
   const [i, setI] = useState(inicial?.i ?? 0)
@@ -708,9 +710,9 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
     clave: b.clave,
     activa: pantalla === 'idea' && !saliendo,
     alFinal: () => {
-      if (!pendiente) return 'Fin de la idea'
+      if (!pendiente) return t('foco.finIdea')
       reclamarRef.current(false)
-      return 'Me paro aquí: toca la comprobación'
+      return t('foco.meParo')
     },
   })
   useEffect(() => setLeyendoVoz(lectura.leyendo), [lectura.leyendo])
@@ -729,11 +731,11 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
   const alternarDudaActiva = useCallback(() => {
     const el = lista[u]
     if (!el) return
-    const t = textoUnidad(el)
-    const d: Duda = { clave: b.clave, u, texto: inicio40(t), parrafo: t.slice(0, MAX_PARRAFO), en: Date.now() }
+    const txt = textoUnidad(el)
+    const d: Duda = { clave: b.clave, u, texto: inicio40(txt), parrafo: txt.slice(0, MAX_PARRAFO), en: Date.now() }
     const n = alternarDuda(dudas, d)
     setDudas(n)
-    setAnuncio(n.length > dudas.length ? `Párrafo ${u + 1} marcado como duda.` : `Párrafo ${u + 1}: duda quitada.`)
+    setAnuncio(t(n.length > dudas.length ? 'foco.duda.marcada' : 'foco.duda.quitada', { n: u + 1 }))
   }, [lista, u, b.clave, dudas])
   // Ir a un párrafo de otra idea (o de esta): la idea cambia y el párrafo activo empieza en él.
   const irAParrafo = (idea: number, parrafo: number) => {
@@ -750,14 +752,14 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
     if (!cuales.length || explicando) return
     setErrorExplicar(null)
     for (const [k, d] of cuales.entries()) {
-      setExplicando(cuales.length > 1 ? `Explicando ${k + 1} de ${cuales.length}…` : 'Explicando…')
+      setExplicando(cuales.length > 1 ? t('foco.explicandoN', { k: k + 1, n: cuales.length }) : t('foco.explicando'))
       try {
         const r = await pedir<{ texto: string }>(`/api/estudio/${mid}/parrafo`, enviarJson({ clave: d.clave, parrafo: d.parrafo, accion: 'facil', pregunta: null }))
         const n: Nota = { clave: d.clave, u: d.u, texto: d.texto, respuesta: r.texto, accion: 'facil', en: Date.now() }
         setNotas((ns) => ponerNota(ns, n))
         setNotasAbiertas((s) => new Set(s).add(claveNota(n)))
       } catch (e) {
-        setErrorExplicar(`No he podido explicártelo: ${mensajeDe(e)}`)
+        setErrorExplicar(t('foco.noExplica', { motivo: mensajeDe(e) }))
         break
       }
     }
@@ -811,9 +813,9 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
     ideaVista.current = i
     if (!zen) return
     setPieAsoma(true)
-    const t = window.setTimeout(() => setPieAsoma(false), PIE_ASOMA_MS)
+    const tm = window.setTimeout(() => setPieAsoma(false), PIE_ASOMA_MS)
     return () => {
-      window.clearTimeout(t)
+      window.clearTimeout(tm)
       setPieAsoma(false)
     }
   }, [i, zen])
@@ -821,10 +823,10 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
   // Lo que llevas de estudio (para el cierre): solo cuenta con la pestaña a la vista, sin pausa y sin descanso.
   useEffect(() => {
     if (enPausa || descanso || cerrada) return
-    const t = setInterval(() => {
+    const tm = setInterval(() => {
       if (document.visibilityState === 'visible') setSegundos((s) => s + 1)
     }, 1000)
-    return () => clearInterval(t)
+    return () => clearInterval(tm)
   }, [enPausa, descanso, cerrada])
 
   // Sin pomodoro en marcha, el ajuste «Pausa» crea uno (también al acabar un descanso). Al salir, sigue fuera.
@@ -926,7 +928,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       // Esc cierra capa a capa: los atajos, «+ Al mapa», el mapa y el glosario. Sin nada abierto, sales.
       if (e.key === 'Escape') {
         if (chuleta) setChuleta(false)
-        else if (lectura.leyendo) lectura.parar('Lectura parada')
+        else if (lectura.leyendo) lectura.parar(t('foco.lecturaParada'))
         else if (seleccion) {
           setSeleccion(null)
           window.getSelection()?.removeAllRanges()
@@ -1007,19 +1009,19 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         const nota = d ? notaDe(d) : undefined
         return (
           <li key={`${x.tipo}-${x.clave}-${x.u ?? ''}`}>
-            <span className={`chip ${x.tipo === 'duda' ? 'chip-duda' : `nota-${x.tipo}`}`}>{x.tipo === 'duda' ? 'Duda' : (NOTA[x.tipo] ?? x.tipo)}</span>
+            <span className={`chip ${x.tipo === 'duda' ? 'chip-duda' : `nota-${x.tipo}`}`}>{x.tipo === 'duda' ? t('foco.duda') : nombreNota(x.tipo)}</span>
             <span className="foco-flojeo-texto">
-              Idea {x.idea + 1}
-              {x.u != null ? `, párrafo ${x.u + 1}` : ''}: {x.tipo === 'duda' ? `«${x.texto}…»` : x.titulo}
+              {t('foco.ideaN', { n: x.idea + 1 })}
+              {x.u != null ? t('foco.parrafoN', { n: x.u + 1 }) : ''}: {x.tipo === 'duda' ? t('foco.comillasPuntos', { x: x.texto }) : x.titulo}
             </span>
             {d && (
-              <button className="boton-mini" onClick={() => setDudas((ds) => quitarDuda(ds, d))} title="Quitar la duda">
-                Ya lo entiendo
+              <button className="boton-mini" onClick={() => setDudas((ds) => quitarDuda(ds, d))} title={t('foco.quitarDuda')}>
+                {t('foco.yaLoEntiendo')}
               </button>
             )}
             {nota && (
               <details className="foco-nota" open={notasAbiertas.has(claveNota(nota))}>
-                <summary>La mascota te lo explicó así</summary>
+                <summary>{t('foco.mascotaExplico')}</summary>
                 <p>{nota.respuesta.replace(/\*\*/g, '')}</p>
               </details>
             )}
@@ -1056,13 +1058,13 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         error: !!errorCierre,
       })}
       pasos={
-        <ol className="foco-pasos" aria-label="Ideas de la lección">
+        <ol className="foco-pasos" aria-label={t('foco.ideasAria')}>
           {bloques.map((x, k) => (
             <li key={x.clave}>
               <button
                 className={`foco-paso ${k === i && !cerrada ? 'actual' : ''} ${comprobado[x.clave] ? `nota-${comprobado[x.clave]}` : k < i || cerrada ? 'vista' : ''}`}
                 title={`${k + 1}. ${x.titulo}`}
-                aria-label={`Idea ${k + 1}: ${x.titulo}`}
+                aria-label={t('foco.ideaAria', { n: k + 1, titulo: x.titulo })}
                 disabled={cerrada || calentando || reexplicando || (k > i && !bloques.slice(i, k).every((y) => !y.pregunta || comprobado[y.clave]))}
                 onClick={() => cambiarIdea(k)}
               />
@@ -1076,13 +1078,13 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
           onClick={() => (pomo.p.fase ? (enPausa ? pomo.seguir() : pomo.pausar()) : setPausado(!pausado))}
           title={
             pomo.p.fase
-              ? `${enPausa ? 'Seguir' : 'Pausar'} el pomodoro (es el mismo que el Tomate de la barra)`
+              ? t(enPausa ? 'foco.seguirPomodoro' : 'foco.pausarPomodoro')
               : enPausa
-                ? 'Seguir'
-                : 'Pausar el reloj'
+                ? t('foco.seguir')
+                : t('foco.pausarReloj')
           }
         >
-          {enPausa ? 'En pausa ▶' : '❚❚'} {relojTexto.tiempo}
+          {enPausa ? t('foco.enPausa') : '❚❚'} {relojTexto.tiempo}
           {!zen && relojTexto.fase && <small> · {relojTexto.fase}</small>}
           {!zen && !relojTexto.fase && previsto > 0 && <small> / {reloj(previsto)}</small>}
         </button>
@@ -1090,29 +1092,29 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       herramientas={
         <>
           {hayGlosario && (
-            <button className="foco-boton" aria-pressed={glosario} onClick={() => { setGlosario(!glosario); setVerMapa(false) }} title="Términos y fórmulas (G)">
-              {leccion.formulas.length ? 'Términos y fórmulas' : 'Términos'}
+            <button className="foco-boton" aria-pressed={glosario} onClick={() => { setGlosario(!glosario); setVerMapa(false) }} title={t('foco.terminosFormulasG')}>
+              {leccion.formulas.length ? t('foco.terminosFormulas') : t('foco.terminos')}
             </button>
           )}
           {pantalla === 'idea' && (
-            <button className="foco-boton" aria-pressed={lectura.leyendo} onClick={() => void lectura.alternar()} title="Leer en voz alta desde el párrafo activo, con la voz de Magister (P)">
-              {lectura.leyendo ? 'Parar la lectura' : 'Leer en voz alta'}
+            <button className="foco-boton" aria-pressed={lectura.leyendo} onClick={() => void lectura.alternar()} title={t('foco.leerTitulo')}>
+              {lectura.leyendo ? t('foco.pararLectura') : t('foco.leer')}
             </button>
           )}
-          <button className="foco-boton" aria-pressed={verMapa} onClick={() => { setVerMapa(!verMapa); setGlosario(false) }} title="Tu mapa de palabras clave (M)">
-            Mi mapa{mapa?.nodos.length ? ` · ${mapa.nodos.length}` : ''}
+          <button className="foco-boton" aria-pressed={verMapa} onClick={() => { setVerMapa(!verMapa); setGlosario(false) }} title={t('foco.miMapaTitulo')}>
+            {t('foco.miMapa')}{mapa?.nodos.length ? ` · ${mapa.nodos.length}` : ''}
           </button>
           {leccion.plan_id != null && !cerrada && !calentando && (
-            <button className="foco-boton" onClick={() => setReexplicando(true)} title="Explícate sin mirar lo que llevas">
-              Reexplicar
+            <button className="foco-boton" onClick={() => setReexplicando(true)} title={t('foco.reexplicarTitulo')}>
+              {t('foco.reexplicar')}
             </button>
           )}
         </>
       }
       ajustes={
         <>
-        <button className="foco-boton" aria-pressed={zen} onClick={() => cambiarZen()} title="Esconder la barra y el pie mientras lees (Z)">
-          {zen ? '✓ ' : ''}Modo zen (Z)
+        <button className="foco-boton" aria-pressed={zen} onClick={() => cambiarZen()} title={t('foco.zenTitulo')}>
+          {zen ? '✓ ' : ''}{t('foco.zen')}
         </button>
         {leerPermisoDictado(typeof localStorage === 'undefined' ? null : localStorage) === 'si' && (
           <button
@@ -1121,51 +1123,51 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
               olvidarPermisoDictado()
               setPermisoQuitado((x) => x + 1)
             }}
-            title="El dictado usa el servicio de voz del navegador (en Chrome, los servidores de Google). Se volverá a preguntar."
+            title={t('foco.quitarPermisoTitulo')}
           >
-            Quitar el permiso de dictado
+            {t('foco.quitarPermiso')}
           </button>
         )}
         <span className="foco-ritmo-ajustes">
           <span className="foco-ancho">
-            Ancho de la página
+            {t('foco.anchoPagina')}
             <span className="foco-ancho-opciones">
-              {ANCHOS.map(([n, t]) => (
+              {ANCHOS.map(([n, clave]) => (
                 <button key={n} type="button" className="foco-boton" aria-pressed={Math.abs(ancho - n) < 4} onClick={() => cambiarAncho(n)}>
-                  {t}
+                  {t(clave)}
                 </button>
               ))}
             </span>
-            <small>También puedes arrastrar el borde derecho de la página.</small>
+            <small>{t('foco.arrastrarBorde')}</small>
           </span>
           <span className="foco-ancho">
-            Letra
+            {t('foco.letra')}
             <span className="foco-ancho-opciones foco-letras">
-              {LETRAS.map(([v, t]) => (
+              {LETRAS.map(([v, tam]) => (
                 <button key={v} type="button" className="foco-boton" aria-pressed={letra === v} onClick={() => { setLetra(v); guardarLetra(v) }}>
-                  {t}
+                  {tam}
                 </button>
               ))}
             </span>
           </span>
-          <label title="El pomodoro del foco: es el mismo que el Tomate de la barra">
-            Pausa
+          <label title={t('foco.pausaTitulo')}>
+            {t('foco.pausa')}
             <select value={ritmo.pausa} onChange={(e) => cambiarPausa(Number(e.target.value))}>
               {[15, 25, 40, 50].map((m) => (
                 <option key={m} value={m}>
-                  cada {m} min
+                  {t('foco.cadaMin', { m })}
                 </option>
               ))}
-              <option value={0}>sin pausa</option>
+              <option value={0}>{t('foco.sinPausa')}</option>
             </select>
           </label>
           <label>
-            Reexplicar
+            {t('foco.reexplicar')}
             <select value={ritmo.reexplicar} onChange={(e) => { const r = { ...ritmo, reexplicar: e.target.value as Ritmo['reexplicar'] }; setRitmo(r); guardarRitmo(r) }}>
-              <option value="pausa">en cada pausa</option>
-              <option value="idea">al acabar cada idea</option>
-              <option value="dos">cada dos ideas</option>
-              <option value="pedir">solo cuando yo quiera</option>
+              <option value="pausa">{t('foco.reex.pausa')}</option>
+              <option value="idea">{t('foco.reex.idea')}</option>
+              <option value="dos">{t('foco.reex.dos')}</option>
+              <option value="pedir">{t('foco.reex.pedir')}</option>
             </select>
           </label>
         </span>
@@ -1175,17 +1177,17 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         glosario ? (
           <Glosario leccion={leccion} alCerrar={() => setGlosario(false)} />
         ) : verMapa && mapa ? (
-          <aside className="foco-glosario foco-mapa" aria-label="Tu mapa de palabras clave">
+          <aside className="foco-glosario foco-mapa" aria-label={t('foco.miMapaTitulo')}>
             <div className="foco-glosario-cabecera">
-              <strong>Tu mapa</strong>
+              <strong>{t('foco.tuMapa')}</strong>
               <button className="foco-boton" onClick={() => setVerMapa(false)}>
-                Cerrar
+                {t('foco.cerrar')}
               </button>
             </div>
             <p className="nota">
               {generandoMapa
-                ? 'Leyendo la lección para sacar los conceptos clave y unirlos…'
-                : 'Los conceptos clave de la lección y cómo se relacionan. Muévelos, quita o añade lo que quieras.'}
+                ? t('foco.mapaLeyendo')
+                : t('foco.mapaIntro')}
             </p>
             {errorMapa && <p className="nota">{errorMapa}</p>}
             <div className="mapa-barra">
@@ -1193,10 +1195,10 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
                 className="boton-mini"
                 disabled={generandoMapa}
                 onClick={() => {
-                  if (mapa.nodos.length === 0 || window.confirm('Se rehace el mapa desde la lección y se pierden tus cambios. ¿Seguimos?')) generarMapa()
+                  if (mapa.nodos.length === 0 || window.confirm(t('foco.mapaConfirmar'))) generarMapa()
                 }}
               >
-                {generandoMapa ? 'Haciendo el mapa…' : mapa.nodos.length ? 'Rehacer desde la lección' : 'Hacerlo leyendo la página'}
+                {generandoMapa ? t('foco.mapaHaciendo') : mapa.nodos.length ? t('foco.mapaRehacer') : t('foco.mapaHacer')}
               </button>
             </div>
             <MapaConceptos mapa={mapa} alCambiar={cambiarMapa} />
@@ -1206,7 +1208,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       pie={
         pantalla === 'calentamiento' ? (
           <>
-            <span className="foco-atajos">Unos minutos para tener el mapa antes de los detalles.</span>
+            <span className="foco-atajos">{t('foco.calentamientoPie')}</span>
             <button
               className="boton-mini"
               onClick={() => {
@@ -1214,7 +1216,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
                 setCalentando(false)
               }}
             >
-              Saltar el calentamiento
+              {t('foco.saltarCalentamiento')}
             </button>
           </>
         ) : !cerrada &&
@@ -1222,11 +1224,11 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         pantalla !== 'dudas' && (
           <>
             <button className="boton" disabled={i === 0} onClick={() => ir(-1)}>
-              ← Anterior
+              {t('foco.anterior')}
             </button>
             {errorCierre ? (
               <span className="foco-atajos foco-error-cierre" role="alert" title={errorCierre}>
-                No he podido marcarla como hecha; tu avance sigue guardado.
+                {t('foco.noMarcada')}
               </span>
             ) : lectura.estado ? (
               <span className="foco-atajos foco-lectura-estado">
@@ -1235,54 +1237,54 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
               </span>
             ) : (
               <span className="foco-atajos">
-                {puedeSeguir ? '↑ ↓ párrafo · ← → idea · ? atajos · Esc salir' : 'Para seguir, contesta la comprobación del final de la idea (o sáltala).'}
+                {puedeSeguir ? t('foco.atajosPie') : t('foco.contestaParaSeguir')}
               </span>
             )}
             {pantalla === 'idea' && lista.length > 0 && (
               <span className="foco-contador-parrafo">
-                párrafo {u + 1} de {lista.length}
+                {t('foco.parrafoDe', { n: u + 1, total: lista.length })}
               </span>
             )}
             {chuleta && (
-              <div className="foco-chuleta" role="dialog" aria-label="Atajos de teclado">
-                <strong>Atajos</strong>
+              <div className="foco-chuleta" role="dialog" aria-label={t('foco.atajosAria')}>
+                <strong>{t('foco.atajos')}</strong>
                 <dl>
-                  <dt>↓ · J · Espacio</dt>
-                  <dd>Párrafo siguiente</dd>
-                  <dt>↑ · K · Mayús + Espacio</dt>
-                  <dd>Párrafo anterior</dd>
-                  <dt>Inicio · Fin</dt>
-                  <dd>Primer y último párrafo</dd>
+                  <dt>{t('foco.k.espacio')}</dt>
+                  <dd>{t('foco.k.siguiente')}</dd>
+                  <dt>{t('foco.k.shiftEspacio')}</dt>
+                  <dd>{t('foco.k.anterior')}</dd>
+                  <dt>{t('foco.k.inicioFin')}</dt>
+                  <dd>{t('foco.k.primerUltimo')}</dd>
                   <dt>← →</dt>
-                  <dd>Idea anterior y siguiente</dd>
+                  <dd>{t('foco.k.ideas')}</dd>
                   <dt>A</dt>
-                  <dd>La mascota te ayuda con el párrafo</dd>
+                  <dd>{t('foco.k.mascota')}</dd>
                   <dt>N</dt>
-                  <dd>No lo entiendo: marcar el párrafo como duda</dd>
+                  <dd>{t('foco.k.duda')}</dd>
                   <dt>P</dt>
-                  <dd>Leer en voz alta desde el párrafo (P o Esc para)</dd>
+                  <dd>{t('foco.k.leer')}</dd>
                   <dt>L</dt>
-                  <dd>Atenuar lo demás</dd>
+                  <dd>{t('foco.k.atenuar')}</dd>
                   <dt>Z</dt>
-                  <dd>Modo zen: solo la página</dd>
+                  <dd>{t('foco.k.zen')}</dd>
                   {b.pregunta?.tipo === 'hablada' && (
                     <>
                       <dt>D</dt>
-                      <dd>Dictar la respuesta de la comprobación</dd>
+                      <dd>{t('foco.k.dictar')}</dd>
                     </>
                   )}
                   {hayGlosario && (
                     <>
                       <dt>G</dt>
-                      <dd>Términos</dd>
+                      <dd>{t('foco.terminos')}</dd>
                     </>
                   )}
                   <dt>M</dt>
-                  <dd>Tu mapa</dd>
+                  <dd>{t('foco.tuMapa')}</dd>
                   <dt>?</dt>
-                  <dd>Esta lista</dd>
+                  <dd>{t('foco.k.lista')}</dd>
                   <dt>Esc</dt>
-                  <dd>Cerrar lo abierto, salir del zen o salir</dd>
+                  <dd>{t('foco.k.esc')}</dd>
                 </dl>
               </div>
             )}
@@ -1304,20 +1306,20 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             )}
             {pendiente && (
               <button className="boton-mini" onClick={() => setComprobado((c) => ({ ...c, [b.clave]: 'saltada' }))}>
-                Saltar la comprobación
+                {t('foco.saltarComprobacion')}
               </button>
             )}
             {errorCierre ? (
               <button ref={botonSeguir} className="boton boton-principal" onClick={cerrar}>
-                Reintentar
+                {t('foco.reintentar')}
               </button>
             ) : ultimo ? (
               <button ref={botonSeguir} className="boton boton-principal" disabled={!puedeSeguir} onClick={cerrar}>
-                Cerrar la sesión
+                {t('foco.cerrarSesion')}
               </button>
             ) : (
               <button ref={botonSeguir} className="boton boton-principal" disabled={!puedeSeguir} onClick={() => ir(1)}>
-                Siguiente idea →
+                {t('foco.siguienteIdea')}
               </button>
             )}
           </>
@@ -1325,7 +1327,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
       }
     >
       <div className="solo-lector" aria-live="polite">
-        {pantalla === 'idea' ? `Idea ${i + 1} de ${bloques.length}: ${b.titulo}` : ''}
+        {pantalla === 'idea' ? t('foco.ideaDe', { n: i + 1, total: bloques.length, titulo: b.titulo }) : ''}
       </div>
       <div className="solo-lector" aria-live="polite">
         {anuncio}
@@ -1354,40 +1356,37 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         />
       ) : descanso ? (
         <section className="foco-descanso">
-          <span className="foco-etq">Descanso</span>
+          <span className="foco-etq">{t('foco.descanso')}</span>
           <strong>{mmssDe(pomo.quedan ?? 0)}</strong>
-          <p>
-            Levántate, mira lejos, bebe agua. Nada de pantallas: el cerebro ordena lo que acabas de leer mientras no haces nada. Es el
-            mismo pomodoro que llevas fuera del foco.
-          </p>
+          <p>{t('foco.descansoTexto')}</p>
           <div className="botones">
             {leccion.plan_id != null && ritmo.reexplicar === 'pausa' && (
-              <button className="boton" onClick={() => setReexplicando(true)} title="Explícate sin mirar lo que llevas">
-                Antes, reexplica lo que llevas
+              <button className="boton" onClick={() => setReexplicando(true)} title={t('foco.reexplicarTitulo')}>
+                {t('foco.antesReexplica')}
               </button>
             )}
             <button className="boton boton-principal" onClick={volverDelDescanso}>
-              Seguir leyendo
+              {t('foco.seguirLeyendo')}
             </button>
           </div>
         </section>
       ) : pantalla === 'dudas' ? (
         <section className="foco-cierre foco-dudas">
-          <span className="foco-etq">Antes de seguir</span>
-          <h1>Te quedaron estas dudas</h1>
+          <span className="foco-etq">{t('foco.antesDeSeguir')}</span>
+          <h1>{t('foco.tequedaron')}</h1>
           <div className="foco-flojeo">
             {listaFlojo(loQueFlojeo(bloques, {}, dudas))}
             <div className="botones">
               {porExplicar.length > 0 && (
-                <button className="boton boton-principal" disabled={!!explicando} onClick={() => explicar(porExplicar)} title="Una explicación corta de cada duda (llama al modelo)">
-                  {explicando ?? 'Explícamelas'}
+                <button className="boton boton-principal" disabled={!!explicando} onClick={() => explicar(porExplicar)} title={t('foco.explicacionCorta')}>
+                  {explicando ?? t('foco.explicamelas')}
                 </button>
               )}
               <button className="boton" onClick={() => { const x = loQueFlojeo(bloques, {}, dudas)[0]; if (x) irAParrafo(x.idea, x.u ?? 0) }}>
-                Ir a la primera
+                {t('foco.irPrimera')}
               </button>
               <button className="boton" onClick={() => setVerDudas(false)}>
-                Seguir donde lo dejé
+                {t('foco.seguirDondeLoDeje')}
               </button>
             </div>
             {errorExplicar && <TextoError texto={errorExplicar} />}
@@ -1405,73 +1404,73 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
         />
       ) : cerrada ? (
         <section className="foco-cierre">
-          <span className="foco-etq">Sesión hecha</span>
+          <span className="foco-etq">{t('foco.sesionHecha')}</span>
           <h1>{tituloFoco}</h1>
           <div className="foco-cifras">
             <div>
               <strong>{reloj(segundos)}</strong>
-              <span>de estudio</span>
+              <span>{t('foco.deEstudio')}</span>
             </div>
             <div>
               <strong>{bloques.length}</strong>
-              <span>ideas</span>
+              <span>{t('foco.ideas')}</span>
             </div>
             <div>
               <strong>
-                {notasComprobadas.filter((n) => n === 'bien' || n === 'perfecta').length} de {bloques.filter((x) => x.pregunta).length}
+                {notasComprobadas.filter((n) => n === 'bien' || n === 'perfecta').length} {t('foco.de', { n: bloques.filter((x) => x.pregunta).length })}
               </strong>
-              <span>comprobaciones bien</span>
+              <span>{t('foco.comprobacionesBien')}</span>
             </div>
           </div>
           {leccion.calentamiento && <ApuestasRevisadas previas={leccion.calentamiento.previas} apuestas={apuestas} />}
           {saltadas.length > 0 && (
             <>
-              <p>No las contestaste (no cuentan para tu repaso):</p>
+              <p>{t('foco.noContestaste')}</p>
               <ul className="foco-flojas">
                 {saltadas.map(([k, n]) => (
                   <li key={k}>
-                    {bloques.find((x) => x.clave === k)?.titulo ?? k} <span className={`chip nota-${n}`}>{NOTA[n] ?? n}</span>
+                    {bloques.find((x) => x.clave === k)?.titulo ?? k} <span className={`chip nota-${n}`}>{nombreNota(n)}</span>
                   </li>
                 ))}
               </ul>
               <div className="botones">
                 <button className="boton" onClick={contestarSaltadas}>
-                  Contestarlas ahora
+                  {t('foco.contestarAhora')}
                 </button>
               </div>
             </>
           )}
           {flojo.length > 0 ? (
             <div className="foco-flojeo">
-              <h2>Lo que flojeó</h2>
-              {flojas.length > 0 && <p className="nota">Lo fallado y lo que salió a medias vuelve en tu repaso, antes que lo demás.</p>}
+              <h2>{t('foco.flojeo')}</h2>
+              {flojas.length > 0 && <p className="nota">{t('foco.flojasVuelven')}</p>}
               {listaFlojo(flojo)}
               <div className="botones">
                 {porExplicar.length > 0 && (
-                  <button className="boton boton-principal" disabled={!!explicando} onClick={() => explicar(porExplicar)} title="Una explicación corta de cada duda (llama al modelo)">
-                    {explicando ?? 'Explícame estas'}
+                  <button className="boton boton-principal" disabled={!!explicando} onClick={() => explicar(porExplicar)} title={t('foco.explicacionCorta')}>
+                    {explicando ?? t('foco.explicameEstas')}
                   </button>
                 )}
-                <button className="boton" onClick={() => irAParrafo(flojo[0].idea, flojo[0].u ?? 0)} title="Vuelve a la lección, a la primera">
-                  Repasar estas
+                <button className="boton" onClick={() => irAParrafo(flojo[0].idea, flojo[0].u ?? 0)} title={t('foco.vuelveLeccion')}>
+                  {t('foco.repasarEstas')}
                 </button>
               </div>
               {errorExplicar && <TextoError texto={errorExplicar} />}
             </div>
           ) : (
-            !saltadas.length && <p>Todo bien. Los conceptos de hoy volverán en el repaso justo antes de que se te olviden.</p>
+            !saltadas.length && <p>{t('foco.todoBien')}</p>
           )}
           <div className="botones">
             {(repasos > 0 || flojas.length > 0) && (
               <button className="boton boton-principal" onClick={() => { alSalir(); irA('repaso') }}>
-                Repasar ahora
+                {t('foco.repasarAhora')}
               </button>
             )}
             <button className="boton" onClick={() => { alSalir(); irA('examen') }}>
-              Examinarme de esta lección
+              {t('foco.examinarme')}
             </button>
             <button className="boton" onClick={salirFoco}>
-              Salir del foco
+              {t('foco.salirFoco')}
             </button>
           </div>
         </section>
@@ -1482,7 +1481,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
           style={{ '--ancho-papel': `${ancho}ch`, '--foco-letra': letra } as CSSProperties}
         >
           <span className="foco-etq">
-            Idea {i + 1} de {bloques.length}
+            {t('foco.ideaDe2', { n: i + 1, total: bloques.length })}
           </span>
           <h1>{b.titulo}</h1>
           <div
@@ -1490,11 +1489,11 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             ref={setPapel}
             onMouseUp={() => {
               const sel = window.getSelection()
-              const t = sel?.toString().trim() ?? ''
-              if (t.length >= 2 && t.length <= 60 && sel?.rangeCount) {
+              const sele = sel?.toString().trim() ?? ''
+              if (sele.length >= 2 && sele.length <= 60 && sel?.rangeCount) {
                 const r = sel.getRangeAt(0).getBoundingClientRect()
                 const caja = papel?.getBoundingClientRect()
-                if (caja) setSeleccion({ texto: t, x: r.left - caja.left + r.width / 2, y: r.top - caja.top })
+                if (caja) setSeleccion({ texto: sele, x: r.left - caja.left + r.width / 2, y: r.top - caja.top })
               } else setSeleccion(null)
             }}
           >
@@ -1502,7 +1501,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             {marca && <div className={`foco-marca ${seguias ? 'seguias' : ''}`} aria-hidden="true" style={{ top: marca.top, height: marca.height }} />}
             {marca && seguias && (
               <span className="foco-seguias" role="status" style={{ top: marca.top - 26 }}>
-                Seguías aquí
+                {t('foco.seguiasAqui')}
               </span>
             )}
             <AsaAncho ancho={ancho} alCambiar={cambiarAncho} papel={papel} />
@@ -1519,7 +1518,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
                   window.getSelection()?.removeAllRanges()
                 }}
               >
-                + Al mapa
+                {t('foco.alMapa')}
               </button>
             )}
             {!estrecho && (
@@ -1544,10 +1543,10 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             <div className="foco-aviso-dudas" role="status">
               <span>{textoAvisoDudas(sinExplicar(dudasIdea, notas).length)}</span>
               <button className="boton boton-principal" disabled={!!explicando} onClick={() => explicar(sinExplicar(dudasIdea, notas))}>
-                {explicando ?? 'Sí, explícamelo'}
+                {explicando ?? t('foco.siExplicamelo')}
               </button>
               <button className="boton" onClick={() => setAvisoDudasVisto((s) => new Set(s).add(b.clave))}>
-                No, sigo
+                {t('foco.noSigo')}
               </button>
               {errorExplicar && <TextoError texto={errorExplicar} />}
             </div>
@@ -1567,7 +1566,7 @@ export function FocoLeccion({ leccion, sesionId, horas, repasos, inicial, alSali
             />
           )}
           {b.pregunta && comprobado[b.clave] && (
-            <p className={`foco-hecho nota-${comprobado[b.clave]}`}>Comprobada: {NOTA[comprobado[b.clave]] ?? comprobado[b.clave]}</p>
+            <p className={`foco-hecho nota-${comprobado[b.clave]}`}>{t('foco.comprobada', { nota: nombreNota(comprobado[b.clave]) })}</p>
           )}
         </article>
       )}

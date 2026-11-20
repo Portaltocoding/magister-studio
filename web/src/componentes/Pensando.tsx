@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { t, type Clave } from '../i18n/i18n.ts'
 import { Aurea, David, Euclides, Pendulos } from './PensandoDibujos.tsx'
 import { Adn, Arbol, Arco, Cuerda, Kepler, Koch, Mitosis, Pitagoras, Quintas, Vitruvio } from './PensandoCampos.tsx'
 
@@ -7,14 +8,12 @@ import { Adn, Arbol, Arco, Cuerda, Kepler, Koch, Mitosis, Pitagoras, Quintas, Vi
 
 export type Variante = 'rubik' | 'hanoi' | 'ordenar' | 'fourier' | 'lissajous' | 'david' | 'aurea' | 'euclides' | 'pendulos'
   | 'vitruvio' | 'pitagoras' | 'arco' | 'kepler' | 'koch' | 'quintas' | 'cuerda' | 'adn' | 'mitosis' | 'arbol'
-// El nombre de cada una, para la galería del Taller.
-export const NOMBRES: Record<Variante, string> = {
-  rubik: 'Cubo de Rubik', hanoi: 'Torre de Hanói', ordenar: 'Ordenación', fourier: 'Fourier', lissajous: 'Lissajous',
-  david: 'David, por encaje', aurea: 'Proporción áurea', euclides: 'Euclides, I.1', pendulos: 'Péndulos',
-  vitruvio: 'El hombre de Vitruvio', pitagoras: 'Pitágoras', arco: 'El arco y su clave', kepler: 'Kepler: áreas iguales', koch: 'Copo de Koch',
-  quintas: 'Círculo de quintas', cuerda: 'Armónicos de una cuerda', adn: 'Doble hélice', mitosis: 'Mitosis', arbol: 'Un árbol que crece',
-}
-export const VARIANTES = Object.keys(NOMBRES) as Variante[]
+export const VARIANTES: Variante[] = [
+  'rubik', 'hanoi', 'ordenar', 'fourier', 'lissajous', 'david', 'aurea', 'euclides', 'pendulos',
+  'vitruvio', 'pitagoras', 'arco', 'kepler', 'koch', 'quintas', 'cuerda', 'adn', 'mitosis', 'arbol',
+]
+// El nombre de cada una, para la galería del Taller, en el idioma de ahora (pensando.nombre.<variante>).
+export const nombreVariante = (v: Variante): string => t(`pensando.nombre.${v}` as Clave)
 
 const quieto = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 

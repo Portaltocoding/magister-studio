@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { t, type Clave } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { BotonLibro, TituloEditable, tituloSencillo, usarIndice } from '../componentes/indice.tsx'
 import {
   enviarJson,
@@ -42,11 +44,7 @@ const RECOMENDADO: Respuestas = {
   cantidad: 'normal',
 }
 
-const AVANCE = [
-  { titulo: 'Apuntes', texto: 'Para leer aquí como un libro o bajar en PDF' },
-  { titulo: 'Fichas', texto: 'Preguntas de memoria, de una en una' },
-  { titulo: 'Repaso', texto: 'Sus conceptos entran en tu repaso diario' },
-]
+const AVANCE = ['apuntes', 'fichas', 'repaso'] as const
 
 interface MaterialInfo {
   id: number
@@ -83,35 +81,21 @@ type EventoTrabajo =
 function motivoLegible(motivo: string, titulos: Record<string, string>): string {
   const viejo = motivo.match(/^bloques por revisar: (.+)$/)
   if (!viejo) return motivo
-  const nombres = viejo[1].split(/,\s*/).map((c) => `«${titulos[c] ?? c}»`)
-  const lista = nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`
-  return `${nombres.length === 1 ? `El bloque ${lista} no ha pasado` : `Los bloques ${lista} no han pasado`} la revisión de estilo tras varios intentos. Puedes leerlo igualmente (el contenido está) o rehacer solo ese bloque con «Rehacer» junto a su título.`
+  const nombres = viejo[1].split(/,\s*/).map((c) => t('material.comillas', { x: titulos[c] ?? c }))
+  const lista = nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(', ')}${t('material.y')}${nombres[nombres.length - 1]}`
+  return t(nombres.length === 1 ? 'material.motivo.uno' : 'material.motivo.varios', { lista })
 }
 
-const NODOS: Record<string, string> = {
-  pendiente: 'En cola',
-  en_curso: 'Empezando',
-  entrada: 'Preparando la lección',
-  contrato: 'Decidiendo los bloques',
-  escribir: 'Escribiendo',
-  lint: 'Revisando el tono',
-  juez: 'Juzgando el tono',
-  refinar: 'Reescribiendo',
-  aceptar: 'Guardando el bloque',
-  montar: 'Montando los apuntes',
-  completitud: 'Comprobando que no falte nada',
-  ampliar: 'Ampliando lo que falta',
-  preguntas: 'Escribiendo las preguntas',
-  pintar: 'Pintando el PDF',
-  diapositivas: 'Haciendo las diapositivas',
-  guion: 'Escribiendo el guion',
-}
+const NODOS = ['pendiente', 'en_curso', 'entrada', 'contrato', 'escribir', 'lint', 'juez', 'refinar', 'aceptar', 'montar', 'completitud', 'ampliar', 'preguntas', 'pintar', 'diapositivas', 'guion']
+const nombreNodo = (nodo: string | null): string =>
+  nodo && NODOS.includes(nodo) ? t(`material.nodo.${nodo}` as Clave) : (nodo ?? t('material.nodo.en_curso'))
 
 const fichero = (m: MaterialInfo, nombre: string) => `/api/materiales/${m.id}/fichero/${nombre}`
 
 
 // Fichas y Vídeo: cada lección como un bloque de aprendizaje (apuntes, fichas, diapositivas y guion).
 export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 'video' }) {
+  usarIdioma() // los textos siguen al idioma
   // null mientras carga: así un fallo o una espera no se confunden con «no tienes plan».
   const [planes, setPlanes] = useState<ResumenPlan[] | null>(null)
   const [fallo, setFallo] = useState(false)
@@ -153,9 +137,9 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
           const abierta = !sinPlan && existe(ruta.clave) ? ruta.clave : existe(hoy?.leccion_clave) ? hoy!.leccion_clave! : (v.lecciones[0]?.clave ?? null)
           setClave(abierta)
           if (sinPlan)
-            setAviso(`No encuentro el plan ${ruta.tema}: el enlace es antiguo o el plan se borró. Te abro «${elegido.tema}»; tus otros planes están en el selector de arriba.`)
+            setAviso(t('material.sinPlan', { id: ruta.tema!, tema: elegido.tema }))
           else if (ruta.clave && !existe(ruta.clave))
-            setAviso(`Este plan no tiene la lección ${ruta.clave}. Te abro ${abierta ?? 'la lista'}; las que tiene están a la izquierda.`)
+            setAviso(t('material.sinLeccion', { clave: ruta.clave, abierta: abierta ?? t('material.laLista') }))
         })
       })
       .catch(() => setFallo(true))
@@ -317,15 +301,10 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
 
   const borrar = async (tipo: 'diapositivas' | 'guion' | 'todo') => {
     if (!plan || !clave) return
-    const que = {
-      diapositivas: 'las diapositivas de esta lección',
-      guion: 'el guion de esta lección',
-      todo: 'todo el material de esta lección (apuntes, fichas, diapositivas y guion). Tus repasos se quedan',
-    }[tipo]
-    if (!confirm(`¿Borrar ${que}? No se puede deshacer.`)) return
+    if (!confirm(t(`material.borrar.${tipo}` as Clave))) return
     try {
       await pedir(`/api/planes/${plan.plan_id}/lecciones/${clave}/material?tipo=${tipo}`, { method: 'DELETE' })
-      setAviso(tipo === 'todo' ? 'Material borrado: la lección queda sin preparar.' : 'Borrado.')
+      setAviso(tipo === 'todo' ? t('material.borrado.todo') : t('material.borrado'))
       if (tipo !== 'todo') setPestana('apuntes')
       cargar()
       cargarEstados()
@@ -336,11 +315,11 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
 
   const cambiarEstilo = async (nuevo: string) => {
     if (!datos?.materiales.apuntes) return
-    setAviso('Volviendo a pintar el PDF…')
+    setAviso(t('material.repintando'))
     try {
       await pedir(`/api/materiales/${datos.materiales.apuntes.id}/estilo`, enviarJson({ estilo: nuevo }))
       setEstilo(nuevo)
-      setAviso(`PDF en estilo ${nuevo === 'libro' ? 'Libro' : 'Ficha general'}.`)
+      setAviso(t('material.pdfEstilo', { estilo: nuevo === 'libro' ? t('material.estilo.libro') : t('material.estilo.ficha') }))
       cargar()
     } catch (e) {
       setAviso(null)
@@ -364,45 +343,45 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
   const leccion = plan?.lecciones.find((l) => l.clave === clave)
   const temaNombre = (planes ?? []).find((p) => p.plan_id === plan?.plan_id)?.tema ?? ''
   const pestanas: { id: Pestana; nombre: string; hay: boolean }[] = [
-    { id: 'apuntes', nombre: 'Apuntes', hay: !!textos.apuntes },
-    { id: 'fichas', nombre: `Fichas${datos?.preguntas.length ? ` (${datos.preguntas.length})` : ''}`, hay: !!datos?.preguntas.length },
-    { id: 'diapositivas', nombre: 'Diapositivas', hay: !!diapos?.ficheros.includes('html') },
-    { id: 'guion', nombre: 'Guion', hay: !!textos.guion },
+    { id: 'apuntes', nombre: t('material.pest.apuntes'), hay: !!textos.apuntes },
+    { id: 'fichas', nombre: `${t('material.pest.fichas')}${datos?.preguntas.length ? ` (${datos.preguntas.length})` : ''}`, hay: !!datos?.preguntas.length },
+    { id: 'diapositivas', nombre: t('material.pest.diapositivas'), hay: !!diapos?.ficheros.includes('html') },
+    { id: 'guion', nombre: t('material.pest.guion'), hay: !!textos.guion },
   ]
 
   if (planes === null)
     return fallo ? (
       <div className="panel">
-        <h1>Lecciones</h1>
-        <p role="alert" className="nota">No he podido cargar tus lecciones. Comprueba que Magister sigue en marcha.</p>
+        <h1>{t('material.lecciones')}</h1>
+        <p role="alert" className="nota">{t('material.noCarga')}</p>
         <button className="boton" onClick={() => setIntento((x) => x + 1)}>
-          Reintentar
+          {t('material.reintentar')}
         </button>
       </div>
     ) : (
-      <Pensando texto="Cargando tus lecciones…" />
+      <Pensando texto={t('material.cargando')} />
     )
   if (!planes.length)
     return (
       <div className="panel">
-        <h1>{modoVista === 'video' ? 'Vídeo' : 'Lecciones'}</h1>
+        <h1>{modoVista === 'video' ? t('material.video') : t('material.lecciones')}</h1>
         <Vacio
-          etiqueta="Sin plan todavía"
-          titulo="Aquí estará cada lección de tu plan"
-          texto="Cada lección es un bloque: apuntes que se leen como un libro, fichas para repasar de memoria, diapositivas y guion de vídeo. Primero hace falta un plan que diga qué lecciones hay."
-          acciones={[{ texto: 'Crear un plan', principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
+          etiqueta={t('material.vacio.etq')}
+          titulo={t('material.vacio.titulo')}
+          texto={t('material.vacio.texto')}
+          acciones={[{ texto: t('material.vacio.crear'), principal: true, alPulsar: () => irARuta('#/nuevo-plan') }]}
         />
       </div>
     )
 
   return (
     <div className="bloques" ref={raiz} style={variables(acentoDe(colores, clave))}>
-      <aside className="bloques-lista" aria-label="Lecciones">
+      <aside className="bloques-lista" aria-label={t('material.lecciones')}>
         {planes.length > 1 ? (
           <div className="selector-tema">
             <span className="punto-tema" style={colorDeTema(plan?.tema_id, planes)?.estilo} aria-hidden="true" />
             <select
-              aria-label="Plan"
+              aria-label={t('material.plan')}
               value={plan?.tema_id ?? ''}
               onChange={(e) =>
                 verPlan(Number(e.target.value))
@@ -411,7 +390,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                     setPlan(v)
                     setClave(v.lecciones[0]?.clave ?? null)
                   })
-                  .catch((err) => setError(`No he podido abrir ese plan: ${mensajeDe(err)}`))
+                  .catch((err) => setError(t('material.noAbrePlan', { motivo: mensajeDe(err) })))
               }
             >
               {planes.map((p) => (
@@ -427,12 +406,12 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
             {temaNombre}
           </p>
         )}
-        {(indice?.temas ?? [{ nombre: '', lecciones: plan?.lecciones.map((l) => l.clave) ?? [], trata: [] }]).map((t) => (
-          <div key={t.nombre || 'todas'} className="bloques-tema">
-            {t.nombre && <p className="bloques-tema-nombre">{t.nombre}</p>}
+        {(indice?.temas ?? [{ nombre: '', lecciones: plan?.lecciones.map((l) => l.clave) ?? [], trata: [] }]).map((tm) => (
+          <div key={tm.nombre || 'todas'} className="bloques-tema">
+            {tm.nombre && <p className="bloques-tema-nombre">{tm.nombre}</p>}
             <ol>
               {plan?.lecciones
-                .filter((l) => t.lecciones.includes(l.clave))
+                .filter((l) => tm.lecciones.includes(l.clave))
                 .map((l) => {
                   const e = estadoLeccion(estados[l.clave])
                   return (
@@ -468,46 +447,46 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                   <p className="bloque-titulo-largo">{leccion.titulo}</p>
                 )}
               {leccion.objetivos.length > 0 && (
-                <p className="bloque-objetivos">Con qué saldrás: {leccion.objetivos.join('; ')}</p>
+                <p className="bloque-objetivos">{t('material.objetivos', { lista: leccion.objetivos.join('; ') })}</p>
               )}
               <div className="bloque-acciones">
                 {apuntes && (
                   <button className="boton boton-principal" onClick={() => irARuta(`#/foco/${apuntes.id}`)}>
-                    Estudiar
+                    {t('material.estudiar')}
                   </button>
                 )}
                 {apuntes && (
                   <button className="boton" disabled={!!enCurso} onClick={() => setPreguntando({ forzar: true })}>
-                    Rehacer el material
+                    {t('material.rehacer')}
                   </button>
                 )}
                 {apuntes?.ficheros.includes('pdf') && (
                   <a className="boton" href={fichero(apuntes, 'pdf')} target="_blank" rel="noreferrer">
-                    Apuntes en PDF
+                    {t('material.apuntesPdf')}
                   </a>
                 )}
                 {diapos?.ficheros.includes('diapositivas_pdf') && (
                   <a className="boton" href={fichero(diapos, 'diapositivas_pdf')} target="_blank" rel="noreferrer">
-                    Diapositivas en PDF
+                    {t('material.diapositivasPdf')}
                   </a>
                 )}
                 {apuntes && (
                   <label className="estilo-pdf">
-                    Estilo del PDF
+                    {t('material.estiloPdf')}
                     <select value={estilo} onChange={(e) => cambiarEstilo(e.target.value)} disabled={!!enCurso}>
-                      <option value="libro">Libro</option>
-                      <option value="ficha">Ficha general</option>
+                      <option value="libro">{t('material.estilo.libro')}</option>
+                      <option value="ficha">{t('material.estilo.ficha')}</option>
                     </select>
                   </label>
                 )}
                 {/* Lo que se usa poco (y lo que no tiene vuelta atrás), recogido: a la vista, solo lo de estudiar. */}
                 <details className="bloque-mas">
-                  <summary className="boton">Más</summary>
+                  <summary className="boton">{t('material.mas')}</summary>
                   <div className="bloque-mas-menu">
                     <Colores leccion={clave} />
                     {apuntes && (
                       <button className="boton peligro" disabled={!!enCurso} onClick={() => borrar('todo')}>
-                        Borrar el material
+                        {t('material.borrarMaterial')}
                       </button>
                     )}
                   </div>
@@ -530,16 +509,16 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         {preguntando && clave && (
           <Cuestionario
             key={`${clave}-${preguntando.forzar}`}
-            titulo={`Material de ${clave}`}
+            titulo={t('material.materialDe', { clave })}
             preguntas={
               modoVista === 'video'
                 ? preguntasMaterial().map((q) => (q.id === 'tipos' ? { ...q, porDefecto: ['apuntes', 'guion'] } : q))
                 : preguntasMaterial()
             }
-            boton={preguntando.forzar ? 'Rehacer el material' : 'Generar el material'}
+            boton={preguntando.forzar ? t('material.rehacer') : t('material.generar')}
             alTerminar={(r) => generar(preguntando.forzar, r)}
             alSaltar={() => setPreguntando(null)}
-            textoSaltar="Cancelar"
+            textoSaltar={t('material.cancelar')}
           />
         )}
         {preguntando && clave && <BarraCuota accion={{ accion: 'material' }} />}
@@ -547,13 +526,13 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         {trabajo && (enCurso || trabajo.estado === 'fallido') && (
           <div className="progreso" role="status">
             {trabajo.estado === 'fallido' ? (
-              <TextoError texto={trabajo.error} antes="No se ha podido preparar. " rol="status" />
+              <TextoError texto={trabajo.error} antes={t('material.noPrepara')} rol="status" />
             ) : (
               <Pensando
                 texto={
                   trabajo.estado === 'pendiente'
                     ? textoCola(trabajo.cola)
-                    : `${NODOS[trabajo.nodo ?? ''] ?? trabajo.nodo ?? 'Empezando'}${trabajo.total > 1 ? ` · bloque ${trabajo.paso + 1} de ${trabajo.total}` : ''}`
+                    : `${nombreNodo(trabajo.nodo)}${trabajo.total > 1 ? t('material.bloqueDe', { n: trabajo.paso + 1, total: trabajo.total }) : ''}`
                 }
               />
             )}
@@ -565,10 +544,10 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 <button
                   className="boton-mini"
                   onClick={() =>
-                    pedir(`/api/trabajos/${trabajo.id}/cancelar`, { method: 'POST' }).catch((e) => setError(`No he podido cancelar: ${mensajeDe(e)}`))
+                    pedir(`/api/trabajos/${trabajo.id}/cancelar`, { method: 'POST' }).catch((e) => setError(t('material.noCancela', { motivo: mensajeDe(e) })))
                   }
                 >
-                  Cancelar
+                  {t('material.cancelar')}
                 </button>
               </>
             )}
@@ -598,7 +577,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 rehacer={
                   datos?.materiales.apuntes
                     ? {
-                        bloques: Object.fromEntries(Object.entries(contrato).map(([k, t]) => [t, k])),
+                        bloques: Object.fromEntries(Object.entries(contrato).map(([k, ti]) => [ti, k])),
                         alRehacer: async (claveBloque, como) => {
                           try {
                             const r = await pedir<{ texto: string }>(
@@ -607,7 +586,7 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                             )
                             setTextos((x) => ({ ...x, apuntes: r.texto }))
                           } catch (e) {
-                            alert(`No se pudo rehacer. ${errorLegible(mensajeDe(e)).mensaje}`)
+                            alert(t('material.noRehace', { motivo: errorLegible(mensajeDe(e)).mensaje }))
                           }
                         },
                       }
@@ -618,11 +597,11 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
             {pestana === 'fichas' && <Tarjetas key={clave} fichas={datos.preguntas} bloques={contrato} />}
             {pestana === 'diapositivas' && diapos?.ficheros.includes('html') && (
               <div className="visor-diapositivas">
-                <iframe title="Diapositivas" src={fichero(diapos, 'html')} />
+                <iframe title={t('material.pest.diapositivas')} src={fichero(diapos, 'html')} />
                 <p className="nota">
-                  Pulsa dentro y usa las flechas para pasar. F abre en pantalla completa.{' '}
+                  {t('material.visorAyuda')}{' '}
                   <button className="boton-mini peligro" onClick={() => borrar('diapositivas')}>
-                    Borrar las diapositivas
+                    {t('material.borrarDiapos')}
                   </button>
                 </p>
               </div>
@@ -632,27 +611,27 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
                 <TextoLibro markdown={textos.guion} className="guion" />
                 <p className="nota">
                   <button className="boton-mini peligro" onClick={() => borrar('guion')}>
-                    Borrar el guion
+                    {t('material.borrarGuion')}
                   </button>
                 </p>
               </>
             )}
             {pestana === 'diapositivas' && !diapos && !enCurso && (
               <Vacio
-                etiqueta="Sin diapositivas"
-                titulo="Las diapositivas se hacen cuando las pides"
-                texto="Unas doce, con los colores del libro, a partir de los apuntes de esta lección. Hacerlas lleva un minuto o dos; si hay otros trabajos antes, te digo cuántos."
-                acciones={[{ texto: 'Hacer las diapositivas', principal: true, alPulsar: () => pedirExtra('diapositivas') }]}
+                etiqueta={t('material.sinDiapos.etq')}
+                titulo={t('material.sinDiapos.titulo')}
+                texto={t('material.sinDiapos.texto')}
+                acciones={[{ texto: t('material.sinDiapos.hacer'), principal: true, alPulsar: () => pedirExtra('diapositivas') }]}
               >
                 <BarraCuota accion={{ accion: 'diapositivas' }} />
               </Vacio>
             )}
             {pestana === 'guion' && !guion && !enCurso && (
               <Vacio
-                etiqueta="Sin guion"
-                titulo="El guion del vídeo se escribe cuando lo pides"
-                texto="Por escenas, para verlo narrado en Vídeo. Sale de los apuntes de esta lección; escribirlo lleva unos minutos y, si hay otros trabajos antes, te digo cuántos."
-                acciones={[{ texto: 'Escribir el guion', principal: true, alPulsar: () => pedirExtra('guion') }]}
+                etiqueta={t('material.sinGuion.etq')}
+                titulo={t('material.sinGuion.titulo')}
+                texto={t('material.sinGuion.texto')}
+                acciones={[{ texto: t('material.sinGuion.hacer'), principal: true, alPulsar: () => pedirExtra('guion') }]}
               >
                 <BarraCuota accion={{ accion: 'video', minutos: 6 }} />
               </Vacio>
@@ -661,26 +640,26 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
         )}
         {datos && !apuntes && !enCurso && !preguntando && (
           <Vacio
-            etiqueta="Lección sin preparar"
-            titulo="Prepárala y tendrás todo esto"
-            texto="El tutor escribe la lección bloque a bloque con tus fuentes, revisa el tono y comprueba que no falte nada. Tarda unos minutos y puedes seguir usando la app mientras tanto."
+            etiqueta={t('material.sinPreparar.etq')}
+            titulo={t('material.sinPreparar.titulo')}
+            texto={t('material.sinPreparar.texto')}
             acciones={[
-              { texto: 'Prepararla con lo recomendado', principal: true, alPulsar: () => generar(false, RECOMENDADO) },
-              { texto: 'Elegir yo las opciones', alPulsar: () => setPreguntando({ forzar: false }) },
+              { texto: t('material.sinPreparar.recomendado'), principal: true, alPulsar: () => generar(false, RECOMENDADO) },
+              { texto: t('material.sinPreparar.elegir'), alPulsar: () => setPreguntando({ forzar: false }) },
             ]}
           >
             <ul className="vacio-avance">
               {AVANCE.map((a) => (
-                <li key={a.titulo}>
-                  <strong>{a.titulo}</strong>
-                  <span>{a.texto}</span>
+                <li key={a}>
+                  <strong>{t(`material.avance.${a}` as Clave)}</strong>
+                  <span>{t(`material.avance.${a}.x` as Clave)}</span>
                 </li>
               ))}
             </ul>
             <BarraCuota accion={{ accion: 'material' }} />
           </Vacio>
         )}
-        {guion && !textos.guion && pestana === 'guion' && <p className="nota">Cargando el guion…</p>}
+        {guion && !textos.guion && pestana === 'guion' && <p className="nota">{t('material.cargandoGuion')}</p>}
       </section>
     </div>
   )

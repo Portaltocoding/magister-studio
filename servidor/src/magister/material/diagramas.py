@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from magister.cerebro.estructura import ErrorEstructura, estructurar
 from magister.cerebro.modelo import al_lanzar
 from magister.cerebro.prompts import cargar
+from magister.config import FUENTE_TEXTO
 
 registro = logging.getLogger("magister.diagramas")
 PROHIBIDO = re.compile(r"<\s*(script|foreignObject|image|a)\b|\bhref\s*=|\bon[a-z]+\s*=", re.I)
@@ -127,6 +128,17 @@ async def _dibujar(clave: str, encargo: str, contexto: str) -> str | None:
         _lanzados.discard(clave)
 
 
+_FUENTE_ATRIBUTO = re.compile(r"""\sfont-family\s*=\s*(?:"[^"]*"|'[^']*')""", re.I)
+_FUENTE_ESTILO = re.compile(r"font-family\s*:[^;}\"']*(?:'[^']*'[^;}\"']*)*;?", re.I)
+
+
+def normalizar_fuente(svg: str) -> str:
+    """Quita todo font-family que escriba el modelo y fija la tipografía de la app en el <svg> raíz."""
+    svg = _FUENTE_ATRIBUTO.sub("", svg)
+    svg = _FUENTE_ESTILO.sub("", svg)
+    return re.sub(r"<svg\b", f'<svg font-family="{FUENTE_TEXTO.replace(chr(34), chr(39))}"', svg, count=1)
+
+
 async def _llamar(encargo: str, contexto: str) -> str | None:
     entrada =f"<explicacion>\n{contexto[-6000:]}\n</explicacion>\n\n<encargo>\n{encargo}\n</encargo>"
     try:
@@ -137,4 +149,4 @@ async def _llamar(encargo: str, contexto: str) -> str | None:
     svg = d.svg.strip()
     for aviso in excesos(svg):
         registro.warning("diagrama más grande de lo pedido: %s", aviso)
-    return svg
+    return normalizar_fuente(svg)
