@@ -48,6 +48,17 @@ El arrancador instala Docker si falta, descarga Magister (unos 2 GB la primera v
 
 **Lo que (todavía) no hace:** el orden de las lecciones queda fijo al aceptar un plan (se adapta el calendario, no la secuencia), los avisos necesitan la pestaña abierta y no hay versión móvil.
 
+## Capturas
+
+Las capturas están en inglés; en español, la app se ve igual.
+
+| | |
+|---|---|
+| ![Estudio libre respondiendo a partir de dos documentos adjuntos, con citas](docs/img/chat.png) | ![Un plan nuevo empieza con un cuestionario corto](docs/img/plan.png) |
+| **Estudio libre** lee lo que adjuntas, responde citándolo y te ofrece cómo seguir. | **Un plan** empieza con unas preguntas: objetivo, nivel, profundidad, plazo y horas. |
+| ![La bienvenida pregunta el idioma](docs/img/bienvenida.png) | ![Estudio libre, la primera pantalla](docs/img/magister.png) |
+| **La bienvenida** te pregunta el idioma y tu nombre, y conecta tu cuenta de Claude. | **Siempre en oscuro**, con la barra lateral fija; la pliegas si prefieres. |
+
 ## Cómo está hecho
 
 | | |

@@ -48,6 +48,15 @@ The launcher installs Docker if it is missing, downloads Magister (about 2 GB th
 
 **What it doesn't do (yet):** the order of lessons is fixed once you accept a plan (the calendar adapts, the sequence doesn't), reminders need the browser tab open, and there is no mobile version.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Study chat answering from two attached documents, with citations](docs/img/chat.png) | ![A new plan starts with a short questionnaire](docs/img/plan.png) |
+| **Study chat** reads what you attach and answers citing it, then offers what to do next. | **A plan** starts with a few questions: goal, level, depth, deadline and hours. |
+| ![The first-run welcome asks for your language](docs/img/bienvenida.png) | ![Study chat, the first screen](docs/img/magister.png) |
+| **The welcome** asks for your language, your name and connects your Claude account. | **Always dark**, with the sidebar pinned; collapse it if you prefer. |
+
 ## How it is built
 
 | | |
