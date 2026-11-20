@@ -1,56 +1,59 @@
 import type { Pregunta, Respuestas } from './Cuestionario.tsx'
 import { fechaLarga } from './formato.ts'
+import { t } from '../i18n/i18n.ts'
 
 // Antes de un plan: lo que el diagnóstico necesita, en cuatro pasos. Con esto suele salir el plan a la primera.
-export const PREGUNTAS_PLAN: Pregunta[] = [
-  { id: 'tema', titulo: '¿Qué quieres aprender?', tipo: 'texto', placeholder: 'Por ejemplo: conceptos de un fullstack senior, cálculo de primero, redes...' },
+// Los textos salen del diccionario (i18n/): el `valor` de cada opción es lo que acaba en el mensaje que se manda al tutor,
+// así que también va en el idioma de ahora. Las únicas claves internas son las de `plazo`, `profundidad` y `nivel`.
+export const preguntasPlan = (): Pregunta[] => [
+  { id: 'tema', titulo: t('cuest.tema.titulo'), tipo: 'texto', placeholder: t('cuest.tema.placeholder') },
   {
-    id: 'objetivo', titulo: '¿Para qué?', tipo: 'una', otro: true,
+    id: 'objetivo', titulo: t('cuest.objetivo.titulo'), tipo: 'una', otro: true,
     opciones: [
-      { valor: 'una entrevista de trabajo', etiqueta: 'Una entrevista', desc: 'Con preguntas de nivel y simulacros' },
-      { valor: 'un examen', etiqueta: 'Un examen', desc: 'Con fecha y temario' },
-      { valor: 'un proyecto o el trabajo', etiqueta: 'Un proyecto o el trabajo', desc: 'Para aplicarlo ya' },
-      { valor: 'curiosidad y base sólida', etiqueta: 'Curiosidad', desc: 'Sin prisa, a fondo' },
+      { valor: t('cuest.objetivo.entrevista.valor'), etiqueta: t('cuest.objetivo.entrevista'), desc: t('cuest.objetivo.entrevista.desc') },
+      { valor: t('cuest.objetivo.examen.valor'), etiqueta: t('cuest.objetivo.examen'), desc: t('cuest.objetivo.examen.desc') },
+      { valor: t('cuest.objetivo.proyecto.valor'), etiqueta: t('cuest.objetivo.proyecto'), desc: t('cuest.objetivo.proyecto.desc') },
+      { valor: t('cuest.objetivo.curiosidad.valor'), etiqueta: t('cuest.objetivo.curiosidad'), desc: t('cuest.objetivo.curiosidad.desc') },
     ],
   },
   {
-    id: 'nivel', titulo: '¿Qué sabes ya?', tipo: 'una',
+    id: 'nivel', titulo: t('cuest.nivel.titulo'), tipo: 'una',
     opciones: [
-      { valor: 'nada', etiqueta: 'Nada', desc: 'Empiezo de cero' },
-      { valor: 'basico', etiqueta: 'Lo básico', desc: 'Me suena, pero con huecos' },
-      { valor: 'intermedio', etiqueta: 'Intermedio', desc: 'Lo uso con soltura' },
-      { valor: 'avanzado', etiqueta: 'Avanzado', desc: 'Quiero pulir y profundizar' },
+      { valor: 'nada', etiqueta: t('cuest.nivel.nada'), desc: t('cuest.nivel.nada.desc') },
+      { valor: 'basico', etiqueta: t('cuest.nivel.basico'), desc: t('cuest.nivel.basico.desc') },
+      { valor: 'intermedio', etiqueta: t('cuest.nivel.intermedio'), desc: t('cuest.nivel.intermedio.desc') },
+      { valor: 'avanzado', etiqueta: t('cuest.nivel.avanzado'), desc: t('cuest.nivel.avanzado.desc') },
     ],
   },
   {
-    id: 'profundidad', titulo: '¿Con qué profundidad?', tipo: 'una',
+    id: 'profundidad', titulo: t('cuest.profundidad.titulo'), tipo: 'una',
     opciones: [
-      { valor: 'esencial', etiqueta: 'Lo esencial', desc: 'Unas 10 h: las ideas clave y saber usarlas' },
-      { valor: 'estandar', etiqueta: 'Estándar', desc: 'Unas 25 h: con práctica y casos típicos' },
-      { valor: 'fondo', etiqueta: 'A fondo', desc: 'Unas 50 h: casos límite, por qué funciona y mucha práctica' },
+      { valor: 'esencial', etiqueta: t('cuest.profundidad.esencial'), desc: t('cuest.profundidad.esencial.desc') },
+      { valor: 'estandar', etiqueta: t('cuest.profundidad.estandar'), desc: t('cuest.profundidad.estandar.desc') },
+      { valor: 'fondo', etiqueta: t('cuest.profundidad.fondo'), desc: t('cuest.profundidad.fondo.desc') },
     ],
   },
   {
-    id: 'plazo', titulo: '¿Para cuándo lo necesitas?', ayuda: 'Con la fecha te propongo cuántas horas y cuándo.', tipo: 'fecha',
+    id: 'plazo', titulo: t('cuest.plazo.titulo'), ayuda: t('cuest.plazo.ayuda'), tipo: 'fecha',
     opciones: [
-      { valor: 'en un mes', etiqueta: 'En un mes' },
-      { valor: 'en tres meses', etiqueta: 'En tres meses' },
-      { valor: 'sin fecha límite', etiqueta: 'Sin fecha' },
+      { valor: 'en un mes', etiqueta: t('cuest.plazo.mes') },
+      { valor: 'en tres meses', etiqueta: t('cuest.plazo.tresMeses') },
+      { valor: 'sin fecha límite', etiqueta: t('cuest.plazo.sin') },
     ],
   },
   {
-    id: 'horas', titulo: '¿Cuánto tiempo le dedicas?', tipo: 'una', otro: true,
+    id: 'horas', titulo: t('cuest.horas.titulo'), tipo: 'una', otro: true,
     opcionesSegun: (r) => sugerirHoras(r),
     ayudaSegun: (r) => explicarHoras(r),
   },
   {
-    id: 'franja', titulo: '¿A qué hora te viene mejor?', tipo: 'una',
+    id: 'franja', titulo: t('cuest.franja.titulo'), tipo: 'una',
     opciones: [
-      { valor: 'por las mañanas, empezando a las 9:00', etiqueta: 'Mañanas', desc: 'Desde las 9:00' },
-      { valor: 'a mediodía, empezando a las 14:00', etiqueta: 'Mediodía', desc: 'Desde las 14:00' },
-      { valor: 'por las tardes, empezando a las 18:00', etiqueta: 'Tardes', desc: 'Desde las 18:00' },
-      { valor: 'por las noches, empezando a las 21:30', etiqueta: 'Noches', desc: 'Desde las 21:30' },
-      { valor: 'a cualquier hora', etiqueta: 'Me da igual' },
+      { valor: t('cuest.franja.manana.valor'), etiqueta: t('cuest.franja.manana'), desc: t('cuest.franja.manana.desc') },
+      { valor: t('cuest.franja.mediodia.valor'), etiqueta: t('cuest.franja.mediodia'), desc: t('cuest.franja.mediodia.desc') },
+      { valor: t('cuest.franja.tarde.valor'), etiqueta: t('cuest.franja.tarde'), desc: t('cuest.franja.tarde.desc') },
+      { valor: t('cuest.franja.noche.valor'), etiqueta: t('cuest.franja.noche'), desc: t('cuest.franja.noche.desc') },
+      { valor: t('cuest.franja.cualquiera.valor'), etiqueta: t('cuest.franja.cualquiera') },
     ],
   },
 ]
@@ -75,8 +78,8 @@ export const fechaMaxima = (hoy = new Date()) => iso(masDias(hoy, 5 * 365))
 // Qué tiene de malo la fecha escrita, o null si vale (o si no es una fecha: «en un mes», «sin fecha límite»).
 export function errorFecha(v: string | string[] | undefined, hoy = new Date()): string | null {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null
-  if (v < fechaMinima(hoy)) return 'Esa fecha ya ha pasado o es hoy: elige una a partir de mañana.'
-  if (v > fechaMaxima(hoy)) return 'Esa fecha queda a más de cinco años: revisa el año o elige «Sin fecha».'
+  if (v < fechaMinima(hoy)) return t('cuest.fecha.pasada')
+  if (v > fechaMaxima(hoy)) return t('cuest.fecha.lejana')
   return null
 }
 
@@ -105,32 +108,32 @@ export function sugerirHoras(r: Respuestas, hoy = new Date()): { valor: string; 
   const dias = diasHasta(r, hoy)
   if (dias == null)
     return [
-      { valor: 'media hora al día entre semana', etiqueta: '30 min entre semana' },
-      { valor: 'una hora al día entre semana', etiqueta: '1 h entre semana' },
-      { valor: 'una hora todos los días', etiqueta: '1 h todos los días' },
-      { valor: 'tres horas los sábados y domingos', etiqueta: '3 h los fines de semana' },
+      { valor: t('cuest.horas.sin.a.valor'), etiqueta: t('cuest.horas.sin.a') },
+      { valor: t('cuest.horas.sin.b.valor'), etiqueta: t('cuest.horas.sin.b') },
+      { valor: t('cuest.horas.sin.c.valor'), etiqueta: t('cuest.horas.sin.c') },
+      { valor: t('cuest.horas.sin.d.valor'), etiqueta: t('cuest.horas.sin.d') },
     ]
   // Un 15 % de margen para repasos y días que fallan.
   const necesarias = horasTotales(r) * 1.15
   const laborables = Math.max(1, Math.round((dias * 5) / 7))
   const findes = Math.max(1, Math.round((dias * 2) / 7))
   const tramos = [
-    { h: necesarias / laborables, texto: 'al día de lunes a viernes', corto: 'de lunes a viernes', max: 4 },
-    { h: necesarias / dias, texto: 'al día, todos los días', corto: 'todos los días', max: 3.5 },
-    { h: necesarias / findes, texto: 'los sábados y los domingos', corto: 'sábados y domingos', max: 6 },
+    { h: necesarias / laborables, texto: t('cuest.tramo.laborables'), corto: t('cuest.tramo.laborables.corto'), max: 4, laborables: true },
+    { h: necesarias / dias, texto: t('cuest.tramo.todos'), corto: t('cuest.tramo.todos.corto'), max: 3.5, laborables: false },
+    { h: necesarias / findes, texto: t('cuest.tramo.findes'), corto: t('cuest.tramo.findes.corto'), max: 6, laborables: false },
   ]
   const ops = tramos
-    .filter((t) => t.h <= t.max)
-    .map((t, i) => ({
-      valor: `${duracion(t.h)} ${t.texto}`,
-      etiqueta: `${duracion(t.h)} ${t.corto}`,
-      desc: i === 0 && t.corto === 'de lunes a viernes' ? 'Recomendado: constante y con el fin de semana libre' : undefined,
+    .filter((x) => x.h <= x.max)
+    .map((x, i) => ({
+      valor: `${duracion(x.h)} ${x.texto}`,
+      etiqueta: `${duracion(x.h)} ${x.corto}`,
+      desc: i === 0 && x.laborables ? t('cuest.tramo.recomendado') : undefined,
     }))
   // La holgura, solo si también cabe en el tope de lunes a viernes.
   const hHolgura = (necesarias / laborables) * 1.3
   if (hHolgura <= tramos[0].max) {
     const holgura = duracion(hHolgura)
-    ops.push({ valor: `${holgura} al día de lunes a viernes`, etiqueta: `${holgura} de lunes a viernes`, desc: 'Con holgura: acabas antes' })
+    ops.push({ valor: `${holgura} ${tramos[0].texto}`, etiqueta: `${holgura} ${tramos[0].corto}`, desc: t('cuest.tramo.holgura') })
   }
   return ops
 }
@@ -138,57 +141,65 @@ export function sugerirHoras(r: Respuestas, hoy = new Date()): { valor: string; 
 export function explicarHoras(r: Respuestas, hoy = new Date()): string {
   const total = horasTotales(r)
   const dias = diasHasta(r, hoy)
-  if (dias == null) return `Para esta profundidad calculo unas ${total} h en total. Sin fecha, elige un ritmo que puedas mantener.`
+  if (dias == null) return t('cuest.explica.sinFecha', { total })
   const porSemana = horasPorSemana(r, dias)
-  const plazo = `${dias} ${dias === 1 ? 'día' : 'días'}`
-  if (!sugerirHoras(r, hoy).length)
-    return (
-      `Unas ${total} h en ${plazo} no caben: serían unas ${Math.ceil(porSemana)} h por semana. ` +
-      'Vuelve atrás y elige una fecha más lejana o menos profundidad, o escribe en «Otro» lo que de verdad puedes dedicarle.'
-    )
-  const aviso = porSemana > 20 ? ' Va justo: alarga la fecha o baja la profundidad.' : ''
-  return `Unas ${total} h en ${plazo}: unas ${Math.ceil(porSemana)} h por semana, con margen para repasos.${aviso}`
+  const plazo = `${dias} ${dias === 1 ? t('cuest.dia') : t('cuest.dias')}`
+  if (!sugerirHoras(r, hoy).length) return t('cuest.explica.noCabe', { total, plazo, semana: Math.ceil(porSemana) })
+  const aviso = porSemana > 20 ? ` ${t('cuest.explica.justo')}` : ''
+  return `${t('cuest.explica.cabe', { total, plazo, semana: Math.ceil(porSemana) })}${aviso}`
 }
 
 export function mensajePlan(r: Respuestas): string {
-  const plazo = /^\d{4}-\d{2}-\d{2}$/.test(String(r.plazo)) ? `antes del ${fechaLarga(String(r.plazo))}` : String(r.plazo ?? 'sin fecha límite')
-  const prof = ({ esencial: 'lo esencial', estandar: 'a nivel estándar', fondo: 'a fondo' } as Record<string, string>)[String(r.profundidad)] ?? 'a nivel estándar'
+  const plazo = /^\d{4}-\d{2}-\d{2}$/.test(String(r.plazo))
+    ? t('cuest.msg.antesDel', { fecha: fechaLarga(String(r.plazo)) })
+    : r.plazo === 'en un mes'
+      ? t('cuest.plazo.mes.msg')
+      : r.plazo === 'en tres meses'
+        ? t('cuest.plazo.tresMeses.msg')
+        : t('cuest.plazo.sin.msg')
+  const prof = t(`cuest.msg.prof.${['esencial', 'estandar', 'fondo'].includes(String(r.profundidad)) ? String(r.profundidad) : 'estandar'}` as 'cuest.msg.prof.estandar')
   // El valor de la opción va sin tilde («basico»): en el mensaje, como se lee.
-  const nivel = ({ nada: 'empiezo de cero', basico: 'lo básico', intermedio: 'intermedio', avanzado: 'avanzado' } as Record<string, string>)[String(r.nivel)] ?? String(r.nivel)
-  return (
-    `Quiero aprender ${r.tema}, para ${r.objetivo}. Mi nivel: ${nivel}. Lo quiero ${prof} (unas ${horasTotales(r)} h en total). ` +
-    `Puedo dedicarle ${r.horas}, ${r.franja ?? 'a cualquier hora'}. Lo quiero ${plazo}.`
-  )
+  const nivel = ['nada', 'basico', 'intermedio', 'avanzado'].includes(String(r.nivel)) ? t(`cuest.msg.nivel.${String(r.nivel)}` as 'cuest.msg.nivel.nada') : String(r.nivel)
+  return t('cuest.msg.plan', {
+    tema: String(r.tema),
+    objetivo: String(r.objetivo),
+    nivel,
+    prof,
+    total: horasTotales(r),
+    horas: String(r.horas),
+    franja: String(r.franja ?? t('cuest.franja.cualquiera.valor')),
+    plazo,
+  })
 }
 
 // Antes de generar el material de una lección.
-export const PREGUNTAS_MATERIAL: Pregunta[] = [
+export const preguntasMaterial = (): Pregunta[] => [
   {
-    id: 'profundidad', titulo: '¿Con qué profundidad?', tipo: 'una',
+    id: 'profundidad', titulo: t('cuest.profundidad.titulo'), tipo: 'una',
     opciones: [
-      { valor: 'intro', etiqueta: 'Introducción', desc: 'Lo esencial, rápido' },
-      { valor: 'estandar', etiqueta: 'Estándar', desc: 'Intuición, lo formal y un ejemplo' },
-      { valor: 'fondo', etiqueta: 'A fondo', desc: 'Casos límite y errores típicos' },
+      { valor: 'intro', etiqueta: t('cuest.mat.intro'), desc: t('cuest.mat.intro.desc') },
+      { valor: 'estandar', etiqueta: t('cuest.profundidad.estandar.corto'), desc: t('cuest.mat.estandar.desc') },
+      { valor: 'fondo', etiqueta: t('cuest.profundidad.fondo'), desc: t('cuest.mat.fondo.desc') },
     ],
   },
   {
-    id: 'preguntas', titulo: '¿Qué tipo de preguntas?', tipo: 'una',
+    id: 'preguntas', titulo: t('cuest.mat.preguntas.titulo'), tipo: 'una',
     opciones: [
-      { valor: 'conceptuales', etiqueta: 'Conceptuales', desc: 'Explicar el porqué' },
-      { valor: 'practicas', etiqueta: 'Prácticas', desc: 'Cálculo, casos y encontrar el fallo' },
-      { valor: 'mezcla', etiqueta: 'Mezcla', desc: 'Un poco de todo' },
+      { valor: 'conceptuales', etiqueta: t('cuest.mat.conceptuales'), desc: t('cuest.mat.conceptuales.desc') },
+      { valor: 'practicas', etiqueta: t('cuest.mat.practicas'), desc: t('cuest.mat.practicas.desc') },
+      { valor: 'mezcla', etiqueta: t('cuest.mat.mezcla'), desc: t('cuest.mat.mezcla.desc') },
     ],
   },
   {
-    id: 'cantidad', titulo: '¿Cuántas fichas?', tipo: 'una',
+    id: 'cantidad', titulo: t('cuest.mat.cantidad.titulo'), tipo: 'una',
     opciones: [
-      { valor: 'pocas', etiqueta: 'Pocas', desc: '4 a 6' },
-      { valor: 'normal', etiqueta: 'Normal', desc: '6 a 10' },
-      { valor: 'muchas', etiqueta: 'Muchas', desc: '10 a 12' },
+      { valor: 'pocas', etiqueta: t('cuest.mat.pocas'), desc: t('cuest.mat.pocas.desc') },
+      { valor: 'normal', etiqueta: t('cuest.mat.normal'), desc: t('cuest.mat.normal.desc') },
+      { valor: 'muchas', etiqueta: t('cuest.mat.muchas'), desc: t('cuest.mat.muchas.desc') },
     ],
   },
   {
-    id: 'enfoque', titulo: '¿Algún enfoque? (opcional)', tipo: 'texto', opcional: true,
-    placeholder: 'Por ejemplo: con ejemplos en TypeScript, pensando en entrevistas, sin matemáticas...',
+    id: 'enfoque', titulo: t('cuest.mat.enfoque.titulo'), tipo: 'texto', opcional: true,
+    placeholder: t('cuest.mat.enfoque.placeholder'),
   },
 ]

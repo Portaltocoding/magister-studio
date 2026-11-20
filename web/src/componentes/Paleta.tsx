@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarPlanes, verPlan, type Conversacion } from '../api.ts'
-import { MODOS } from '../modos.ts'
+import { MODOS, ayudaModo, nombreModo } from '../modos.ts'
 import { usarPomodoro } from './pomodoro.ts'
 import { filtrarPaleta } from './buscarPaleta.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 // Ctrl+K: escribe y salta. Pantallas, lecciones, conversaciones y acciones, sin tocar el ratón.
 
@@ -24,6 +25,7 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
   // Dónde estaba el foco al abrir: al cerrar vuelve ahí.
   const antes = useRef<HTMLElement | null>(null)
   const pomo = usarPomodoro()
+  const { t, idioma } = usarIdioma()
 
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
@@ -72,20 +74,20 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
 
   const entradas = useMemo<Entrada[]>(
     () => [
-      { grupo: 'Acciones', texto: 'Empezar la lección de hoy en modo foco', hacer: ir('#/foco/hoy') },
-      { grupo: 'Acciones', texto: 'Repasar lo de hoy', hacer: ir('#/repaso') },
-      { grupo: 'Acciones', texto: 'Nueva conversación', detalle: 'Estudio libre', hacer: ir('#/libre') },
-      { grupo: 'Acciones', texto: 'Nuevo plan', hacer: ir('#/nuevo-plan') },
-      { grupo: 'Acciones', texto: pomo.p.fase ? 'Parar el pomodoro' : 'Empezar un pomodoro de 25 + 5', hacer: () => (pomo.p.fase ? pomo.parar() : pomo.empezar(25, 5)) },
-      { grupo: 'Acciones', texto: 'Abrir o plegar la barra lateral', detalle: 'Ctrl+B', hacer: alPlegar },
-      ...MODOS.filter((m) => m.encendido).map((m) => ({ grupo: 'Ir a', texto: m.nombre, detalle: m.ayuda, hacer: ir(`#/${m.id}`) })),
+      { grupo: t('paleta.grupo.acciones'), texto: t('paleta.foco'), hacer: ir('#/foco/hoy') },
+      { grupo: t('paleta.grupo.acciones'), texto: t('paleta.repasar'), hacer: ir('#/repaso') },
+      { grupo: t('paleta.grupo.acciones'), texto: t('paleta.nuevaConv'), detalle: t('paleta.estudioLibre'), hacer: ir('#/libre') },
+      { grupo: t('paleta.grupo.acciones'), texto: t('paleta.nuevoPlan'), hacer: ir('#/nuevo-plan') },
+      { grupo: t('paleta.grupo.acciones'), texto: pomo.p.fase ? t('paleta.pararPomo') : t('paleta.empezarPomo'), hacer: () => (pomo.p.fase ? pomo.parar() : pomo.empezar(25, 5)) },
+      { grupo: t('paleta.grupo.acciones'), texto: t('paleta.plegar'), detalle: 'Ctrl+B', hacer: alPlegar },
+      ...MODOS.filter((m) => m.encendido).map((m) => ({ grupo: t('paleta.grupo.irA'), texto: nombreModo(m.id), detalle: ayudaModo(m.id), hacer: ir(`#/${m.id}`) })),
       ...lecciones.flatMap((l) => [
-        { grupo: 'Lecciones', texto: `${l.clave} · ${l.titulo}`, detalle: l.tema, hacer: ir(`#/fichas/${l.tema_id}/${l.clave}`) },
+        { grupo: t('paleta.grupo.lecciones'), texto: `${l.clave} · ${l.titulo}`, detalle: l.tema, hacer: ir(`#/fichas/${l.tema_id}/${l.clave}`) },
       ]),
-      ...conversaciones.map((c) => ({ grupo: 'Conversaciones', texto: c.titulo, hacer: ir(`#/conversacion/${c.id}`) })),
+      ...conversaciones.map((c) => ({ grupo: t('paleta.grupo.conversaciones'), texto: c.titulo, hacer: ir(`#/conversacion/${c.id}`) })),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lecciones, conversaciones, pomo.p.fase],
+    [lecciones, conversaciones, pomo.p.fase, idioma],
   )
 
   // El nombre que coincide gana a la descripción: «roadmap» lleva a Roadmap, no a Proyectos (buscarPaleta.ts).
@@ -105,7 +107,7 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
         className="paleta"
         role="dialog"
         aria-modal="true"
-        aria-label="Ir a o hacer"
+        aria-label={t('paleta.aria')}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           // Esc cierra desde cualquier sitio de la paleta; Tab no se escapa a lo de detrás.
@@ -135,8 +137,8 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
               setI((x) => Math.max(0, x - 1))
             } else if (e.key === 'Enter') elegir(filtradas[i])
           }}
-          placeholder="Ir a una pantalla, una lección, una conversación… o hacer algo"
-          aria-label="Buscar"
+          placeholder={t('paleta.placeholder')}
+          aria-label={t('sesion.buscar')}
         />
         <ul>
           {filtradas.map((e, k) => (
@@ -148,9 +150,9 @@ export default function Paleta({ conversaciones, alPlegar }: { conversaciones: C
               </button>
             </li>
           ))}
-          {!filtradas.length && <li className="paleta-nada">Nada con «{q}».</li>}
+          {!filtradas.length && <li className="paleta-nada">{t('paleta.nada', { q })}</li>}
         </ul>
-        <p className="paleta-pie">↑ ↓ para elegir · Intro para ir · Esc para cerrar</p>
+        <p className="paleta-pie">{t('paleta.pie')}</p>
       </div>
     </div>
   )

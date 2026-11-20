@@ -2,7 +2,7 @@ from magister.cerebro.estructura import ErrorEstructura, Intento, estructurar
 from magister.cerebro.prompts import cargar
 from magister.config import ajustes
 from magister.flujo import fuentes as fuentes_plan
-from magister.flujo.comun import fase, hoy_de, perfil_de, perfil_json, reglas_plan
+from magister.flujo.comun import con_idioma_del_alumno, fase, hoy_de, perfil_de, perfil_json, reglas_plan
 from magister.flujo.estado import Estado
 from magister.plan.esquemas import PlanNuevo
 from magister.plan.razonamiento import pulir_razonamiento
@@ -40,6 +40,7 @@ async def planificar(estado: Estado, buscador=None) -> dict:
         fuentes=await fuentes_plan.contexto_para_plan(buscador, perfil.tema or ""),
         hoy=hoy.isoformat(),
     )
+    sistema = await con_idioma_del_alumno(sistema)
     fallidos: list[Intento] = []
     try:
         plan = await estructurar(

@@ -4,7 +4,9 @@ import assert from 'node:assert/strict'
 import { hayQueEscribir, leerRuta, rutaDe } from '../src/rutas.ts'
 
 test('cada ruta abre su pantalla', () => {
-  assert.deepEqual(leerRuta(''), { modo: 'hoy', conversacion: null, nuevoPlan: false })
+  assert.deepEqual(leerRuta(''), { modo: 'libre', conversacion: null, nuevoPlan: false })
+  assert.deepEqual(leerRuta('#/'), { modo: 'libre', conversacion: null, nuevoPlan: false })
+  assert.deepEqual(leerRuta('#/hoy'), { modo: 'hoy', conversacion: null, nuevoPlan: false })
   assert.deepEqual(leerRuta('#/roadmap'), { modo: 'roadmap', conversacion: null, nuevoPlan: false })
   assert.deepEqual(leerRuta('#/conversacion/6'), { modo: 'libre', conversacion: 6, nuevoPlan: false })
   assert.deepEqual(leerRuta('#/fichas/3/L2'), { modo: 'fichas', conversacion: null, nuevoPlan: false })

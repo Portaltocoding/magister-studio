@@ -1,3 +1,4 @@
+import { t as tr } from '../i18n/i18n.ts'
 // «Lo dejaste a medias»: lo que quedó sin acabar fuera de Proyectos (una lección en foco, una respuesta del tutor que se
 // cortó o que espera la tuya, un repaso que dejaste a mitad, material que terminó mientras no estabas) y dónde retomarlo.
 // Solo con lo que ya hay: el avance del foco y la tanda de repaso en localStorage, las conversaciones y los materiales
@@ -77,17 +78,17 @@ export function cuando(en: number, ahora: number): string {
   const dias = Math.round(
     (new Date(d1.getFullYear(), d1.getMonth(), d1.getDate()).getTime() - new Date(d0.getFullYear(), d0.getMonth(), d0.getDate()).getTime()) / DIA,
   )
-  if (dias <= 0) return 'hoy'
-  if (dias === 1) return 'ayer'
-  return `hace ${dias} días`
+  if (dias <= 0) return tr('medias.hoy')
+  if (dias === 1) return tr('medias.ayer')
+  return tr('medias.haceDias', { n: dias })
 }
 
-const NOMBRE_MATERIAL: Record<string, { texto: (c: string) => string; boton: string; ruta: (m: MaterialListo) => string }> = {
-  apuntes: { texto: (c) => `Ya están los apuntes de ${c}.`, boton: 'Abrirlos', ruta: (m) => `#/fichas/${m.tema_id}/${m.clave}` },
-  guion: { texto: (c) => `Ya está el vídeo de ${c}.`, boton: 'Verlo', ruta: () => '#/video' },
+const NOMBRE_MATERIAL: Record<string, { texto: (c: string) => string; boton: () => string; ruta: (m: MaterialListo) => string }> = {
+  apuntes: { texto: (c) => tr('medias.apuntes', { c }), boton: () => tr('medias.apuntes.boton'), ruta: (m) => `#/fichas/${m.tema_id}/${m.clave}` },
+  guion: { texto: (c) => tr('medias.guion', { c }), boton: () => tr('medias.guion.boton'), ruta: () => '#/video' },
   diapositivas: {
-    texto: (c) => `Ya están las diapositivas de ${c}.`,
-    boton: 'Verlas',
+    texto: (c) => tr('medias.diapositivas', { c }),
+    boton: () => tr('medias.diapositivas.boton'),
     ruta: (m) => `#/fichas/${m.tema_id}/${m.clave}/diapositivas`,
   },
 }
@@ -104,7 +105,7 @@ export function aMedias(l: Lectura, ahora: number): AMedias[] {
     const t = NOMBRE_MATERIAL[m.tipo]
     if (!t || (m.tipo === 'apuntes' && m.id === l.deHoy)) continue // los de hoy ya los ofrece su tarjeta
     // El material nuevo es una noticia: va delante de lo que llevas días sin tocar.
-    todos.push({ id: `mat:${m.tipo}:${m.id}`, texto: t.texto(m.clave), boton: t.boton, destino: { tipo: 'ruta', ruta: t.ruta(m) }, en: ahora })
+    todos.push({ id: `mat:${m.tipo}:${m.id}`, texto: t.texto(m.clave), boton: t.boton(), destino: { tipo: 'ruta', ruta: t.ruta(m) }, en: ahora })
   }
 
   for (const a of l.avances) {
@@ -115,16 +116,16 @@ export function aMedias(l: Lectura, ahora: number): AMedias[] {
     const empezada = a.i > 0 || (a.u ?? 0) > 0 || Object.keys(a.comprobado ?? {}).length > 0 || (a.segundos ?? 0) >= 60
     if (!empezada) continue
     if (a.en != null && ahora - a.en > CADUCA_DIAS * DIA) continue
-    const idea = a.n ? `la idea ${a.i + 1} de ${a.n}` : `la idea ${a.i + 1}`
-    const texto = a.en != null ? `Lo dejaste ${cuando(a.en, ahora)} en ${idea} de ${lec.clave}.` : `Te quedaste en ${idea} de ${lec.clave}.`
-    todos.push({ id: `foco:${a.mid}:${a.i}`, texto, boton: `Seguir por la idea ${a.i + 1}`, destino: { tipo: 'foco', mid: a.mid }, en: a.en ?? 0 })
+    const idea = a.n ? tr('medias.ideaDe', { i: a.i + 1, n: a.n }) : tr('medias.idea', { i: a.i + 1 })
+    const texto = a.en != null ? tr('medias.dejasteIdea', { cuando: cuando(a.en, ahora), idea, clave: lec.clave }) : tr('medias.quedasteIdea', { idea, clave: lec.clave })
+    todos.push({ id: `foco:${a.mid}:${a.i}`, texto, boton: tr('medias.seguirIdea', { i: a.i + 1 }), destino: { tipo: 'foco', mid: a.mid }, en: a.en ?? 0 })
   }
 
   // Un repaso a mitad: al menos una respondida (abrir la primera y salir no cuenta) y aún te queda alguno.
   const p = l.practica
   if (p && p.hechas > 0 && (l.repasosPendientes ?? 0) > 0 && ahora - p.en <= CADUCA_DIAS * DIA) {
-    const llevabas = p.hechas < p.total ? `: llevabas ${p.hechas} de ${p.total}` : ''
-    todos.push({ id: `practica:${p.en}`, texto: `Dejaste el repaso a medias ${cuando(p.en, ahora)}${llevabas}.`, boton: 'Seguir repasando', destino: { tipo: 'ruta', ruta: '#/repaso' }, en: p.en })
+    const llevabas = p.hechas < p.total ? tr('medias.llevabas', { h: p.hechas, t: p.total }) : ''
+    todos.push({ id: `practica:${p.en}`, texto: tr('medias.repasoMedias', { cuando: cuando(p.en, ahora), llevabas }), boton: tr('medias.seguirRepasando'), destino: { tipo: 'ruta', ruta: '#/repaso' }, en: p.en })
   }
 
   for (const c of l.conversaciones) {
@@ -135,9 +136,9 @@ export function aMedias(l: Lectura, ahora: number): AMedias[] {
     const ruta = `#/conversacion/${c.id}`
     const cortada = m.rol === 'usuario' || m.estado === 'interrumpido' || m.estado === 'error'
     if (cortada)
-      todos.push({ id: `conv:${c.id}:${m.id}`, texto: `La respuesta del tutor se cortó en «${c.titulo}».`, boton: 'Retomarla', destino: { tipo: 'ruta', ruta }, en })
+      todos.push({ id: `conv:${c.id}:${m.id}`, texto: tr('medias.cortada', { titulo: c.titulo }), boton: tr('medias.retomarla'), destino: { tipo: 'ruta', ruta }, en })
     else if (m.rol === 'tutor' && acabaPreguntando(m.contenido))
-      todos.push({ id: `conv:${c.id}:${m.id}`, texto: `El tutor te hizo una pregunta en «${c.titulo}» y está sin contestar.`, boton: 'Contestar', destino: { tipo: 'ruta', ruta }, en })
+      todos.push({ id: `conv:${c.id}:${m.id}`, texto: tr('medias.sinContestar', { titulo: c.titulo }), boton: tr('medias.contestar'), destino: { tipo: 'ruta', ruta }, en })
   }
 
   return todos.filter((x) => !fuera.has(x.id)).sort((a, b) => b.en - a.en).slice(0, MAX_A_MEDIAS)

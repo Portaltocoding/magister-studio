@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import { avisoIncompleta } from '../componentes/bibliotecaLeccion.ts'
@@ -19,16 +20,11 @@ import {
   type Tema,
 } from '../api.ts'
 
-const ESTADOS: Record<string, string> = {
-  recibida: 'recibida, en cola',
-  pendiente: 'texto listo, indexando',
-  lista: 'lista',
-  cuarentena: 'en cuarentena',
-  retirada: 'retirada',
-}
+const textoEstado = (e: string): string => (['recibida', 'pendiente', 'lista', 'cuarentena', 'retirada'].includes(e) ? t(`fuen.estado.${e}` as 'fuen.estado.lista') : e)
 
 // Temas y fuentes: tus fuentes, sus documentos con estado, la subida y las propuestas del research.
 export default function PanelFuentes() {
+  usarIdioma() // los textos siguen al idioma
   const [fuentes, setFuentes] = useState<Fuente[]>([])
   const [temas, setTemas] = useState<Tema[]>([])
   const [activa, setActiva] = useState<number | null>(null)
@@ -65,7 +61,7 @@ export default function PanelFuentes() {
     if (activa != null)
       listarDocumentos(activa)
         .then(setDocs)
-        .catch((e) => setAviso(`No he podido cargar los documentos: ${mensajeDe(e)}`))
+        .catch((e) => setAviso(t('fuen.noDocs', { motivo: mensajeDe(e) })))
   }, [activa])
 
   useEffect(cargarDocs, [cargarDocs])
@@ -94,24 +90,23 @@ export default function PanelFuentes() {
   if (!cargada)
     return (
       <div className="panel">
-        <h1>Tus fuentes</h1>
-        <Cargando texto="Cargando tus fuentes…" error={fallo} reintentar={recargar} />
+        <h1>{t('fuen.titulo')}</h1>
+        <Cargando texto={t('fuen.cargando')} error={fallo} reintentar={recargar} />
       </div>
     )
 
   return (
     <div className="panel">
-      <h1>Tus fuentes</h1>
+      <h1>{t('fuen.titulo')}</h1>
       <p className="nota">
-        {estado ? `${estado.documentos} documentos · ${estado.fragmentos} fragmentos indexados` : ''} · El tutor responde
-        con tus fuentes y cita cada afirmación.
+        {estado ? t('fuen.indexados', { docs: estado.documentos, frag: estado.fragmentos }) : ''}{t('fuen.nota')}
       </p>
       {aviso && <TextoError texto={aviso} rol="status" className="nota" />}
 
       {propuestas.length > 0 && (
         <p className="nota">
           <button className="enlace" onClick={() => irARuta('#/buscar')}>
-            {propuestas.length} {propuestas.length === 1 ? 'fuente propuesta' : 'fuentes propuestas'} por revisar, en Buscar fuentes →
+            {t('fuen.porRevisar', { n: propuestas.length, fuentes: propuestas.length === 1 ? t('fuen.propuesta') : t('fuen.propuestas') })}
           </button>
         </p>
       )}
@@ -134,19 +129,19 @@ export default function PanelFuentes() {
             <button className="tarjeta" aria-pressed={f.id === activa} onClick={() => setActiva(f.id)}>
               <strong>{f.nombre}</strong>
               <span className="nota">
-                {f.tipo} · confianza {f.confianza}
+                {t('fuen.confianza', { tipo: f.tipo, n: f.confianza })}
               </span>
             </button>
             <button
               className="borrar"
-              aria-label={`Borrar la fuente ${f.nombre}`}
-              title="Borrar la fuente y sus documentos"
+              aria-label={t('fuen.borrarAria', { nombre: f.nombre })}
+              title={t('fuen.borrarTitulo')}
               onClick={async () => {
-                if (!confirm(`¿Borrar la fuente «${f.nombre}» con todos sus documentos? El tutor dejará de citarla. No se puede deshacer.`)) return
+                if (!confirm(t('fuen.confirmarBorrar', { nombre: f.nombre }))) return
                 try {
                   await pedir(`/api/fuentes/${f.id}`, { method: 'DELETE' })
                 } catch (e) {
-                  setAviso(`No he podido borrar la fuente: ${mensajeDe(e)}`)
+                  setAviso(t('fuen.noBorrar', { motivo: mensajeDe(e) }))
                   return
                 }
                 if (activa === f.id) setActiva(null)
@@ -162,48 +157,48 @@ export default function PanelFuentes() {
           onSubmit={(e) => {
             e.preventDefault()
             if (!nueva.nombre.trim()) return
-            conAviso(() => crearFuente(nueva.nombre.trim(), nueva.tipo, nueva.confianza), 'Fuente creada.')
+            conAviso(() => crearFuente(nueva.nombre.trim(), nueva.tipo, nueva.confianza), t('fuen.creada'))
           }}
         >
           <input
-            placeholder="Nueva fuente (apuntes, libro BD...)"
-            aria-label="Nombre de la fuente nueva"
+            placeholder={t('fuen.nuevaPlaceholder')}
+            aria-label={t('fuen.nuevaAria')}
             value={nueva.nombre}
             onChange={(e) => setNueva({ ...nueva, nombre: e.target.value })}
           />
           <span className="fila">
             <select
-              aria-label="Tipo"
+              aria-label={t('fuen.tipo')}
               value={nueva.tipo}
               onChange={(e) => setNueva({ ...nueva, tipo: e.target.value as Fuente['tipo'] })}
             >
-              <option value="pdf">PDF o ficheros</option>
-              <option value="libro">Libro</option>
-              <option value="vault">Notas (Obsidian)</option>
-              <option value="web">Web</option>
+              <option value="pdf">{t('fuen.tipo.pdf')}</option>
+              <option value="libro">{t('fuen.tipo.libro')}</option>
+              <option value="vault">{t('fuen.tipo.vault')}</option>
+              <option value="web">{t('fuen.tipo.web')}</option>
             </select>
             <select
-              aria-label="Confianza"
+              aria-label={t('fuen.confianzaAria')}
               value={nueva.confianza}
               onChange={(e) => setNueva({ ...nueva, confianza: Number(e.target.value) })}
             >
-              <option value={3}>Fiabilidad máxima (mío)</option>
-              <option value={2}>Fiabilidad media (libro)</option>
-              <option value={1}>Fiabilidad baja (web)</option>
+              <option value={3}>{t('fuen.conf3')}</option>
+              <option value={2}>{t('fuen.conf2')}</option>
+              <option value={1}>{t('fuen.conf1')}</option>
             </select>
-            <button className="boton-mini">Crear fuente</button>
+            <button className="boton-mini">{t('fuen.crear')}</button>
           </span>
         </form>
       </div>
 
       {activa != null && (
         <section>
-          <h2>Añadir a esta fuente</h2>
+          <h2>{t('fuen.anadir')}</h2>
           <div className="fila">
             <label>
-              Tema{' '}
+              {t('fuen.tema')}{' '}
               <select value={tema ?? ''} onChange={(e) => setTema(e.target.value ? Number(e.target.value) : null)}>
-                <option value="">sin tema (vale para todos)</option>
+                <option value="">{t('fuen.sinTema')}</option>
                 {temas.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.nombre}
@@ -212,7 +207,7 @@ export default function PanelFuentes() {
               </select>
             </label>
             <label className="boton-mini">
-              Subir fichero (PDF, Markdown, HTML, texto)
+              {t('fuen.subir')}
               <input
                 type="file"
                 hidden
@@ -222,29 +217,29 @@ export default function PanelFuentes() {
                   const ficheros = Array.from(e.target.files ?? [])
                   conAviso(
                     () => Promise.all(ficheros.map((f) => subirFichero(activa, f, tema))),
-                    `${ficheros.length} fichero(s) en cola. Se indexan solos.`,
+                    t('fuen.enCola', { n: ficheros.length }),
                   )
                   e.target.value = ''
                 }}
               />
             </label>
             <button className="boton-mini" onClick={() => irARuta('#/web')}>
-              Guardar páginas o PDF de la web →
+              {t('fuen.guardarWeb')}
             </button>
           </div>
           <p className="nota">
-            Para una carpeta entera o tu vault de Obsidian: <code>uv run magister ingerir RUTA --fuente NOMBRE</code>
+            {t('fuen.carpeta')} <code>uv run magister ingerir RUTA --fuente NOMBRE</code>
           </p>
-          <h2>Documentos</h2>
+          <h2>{t('fuen.documentos')}</h2>
           {docs.length === 0 ? (
-            <p className="vacio">Esta fuente aún no tiene documentos.</p>
+            <p className="vacio">{t('fuen.sinDocs')}</p>
           ) : (
             <table className="tabla">
               <thead>
                 <tr>
-                  <th>Documento</th>
-                  <th>Estado</th>
-                  <th>Fragmentos</th>
+                  <th>{t('fuen.col.doc')}</th>
+                  <th>{t('fuen.col.estado')}</th>
+                  <th>{t('fuen.col.frag')}</th>
                   <th />
                 </tr>
               </thead>
@@ -253,17 +248,17 @@ export default function PanelFuentes() {
                   <tr key={d.id}>
                     <td title={d.uri}>{d.titulo}</td>
                     <td className={`estado-${d.version?.estado}`}>
-                      {d.version ? ESTADOS[d.version.estado] : '·'}
+                      {d.version ? textoEstado(d.version.estado) : '·'}
                       {d.que_paso ? ` · ${d.que_paso}` : d.version?.motivo ? ` · ${d.version.motivo}` : ''}
-                      {d.version?.duplicado_de ? ` · duplicado de ${d.version.duplicado_de}` : ''}
+                      {d.version?.duplicado_de ? t('fuen.duplicadoDe', { id: d.version.duplicado_de }) : ''}
                       {d.version?.origen === 'research'
-                        ? ` · del research${d.version.leccion_clave ? ` para ${d.version.leccion_clave}` : ''}${d.version.automatica ? ', entró solo' : ''}`
+                        ? t('fuen.delResearch', { leccion: d.version.leccion_clave ? t('fuen.paraLeccion', { clave: d.version.leccion_clave }) : '', auto: d.version.automatica ? t('fuen.entroSolo') : '' })
                         : ''}
                       {(d.incompleta ?? d.version?.incompleta) && (
                         <span className="aviso-incompleta" role="note">
                           {avisoIncompleta((d.incompleta ?? d.version?.incompleta)!)}{' '}
                           <label className="boton-mini">
-                            Subir el PDF
+                            {t('fuen.subirPdf')}
                             <input
                               type="file"
                               hidden
@@ -271,7 +266,7 @@ export default function PanelFuentes() {
                               onChange={(e) => {
                                 const f = e.target.files?.[0]
                                 if (f && activa != null)
-                                  conAviso(() => subirFichero(activa, f, d.tema_id), `«${f.name}» en cola. Se indexa solo.`)
+                                  conAviso(() => subirFichero(activa, f, d.tema_id), t('fuen.pdfEnCola', { nombre: f.name }))
                                 e.target.value = ''
                               }}
                             />
@@ -285,10 +280,10 @@ export default function PanelFuentes() {
                           <button
                             className="boton-mini"
                             onClick={() =>
-                              conAviso(() => reintentarVersion(d.version!.id), `«${d.titulo}» vuelve a indexarse.`)
+                              conAviso(() => reintentarVersion(d.version!.id), t('fuen.reindexa', { titulo: d.titulo }))
                             }
                           >
-                            Reintentar
+                            {t('fuen.reintentar')}
                           </button>
                         </>
                       )}
@@ -297,9 +292,9 @@ export default function PanelFuentes() {
                     <td>
                       <button
                         className="borrar"
-                        aria-label={`Borrar ${d.titulo}`}
+                        aria-label={t('fuen.borrarDoc', { titulo: d.titulo })}
                         onClick={async () => {
-                          if (activa == null || !confirm(`¿Borrar «${d.titulo}»? El tutor dejará de citarlo.`)) return
+                          if (activa == null || !confirm(t('fuen.confirmarDoc', { titulo: d.titulo }))) return
                           await pedir(`/api/fuentes/${activa}/documentos/${d.id}`, { method: 'DELETE' })
                           cargarDocs()
                           recargar()

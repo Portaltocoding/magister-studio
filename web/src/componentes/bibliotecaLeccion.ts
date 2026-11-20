@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts'
 // La pequeña biblioteca de cada lección del Roadmap: qué frase toca en cada estado. Lógica pura, sin React: se prueba
 // en web/pruebas/bibliotecaLeccion.test.ts. Los tipos van escritos aquí (y no importados de api.ts) para que el test
 // corra con Node sin el resto de la app.
@@ -104,7 +105,7 @@ export function textoApuntes(estado: EstadoApuntes, fuentes: number, unidad: 'fu
 
 // Un documento que entró a medias (un muro de pago, solo el resumen).
 export const avisoIncompleta = (motivo: string) =>
-  `Solo una parte: ${motivo.trim().replace(/[.\s]+$/, '')}. Si lo tienes completo, súbelo en PDF.`
+  t('fuen.soloParte', { motivo: motivo.trim().replace(/[.\s]+$/, '') })
 
 // Mientras alguna lección está buscando, el Roadmap se refresca; en cuanto ninguna busca, para.
 export const algunaBuscando = (lecciones: readonly { biblioteca?: Biblioteca }[]) =>
@@ -135,7 +136,7 @@ export function clavesParaBuscar(
 // son las tareas que de verdad se lanzaron y `aviso`, lo que el servidor dice de las que se saltó.
 export function avisoAlAceptar(lecciones: number, aviso?: string | null): string {
   const extra = aviso ? ` ${aviso}` : ''
-  if (lecciones < 1) return aviso || 'No busco fuentes: las lecciones sin material se explican bien sin ellas.'
+  if (lecciones < 1) return aviso || t('acepta.sinBuscar')
   const minutos = Math.max(2, Math.ceil(lecciones / 2) * 2)
-  return `Busco fuentes para ${lecciones} ${lecciones === 1 ? 'lección' : 'lecciones'} (unos ${minutos} minutos). Entran solas; lo ves en Roadmap, lección a lección.${extra}`
+  return `${t('acepta.busco', { n: lecciones, lecciones: lecciones === 1 ? t('acepta.leccion') : t('acepta.lecciones'), min: minutos })}${extra}`
 }

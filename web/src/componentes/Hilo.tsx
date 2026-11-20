@@ -19,6 +19,8 @@ import Acciones, { type AccionArnes } from './Acciones.tsx'
 import { ACEPTA, type Adjunto } from './usarAdjuntos.ts'
 import { BotonGuardar, GuardarMarcado, usarGuardadas } from './GuardarNota.tsx'
 import { demasiadoLargo, largoMensaje, LIMITE_MENSAJE } from './turnos.ts'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 export interface Burbuja {
   clave: string
@@ -59,12 +61,7 @@ interface Props {
 // Lo que «Parar» tarda en poder pulsarse tras enviar (el segundo clic de un doble clic llega antes).
 const PARAR_TRAS_ENVIAR_MS = 500
 
-const ESTADO_ADJUNTO: Record<Adjunto['estado'], string> = {
-  subiendo: 'subiendo…',
-  indexando: 'leyéndolo…',
-  listo: 'listo: el tutor ya lo usa',
-  error: 'no se pudo leer',
-}
+const estadoAdjunto = (e: Adjunto['estado']): string => t(`hilo.adj.${e}`)
 
 // El texto del tutor. Los componentes de Markdown se fijan por burbuja (useMemo): si se crearan en cada
 // fotograma mientras el texto aparece, los diagramas y los tests se volverían a montar sin parar.
@@ -140,7 +137,7 @@ function CuerpoTutor({
           <button
             type="button"
             className={info?.dudosa ? 'marca-cita cita-dudosa' : 'marca-cita'}
-            title={info?.dudosa ? 'Cita dudosa: compruébala' : 'Ver la fuente'}
+            title={info?.dudosa ? t('hilo.citaDudosa') : t('hilo.verFuente')}
             onClick={() => alCita({ id, info })}
           >
             {id}
@@ -179,6 +176,7 @@ export default function Hilo({
   espera,
   guardable = false,
 }: Props) {
+  const { idioma } = usarIdioma() // el hilo vuelve a pintarse al cambiar el idioma
   const guardadas = usarGuardadas(guardable)
   const zonaMensajes = useRef<HTMLDivElement>(null)
   const [encima, setEncima] = useState(false)
@@ -315,7 +313,7 @@ export default function Hilo({
           >
             {b.notaGuardada && (
               <p className="aviso-nota">
-                Guardado en <a href="#/notas">Mis notas</a>
+                {t('hilo.guardadoEn')} <a href="#/notas">{t('hilo.misNotas')}</a>
               </p>
             )}
             {b.rol === 'tutor' && b.estado === 'llegando' && !b.contenido ? (
@@ -328,11 +326,11 @@ export default function Hilo({
               <p className="propio">{b.contenido}</p>
             )}
             {b.rol === 'usuario' && b.noCuenta && (
-              <small className="nota" title="Lo marcaste como «esto no cuenta para el tutor»: no entra en tu perfil">
-                No cuenta
+              <small className="nota" title={t('hilo.noCuentaTitulo')}>
+                {t('hilo.noCuenta')}
               </small>
             )}
-            {b.estado === 'interrumpido' && <small className="nota">Interrumpido</small>}
+            {b.estado === 'interrumpido' && <small className="nota">{t('hilo.interrumpido')}</small>}
             {b.acciones && b.acciones.length > 0 && b.estado === 'completo' && <Acciones acciones={b.acciones} />}
             {guardable && b.rol === 'tutor' && b.estado === 'completo' && mid != null && b.contenido.trim() && (
               <BotonGuardar mensajeId={mid} texto={b.contenido} guardada={guardadas.has(mid)} />
@@ -374,9 +372,9 @@ export default function Hilo({
                   {a.estado === 'listo' ? '✓' : a.estado === 'error' ? '!' : '…'}
                 </span>
                 <span className="adjunto-nombre">{a.nombre}</span>
-                <small>{ESTADO_ADJUNTO[a.estado]}</small>
+                <small>{estadoAdjunto(a.estado)}</small>
                 {alQuitarAdjunto && (
-                  <button type="button" aria-label={`Quitar ${a.nombre}`} onClick={() => alQuitarAdjunto(a.nombre)}>
+                  <button type="button" aria-label={t('hilo.quitar', { nombre: a.nombre })} onClick={() => alQuitarAdjunto(a.nombre)}>
                     ×
                   </button>
                 )}
@@ -385,7 +383,7 @@ export default function Hilo({
           </ul>
         )}
         {alAdjuntar && (
-          <label className="adjuntar" title="Adjuntar PDF, Markdown, HTML o texto (también puedes arrastrarlos aquí)" aria-label="Adjuntar un fichero">
+          <label className="adjuntar" title={t('hilo.adjuntarTitulo')} aria-label={t('hilo.adjuntar')}>
             <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden>
               <path d="M10 4.5v11M4.5 10h11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
@@ -407,30 +405,29 @@ export default function Hilo({
           value={borrador}
           onChange={(e) => setBorrador(e.target.value)}
           onKeyDown={alTeclear}
-          placeholder={placeholder ?? 'Escribe tu mensaje (Mayúsculas + Intro para saltar de línea)'}
-          aria-label="Tu mensaje"
+          placeholder={placeholder ?? t('hilo.placeholder')}
+          aria-label={t('hilo.tuMensaje')}
           disabled={deshabilitado}
         />
         {escribiendo ? (
-          <button type="button" className="boton" onClick={alParar} disabled={!pararListo} title="Parar la respuesta">
-            Parar
+          <button type="button" className="boton" onClick={alParar} disabled={!pararListo} title={t('hilo.pararTitulo')}>
+            {t('hilo.parar')}
           </button>
         ) : (
           <button type="submit" className="boton boton-principal" disabled={!borrador.trim() || deshabilitado || largo}>
-            Enviar
+            {t('hilo.enviar')}
           </button>
         )}
       </form>
       {avisoOcupado && (
         <p className="nota" role="status">
-          Espera a que termine la respuesta (o párala con «Parar»): tu mensaje sigue en la caja.
+          {t('hilo.ocupado')}
         </p>
       )}
       {largo && (
         <p className="nota" role="alert">
-          Tu mensaje tiene {largoMensaje(borrador.trim()).toLocaleString('es-ES')} caracteres y el máximo es{' '}
-          {LIMITE_MENSAJE.toLocaleString('es-ES')}: recórtalo para enviarlo
-          {alAdjuntar ? ' o adjúntalo como fichero' : ''}.
+          {t('hilo.largo', { largo: largoMensaje(borrador.trim()).toLocaleString(idioma === 'en' ? 'en-GB' : 'es-ES'), max: LIMITE_MENSAJE.toLocaleString(idioma === 'en' ? 'en-GB' : 'es-ES') })}
+          {alAdjuntar ? t('hilo.largoAdjuntar') : ''}.
         </p>
       )}
     </div>
@@ -456,9 +453,9 @@ function Esperando({ fase, espera, alParar }: { fase?: string | null; espera?: E
   const razonando = (espera?.pulsos ?? 0) > 0
   const frases = espera?.frases ?? []
   const frase = frases.length ? frases[Math.floor(segundos / 4) % frases.length] : null
-  const actual = frase ?? (razonando ? 'Razonando' : fase ?? 'Pensando')
+  const actual = frase ?? (razonando ? t('hilo.razonando') : fase ?? t('hilo.pensando'))
   const colgada = razonando && espera?.ultimo != null && ahora - espera.ultimo > SIN_SENAL_MS
-  if (!pasos.length && segundos < 3) return <Pensando texto={fase ? `${fase}…` : 'Pensando…'} />
+  if (!pasos.length && segundos < 3) return <Pensando texto={fase ? `${fase}…` : `${t('hilo.pensando')}…`} />
   return (
     <div className="espera" aria-live="polite">
       <ol className="espera-pasos">
@@ -475,16 +472,15 @@ function Esperando({ fase, espera, alParar }: { fase?: string | null; espera?: E
       </ol>
       {espera?.guion && (
         <div className="espera-guion">
-          <small>Mientras piensa, por dónde va a ir</small>
+          <small>{t('hilo.guion')}</small>
           <Markdown>{espera.guion}</Markdown>
         </div>
       )}
       {colgada && (
         <p className="espera-colgada" role="alert">
-          No llegan señales del modelo desde hace {Math.round((ahora - (espera?.ultimo ?? ahora)) / 1000)} s: puede que se haya
-          colgado.{' '}
+          {t('hilo.colgada', { s: Math.round((ahora - (espera?.ultimo ?? ahora)) / 1000) })}{' '}
           <button type="button" className="boton-mini" onClick={alParar}>
-            Parar
+            {t('hilo.parar')}
           </button>
         </p>
       )}

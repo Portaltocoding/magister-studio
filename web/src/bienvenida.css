@@ -41,3 +41,4 @@
 .bienvenida .boton-discreto:hover { color: var(--texto); }
 ul.bienvenida-pasos { list-style: none; padding-left: 0; }
 ul.bienvenida-pasos li { margin: 4px 0; }
+.bienvenida-nota { font-size: 0.75rem; opacity: 0.7; margin: 8px 0 0; }

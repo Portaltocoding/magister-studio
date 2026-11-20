@@ -31,7 +31,7 @@ function puntuar(e: EntradaBuscable, consulta: string, palabras: string[]): numb
 export function filtrarPaleta<E extends EntradaBuscable>(entradas: E[], q: string, max = 14): E[] {
   const consulta = plano(q).replace(/\s+/g, ' ')
   const palabras = consulta.split(' ').filter(Boolean)
-  if (!palabras.length) return entradas.filter((e) => e.grupo !== 'Conversaciones').slice(0, max)
+  if (!palabras.length) return entradas.filter((e) => e.grupo !== 'Conversaciones' && e.grupo !== 'Conversations').slice(0, max)
   return entradas
     .map((e, i) => ({ e, i, p: puntuar(e, consulta, palabras) }))
     .filter((x): x is { e: E; i: number; p: number } => x.p != null)

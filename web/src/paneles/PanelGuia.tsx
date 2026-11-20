@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { hoyIso, pedir, rutaExamen } from '../api.ts'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
+import { numero } from '../componentes/formato.ts'
 import Mascota from '../Mascota.tsx'
 import type { IdModo } from '../modos.ts'
 import { irARuta } from '../componentes/Vacio.tsx'
@@ -50,22 +53,22 @@ function guardarDia(d: Dia) {
 
 const horasTexto = (h: number) => {
   if (h < 1) return `${Math.round(h * 60)} min`
-  return `${String(Math.round(h * 10) / 10).replace('.', ',')} h`
+  return `${numero(h, 1)} h`
 }
 
 // Une una lista en castellano: «a, b y c».
-const unir = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`)
+const unir = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')}${t('guia.y')}${xs[xs.length - 1]}`)
 
 function pasosDe(hoy: Hoy, minutos: number | null, dia: Dia, titulo: (clave: string, largo: string) => string): Paso[] {
   const pasos: Paso[] = []
-  for (const t of hoy.temas ?? [])
-    pasos.push({ id: `tema-${t.clave}`, tipo: 'tema', titulo: `Recordar entera ${titulo(t.clave, t.titulo)}`, detalle: 'repaso del tema, de memoria', hecho: false, clave: t.clave })
+  for (const tm of hoy.temas ?? [])
+    pasos.push({ id: `tema-${tm.clave}`, tipo: 'tema', titulo: t('guia.recordarEntera', { titulo: titulo(tm.clave, tm.titulo) }), detalle: t('guia.repasoTema'), hecho: false, clave: tm.clave })
   if (hoy.repasos > 0 || dia.repasosHechos)
     pasos.push({
       id: 'repasos',
       tipo: 'repasos',
-      titulo: hoy.repasos > 0 ? `Repasar ${hoy.repasos} ${hoy.repasos === 1 ? 'concepto' : 'conceptos'}` : 'Repasos',
-      detalle: hoy.repasos > 0 ? `unos ${minutos ?? hoy.repasos * 2} min` : 'hechos',
+      titulo: hoy.repasos > 0 ? t('guia.repasarN', { n: hoy.repasos, conceptos: hoy.repasos === 1 ? t('hoy.concepto') : t('hoy.conceptos') }) : t('guia.repasos'),
+      detalle: hoy.repasos > 0 ? t('hoy.unosMin', { min: minutos ?? hoy.repasos * 2 }) : t('guia.hechos'),
       hecho: hoy.repasos === 0,
     })
   // La lección atrasada (si la hay) va primero; luego las del día.
@@ -75,7 +78,7 @@ function pasosDe(hoy: Hoy, minutos: number | null, dia: Dia, titulo: (clave: str
       id: `leccion-${hoy.leccion_clave}`,
       tipo: 'leccion',
       titulo: titulo(hoy.leccion_clave, hoy.titulo ?? ''),
-      detalle: `${hoy.leccion_clave} · ${horasTexto(hoy.horas ?? 0)} · atrasada`,
+      detalle: `${hoy.leccion_clave} · ${horasTexto(hoy.horas ?? 0)} · ${t('guia.atrasada')}`,
       hecho: false,
       clave: hoy.leccion_clave,
       material_id: hoy.estado === 'sin_preparar' ? null : (hoy.material_id ?? null),
@@ -99,7 +102,7 @@ function pasosDe(hoy: Hoy, minutos: number | null, dia: Dia, titulo: (clave: str
       id: 'examen',
       tipo: 'examen',
       titulo: hoy.examen.titulo,
-      detalle: `${hoy.examen.preguntas} preguntas · ${hoy.examen.minutos} min`,
+      detalle: t('guia.examenInfo', { n: hoy.examen.preguntas, min: hoy.examen.minutos }),
       hecho: !!hoy.examen.hecho,
     })
   return pasos
@@ -110,36 +113,37 @@ function frase(pasos: Paso[], actual: Paso | undefined, hoy: Hoy, comentario: st
   const pendientes = pasos.filter((p) => !p.hecho)
   const hechos = pasos.filter((p) => p.hecho)
   if (hoy.estado === 'sin_plan' && !pasos.length)
-    return `${saludo()}. Empezamos de cero: dime qué quieres aprender y te monto el plan, con sus lecciones y su calendario. Mientras, puedes preguntarme lo que quieras en Estudio libre.`
+    return t('guia.sinPlan', { saludo: saludo() })
   if (!pasos.length)
     return hoy.titulo && hoy.estado === 'adelantar'
-      ? `${saludo()}. Hoy no te toca nada. Si te apetece, adelantamos ${hoy.leccion_clave}; si no, descansa, que también cuenta.`
-      : `${saludo()}. Hoy no te toca nada: descansa, que también cuenta.`
-  if (!actual) return `${comentario ? `${comentario} ` : ''}Todo hecho por hoy. Buen trabajo: mañana te lo pregunto justo antes de que se te olvide.`
+      ? t('guia.nadaAdelantar', { saludo: saludo(), clave: hoy.leccion_clave ?? '' })
+      : t('guia.nada', { saludo: saludo() })
+  if (!actual) return `${comentario ? `${comentario} ` : ''}${t('guia.todoHecho')}`
   const queda = (p: Paso) => {
     if (p.tipo === 'repasos') return `${p.titulo.toLowerCase()} (${p.detalle})`
     if (p.tipo === 'leccion') {
       const av = p.material_id ? leerAvance(p.material_id) : null
-      return `«${p.titulo}»${av ? `, que la dejaste en la idea ${av.i + 1}` : ''}`
+      return `«${p.titulo}»${av ? t('guia.dejadaIdea', { i: av.i + 1 }) : ''}`
     }
-    if (p.tipo === 'examen') return `el ${p.titulo}`
+    if (p.tipo === 'examen') return t('guia.elExamen', { titulo: p.titulo })
     return p.titulo.charAt(0).toLowerCase() + p.titulo.slice(1)
   }
   if (!hechos.length && !comentario) {
     // Corto: lo primero y lo que viene después; el resto está en la lista de abajo.
     const primeros = pendientes.slice(0, 2).map(queda)
     const mas = pendientes.length - primeros.length
-    const lista = mas > 0 ? `${primeros.join(' y luego ')}, y ${mas === 1 ? 'una cosa más' : `${mas} cosas más`}` : unir(primeros)
-    return `${saludo()}. Hoy empezamos con ${lista}. Vamos paso a paso y te acompaño en cada uno. ¿Empezamos?`
+    const lista = mas > 0 ? `${primeros.join(t('guia.yLuego'))}${t('guia.coma')}${mas === 1 ? t('guia.unaMas') : t('guia.nMas', { n: mas })}` : unir(primeros)
+    return t('guia.empezamos', { saludo: saludo(), lista })
   }
-  const siguiente = actual.tipo === 'repasos' ? 'los repasos' : actual.tipo === 'examen' ? `el ${actual.titulo}` : queda(actual)
+  const siguiente = actual.tipo === 'repasos' ? t('guia.losRepasos') : actual.tipo === 'examen' ? t('guia.elExamen', { titulo: actual.titulo }) : queda(actual)
   const resto = pendientes.length - 1
-  return `${comentario ? `${comentario} ` : ''}Ahora toca ${siguiente}.${resto > 0 ? ` Después, ${resto === 1 ? 'un paso más' : `${resto} pasos más`}.` : ' Es lo último de hoy.'}`
+  return `${comentario ? `${comentario} ` : ''}${t('guia.ahoraToca', { siguiente, resto: resto > 0 ? (resto === 1 ? t('guia.despuesUno') : t('guia.despuesN', { n: resto })) : t('guia.ultimo') })}`
 }
 
 type EnCurso = { tipo: 'repasos' } | { tipo: 'leccion'; leccion: Leccion; paso: Paso }
 
 export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
+  usarIdioma() // los textos siguen al idioma
   const [hoy, setHoy] = useState<Hoy | null>(null)
   const [minutos, setMinutos] = useState<number | null>(null)
   const [dia, setDia] = useState<Dia>(leerDia)
@@ -167,7 +171,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
     guardarDia(d)
   }
 
-  if (!hoy) return <Cargando texto="Preparando…" error={fallo} reintentar={cargar} />
+  if (!hoy) return <Cargando texto={t('hoy.preparando')} error={fallo} reintentar={cargar} />
 
   if (enCurso?.tipo === 'repasos')
     return (
@@ -202,7 +206,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
         alSalir={() => {
           const av = leerAvance(enCurso.leccion.material_id)
           setEnCurso(null)
-          setComentario(av ? `Lo dejamos en la idea ${av.i + 1}; luego seguimos desde ahí.` : '¡Lección hecha!')
+          setComentario(av ? t('guia.dejamos', { i: av.i + 1 }) : t('guia.leccionHecha'))
           if (!av) window.setTimeout(() => celebrar(null, true), 450)
           cargar()
         }}
@@ -223,7 +227,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
       try {
         setEnCurso({ tipo: 'leccion', leccion: await cargarLeccion(p.material_id), paso: p })
       } catch (e) {
-        setComentario(`No he podido abrir la lección. ${mensajeDe(e)}`)
+        setComentario(t('guia.noAbrir', { motivo: mensajeDe(e) }))
       } finally {
         setAbriendo(false)
       }
@@ -231,18 +235,18 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
   }
   const saltar = (p: Paso) => {
     cambiarDia({ ...dia, saltados: [...dia.saltados, p.id] })
-    setComentario('Vale, eso lo dejamos para otro día.')
+    setComentario(t('guia.otroDia'))
   }
 
   const boton = (p: Paso) => {
     if (p.tipo === 'leccion' && !p.material_id) return 'Prepararla'
     if (p.tipo === 'leccion') {
       const av = leerAvance(p.material_id!)
-      return av ? `Seguir por la idea ${av.i + 1}` : 'Empezar en modo foco'
+      return av ? t('guia.seguirIdea', { i: av.i + 1 }) : t('guia.empezarFoco')
     }
-    if (p.tipo === 'repasos') return 'Empezar los repasos'
-    if (p.tipo === 'examen') return 'Hacer el examen'
-    return 'Ir al repaso del tema'
+    if (p.tipo === 'repasos') return t('guia.empezarRepasos')
+    if (p.tipo === 'examen') return t('guia.hacerExamen')
+    return t('guia.irRepasoTema')
   }
 
   const entrar = (p: Paso) => (p.tipo === 'leccion' && !p.material_id ? irARuta(`#/fichas/${hoy.tema_id}/${p.clave}`) : empezar(p))
@@ -260,10 +264,10 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
   // Lo que dice el tutor sobre el paso ampliado, si no es el que toca ahora.
   const sobre = (p: Paso): string => {
     const av = p.tipo === 'leccion' && p.material_id ? leerAvance(p.material_id) : null
-    if (p.hecho) return `«${p.titulo}» ya está hecho.${p.tipo === 'leccion' ? ' Si quieres repasarlo, otro clic y entramos.' : ''}`
-    if (dia.saltados.includes(p.id)) return `«${p.titulo}» lo dejamos para otro día. Si te apetece, lo retomamos.`
-    if (p.tipo === 'leccion' && !p.material_id) return `«${p.titulo}» aún no tiene apuntes: otro clic y la preparamos.`
-    return `${p.titulo} (${p.detalle})${av ? `: la dejaste en la idea ${av.i + 1}` : ''}. Otro clic y entramos.`
+    if (p.hecho) return `${t('guia.sobreHecho', { titulo: p.titulo })}${p.tipo === 'leccion' ? t('guia.sobreHechoLeccion') : ''}`
+    if (dia.saltados.includes(p.id)) return t('guia.sobreSaltado', { titulo: p.titulo })
+    if (p.tipo === 'leccion' && !p.material_id) return t('guia.sobreSinApuntes', { titulo: p.titulo })
+    return t('guia.sobreNormal', { titulo: p.titulo, detalle: p.detalle, idea: av ? t('guia.sobreIdea', { i: av.i + 1 }) : '' })
   }
   const dice = ampliado && actual && ampliado.id !== actual.id ? sobre(ampliado) : frase(pasos, actual, hoy, comentario)
 
@@ -274,30 +278,30 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
           <Mascota gesto={abriendo ? 'pensando' : 'normal'} lugar="tutor" />
         </div>
         <div className="guia-bocadillo" role="status">
-          <span className="vacio-etq">Tu tutor</span>
+          <span className="vacio-etq">{t('guia.tuTutor')}</span>
           {/* La clave hace que cada frase nueva entre con un fundido suave. */}
           <p key={dice}>{dice}</p>
           {!actual && hoy.estado === 'sin_plan' && (
             <div className="vacio-acciones">
               <button className="boton boton-principal" onClick={() => irARuta('#/nuevo-plan')}>
-                Crear mi plan
+                {t('guia.crearPlan')}
               </button>
               <button className="boton" onClick={() => irA('libre')}>
-                Estudio libre
+                {t('guia.estudioLibre')}
               </button>
             </div>
           )}
           {!actual && hoy.estado !== 'sin_plan' && (
             <div className="vacio-acciones">
               <button className="boton" onClick={() => irARuta('#/llamada')}>
-                Charlar por llamada
+                {t('guia.llamada')}
               </button>
               <button className="boton" onClick={() => irA('foco')}>
-                Estudiar otra lección
+                {t('guia.otraLeccion')}
               </button>
               {dia.saltados.length > 0 && (
                 <button className="boton boton-suave" onClick={() => cambiarDia({ ...dia, saltados: [] })}>
-                  Retomar lo que salté
+                  {t('guia.retomarSalte')}
                 </button>
               )}
             </div>
@@ -308,7 +312,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
       {pasos.length > 0 && (
         <ol
           className="guia-pasos"
-          aria-label="Lo que toca hoy"
+          aria-label={t('guia.aria')}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault()
@@ -336,7 +340,7 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
                     <small>{p.detalle}</small>
                   </span>
                   <small className="guia-estado">
-                    {estado === 'ahora' ? `paso ${n} de ${pasos.length}` : estado === 'saltado' ? 'hoy no' : estado === 'hecho' ? 'hecho' : ''}
+                    {estado === 'ahora' ? t('guia.pasoDe', { n, de: pasos.length }) : estado === 'saltado' ? t('guia.hoyNo') : estado === 'hecho' ? t('guia.hecho') : ''}
                   </small>
                   <span className="guia-flecha" aria-hidden>
                     {abierto ? '→' : '›'}
@@ -347,22 +351,22 @@ export default function PanelGuia({ irA }: { irA: (m: IdModo) => void }) {
                     <div className="vacio-acciones">
                       {(!p.hecho || p.tipo === 'leccion') && estado !== 'saltado' && (
                         <button className="boton boton-principal" disabled={abriendo} tabIndex={abierto ? 0 : -1} onClick={() => void entrar(p)}>
-                          {abriendo ? 'Abriendo…' : p.hecho ? 'Repasarla' : boton(p)}
+                          {abriendo ? t('guia.abriendo') : p.hecho ? t('guia.repasarla') : boton(p)}
                         </button>
                       )}
                       {p.tipo === 'leccion' && p.material_id && !p.hecho && estado !== 'saltado' && (
-                        <button className="boton" tabIndex={abierto ? 0 : -1} onClick={() => irARuta(`#/llamada/clase/${p.clave}`)} title="Te la explica en voz y le interrumpes con tus dudas">
-                          Mejor por llamada
+                        <button className="boton" tabIndex={abierto ? 0 : -1} onClick={() => irARuta(`#/llamada/clase/${p.clave}`)} title={t('hoy.llamadaTitulo')}>
+                          {t('guia.mejorLlamada')}
                         </button>
                       )}
                       {estado === 'saltado' ? (
                         <button className="boton" tabIndex={abierto ? 0 : -1} onClick={() => cambiarDia({ ...dia, saltados: dia.saltados.filter((x) => x !== p.id) })}>
-                          Retomar
+                          {t('guia.retomar')}
                         </button>
                       ) : (
                         !p.hecho && (
                           <button className="boton boton-suave" tabIndex={abierto ? 0 : -1} onClick={() => saltar(p)}>
-                            Hoy no
+                            {t('guia.hoyNoBoton')}
                           </button>
                         )
                       )}

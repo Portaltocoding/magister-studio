@@ -3,6 +3,7 @@ import { EVENTO_SIN_RESPUESTA, pedir } from './api.ts'
 import Afinar from './componentes/Afinar.tsx'
 import Tomate from './componentes/Tomate.tsx'
 import { EVENTO_CONECTADO } from './componentes/Cargando.tsx'
+import { usarIdioma } from './i18n/usarIdioma.ts'
 
 type Estado = 'comprobando' | 'conectado' | 'sin conexión'
 
@@ -14,6 +15,7 @@ interface Alerta {
 }
 
 export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
+  const { t } = usarIdioma()
   const [estado, setEstado] = useState<Estado>('comprobando')
   const [alertas, setAlertas] = useState<Alerta[]>([])
   // La alerta que no se pudo marcar como resuelta: el botón lo dice en vez de no hacer nada.
@@ -89,15 +91,16 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
     }
   }, [])
 
+  const textoEstado = t(estado === 'comprobando' ? 'sesion.estado.comprobando' : estado === 'conectado' ? 'sesion.estado.conectado' : 'sesion.estado.sinConexion')
   return (
     <header className="sesion">
       {alMenu && (
-        <button type="button" className="boton-menu boton-mini" onClick={alMenu} aria-label="Abrir el menú">
-          ☰ Menú
+        <button type="button" className="boton-menu boton-mini" onClick={alMenu} aria-label={t('sesion.menu')}>
+          {t('sesion.menuTexto')}
         </button>
       )}
-      <button type="button" className="boton-buscar" onClick={() => window.dispatchEvent(new Event('magister-paleta'))} title="Ir a o hacer (Ctrl+K)">
-        <span className="buscar-texto">Buscar</span> <kbd>Ctrl K</kbd>
+      <button type="button" className="boton-buscar" onClick={() => window.dispatchEvent(new Event('magister-paleta'))} title={t('sesion.buscarTitulo')}>
+        <span className="buscar-texto">{t('sesion.buscar')}</span> <kbd>Ctrl K</kbd>
       </button>
       {/* Los avisos, recogidos: un botón con cuántos hay que despliega la lista (antes ocupaban media barra). */}
       <div className="avisos" ref={cajaAvisos}>
@@ -106,33 +109,33 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
             type="button"
             className="avisos-boton"
             aria-expanded={verAvisos}
-            aria-label={`${alertas.length} ${alertas.length === 1 ? 'aviso' : 'avisos'}`}
-            title="Avisos de Magister"
+            aria-label={`${alertas.length} ${alertas.length === 1 ? t('sesion.aviso') : t('sesion.avisos')}`}
+            title={t('sesion.avisosTitulo')}
             onClick={() => setVerAvisos(!verAvisos)}
           >
             ⚠ <span>{alertas.length}</span>
           </button>
         )}
         {verAvisos && alertas.length > 0 && (
-          <div className="avisos-caja" role="dialog" aria-label="Avisos">
+          <div className="avisos-caja" role="dialog" aria-label={t('sesion.avisosCabeza')}>
             <div className="avisos-cabeza">
-              <strong>Avisos</strong>
+              <strong>{t('sesion.avisosCabeza')}</strong>
               <button type="button" className="boton-mini" onClick={() => alertas.forEach((a) => resolver(a.id))}>
-                Marcar todos como resueltos
+                {t('sesion.resolverTodos')}
               </button>
             </div>
             <ul>
               {alertas.map((a) => (
                 <li key={a.id}>
                   <p>{a.detalle}</p>
-                  <small title="La guía con qué hacer, en el repositorio">Qué hacer: {a.runbook}</small>
+                  <small title={t('sesion.runbookTitulo')}>{t('sesion.queHacer', { runbook: a.runbook })}</small>
                   <button
                     type="button"
                     className="boton-mini"
                     onClick={() => resolver(a.id)}
-                    title={sinResolver === a.id ? 'No se pudo marcar: pulsa para reintentar' : undefined}
+                    title={sinResolver === a.id ? t('sesion.noResueltaTitulo') : undefined}
                   >
-                    {sinResolver === a.id ? 'No se pudo, reintentar' : 'Resuelta'}
+                    {sinResolver === a.id ? t('sesion.noResuelta') : t('sesion.resuelta')}
                   </button>
                 </li>
               ))}
@@ -140,8 +143,8 @@ export default function BarraSesion({ alMenu }: { alMenu?: () => void }) {
           </div>
         )}
       </div>
-      <span className={estado === 'conectado' ? 'estado estado-si' : 'estado estado-no'} title={estado}>
-        <span className="estado-texto">{estado}</span>
+      <span className={estado === 'conectado' ? 'estado estado-si' : 'estado estado-no'} title={textoEstado}>
+        <span className="estado-texto">{textoEstado}</span>
       </span>
       <Tomate />
       <Afinar />

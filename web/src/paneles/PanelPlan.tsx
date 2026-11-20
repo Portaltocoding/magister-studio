@@ -9,7 +9,7 @@ import Cargando, { mensajeDe, TextoError } from '../componentes/Cargando.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import BarraCuota from '../componentes/BarraCuota.tsx'
 import { plural } from '../componentes/formato.ts'
-import { ETIQUETA_FUENTES } from '../PropuestaPlan.tsx'
+import { NIVELES_FUENTES, etiquetaFuentes } from '../PropuestaPlan.tsx'
 import {
   algunaBuscando,
   avisoIncompleta,
@@ -74,9 +74,9 @@ function ChipFuentes({ leccion, alCambiar }: { leccion: LeccionVista; alCambiar:
         }
       }}
     >
-      {(Object.keys(ETIQUETA_FUENTES) as NecesitaFuentes[]).map((k) => (
+      {NIVELES_FUENTES.map((k) => (
         <option key={k} value={k}>
-          {ETIQUETA_FUENTES[k]}
+          {etiquetaFuentes(k)}
         </option>
       ))}
     </select>

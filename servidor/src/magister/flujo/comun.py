@@ -560,6 +560,26 @@ IDIOMA_ESPANOL = ("Responde en español de España aunque te escriba en otro idi
                   "este mismo mensaje pida expresamente otro idioma.")
 
 
+# Los nodos del plan (diagnóstico, plan, negociación) no pasan por las preferencias del chat: sin esto el plan salía en
+# español aunque el alumno hubiera elegido inglés. Solo hace falta pedirlo en inglés: las plantillas ya están en español.
+IDIOMA_INGLES_PLAN = ("The student chose English. Write everything the student will read (your questions, explanations, the plan's "
+                      "title, lesson titles and descriptions, the reasoning) in English, even if these instructions or the "
+                      "sources are in Spanish. Keep JSON keys, enum values and lesson codes exactly as specified.")
+
+
+def con_idioma(sistema: str, p: dict) -> str:
+    """El prompt con la orden de idioma si el alumno ha elegido inglés. Puro: las preferencias entran como argumento."""
+    return f"{sistema}\n\n{IDIOMA_INGLES_PLAN}" if p.get("idioma") == "en" else sistema
+
+
+async def con_idioma_del_alumno(sistema: str) -> str:
+    """Lo mismo leyendo sus preferencias; si no se pueden leer, el prompt tal cual (el español es el de partida)."""
+    try:
+        return con_idioma(sistema, await preferencias_tutor())
+    except Exception:  # noqa: BLE001
+        return sistema
+
+
 def texto_preferencias(p: dict) -> str:
     lineas = {
         "longitud": {"breve": "Prefiere respuestas breves: como mucho unas 150 palabras, salvo que pida más.",

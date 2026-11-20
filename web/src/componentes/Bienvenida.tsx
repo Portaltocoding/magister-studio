@@ -2,8 +2,8 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { enviarCodigoCuenta, guardarBienvenida, iniciarCuenta, probarCuenta } from '../api.ts'
 import Mascota, { type GestoMascota } from '../Mascota.tsx'
 import { cambiarPreferencias } from './preferencias.ts'
-import { Locutor, vocesMagisterListas, vozMagister } from './voz.ts'
-import { IDIOMAS, fijarIdioma, t, type Idioma } from '../i18n/i18n.ts'
+import { Locutor } from './voz.ts'
+import { IDIOMAS, fijarIdioma, t, traducir, type Idioma } from '../i18n/i18n.ts'
 import { usarIdioma } from '../i18n/usarIdioma.ts'
 import {
   codigoLimpio,
@@ -65,7 +65,9 @@ export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectad
       // Si no se puede guardar, se cierra igual: lo peor es que vuelva a salir.
       if (modo === 'completa') await guardarBienvenida(estado).catch(() => undefined)
       alCerrar()
+      // Al terminar la bienvenida de primera vez se aterriza en Estudio libre (salvo que se pida otra pantalla).
       if (ir) window.location.hash = ir
+      else if (modo === 'completa') window.location.hash = '#/libre'
     },
     [modo, alCerrar],
   )
@@ -84,7 +86,7 @@ export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectad
           {textoMascota(paso, nombre, modo, idioma)}
         </p>
         <p className="bienvenida-paso">
-          {t('bienvenida.paso', { n, de })}
+          {paso === 'idioma' ? traducir('es', 'bienvenida.paso', { n, de }) : t('bienvenida.paso', { n, de })}
         </p>
         <h2 id="bienvenida-titulo">{tituloDe(paso, idioma)}</h2>
 
@@ -135,23 +137,20 @@ export default function Bienvenida({ modo, nombre: nombreInicial, cuentaConectad
         )}
 
         <button type="button" className="bienvenida-saltar" onClick={omitir}>
-          {modo === 'reconectar' ? t('bienvenida.ahoraNo') : t('bienvenida.saltar')}
+          {paso === 'idioma' ? traducir('es', 'bienvenida.saltar') : modo === 'reconectar' ? t('bienvenida.ahoraNo') : t('bienvenida.saltar')}
         </button>
       </div>
     </div>
   )
 }
 
-// El primer paso: el idioma de la pantalla, de lo que dice la mascota, de la voz y del tutor. Se guarda al pulsar.
+// El primer paso: el idioma de la pantalla, de lo que dice la mascota, de la voz y del tutor. Al pulsar se guarda y se pasa
+// al siguiente paso.
 function PasoIdioma({ alSeguir }: { alSeguir: () => void }) {
-  const [elegido, setElegido] = useState<Idioma | null>(null)
-  const [voz, setVoz] = useState<string | null>(null)
   const elegir = (i: Idioma) => {
-    setElegido(i)
     fijarIdioma(i)
     void cambiarPreferencias({ idioma: i }).catch(() => undefined)
-    // La voz inglesa: una de Magister (Piper) si el servidor tiene alguna; si no, la del navegador.
-    void vocesMagisterListas.then(() => setVoz(vozMagister() ? t('bienvenida.idioma.vozMagister') : t('bienvenida.idioma.vozNavegador')))
+    alSeguir()
   }
   return (
     <>
@@ -161,26 +160,16 @@ function PasoIdioma({ alSeguir }: { alSeguir: () => void }) {
             key={i.id}
             type="button"
             role="radio"
-            aria-checked={elegido === i.id}
+            aria-checked={false}
             autoFocus={i.id === 'es'}
-            className={`boton bienvenida-idioma ${elegido === i.id ? 'boton-principal' : ''}`}
+            className="boton bienvenida-idioma"
             onClick={() => elegir(i.id)}
           >
             {i.nombre}
           </button>
         ))}
       </div>
-      {elegido && (
-        <>
-          <p>{t('bienvenida.idioma.nota')}</p>
-          {elegido === 'en' && voz && <p role="status">{t('bienvenida.idioma.vozEn', { voz })}</p>}
-          <div className="bienvenida-botones">
-            <button type="button" className="boton boton-principal" onClick={alSeguir}>
-              {t('bienvenida.seguir')}
-            </button>
-          </div>
-        </>
-      )}
+      <p className="bienvenida-nota">{t('bienvenida.idioma.nota')}</p>
     </>
   )
 }

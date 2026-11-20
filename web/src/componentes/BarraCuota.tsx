@@ -3,6 +3,8 @@
 // comería antes de aceptarla. Los datos los da el propio Claude tras cada respuesta; la estimación sale de tu uso real.
 import { useEffect, useState } from 'react'
 import { pedir } from '../api.ts'
+import { idiomaActual, t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 interface Ventana {
   uso: number
@@ -31,24 +33,25 @@ export type Accion =
   // varias (aceptar un plan y buscar fuentes).
   | { accion: 'research'; lecciones?: number }
 
+const loc = () => (idiomaActual() === 'en' ? 'en-GB' : 'es-ES')
 const pct = (x: number) => Math.round(x * 100)
 const POCO = 0.05 // menos del 5 % de la sesión: una línea en vez de las barras
 
 function cuando(epoch: number | null, semana: boolean): string {
   if (epoch == null) return ''
   const d = new Date(epoch * 1000)
-  const hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  const hora = d.toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' })
   const hoy = new Date().toDateString() === d.toDateString()
-  if (!semana && hoy) return `a las ${hora}`
-  return `el ${d.toLocaleDateString('es-ES', { weekday: 'long' })} a las ${hora}`
+  if (!semana && hoy) return t('cuota.aLas', { hora })
+  return t('cuota.elDiaALas', { dia: d.toLocaleDateString(loc(), { weekday: 'long' }), hora })
 }
 
 function Fila({ nombre, v, extra, semana, compacta }: { nombre: string; v: Ventana; extra: number | null; semana: boolean; compacta: boolean }) {
   const usado = Math.min(1, v.uso)
   const mas = extra ? Math.min(1 - usado, extra) : 0
   const pasa = extra != null && v.uso + extra > 1
-  const renovacion = v.reinicia == null ? 'recién renovada' : `se renueva ${cuando(v.reinicia, semana)}`
-  const texto = `${nombre}: ${pct(v.uso)} % usado · ${renovacion}`
+  const renovacion = v.reinicia == null ? t('cuota.recienRenovada') : t('cuota.seRenueva', { cuando: cuando(v.reinicia, semana) })
+  const texto = t('cuota.usado', { nombre, pct: pct(v.uso), renovacion })
   return (
     <div className={`cuota-fila ${pasa ? 'cuota-pasa' : ''}`} title={texto}>
       {!compacta && <span className="cuota-nombre">{nombre}</span>}
@@ -67,6 +70,7 @@ function Fila({ nombre, v, extra, semana, compacta }: { nombre: string; v: Venta
 }
 
 export default function BarraCuota({ accion, compacta = false }: { accion?: Accion; compacta?: boolean }) {
+  usarIdioma()
   const [estado, setEstado] = useState<Estado | null>(null)
   const [estimacion, setEstimacion] = useState<Estimacion | null>(null)
   const clave = accion ? JSON.stringify(accion) : ''
@@ -105,32 +109,32 @@ export default function BarraCuota({ accion, compacta = false }: { accion?: Acci
 
   if (!estado?.sesion && !estado?.semana) {
     if (compacta) return null
-    return <p className="nota cuota-vacia">Tu uso aparecerá aquí después de la primera respuesta del tutor.</p>
+    return <p className="nota cuota-vacia">{t('cuota.vacia')}</p>
   }
   const pasa = estimacion && estado.sesion && estimacion.sesion.extra != null && estado.sesion.uso + estimacion.sesion.extra > 1
   // Si gasta poco y te sobra sesión, basta una línea: las barras, para lo que de verdad pesa.
   const extra = estimacion?.sesion.extra
   // En compacto, un gasto pequeño no se ve en la barra (es una raya de menos de un píxel): se dice con palabras.
   if (compacta && estado.sesion && extra != null && extra < POCO && estado.sesion.uso < 0.8)
-    return <small className="nota cuota-poco">Gasta {extra < 0.005 ? 'menos del 1' : `un ${pct(extra)}`} % de tu sesión.</small>
+    return <small className="nota cuota-poco">{t('cuota.gastaCompacto', { x: extra < 0.005 ? t('cuota.menos1') : t('cuota.un', { n: pct(extra) }) })}</small>
   if (!compacta && estado.sesion && extra != null && extra < POCO && estado.sesion.uso < 0.8)
     return (
-      <p className="nota cuota-poco" title={`Semana: ${estado.semana ? pct(estado.semana.uso) : '—'} % usado`}>
-        Gasta poco: {extra < 0.005 ? 'menos del 1' : `un ${pct(extra)}`} % de tu sesión (llevas un {pct(estado.sesion.uso)} %).
+      <p className="nota cuota-poco" title={t('cuota.semanaTitulo', { n: estado.semana ? pct(estado.semana.uso) : '—' })}>
+        {t('cuota.gastaPoco', { x: extra < 0.005 ? t('cuota.menos1') : t('cuota.un', { n: pct(extra) }), n: pct(estado.sesion.uso) })}
       </p>
     )
   return (
     <div className={`cuota ${compacta ? 'cuota-compacta' : ''}`}>
-      {estado.sesion && <Fila nombre="Sesión" v={estado.sesion} extra={estimacion?.sesion.extra ?? null} semana={false} compacta={compacta} />}
-      {estado.semana && <Fila nombre="Semana" v={estado.semana} extra={estimacion?.semana.extra ?? null} semana compacta={compacta} />}
+      {estado.sesion && <Fila nombre={t('cuota.sesion')} v={estado.sesion} extra={estimacion?.sesion.extra ?? null} semana={false} compacta={compacta} />}
+      {estado.semana && <Fila nombre={t('cuota.semana')} v={estado.semana} extra={estimacion?.semana.extra ?? null} semana compacta={compacta} />}
       {!compacta && estimacion && (
         <p className="nota cuota-nota">
           {pasa
-            ? 'No cabe en lo que queda de tu sesión: se cortaría a medias. Mejor cuando se renueve.'
+            ? t('cuota.noCabe')
             : estimacion.sesion.extra == null && estimacion.semana.extra == null
-              ? 'Aún no sé cuánto gasta esto: lo sabré cuando lo hayas hecho una vez.'
-              : 'Lo rayado es lo que gastaría esta generación si la aceptas.'}
-          {estimacion.sesion.calibrada ? '' : ' Estimación aproximada: se afina con tu uso.'}
+              ? t('cuota.aunNo')
+              : t('cuota.rayado')}
+          {estimacion.sesion.calibrada ? '' : t('cuota.aprox')}
         </p>
       )}
     </div>

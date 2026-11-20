@@ -12,7 +12,7 @@ import {
 import { planActivo, recordarPlan } from '../componentes/planActivo.ts'
 import { colorDeTema } from '../componentes/colorTema.ts'
 import Cuestionario, { type Respuestas } from '../componentes/Cuestionario.tsx'
-import { PREGUNTAS_MATERIAL } from '../componentes/cuestionarios.ts'
+import { preguntasMaterial } from '../componentes/cuestionarios.ts'
 import LectorLibro, { TextoLibro } from '../componentes/LectorLibro.tsx'
 import { varianteFicha } from '../componentes/varianteFicha.ts'
 import Tarjetas, { type Ficha } from '../componentes/Tarjetas.tsx'
@@ -533,8 +533,8 @@ export default function PanelMaterial({ vista: modoVista }: { vista: 'fichas' | 
             titulo={`Material de ${clave}`}
             preguntas={
               modoVista === 'video'
-                ? PREGUNTAS_MATERIAL.map((q) => (q.id === 'tipos' ? { ...q, porDefecto: ['apuntes', 'guion'] } : q))
-                : PREGUNTAS_MATERIAL
+                ? preguntasMaterial().map((q) => (q.id === 'tipos' ? { ...q, porDefecto: ['apuntes', 'guion'] } : q))
+                : preguntasMaterial()
             }
             boton={preguntando.forzar ? 'Rehacer el material' : 'Generar el material'}
             alTerminar={(r) => generar(preguntando.forzar, r)}

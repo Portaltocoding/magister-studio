@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { t } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import { cambiarPreferencias, escribirEnChat, idDeModo, todosLosModos, usarPreferencias } from './preferencias.ts'
 
 // ```recordar  -> una instrucción duradera («a partir de ahora...»): se guarda solo si la aceptas.
@@ -129,14 +131,15 @@ export function ModoTarjeta({ texto, completo }: { texto: string; completo: bool
 // En qué idioma contesta el tutor en el chat escrito; la voz, la llamada y el material siguen en español.
 export function SelectorIdioma() {
   const p = usarPreferencias()
+  usarIdioma()
   if (!p) return null
   const actual = p.idioma ?? 'es'
   return (
-    <div className="selector-idioma" role="radiogroup" aria-label="Idioma de las respuestas" title="En qué idioma te contesta el tutor">
+    <div className="selector-idioma" role="radiogroup" aria-label={t('modo.idiomaAria')} title={t('modo.idiomaTitulo')}>
       {(
         [
-          ['es', 'ES', 'Respuestas en español'],
-          ['en', 'EN', 'Respuestas en inglés'],
+          ['es', 'ES', t('modo.idiomaEs')],
+          ['en', 'EN', t('modo.idiomaEn')],
         ] as const
       ).map(([valor, texto, ayuda]) => (
         <button key={valor} type="button" role="radio" aria-checked={actual === valor} title={ayuda} onClick={() => actual !== valor && cambiarPreferencias({ idioma: valor })}>
@@ -150,6 +153,7 @@ export function SelectorIdioma() {
 // El selector de modo, junto al cuadro del chat: Normal, los de serie y los tuyos.
 export function SelectorModo() {
   const p = usarPreferencias()
+  usarIdioma()
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -173,13 +177,13 @@ export function SelectorModo() {
   return (
     <div className="selector-modo" ref={caja}>
       <button type="button" className={`boton-mini ${actual ? 'activo' : ''}`} aria-expanded={abierto} onClick={() => setAbierto(!abierto)} title={actual?.para}>
-        Modo: {actual?.nombre ?? 'Normal'} ▾
+        {t('modo.selector', { nombre: actual?.nombre ?? t('modo.normal') })}
       </button>
       {abierto && (
         <div className="selector-modo-lista" role="menu">
           <button role="menuitemradio" aria-checked={!actual} onClick={() => elegir(null)}>
-            <strong>Normal</strong>
-            <small>Explicaciones completas, como siempre.</small>
+            <strong>{t('modo.normal')}</strong>
+            <small>{t('modo.normalAyuda')}</small>
           </button>
           {modos.map((m) => (
             <div key={m.id} className="selector-modo-fila">
@@ -190,9 +194,9 @@ export function SelectorModo() {
               {p.modos.some((x) => x.id === m.id) && (
                 <button
                   className="borrar"
-                  aria-label={`Borrar el modo ${m.nombre}`}
+                  aria-label={t('modo.borrar', { nombre: m.nombre })}
                   onClick={() => {
-                    if (!confirm(`¿Borrar el modo «${m.nombre}»?`)) return
+                    if (!confirm(t('modo.confirmarBorrar', { nombre: m.nombre }))) return
                     cambiarPreferencias({ modos: p.modos.filter((x) => x.id !== m.id), ...(p.modo === m.id ? { modo: null } : {}) })
                   }}
                 >
@@ -205,10 +209,10 @@ export function SelectorModo() {
             className="selector-modo-crear"
             onClick={() => {
               setAbierto(false)
-              escribirEnChat('Crea un modo de aprendizaje que ')
+              escribirEnChat(t('modo.crearTexto'))
             }}
           >
-            + Crear el tuyo, contándoselo al tutor
+            {t('modo.crearTuyo')}
           </button>
         </div>
       )}

@@ -57,3 +57,11 @@ def test_puede_conectar_solo_con_pty_y_claude(monkeypatch) -> None:
 
     monkeypatch.setattr(builtins, "__import__", sin_pty)
     assert cuenta.puede_conectar() is False  # Windows
+
+
+def test_el_plan_se_pide_en_ingles_solo_si_el_alumno_lo_ha_elegido() -> None:
+    from magister.flujo.comun import IDIOMA_INGLES_PLAN, con_idioma
+
+    assert con_idioma("prompt", {"idioma": "en"}).endswith(IDIOMA_INGLES_PLAN)
+    assert con_idioma("prompt", {"idioma": "es"}) == "prompt"
+    assert con_idioma("prompt", {}) == "prompt"

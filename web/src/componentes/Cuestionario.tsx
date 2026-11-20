@@ -1,6 +1,7 @@
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { errorFecha, fechaMaxima, fechaMinima } from './cuestionarios.ts'
 import { fechaLarga } from './formato.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 
 export interface Opcion {
   valor: string
@@ -64,6 +65,7 @@ export function borrarCuestionario(clave: string) {
 
 // Unas pocas preguntas antes de crear algo, de una en una: pulsas una opción y avanza.
 export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alSaltar, textoSaltar, guardarComo }: Props) {
+  const { t } = usarIdioma()
   const [guardado] = useState(() => leerGuardado(guardarComo))
   const [paso, setPaso] = useState(() => Math.min(guardado?.paso ?? 0, preguntas.length))
   const [r, setR] = useState<Respuestas>(
@@ -126,7 +128,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
     <section className="cuestionario" aria-label={titulo}>
       <div className="cuestionario-cabecera">
         <span className="nota">{titulo}</span>
-        <span className="puntos-paso" aria-label={`Paso ${Math.min(paso + 1, preguntas.length + 1)} de ${preguntas.length + 1}`}>
+        <span className="puntos-paso" aria-label={t('cuest.ui.paso', { n: Math.min(paso + 1, preguntas.length + 1), de: preguntas.length + 1 })}>
           {[...preguntas, null].map((_, i) => (
             <span key={i} className={i < paso ? 'punto hecho' : i === paso ? 'punto actual' : 'punto'} />
           ))}
@@ -144,7 +146,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
           {p.tipo === 'fecha' && (
             <div className="opciones">
               <input type="date" className="campo-fecha" value={(valor(p.id) as string) ?? ''}
-                min={fechaMinima()} max={fechaMaxima()} aria-label="Fecha límite" aria-invalid={!!fallaFecha}
+                min={fechaMinima()} max={fechaMaxima()} aria-label={t('cuest.ui.fechaLimite')} aria-invalid={!!fallaFecha}
                 aria-describedby={fallaFecha ? `error-${p.id}` : undefined}
                 onChange={(e) => setR({ ...r, [p.id]: e.target.value })} onKeyDown={enter} />
               {opcionesDe(p).map((o) => (
@@ -173,29 +175,29 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
               })}
               {p.otro && (
                 <button className={`opcion ${valor(p.id) === '__otro' ? 'elegida' : ''}`} onClick={() => elegir(p, '__otro')}>
-                  <strong>Otro</strong>
+                  <strong>{t('cuest.ui.otro')}</strong>
                 </button>
               )}
             </div>
           )}
           {valor(p.id) === '__otro' && (
-            <input autoFocus className="campo-otro" placeholder="Cuéntalo con tus palabras" value={otro[p.id] ?? ''}
+            <input autoFocus className="campo-otro" placeholder={t('cuest.ui.otroPlaceholder')} value={otro[p.id] ?? ''}
               onChange={(e) => setOtro({ ...otro, [p.id]: e.target.value })} onKeyDown={enter} />
           )}
           <div className="botones">
             {paso > 0 && (
               <button className="boton" onClick={() => setPaso(paso - 1)}>
-                Atrás
+                {t('cuest.ui.atras')}
               </button>
             )}
             {(p.tipo !== 'una' || valor(p.id) === '__otro') && (
               <button className="boton boton-principal" disabled={!valida(p)} onClick={siguiente}>
-                {p.opcional && !valor(p.id) ? 'Saltar' : 'Siguiente'}
+                {p.opcional && !valor(p.id) ? t('cuest.ui.saltar') : t('cuest.ui.siguiente')}
               </button>
             )}
             {alSaltar && paso === 0 && (
               <button className="boton-mini" onClick={alSaltar}>
-                {textoSaltar ?? 'Prefiero contarlo yo'}
+                {textoSaltar ?? t('cuest.ui.contarlo')}
               </button>
             )}
           </div>
@@ -204,7 +206,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
 
       {resumen && (
         <div className="cuestionario-pregunta">
-          <h2>¿Así?</h2>
+          <h2>{t('cuest.ui.asi')}</h2>
           <dl className="resumen-respuestas">
             {preguntas.map((q, i) => (
               <div key={q.id}>
@@ -212,7 +214,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
                 <dd>
                   {legible(q)}{' '}
                   <button className="boton-mini" onClick={() => setPaso(i)}>
-                    Cambiar
+                    {t('cuest.ui.cambiar')}
                   </button>
                 </dd>
               </div>
@@ -220,7 +222,7 @@ export default function Cuestionario({ titulo, preguntas, boton, alTerminar, alS
           </dl>
           <div className="botones">
             <button className="boton" onClick={() => setPaso(paso - 1)}>
-              Atrás
+              {t('cuest.ui.atras')}
             </button>
             <button
               className="boton boton-principal"

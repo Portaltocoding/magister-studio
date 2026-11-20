@@ -14,8 +14,8 @@ export function leerRuta(hash: string): Ruta {
   if (partes[0] === 'conversacion' && Number(partes[1])) return { modo: 'libre', conversacion: Number(partes[1]), nuevoPlan: false }
   if (partes[0] === 'nuevo-plan') return { modo: 'libre', conversacion: null, nuevoPlan: true }
   const modo = MODOS.find((m) => m.id === partes[0] && m.encendido)?.id
-  // Sin ruta se abre Hoy, que te recibe con lo que toca.
-  return { modo: modo ?? (partes[0] ? 'libre' : 'hoy'), conversacion: null, nuevoPlan: false }
+  // Sin ruta se abre Estudio libre; Hoy sigue en #/hoy.
+  return { modo: modo ?? 'libre', conversacion: null, nuevoPlan: false }
 }
 
 export function rutaDe(modo: IdModo, conversacion: number | null, tipoNueva: 'libre' | 'plan'): string {

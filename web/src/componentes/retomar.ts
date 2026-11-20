@@ -2,6 +2,7 @@
 // pantalla a la que vuelves al salir y el «Seguir · idea 3, párrafo 6 · hace 2 días» de la lista y de Hoy.
 // Las funciones son puras (con pruebas en web/pruebas/retomar.test.ts); lo que toca la URL va al final.
 import { cuando } from './aMedias.ts'
+import { t } from '../i18n/i18n.ts'
 
 const MINUTO = 60_000
 
@@ -56,16 +57,16 @@ export function rutaDeVuelta(c: { estado: unknown; recordada: string | null; act
 // «hace un momento», «hace 20 min», «hoy», «ayer», «hace 3 días». `ahora` entra como argumento (ms).
 export function haceCuanto(en: number, ahora: number): string {
   const d = ahora - en
-  if (d < 2 * MINUTO) return 'hace un momento'
-  if (d < 60 * MINUTO) return `hace ${Math.floor(d / MINUTO)} min`
+  if (d < 2 * MINUTO) return t('medias.hace')
+  if (d < 60 * MINUTO) return t('medias.haceMin', { n: Math.floor(d / MINUTO) })
   return cuando(en, ahora)
 }
 
 // «Seguir · idea 3, párrafo 6 · hace 2 días». Sin párrafo guardado (o en el primero), solo la idea; sin fecha, sin el final.
 export function textoSeguir(av: { i: number; u?: number; en?: number }, ahora: number): string {
-  const parrafo = av.u != null && av.u > 0 ? `, párrafo ${av.u + 1}` : ''
+  const parrafo = av.u != null && av.u > 0 ? t('medias.parrafo', { n: av.u + 1 }) : ''
   const hace = av.en != null ? ` · ${haceCuanto(av.en, ahora)}` : ''
-  return `Seguir · idea ${av.i + 1}${parrafo}${hace}`
+  return t('medias.seguir', { i: av.i + 1, parrafo, hace })
 }
 
 // ===== La URL (con el navegador; en las pruebas no hay ventana) =====

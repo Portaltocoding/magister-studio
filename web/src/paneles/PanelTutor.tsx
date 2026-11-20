@@ -26,7 +26,9 @@ import { colorDeTema, nombreCorto } from '../componentes/colorTema.ts'
 import { Tex, TextoLibro } from '../componentes/LectorLibro.tsx'
 import { varianteFicha } from '../componentes/varianteFicha.ts'
 import { semanaDeTodos } from '../componentes/semana.ts'
-import { plural } from '../componentes/formato.ts'
+import { numero, pluralT } from '../componentes/formato.ts'
+import { idiomaActual } from '../i18n/i18n.ts'
+import { usarIdioma } from '../i18n/usarIdioma.ts'
 import MarcoFoco, { pedirPantallaCompleta, reloj } from '../componentes/MarcoFoco.tsx'
 import Vacio, { irARuta } from '../componentes/Vacio.tsx'
 import Mascota from '../Mascota.tsx'
@@ -1582,32 +1584,32 @@ function TuDia({ hoy, minutosRepaso, irA, planes = [] }: { hoy: Hoy; minutosRepa
   const variosPlanes = new Set(dia.map((s) => s.plan_id).filter((p) => p != null)).size > 1
   const temaDeSesion = (planId?: number) => planes.find((p) => p.plan_id === planId)
   if (!dia.length && !hoy.examen && !hoy.temas?.length) return null
-  const horas = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',')
+  const horas = (n: number) => numero(n, 1)
   const quedan = dia.filter((s) => s.estado !== 'hecha').reduce((a, s) => a + s.horas, 0) +
     (hoy.repasos ? (minutosRepaso ?? hoy.repasos * 2) / 60 : 0) + (hoy.examen && !hoy.examen.hecho ? hoy.examen.minutos / 60 : 0)
   let n = 0
   return (
     <section className="tu-dia">
       <h2>
-        Lo que toca <small>{quedan > 0 ? `quedan unas ${horas(quedan)} h` : 'todo hecho'}</small>
+        {t('hoy.loQueToca')} <small>{quedan > 0 ? t('hoy.quedan', { h: horas(quedan) }) : t('hoy.todoHecho')}</small>
       </h2>
       <ol>
-        {(hoy.temas ?? []).map((t) => (
-          <li key={`tema-${t.clave}`}>
+        {(hoy.temas ?? []).map((tm) => (
+          <li key={`tema-${tm.clave}`}>
             <span className="tu-dia-num">{++n}</span>
             <button className="enlace" onClick={() => irA('repaso')}>
-              Recordar entera <b className="tu-dia-clave">{t.clave}</b> {tituloSencillo(indice, t.clave, t.titulo)}
+              {t('hoy.recordarEntera')} <b className="tu-dia-clave">{tm.clave}</b> {tituloSencillo(indice, tm.clave, tm.titulo)}
             </button>
-            <small>repaso del tema</small>
+            <small>{t('hoy.repasoDelTema')}</small>
           </li>
         ))}
         {hoy.repasos > 0 && (
           <li>
             <span className="tu-dia-num">{++n}</span>
             <button className="enlace" onClick={() => irA('repaso')}>
-              Repasar {hoy.repasos} {hoy.repasos === 1 ? 'concepto' : 'conceptos'}
+              {t('hoy.repasarN', { n: hoy.repasos, conceptos: hoy.repasos === 1 ? t('hoy.concepto') : t('hoy.conceptos') })}
             </button>
-            <small>unos {minutosRepaso ?? '·'} min</small>
+            <small>{t('hoy.unosMin', { min: minutosRepaso ?? '·' })}</small>
           </li>
         )}
         {dia.map((s) => {
@@ -1647,17 +1649,17 @@ function TarjetaExamen({ examen, despues }: { examen: HitoExamen; despues?: stri
   return (
     <section className="tutor-examen">
       <div>
-        <span className="vacio-etq">{atrasado ? 'Examen pendiente' : 'Hoy toca examen'}</span>
+        <span className="vacio-etq">{atrasado ? t('hoy.examenPend') : t('hoy.tocaExamen')}</span>
         <strong>{examen.titulo}</strong>
         <small>
-          {examen.preguntas} preguntas · {examen.minutos} min
-          {despues?.length ? ` · mejor al acabar ${despues.join(' y ')}` : ''}
-          {examen.nota != null ? ` · tu mejor nota: ${examen.nota.toFixed(1).replace('.', ',')} (se aprueba con 5)` : ''}
+          {t('hoy.examenInfo', { n: examen.preguntas, min: examen.minutos })}
+          {despues?.length ? t('hoy.mejorAlAcabar', { lista: despues.join(t('hoy.y')) }) : ''}
+          {examen.nota != null ? t('hoy.mejorNota', { nota: numero(Math.round(examen.nota * 10) / 10, 1) }) : ''}
         </small>
       </div>
       {examen.plan_id && (
         <button className="boton boton-principal" onClick={() => irARuta(rutaExamen(examen.plan_id!, examen))}>
-          Hacer el examen
+          {t('hoy.hacerExamen')}
         </button>
       )}
     </section>
@@ -1668,8 +1670,8 @@ function TarjetaExamen({ examen, despues }: { examen: HitoExamen; despues?: stri
 function FranjaAMedias({ avisos, alIr, alDescartar }: { avisos: AMedias[]; alIr: (a: AMedias) => void; alDescartar: (id: string) => void }) {
   if (!avisos.length) return null
   return (
-    <section className="a-medias" aria-label="Lo que dejaste a medias">
-      <span className="a-medias-etq">A medias</span>
+    <section className="a-medias" aria-label={t('hoy.aMediasAria')}>
+      <span className="a-medias-etq">{t('hoy.aMedias')}</span>
       <ul>
         {avisos.map((a) => (
           <li key={a.id}>
@@ -1677,7 +1679,7 @@ function FranjaAMedias({ avisos, alIr, alDescartar }: { avisos: AMedias[]; alIr:
             <button className="boton-mini" onClick={() => alIr(a)}>
               {a.boton} →
             </button>
-            <button className="a-medias-quitar" onClick={() => alDescartar(a.id)} aria-label={`Quitar: ${a.texto}`} title="Quitar este aviso">
+            <button className="a-medias-quitar" onClick={() => alDescartar(a.id)} aria-label={t('hoy.quitarAviso', { texto: a.texto })} title={t('hoy.quitarAvisoTitulo')}>
               ×
             </button>
           </li>
@@ -1689,12 +1691,13 @@ function FranjaAMedias({ avisos, alIr, alDescartar }: { avisos: AMedias[]; alIr:
 
 export const saludo = () => {
   const h = new Date().getHours()
-  return h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'
+  return h < 6 ? t('hoy.buenasNoches') : h < 14 ? t('hoy.buenosDias') : h < 21 ? t('hoy.buenasTardes') : t('hoy.buenasNoches')
 }
 
 // «Hoy»: tus cifras, tu día y la lección de hoy (el tutor que te guía está en PanelGuia).
 // vista «foco»: su propia entrada en la barra lateral, con todas las lecciones para elegir.
 export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) => void; vista?: 'hoy' | 'foco' }) {
+  usarIdioma() // los textos siguen al idioma
   const [hoy, setHoy] = useState<Hoy | null>(null)
   const indiceHoy = usarIndice(hoy?.plan_id)
   const [leccion, setLeccion] = useState<Leccion | null>(null)
@@ -1717,7 +1720,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
   }, [])
   const avisoPerdida = leccionPerdida && (
     <p className="nota" role="status">
-      Esa lección ya no existe: puede que borraras su plan o que el enlace esté mal. Elige otra.
+      {t('hoy.perdida')}
     </p>
   )
 
@@ -1731,7 +1734,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     } catch (e) {
       // Un enlace a unos apuntes que ya no están (#/foco/99999): se dice y se queda la lista, sin reintentar.
       if (e instanceof ErrorApi && e.codigo === 404) setLeccionPerdida(true)
-      else setFallo(`No he podido abrir la lección. ${mensajeDe(e)}`)
+      else setFallo(t('hoy.noAbrir', { motivo: mensajeDe(e) }))
     }
   }, [])
 
@@ -1828,7 +1831,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
     abrir(mid)
   }
 
-  if (!hoy) return <Cargando texto="Preparando…" error={fallo} reintentar={reintentar} />
+  if (!hoy) return <Cargando texto={t('hoy.preparando')} error={fallo} reintentar={reintentar} />
 
   if (leccion)
     return (
@@ -1900,8 +1903,8 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
         <Mascota mini />
         <div>
           <p className="hoy-saludo">{saludo()}</p>
-          <h1>Hoy</h1>
-          <p className="nota hoy-fecha">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <h1>{t('hoy.titulo')}</h1>
+          <p className="nota hoy-fecha">{new Date().toLocaleDateString(idiomaActual() === 'en' ? 'en-GB' : 'es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
       </header>
       {fallo && <Cargando error={fallo} reintentar={reintentar} />}
@@ -1909,32 +1912,32 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
       <div className="hoy-resumen">
         <button className="hoy-cifra" onClick={() => irA('repaso')} disabled={!hoy.repasos}>
           <strong>{hoy.repasos}</strong>
-          <span>{hoy.repasos === 1 ? 'repaso' : 'repasos'}</span>
+          <span>{hoy.repasos === 1 ? t('hoy.repaso') : t('hoy.repasos')}</span>
           <small>
             {hoy.repasos
-              ? `${hoy.nuevos ? `${hoy.nuevos} ${hoy.nuevos === 1 ? 'concepto nuevo' : 'conceptos nuevos'} · ` : ''}unos ${minutosRepaso ?? '·'} min · Repasar →`
-              : 'nada pendiente'}
+              ? `${hoy.nuevos ? `${hoy.nuevos} ${hoy.nuevos === 1 ? t('hoy.conceptoNuevo') : t('hoy.conceptosNuevos')} · ` : ''}${t('hoy.minRepasar', { min: minutosRepaso ?? '·' })}`
+              : t('hoy.nadaPendiente')}
           </small>
         </button>
         {semana && (
           <div className="hoy-cifra">
             <strong>
-              {String(Math.round(semana.hechas * 10) / 10).replace('.', ',')} <small>de {String(Math.round(semana.total * 10) / 10).replace('.', ',')} h</small>
+              {numero(semana.hechas, 1)} <small>{t('hoy.deHoras', { total: numero(semana.total, 1) })}</small>
             </strong>
-            <span>esta semana</span>
+            <span>{t('hoy.estaSemana')}</span>
             <span className="barra">
               <span style={{ width: `${semana.total ? (semana.hechas / semana.total) * 100 : 0}%` }} />
             </span>
             <small>
-              {semana.hechasN} de {plural(semana.sesiones, 'sesión', 'sesiones')}
-              {planes.length > 1 ? ` · ${planes.length} planes` : ''}
+              {t('hoy.sesionesDe', { hechas: semana.hechasN, sesiones: pluralT(semana.sesiones, 'hoy.sesion', 'hoy.sesiones') })}
+              {planes.length > 1 ? t('hoy.nPlanes', { n: planes.length }) : ''}
             </small>
           </div>
         )}
         <button className="hoy-cifra" onClick={() => irA('examen')}>
           <strong>{hoy.examen ? '1' : '0'}</strong>
-          <span>{hoy.examen ? 'examen pendiente' : 'exámenes pendientes'}</span>
-          <small>{hoy.examen ? `${hoy.examen.titulo} →` : 'Hacer uno cuando quieras →'}</small>
+          <span>{hoy.examen ? t('hoy.examenPendiente') : t('hoy.examenesPendientes')}</span>
+          <small>{hoy.examen ? `${hoy.examen.titulo} →` : t('hoy.hacerUno')}</small>
         </button>
       </div>
       <FranjaAMedias avisos={avisosAMedias} alIr={irAMedias} alDescartar={(id) => setDescartados(descartar(id))} />
@@ -1942,48 +1945,48 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
       {hoy.examen && !examenDespues.length && <TarjetaExamen examen={hoy.examen} />}
       {hoy.titulo && hoy.estado !== 'solo_repaso' ? (
         <section className="tutor-hoy">
-          <span className="vacio-etq">Hoy · {hoy.razon}</span>
+          <span className="vacio-etq">{t('hoy.etiqueta', { razon: hoy.razon ?? '' })}</span>
           <h1>
             <span className="bloques-clave">{hoy.leccion_clave}</span> {tituloSencillo(indiceHoy, hoy.leccion_clave ?? '', hoy.titulo)}
           </h1>
           <p className="nota">
             {planes.length > 1 && <span className="punto-tema" style={colorDeTema(hoy.tema_id, planes)?.estilo} aria-hidden="true" />}
-            {hoy.tema} · {String(hoy.horas).replace('.', ',')} h previstas
+            {t('hoy.horasPrevistas', { tema: hoy.tema ?? '', h: numero(Number(hoy.horas), 2) })}
           </p>
           {hoy.estado === 'sin_preparar' || !hoy.material_id ? (
             <>
-              <p>La lección aún no está preparada. Prepárala y vuelve: tarda unos minutos.</p>
+              <p>{t('hoy.sinPreparar')}</p>
               <div className="vacio-acciones">
                 <button
                   className="boton boton-principal"
                   onClick={() => (hoy.tema_id ? irARuta(`#/fichas/${hoy.tema_id}/${hoy.leccion_clave}`) : irA('fichas'))}
                 >
-                  Prepararla
+                  {t('hoy.prepararla')}
                 </button>
               </div>
             </>
           ) : (
             <>
               <ul className="tutor-como">
-                <li>Pantalla completa, sin menús ni avisos, con lupa y los colores que quieras.</li>
-                <li>Una idea cada vez y una comprobación al final de cada una.</li>
-                <li>Reloj con pausa cada 25 minutos. Esc para salir; guarda dónde lo dejas.</li>
+                <li>{t('hoy.como1')}</li>
+                <li>{t('hoy.como2')}</li>
+                <li>{t('hoy.como3')}</li>
               </ul>
               <div className="vacio-acciones">
                 <button className="boton boton-principal" onClick={() => empezar(hoy.material_id!)}>
-                  {seguir ?? 'Empezar en modo foco'}
+                  {seguir ?? t('hoy.empezarFoco')}
                 </button>
                 {seguir && (
                   <button className="boton" onClick={() => empezar(hoy.material_id!, true)}>
-                    Empezar de cero
+                    {t('hoy.deCero')}
                   </button>
                 )}
-                <button className="boton" onClick={() => irARuta(`#/llamada/clase/${hoy.leccion_clave}`)} title="Te la explica en voz y le interrumpes con tus dudas">
-                  Explícamela por llamada
+                <button className="boton" onClick={() => irARuta(`#/llamada/clase/${hoy.leccion_clave}`)} title={t('hoy.llamadaTitulo')}>
+                  {t('hoy.llamada')}
                 </button>
                 {hoy.repasos > 0 && (
                   <button className="boton" onClick={() => irA('repaso')}>
-                    Antes, {hoy.repasos} repasos
+                    {t('hoy.antesRepasos', { n: hoy.repasos })}
                   </button>
                 )}
               </div>
@@ -2006,7 +2009,7 @@ export default function PanelTutor({ irA, vista = 'hoy' }: { irA: (m: IdModo) =>
       {otras.some((o) => o.material_id && o.material_id !== hoy.material_id) && (
         <p className="tutor-otras-enlace">
           <button className="boton" onClick={() => irA('foco')}>
-            Estudiar otra lección en modo foco →
+            {t('hoy.otraFoco')}
           </button>
         </p>
       )}
@@ -2025,7 +2028,7 @@ function ElegirFoco({ hoy, otras, empezar }: { hoy: Hoy; otras: Opcion[]; empeza
     ? ix.temas.map((t) => ({ nombre: t.nombre, lecciones: otras.filter((o) => o.plan_id === planId && t.lecciones.includes(o.clave)) }))
     : [{ nombre: '', lecciones: otras }]
   const sueltas = ix ? otras.filter((o) => !grupos.some((g) => g.lecciones.includes(o))) : []
-  if (sueltas.length) grupos.push({ nombre: 'Otras', lecciones: sueltas })
+  if (sueltas.length) grupos.push({ nombre: t('foco.otras'), lecciones: sueltas })
   if (!otras.length)
     return (
       <div className="panel">
@@ -2040,22 +2043,22 @@ function ElegirFoco({ hoy, otras, empezar }: { hoy: Hoy; otras: Opcion[]; empeza
   return (
     <div className="tutor-inicio foco-elegir">
       <header>
-        <h1>Modo foco</h1>
-        <p className="nota">Pantalla completa, una idea cada vez y una comprobación al final de cada una. Esc para salir; guarda dónde lo dejas.</p>
+        <h1>{t('foco.titulo')}</h1>
+        <p className="nota">{t('foco.nota')}</p>
       </header>
       {deHoy?.material_id && (
         <section className="tutor-hoy">
-          <span className="vacio-etq">La de hoy</span>
+          <span className="vacio-etq">{t('foco.laDeHoy')}</span>
           <h1>
             <span className="bloques-clave">{deHoy.clave}</span> {tituloSencillo(ix, deHoy.clave, deHoy.titulo)}
           </h1>
           <div className="vacio-acciones">
             <button className="boton boton-principal" onClick={() => empezar(deHoy.material_id!)}>
-              {avanceHoy ? textoSeguir(avanceHoy, Date.now()) : 'Empezar'}
+              {avanceHoy ? textoSeguir(avanceHoy, Date.now()) : t('foco.empezar')}
             </button>
             {avanceHoy && (
               <button className="boton" onClick={() => empezar(deHoy.material_id!, true)}>
-                Empezar de cero
+                {t('hoy.deCero')}
               </button>
             )}
           </div>
@@ -2074,11 +2077,11 @@ function ElegirFoco({ hoy, otras, empezar }: { hoy: Hoy; otras: Opcion[]; empeza
                     <button
                       className={`tutor-otra ${o.material_id ? '' : 'sin-preparar'}`}
                       onClick={() => (o.material_id ? empezar(o.material_id) : irARuta(`#/fichas/${o.tema_id}/${o.clave}`))}
-                      title={o.material_id ? o.titulo : 'Aún sin preparar: te llevo a prepararla'}
+                      title={o.material_id ? o.titulo : t('foco.sinPrepararTitulo')}
                     >
                       <span className="bloques-clave">{o.clave}</span>
                       <span>{tituloSencillo(ix, o.clave, o.titulo)}</span>
-                      <small>{!o.material_id ? 'Prepararla →' : av ? textoSeguir(av, Date.now()) : 'Empezar →'}</small>
+                      <small>{!o.material_id ? t('foco.prepararlaFlecha') : av ? textoSeguir(av, Date.now()) : t('foco.empezarFlecha')}</small>
                     </button>
                   </li>
                 )

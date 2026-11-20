@@ -1,15 +1,14 @@
 import { useState } from 'react'
 import type { NecesitaFuentes, Propuesta } from './api.ts'
 import BarraCuota from './componentes/BarraCuota.tsx'
-import { numero, plural, textoSustituye } from './componentes/formato.ts'
+import { numero, pluralT, textoSustituye } from './componentes/formato.ts'
+import { idiomaActual, t } from './i18n/i18n.ts'
+import { usarIdioma } from './i18n/usarIdioma.ts'
 
 // Si una lección necesita fuentes (ADR-0021): lo decide el plan y lo cambias en Roadmap. Aquí y no en PanelPlan, que se
 // carga aparte (lazy).
-export const ETIQUETA_FUENTES: Record<NecesitaFuentes, string> = {
-  no: 'sin fuentes',
-  conviene: 'fuentes: convienen',
-  imprescindible: 'fuentes: imprescindibles',
-}
+export const etiquetaFuentes = (k: NecesitaFuentes): string => t(`prop.fuentes.${k}`)
+export const NIVELES_FUENTES: NecesitaFuentes[] = ['no', 'conviene', 'imprescindible']
 
 interface Props {
   propuesta: Propuesta
@@ -20,10 +19,11 @@ interface Props {
 }
 
 const fecha = (iso: string | null) =>
-  iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '·'
+  iso ? new Date(iso + 'T12:00:00').toLocaleDateString(idiomaActual() === 'en' ? 'en-GB' : 'es-ES', { day: 'numeric', month: 'short' }) : '·'
 
 // La cara de la pausa del grafo: el plan propuesto espera tu decisión.
 export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar, alDescartar }: Props) {
+  usarIdioma()
   const [cambiando, setCambiando] = useState(false)
   const [texto, setTexto] = useState('')
   const [pulsado, setPulsado] = useState(false)
@@ -36,11 +36,10 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
   const idAviso = 'propuesta-sustituye'
 
   return (
-    <section className="propuesta" aria-label="Plan propuesto">
-      <h2>Plan propuesto{propuesta.tema ? `: ${propuesta.tema}` : ''}</h2>
+    <section className="propuesta" aria-label={t('prop.aria')}>
+      <h2>{t('prop.titulo')}{propuesta.tema ? `: ${propuesta.tema}` : ''}</h2>
       <p className="nota">
-        {numero(propuesta.total_horas)} h de {numero(propuesta.capacidad_horas)} h disponibles · acaba el {fecha(propuesta.fin)} ·{' '}
-        {plural(propuesta.sesiones.length, 'sesión', 'sesiones')}
+        {t('prop.resumen', { total: numero(propuesta.total_horas), cap: numero(propuesta.capacidad_horas), fin: fecha(propuesta.fin), sesiones: pluralT(propuesta.sesiones.length, 'prop.sesion', 'prop.sesiones') })}
       </p>
       {sustituye && (
         <p className="aviso-sustituye" role="note" id={idAviso}>
@@ -55,12 +54,12 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
               {l.clave} · {l.titulo}
             </strong>{' '}
             <span className="nota-linea">
-              {numero(l.horas, 2)} h{l.depende_de.length ? ` · después de ${l.depende_de.join(', ')}` : ''}
+              {numero(l.horas, 2)} h{l.depende_de.length ? ` · ${t('prop.despuesDe', { lista: l.depende_de.join(', ') })}` : ''}
             </span>{' '}
             {l.necesita_fuentes && (
               // Lo que decide el plan; se cambia en Roadmap, lección a lección, una vez aceptado.
-              <span className="chip chip-fuentes" title={`${l.fuentes_por_que ?? ''} Lo puedes cambiar en Roadmap.`.trim()}>
-                {ETIQUETA_FUENTES[l.necesita_fuentes]}
+              <span className="chip chip-fuentes" title={`${l.fuentes_por_que ?? ''} ${t('prop.fuentesTitulo')}`.trim()}>
+                {etiquetaFuentes(l.necesita_fuentes)}
               </span>
             )}
             <ul>
@@ -91,12 +90,12 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
           <input
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            placeholder="Qué cambiarías (menos horas, otro orden, quitar algo...)"
-            aria-label="Qué cambiarías del plan"
+            placeholder={t('prop.cambiarPlaceholder')}
+            aria-label={t('prop.cambiarAria')}
             autoFocus
           />
           <button className="boton boton-principal" disabled={bloqueado || !texto.trim()}>
-            Rehacer
+            {t('prop.rehacer')}
           </button>
         </form>
       ) : (
@@ -110,7 +109,7 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
               alAceptar(true)
             }}
           >
-            {sustituye ? 'Sustituir y buscar fuentes' : 'Aceptar y buscar fuentes'}
+            {sustituye ? t('prop.sustituirBuscar') : t('prop.aceptarBuscar')}
           </button>
           <button
             className="boton"
@@ -121,10 +120,10 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
               alAceptar(false)
             }}
           >
-            {sustituye ? 'Aceptar y sustituir' : 'Aceptar'}
+            {sustituye ? t('prop.aceptarSustituir') : t('prop.aceptar')}
           </button>
           <button className="boton" disabled={bloqueado} onClick={() => setCambiando(true)}>
-            Cambiar algo
+            {t('prop.cambiarAlgo')}
           </button>
           {/* Sin plan y de vuelta a estudio: la conversación sigue. */}
           <button
@@ -135,7 +134,7 @@ export default function PropuestaPlan({ propuesta, ocupado, alAceptar, alCambiar
               alDescartar()
             }}
           >
-            Ahora no
+            {t('prop.ahoraNo')}
           </button>
         </div>
       )}

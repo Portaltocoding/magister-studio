@@ -1,5 +1,6 @@
 import { usarAdjuntos } from './componentes/usarAdjuntos.ts'
 import { t } from './i18n/i18n.ts'
+import { usarIdioma } from './i18n/usarIdioma.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   crearConversacion,
@@ -21,7 +22,7 @@ import { TextoError } from './componentes/Cargando.tsx'
 import { cortarTitulo } from './componentes/formato.ts'
 import { recordarPlan } from './componentes/planActivo.ts'
 import { mensajeSinConexion } from './componentes/errores.ts'
-import { mensajePlan, PREGUNTAS_PLAN } from './componentes/cuestionarios.ts'
+import { mensajePlan, preguntasPlan } from './componentes/cuestionarios.ts'
 import Hilo from './componentes/Hilo.tsx'
 import { usarConversacion } from './componentes/usarConversacion.ts'
 import { escribirEnChat } from './componentes/preferencias.ts'
@@ -42,6 +43,7 @@ const CLAVE_CUESTIONARIO = 'magister-cuestionario-plan'
 
 // Estudio libre (preguntas lo que quieres) y la conversación de diagnóstico que acaba en un plan.
 export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar }: Props) {
+  usarIdioma() // los textos siguen al idioma
   const [noCuenta, setNoCuenta] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [noExiste, setNoExiste] = useState(false)
@@ -53,7 +55,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     if (!buscarAlGuardar.current) return
     buscarAlGuardar.current = false
     const vista = await verPlan(temaId)
-    if (!vista.lecciones.some((l) => l.sin_material)) return setAviso('Todas las lecciones tienen ya material en tus fuentes.')
+    if (!vista.lecciones.some((l) => l.sin_material)) return setAviso(t('libre.sinMaterial'))
     const claves = clavesParaBuscar(vista.lecciones)
     if (!claves.length) return setAviso(avisoAlAceptar(0))
     const r = await lanzarResearch(planId, claves)
@@ -148,7 +150,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     if (conversacionId == null) {
       try {
         // El título, cortado por palabra (no a media palabra) y con «…» si no cabe entero.
-        const titulo = tipo === 'plan' ? `Plan: ${cortarTitulo(texto, 50)}` : cortarTitulo(texto, 60)
+        const titulo = tipo === 'plan' ? t('libre.tituloPlan', { texto: cortarTitulo(texto, 50) }) : cortarTitulo(texto, 60)
         const c = await crearConversacion(titulo, null, tipo)
         if (tipo === 'plan') borrarCuestionario(CLAVE_CUESTIONARIO)
         recienCreada.current = c.id
@@ -172,7 +174,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
   const pie = (
     <>
       {opciones.length > 0 && !escribiendo && !propuesta && (
-        <div className="respuestas-rapidas" aria-label="Respuestas rápidas">
+        <div className="respuestas-rapidas" aria-label={t('libre.rapidas')}>
           {opciones.map((o) => (
             <button key={o.valor} className="opcion opcion-chip" onClick={() => alEnviar(o.valor)}>
               {o.etiqueta}
@@ -202,9 +204,8 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
         <div className="pie-chat">
           <SelectorModo />
           <SelectorIdioma />
-          <label className="interruptor" title="Para explorar o equivocarte a propósito sin falsear tu perfil">
-            <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} /> Esto no
-            cuenta para el tutor
+          <label className="interruptor" title={t('libre.noCuentaTitulo')}>
+            <input type="checkbox" checked={noCuenta} onChange={(e) => setNoCuenta(e.target.checked)} /> {t('libre.noCuenta')}
           </label>
         </div>
       )}
@@ -217,9 +218,9 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
         <Mascota lugar="libre" />
         {error && <p role="alert">{error}</p>}
         <Cuestionario
-          titulo="Nuevo plan"
-          preguntas={PREGUNTAS_PLAN}
-          boton="Prepárame el plan"
+          titulo={t('libre.nuevoPlan')}
+          preguntas={preguntasPlan()}
+          boton={t('libre.preparaPlan')}
           alTerminar={(r) => alEnviar(mensajePlan(r))}
           alSaltar={() => setAMano(true)}
           guardarComo={CLAVE_CUESTIONARIO}
@@ -233,16 +234,15 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
     return (
       <div className="libre">
         <Mascota lugar="libre" />
-        <h1>{tipo === 'plan' ? '¿Qué quieres aprender, para qué y con cuánto tiempo?' : '¿Qué tema tratamos hoy?'}</h1>
+        <h1>{tipo === 'plan' ? t('libre.hPlan') : t('libre.hTema')}</h1>
         {tipo === 'plan' && (
           <p className="nota">
-            Cuéntamelo con tus palabras: el tema, para qué lo quieres, lo que ya sabes, cuántas horas tienes y hasta
-            cuándo. Si falta algo, te lo pregunto.
+            {t('libre.notaPlan')}
           </p>
         )}
         {tipo === 'libre' && (
           <button type="button" className="libre-a-plan" onClick={() => irARuta('#/nuevo-plan')}>
-            ¿Quieres estudiarlo con un plan, con lecciones y calendario? Crear un plan →
+            {t('libre.aPlan')}
           </button>
         )}
         {error && <p role="alert">{error}</p>}
@@ -251,7 +251,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           escribiendo={false}
           alEnviar={alEnviar}
           alParar={parar}
-          placeholder={tipo === 'plan' ? 'Quiero preparar...' : 'Escribe un tema o una pregunta'}
+          placeholder={tipo === 'plan' ? t('libre.phPlan') : t('libre.phLibre')}
           pie={pie}
           {...conAdjuntos}
         />
@@ -268,7 +268,7 @@ export default function EstudioLibre({ conversacionId, tipo, alCrear, alCambiar 
           texto={t('vacio.libre.texto')}
           acciones={[{ texto: t('vacio.libre.nueva'), principal: true, alPulsar: () => irARuta('#/libre') }]}
         />
-        <Hilo burbujas={[]} escribiendo={false} alEnviar={() => undefined} alParar={parar} placeholder="Esta conversación no existe" deshabilitado />
+        <Hilo burbujas={[]} escribiendo={false} alEnviar={() => undefined} alParar={parar} placeholder={t('libre.noExiste')} deshabilitado />
       </div>
     )
 
